@@ -1,0 +1,49 @@
+/* Design tokens — single source of truth (PORTAL_UI_PLAN.md §3).
+   Components consume the semantic Tailwind names mapped to these in
+   tailwind.config.ts; never hard-code hex in components. */
+:root {
+  /* Brand palette (given) */
+  --red: #d63e46;
+  --navy: #28304c;
+  --slate: #75797f;
+  --grey: #abafb5;
+  --canvas: #f0f1f3;
+  --sunken: #f4f4f4;
+  --surface: #ffffff;
+
+  /* Derived / functional */
+  --red-press: #b8333a;
+  --red-tint: #fbeaeb;
+  --navy-tint: #e7e9ef;
+  --ink: #1c2233;
+
+  /* Status (alpine signal set) */
+  --status-pending: #c9882b;
+  --status-approved: #2f7d6b;
+  --status-rejected: var(--red);
+  --status-inactive: var(--slate);
+
+  /* Typography */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-cjk: 'Noto Sans SC', var(--font-body);
+  --font-mono: 'Spline Sans Mono', ui-monospace, monospace;
+
+  /* Geometry */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 2px rgba(40, 48, 76, 0.06),
+    0 8px 24px -12px rgba(40, 48, 76, 0.18);
+  --shadow-pop: 0 12px 40px -8px rgba(28, 34, 51, 0.28);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 220ms;
+}
+
+/* Apply the CJK font for Chinese content runs. */
+:lang(zh),
+:lang(zh-CN) {
+  font-family: var(--font-cjk);
+}
