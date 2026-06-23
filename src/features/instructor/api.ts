@@ -59,7 +59,12 @@ export function useUploadAvatar() {
         headers: { 'Content-Type': contentType, 'x-upsert': 'true' },
         body: file,
       });
-      if (!put.ok) throw new Error('Upload failed. Please try again.');
+      if (!put.ok) {
+        const detail = await put.text().catch(() => '');
+        throw new Error(
+          `Storage upload failed (${put.status}). ${detail.slice(0, 300)}`,
+        );
+      }
 
       return api<InstructorProfile>('/me/instructor/photo/confirm', {
         method: 'POST',

@@ -66,6 +66,13 @@ export function PhotoUploader({ profile }: { profile: InstructorProfile }) {
             <span className="text-xs">{error}</span>
           </Banner>
         )}
+        {upload.isError && (
+          <Banner tone="error">
+            <span className="text-xs">
+              {(upload.error as Error).message || t.errors.generic}
+            </span>
+          </Banner>
+        )}
       </div>
     </div>
   );
