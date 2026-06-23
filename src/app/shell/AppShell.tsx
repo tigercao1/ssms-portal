@@ -41,7 +41,7 @@ export function AppShell() {
       >
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
         <div className="relative flex items-center gap-2.5 px-5 py-5">
-          <Brandmark size={36} />
+          <Brandmark height={20} pad={7} />
           <span className="rounded-sm bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
             {isAdmin ? t.nav.adminArea : t.nav.instructorArea}
           </span>

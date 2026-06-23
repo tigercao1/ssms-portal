@@ -14,7 +14,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <aside className="relative hidden overflow-hidden bg-navy p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
         <div className="relative animate-[rise_600ms_var(--ease)_both]">
-          <Brandmark size={132} />
+          <Brandmark height={60} pad={20} />
         </div>
         <div className="relative animate-[rise_700ms_var(--ease)_both]">
           <h1 className="max-w-xs text-4xl leading-tight text-white">
@@ -32,7 +32,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         <div className="w-full max-w-sm">
           {/* Big red logo on white — the brand on the content side, and the only
               brand element on mobile where the navy panel is hidden. */}
-          <Logo className="mb-8 h-16 w-auto lg:hidden" />
+          <Logo className="mb-8 h-12 lg:hidden" />
           {children}
         </div>
       </main>
