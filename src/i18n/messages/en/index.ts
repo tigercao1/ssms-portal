@@ -32,6 +32,19 @@ export const en: Messages = {
     forgotPassword: 'Forgot password?',
     invalidCredentials: 'Incorrect email or password.',
     genericError: 'Something went wrong. Please try again.',
+    noAccount: 'New instructor?',
+    createAccount: 'Create an account',
+    haveAccount: 'Already have an account?',
+    signUpTitle: 'Apply as an instructor',
+    signUpSubtitle:
+      'Create an account to start your profile. An admin reviews every application.',
+    signUpButton: 'Create account',
+    signingUp: 'Creating account…',
+    passwordHint: 'At least 6 characters.',
+    signUpDone: 'Check your email',
+    signUpDoneBody:
+      'We sent a verification link to confirm your address. Click it, then sign in to build your profile.',
+    emailInUse: 'An account with that email already exists. Try signing in.',
     verifyTitle: 'Verify your email',
     verifyBody:
       'We sent a verification link to your inbox. Confirm it, then sign in to continue.',

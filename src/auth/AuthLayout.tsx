@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Contour } from '@/components';
+import { Brandmark, Contour } from '@/components';
 import { LangSwitch } from '@/components/LangSwitch';
 import { useT } from '@/i18n/core/I18nProvider';
 
@@ -13,7 +13,8 @@ export function AuthLayout({ children }: { children: ReactNode }) {
     <div className="grid min-h-screen lg:grid-cols-[2fr_3fr]">
       <aside className="relative hidden overflow-hidden bg-navy p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
-        <div className="relative animate-[rise_600ms_var(--ease)_both]">
+        <div className="relative flex items-center gap-3 animate-[rise_600ms_var(--ease)_both]">
+          <Brandmark size={44} />
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-white/60">
             SSMS
           </span>

@@ -14,6 +14,7 @@ import { AdminListPage } from '@/features/admin/AdminListPage';
 import { AdminDetailPage } from '@/features/admin/AdminDetailPage';
 import { ReferenceManagerPage } from '@/features/admin/ReferenceManagerPage';
 import { LoginPage } from '@/auth/LoginPage';
+import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
 import { RequestResetPage } from '@/auth/RequestResetPage';
 import { UpdatePasswordPage } from '@/auth/UpdatePasswordPage';
@@ -25,6 +26,7 @@ import { UpdatePasswordPage } from '@/auth/UpdatePasswordPage';
  */
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/signup', element: <SignUpPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/reset-password', element: <RequestResetPage /> },
   { path: '/update-password', element: <UpdatePasswordPage /> },

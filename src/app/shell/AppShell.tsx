@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useSession } from '@/auth/SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
-import { Contour } from '@/components';
+import { Brandmark, Contour } from '@/components';
 import { LangSwitch } from '@/components/LangSwitch';
 import { cn } from '@/lib/cn';
 
@@ -40,7 +40,8 @@ export function AppShell() {
         )}
       >
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
-        <div className="relative flex items-center gap-2 px-5 py-5">
+        <div className="relative flex items-center gap-2.5 px-5 py-5">
+          <Brandmark size={32} />
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-white/60">
             SSMS
           </span>

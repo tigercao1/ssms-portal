@@ -74,6 +74,12 @@ export function LoginPage() {
         >
           {t.auth.forgotPassword}
         </Link>
+        <p className="border-t border-grey/50 pt-4 text-center text-sm text-slate">
+          {t.auth.noAccount}{' '}
+          <Link to="/signup" className="text-navy hover:underline">
+            {t.auth.createAccount}
+          </Link>
+        </p>
       </form>
     </AuthLayout>
   );

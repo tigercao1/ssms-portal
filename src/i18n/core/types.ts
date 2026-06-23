@@ -34,6 +34,17 @@ export interface Messages {
     forgotPassword: string;
     invalidCredentials: string;
     genericError: string;
+    noAccount: string;
+    createAccount: string;
+    haveAccount: string;
+    signUpTitle: string;
+    signUpSubtitle: string;
+    signUpButton: string;
+    signingUp: string;
+    passwordHint: string;
+    signUpDone: string;
+    signUpDoneBody: string;
+    emailInUse: string;
     verifyTitle: string;
     verifyBody: string;
     resend: string;

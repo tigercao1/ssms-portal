@@ -10,4 +10,5 @@ export { Spinner } from './Spinner';
 export { EmptyState } from './EmptyState';
 export { Toggle } from './Toggle';
 export { Contour } from './Contour';
+export { Logo, Brandmark } from './Logo';
 export { statusMeta, type ApprovalStatus, type StatusMeta } from './statusMeta';
