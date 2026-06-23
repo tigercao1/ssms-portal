@@ -7,25 +7,30 @@ export function Logo({ className }: { className?: string }) {
 }
 
 /**
- * Brandmark = the logo on a white rounded plate, so the red + black marks stay
- * legible on dark surfaces (navy sidebar / auth panel). Padding scales with
- * size so it reads as a deliberate badge at any scale.
+ * Brandmark = the logo on a white plate, used on dark surfaces (navy sidebar /
+ * auth panel) where the black parts of the mark would otherwise vanish. The
+ * plate is square (matching the logo's square viewBox) with small, equal
+ * padding, so spacing around the mark is identical on all four sides.
+ *
+ * `pad` is the fraction of the box used as padding (default 8%). On light
+ * surfaces you don't need this at all — render <Logo> directly.
  */
 export function Brandmark({
   size = 40,
+  pad = 0.08,
   className,
 }: {
   size?: number;
+  pad?: number;
   className?: string;
 }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center bg-white shadow-card',
-        size >= 96 ? 'rounded-2xl' : 'rounded-lg',
+        'inline-flex items-center justify-center rounded-md bg-white shadow-card',
         className,
       )}
-      style={{ width: size, height: size, padding: Math.round(size * 0.16) }}
+      style={{ width: size, height: size, padding: Math.round(size * pad) }}
     >
       <Logo className="h-full w-full object-contain" />
     </span>
