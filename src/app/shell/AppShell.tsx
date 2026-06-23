@@ -41,10 +41,7 @@ export function AppShell() {
       >
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
         <div className="relative flex items-center gap-2.5 px-5 py-5">
-          <Brandmark size={32} />
-          <span className="font-mono text-xs uppercase tracking-[0.2em] text-white/60">
-            SSMS
-          </span>
+          <Brandmark size={36} />
           <span className="rounded-sm bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
             {isAdmin ? t.nav.adminArea : t.nav.instructorArea}
           </span>

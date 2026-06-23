@@ -7,14 +7,25 @@ export function Logo({ className }: { className?: string }) {
 }
 
 /**
- * Brandmark for dark surfaces: the logo inside a white rounded chip so both the
- * red and black marks stay legible on navy (sidebar, auth panel).
+ * Brandmark = the logo on a white rounded plate, so the red + black marks stay
+ * legible on dark surfaces (navy sidebar / auth panel). Padding scales with
+ * size so it reads as a deliberate badge at any scale.
  */
-export function Brandmark({ size = 40 }: { size?: number }) {
+export function Brandmark({
+  size = 40,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
   return (
     <span
-      className="inline-flex items-center justify-center rounded-md bg-white p-1.5 shadow-card"
-      style={{ width: size, height: size }}
+      className={cn(
+        'inline-flex items-center justify-center bg-white shadow-card',
+        size >= 96 ? 'rounded-2xl' : 'rounded-lg',
+        className,
+      )}
+      style={{ width: size, height: size, padding: Math.round(size * 0.16) }}
     >
       <Logo className="h-full w-full object-contain" />
     </span>
