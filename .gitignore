@@ -5,3 +5,6 @@ dist-ssr
 .env
 .DS_Store
 coverage
+
+# lean-ctx local agent cache (machine-local; never committed)
+.lean-ctx/
