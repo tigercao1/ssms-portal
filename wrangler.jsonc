@@ -1,0 +1,25 @@
+{
+  // Cloudflare Workers Static Assets config for the SSMS portal.
+  //
+  // This replaces the classic Pages "build command + output directory"
+  // dashboard settings. The dashboard's Deploy command is `npx wrangler deploy`,
+  // which reads this file.
+  //
+  // Docs: https://developers.cloudflare.com/workers/static-assets/
+  "name": "ssms-portal",
+  "compatibility_date": "2026-09-19",
+
+  "assets": {
+    // Vite's build output.
+    "directory": "./dist/",
+
+    // SPA fallback: any path that isn't a real file returns index.html with
+    // HTTP 200, so react-router deep links like /admin/instructors/:id resolve
+    // on refresh and direct navigation.
+    //
+    // This is the Workers equivalent of the Pages `_redirects` rule
+    // `/*  /index.html  200`. That file does NOT work here — on Workers the
+    // wildcard rule re-matches /index.html and is rejected as a loop.
+    "not_found_handling": "single-page-application"
+  }
+}
