@@ -2,9 +2,16 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Secrets / per-env config — NEVER commit. Only the *.example files are tracked.
 .env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+
 .DS_Store
 coverage
 
-# lean-ctx local agent cache (machine-local; never committed)
+# lean-ctx local cache
 .lean-ctx/
