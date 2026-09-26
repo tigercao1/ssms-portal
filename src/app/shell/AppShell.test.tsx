@@ -109,4 +109,13 @@ describe('AppShell mobile menu', () => {
     expect(menu()).not.toHaveClass('fixed');
     expect(document.body).not.toHaveClass('overflow-hidden');
   });
+
+  it('keeps the desktop sidebar classes whether or not the menu is open', async () => {
+    renderShell();
+    const desktop = ['lg:relative', 'lg:z-20', 'lg:flex', 'lg:translate-x-0'];
+    expect(menu()).toHaveClass(...desktop);
+    await openMenu();
+    expect(menu()).toHaveClass(...desktop, 'lg:overflow-hidden');
+    expect(menu()).not.toHaveClass('lg:z-auto');
+  });
 });

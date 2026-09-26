@@ -63,9 +63,10 @@ export function AppShell() {
       <aside
         id="app-nav"
         className={cn(
-          'flex-col overflow-hidden bg-navy text-white lg:relative lg:flex',
+          'flex-col overflow-hidden bg-navy text-white',
+          'lg:relative lg:z-20 lg:flex lg:translate-x-0',
           open
-            ? 'fixed inset-0 z-50 flex overflow-y-auto lg:inset-auto lg:z-auto'
+            ? 'fixed inset-0 z-50 flex overflow-y-auto lg:overflow-hidden'
             : 'hidden',
         )}
       >
