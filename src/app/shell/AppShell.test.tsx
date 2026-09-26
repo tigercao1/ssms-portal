@@ -1,0 +1,86 @@
+import { describe, expect, it, vi } from 'vitest';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
+import { AppShell } from './AppShell';
+import { renderWithProviders } from '@/test/render';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({
+    isAdmin: true,
+    user: { email: 'admin@example.com' },
+    signOut: vi.fn(),
+  }),
+}));
+
+function renderShell() {
+  renderWithProviders(
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route path="/admin" element={<p>Dashboard page</p>} />
+        <Route path="/admin/instructors" element={<p>Instructors page</p>} />
+      </Route>
+    </Routes>,
+    { route: '/admin' },
+  );
+}
+
+function hamburger() {
+  return screen.getByRole('button', { name: 'Open menu' });
+}
+
+function menu() {
+  return document.getElementById('app-nav')!;
+}
+
+async function openMenu() {
+  await userEvent.click(hamburger());
+  return screen.getByRole('button', { name: 'Close menu' });
+}
+
+describe('AppShell mobile menu', () => {
+  it('starts collapsed', () => {
+    renderShell();
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
+    expect(hamburger()).toHaveAttribute('aria-controls', 'app-nav');
+    expect(menu()).toHaveClass('hidden');
+    expect(document.body).not.toHaveClass('overflow-hidden');
+  });
+
+  it('opens a full-screen overlay and focuses the close button', async () => {
+    renderShell();
+    const close = await openMenu();
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'true');
+    expect(menu()).toHaveClass('fixed', 'inset-0');
+    expect(menu()).not.toHaveClass('hidden');
+    expect(close).toHaveFocus();
+    expect(document.body).toHaveClass('overflow-hidden');
+  });
+
+  it('closes via the close button and returns focus to the hamburger', async () => {
+    renderShell();
+    await userEvent.click(await openMenu());
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
+    expect(menu()).toHaveClass('hidden');
+    expect(hamburger()).toHaveFocus();
+    expect(document.body).not.toHaveClass('overflow-hidden');
+  });
+
+  it('closes on Escape', async () => {
+    renderShell();
+    await openMenu();
+    await userEvent.keyboard('{Escape}');
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
+    expect(menu()).toHaveClass('hidden');
+    expect(hamburger()).toHaveFocus();
+  });
+
+  it('closes when a nav link is clicked', async () => {
+    renderShell();
+    await openMenu();
+    await userEvent.click(screen.getByRole('link', { name: 'Instructors' }));
+    expect(screen.getByText('Instructors page')).toBeInTheDocument();
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
+    expect(menu()).toHaveClass('hidden');
+  });
+});
