@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import {
+  Route,
+  Routes,
+  useNavigate,
+  type NavigateFunction,
+} from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { renderWithProviders } from '@/test/render';
 
@@ -13,14 +18,24 @@ vi.mock('@/auth/SessionProvider', () => ({
   }),
 }));
 
+let navigate: NavigateFunction;
+
+function CaptureNavigate() {
+  navigate = useNavigate();
+  return null;
+}
+
 function renderShell() {
   renderWithProviders(
-    <Routes>
-      <Route element={<AppShell />}>
-        <Route path="/admin" element={<p>Dashboard page</p>} />
-        <Route path="/admin/instructors" element={<p>Instructors page</p>} />
-      </Route>
-    </Routes>,
+    <>
+      <CaptureNavigate />
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/admin" element={<p>Dashboard page</p>} />
+          <Route path="/admin/instructors" element={<p>Instructors page</p>} />
+        </Route>
+      </Routes>
+    </>,
     { route: '/admin' },
   );
 }
@@ -82,5 +97,16 @@ describe('AppShell mobile menu', () => {
     expect(screen.getByText('Instructors page')).toBeInTheDocument();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
     expect(menu()).toHaveClass('hidden');
+  });
+
+  it('closes and releases the scroll lock when the route changes elsewhere', async () => {
+    renderShell();
+    await openMenu();
+    act(() => navigate('/admin/instructors'));
+    expect(screen.getByText('Instructors page')).toBeInTheDocument();
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
+    expect(menu()).toHaveClass('hidden');
+    expect(menu()).not.toHaveClass('fixed');
+    expect(document.body).not.toHaveClass('overflow-hidden');
   });
 });
