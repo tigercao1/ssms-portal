@@ -80,40 +80,6 @@ export function SignUpPage() {
 
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4" noValidate>
         {error && <Banner tone="error">{error}</Banner>}
-        <Field label={t.auth.email} required>
-          {(p) => (
-            <Input
-              {...p}
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          )}
-        </Field>
-        <Field label={t.auth.password} hint={t.auth.passwordHint} required>
-          {(p) => (
-            <Input
-              {...p}
-              type="password"
-              autoComplete="new-password"
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          )}
-        </Field>
-        <Button type="submit" loading={busy} className="mt-2 w-full">
-          {busy ? t.auth.signingUp : t.auth.signUpButton}
-        </Button>
-        <p className="text-center text-sm text-slate">
-          {t.auth.haveAccount}{' '}
-          <Link to="/login" className="text-navy hover:underline">
-            {t.auth.signInButton}
-          </Link>
-        </p>
         <Field label={t.auth.firstName} required>
           {(p) => (
             <Input
@@ -149,6 +115,40 @@ export function SignUpPage() {
             />
           )}
         </Field>
+        <Field label={t.auth.email} required>
+          {(p) => (
+            <Input
+              {...p}
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          )}
+        </Field>
+        <Field label={t.auth.password} hint={t.auth.passwordHint} required>
+          {(p) => (
+            <Input
+              {...p}
+              type="password"
+              autoComplete="new-password"
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          )}
+        </Field>
+        <Button type="submit" loading={busy} className="mt-2 w-full">
+          {busy ? t.auth.signingUp : t.auth.signUpButton}
+        </Button>
+        <p className="text-center text-sm text-slate">
+          {t.auth.haveAccount}{' '}
+          <Link to="/login" className="text-navy hover:underline">
+            {t.auth.signInButton}
+          </Link>
+        </p>
       </form>
     </AuthLayout>
   );
