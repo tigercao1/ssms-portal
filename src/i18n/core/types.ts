@@ -39,6 +39,10 @@ export interface Messages {
     haveAccount: string;
     signUpTitle: string;
     signUpSubtitle: string;
+    firstName: string;
+    lastName: string;
+    nickname: string;
+    nicknameHint: string;
     signUpButton: string;
     signingUp: string;
     passwordHint: string;

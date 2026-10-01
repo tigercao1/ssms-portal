@@ -13,6 +13,9 @@ import { AuthLayout } from './AuthLayout';
  */
 export function SignUpPage() {
   const t = useT();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +29,14 @@ export function SignUpPage() {
     const { data, error: err } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: `${window.location.origin}/login` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/login`,
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          nickname: nickname.trim() || null,
+        },
+      },
     });
     setBusy(false);
     if (err) {
@@ -70,6 +80,41 @@ export function SignUpPage() {
 
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4" noValidate>
         {error && <Banner tone="error">{error}</Banner>}
+        <Field label={t.auth.firstName} required>
+          {(p) => (
+            <Input
+              {...p}
+              type="text"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+            />
+          )}
+        </Field>
+        <Field label={t.auth.lastName} required>
+          {(p) => (
+            <Input
+              {...p}
+              type="text"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+            />
+          )}
+        </Field>
+        <Field label={t.auth.nickname} hint={t.auth.nicknameHint}>
+          {(p) => (
+            <Input
+              {...p}
+              type="text"
+              autoComplete="nickname"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+            />
+          )}
+        </Field>
         <Field label={t.auth.email} required>
           {(p) => (
             <Input
