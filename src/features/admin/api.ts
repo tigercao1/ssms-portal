@@ -3,7 +3,9 @@ import { api } from '@/lib/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
+  DeletedReferenceRecord,
   ReferenceRecord,
+  ReferenceUsage,
   UpdateProfileBody,
   UserRoleRecord,
 } from '@/lib/types';
@@ -51,7 +53,10 @@ function useInvalidate(id: string) {
 export function useSetApproval(id: string) {
   const sync = useInvalidate(id);
   return useMutation({
-    mutationFn: (vars: { approvalStatus: 'approved' | 'rejected'; reason?: string }) =>
+    mutationFn: (vars: {
+      approvalStatus: 'approved' | 'rejected';
+      reason?: string;
+    }) =>
       api<AdminInstructorRecord>(`/admin/instructors/${id}/approval`, {
         method: 'PATCH',
         body: vars,
@@ -97,9 +102,28 @@ export function useAdminUpdateProfile(id: string) {
   });
 }
 
+const adminReferenceKey = (slug: string) =>
+  ['admin', 'reference', slug] as const;
+
+function useInvalidateReference(slug: string) {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: adminReferenceKey(slug) }),
+      qc.invalidateQueries({ queryKey: ['reference', slug] }),
+    ]);
+}
+
+export function useAdminReferences(slug: string) {
+  return useQuery({
+    queryKey: adminReferenceKey(slug),
+    queryFn: () => api<ReferenceRecord[]>(`/admin/reference/${slug}`),
+  });
+}
+
 /** W2.13 — append a reference row. */
 export function useAddReference(slug: string) {
-  const qc = useQueryClient();
+  const invalidate = useInvalidateReference(slug);
   return useMutation({
     mutationFn: (body: {
       key: string;
@@ -111,6 +135,46 @@ export function useAddReference(slug: string) {
         method: 'POST',
         body,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['reference', slug] }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateReference(slug: string) {
+  const invalidate = useInvalidateReference(slug);
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      isActive?: boolean;
+      name?: string;
+      sortOrder?: number;
+    }) =>
+      api<ReferenceRecord>(`/admin/reference/${slug}/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReferenceUsage(slug: string, id: string | null) {
+  return useQuery({
+    queryKey: [...adminReferenceKey(slug), id, 'usage'] as const,
+    queryFn: () => api<ReferenceUsage>(`/admin/reference/${slug}/${id}/usage`),
+    enabled: id !== null,
+    staleTime: 0,
+  });
+}
+
+export function useDeleteReference(slug: string) {
+  const invalidate = useInvalidateReference(slug);
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<DeletedReferenceRecord>(`/admin/reference/${slug}/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: invalidate,
   });
 }
