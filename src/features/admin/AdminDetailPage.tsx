@@ -16,12 +16,17 @@ import {
 } from '@/components';
 import {
   useAdminInstructor,
+  useAdminUserRole,
   useAdminUpdateProfile,
   useSetActivation,
   useSetApproval,
   useSetRole,
 } from './api';
-import type { AdminInstructorRecord, PreferredLanguage } from '@/lib/types';
+import type {
+  AdminInstructorRecord,
+  PreferredLanguage,
+  UserRole,
+} from '@/lib/types';
 
 /** W2.8–W2.12 — admin instructor detail + actions rail. */
 export function AdminDetailPage() {
@@ -177,12 +182,8 @@ function EditCore({ rec }: { rec: AdminInstructorRecord }) {
 /** W2.9–W2.11 — approve/reject, activate/deactivate, role change. */
 function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
   const t = useT();
-  const { user } = useSession();
   const approval = useSetApproval(rec.id);
-  const role = useSetRole(rec.authUserId);
   const [reason, setReason] = useState('');
-
-  const isSelf = user?.id === rec.authUserId;
 
   return (
     <div className="flex flex-col gap-4">
@@ -225,32 +226,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
         <VisibilityAction rec={rec} />
       </Card>
 
-      <Card className="flex flex-col gap-3">
-        <h2 className="text-lg">{t.admin.roleSection}</h2>
-        {isSelf ? (
-          <Banner tone="info">{t.admin.cantChangeOwnRole}</Banner>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => role.mutate('admin')}
-              loading={role.isPending}
-            >
-              {t.admin.makeAdmin}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => role.mutate('instructor')}
-              loading={role.isPending}
-            >
-              {t.admin.makeInstructor}
-            </Button>
-            {role.isSuccess && (
-              <Banner tone="approved">{t.admin.actionDone}</Banner>
-            )}
-          </div>
-        )}
-      </Card>
+      <RoleCard authUserId={rec.authUserId} />
     </div>
   );
 }
@@ -297,5 +273,70 @@ function VisibilityAction({ rec }: { rec: AdminInstructorRecord }) {
       )}
       {activation.isError && <Banner tone="error">{t.errors.generic}</Banner>}
     </div>
+  );
+}
+
+function RoleCard({ authUserId }: { authUserId: string }) {
+  const t = useT();
+  const { user } = useSession();
+  const current = useAdminUserRole(authUserId);
+  const role = useSetRole(authUserId);
+  const currentRole = current.data?.role;
+  const isSelf = user?.id === authUserId;
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg">{t.admin.roleSection}</h2>
+        {currentRole && <RolePill role={currentRole} />}
+      </div>
+      {current.isError && <Banner tone="error">{t.errors.generic}</Banner>}
+      {isSelf ? (
+        <Banner tone="info">{t.admin.cantChangeOwnRole}</Banner>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => role.mutate('admin')}
+            loading={role.isPending}
+            disabled={currentRole !== 'instructor'}
+            aria-describedby={currentRole === 'admin' ? 'role-hint' : undefined}
+          >
+            {t.admin.makeAdmin}
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => role.mutate('instructor')}
+            loading={role.isPending}
+            disabled={currentRole !== 'admin'}
+            aria-describedby={
+              currentRole === 'instructor' ? 'role-hint' : undefined
+            }
+          >
+            {t.admin.makeInstructor}
+          </Button>
+          {currentRole && (
+            <p id="role-hint" className="text-xs text-slate">
+              {currentRole === 'admin'
+                ? t.admin.alreadyAdmin
+                : t.admin.alreadyInstructor}
+            </p>
+          )}
+          {role.isError && <Banner tone="error">{t.errors.generic}</Banner>}
+          {role.isSuccess && (
+            <Banner tone="approved">{t.admin.actionDone}</Banner>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function RolePill({ role }: { role: UserRole }) {
+  const t = useT();
+  return (
+    <span className="rounded-sm bg-navy-tint px-2 py-0.5 text-xs font-medium text-navy">
+      {role === 'admin' ? t.admin.roleAdmin : t.admin.roleInstructor}
+    </span>
   );
 }

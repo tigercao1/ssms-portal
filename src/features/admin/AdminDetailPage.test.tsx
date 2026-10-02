@@ -6,7 +6,7 @@ import { Route, Routes } from 'react-router-dom';
 import { AdminDetailPage } from './AdminDetailPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeAdminList, server } from '@/test/msw';
-import type { AdminInstructorRecord } from '@/lib/types';
+import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
 const API = 'http://localhost:3000';
 
@@ -20,12 +20,17 @@ vi.mock('@/auth/SessionProvider', () => ({
   }),
 }));
 
-function serveRecord(overrides: Partial<AdminInstructorRecord>) {
+function serveRecord(
+  overrides: Partial<AdminInstructorRecord>,
+  initialRole: UserRole = 'instructor',
+) {
   let record: AdminInstructorRecord = {
     ...(fakeAdminList[0] as AdminInstructorRecord),
     ...overrides,
   };
+  let role = initialRole;
   const activationBodies: unknown[] = [];
+  const roleBodies: unknown[] = [];
   server.use(
     http.get(`${API}/admin/instructors/:id`, () => HttpResponse.json(record)),
     http.patch(
@@ -41,8 +46,21 @@ function serveRecord(overrides: Partial<AdminInstructorRecord>) {
         return HttpResponse.json(record);
       },
     ),
+    http.get(`${API}/admin/users/:id/role`, () => HttpResponse.json({ role })),
+    http.patch(`${API}/admin/users/:id/role`, async ({ request, params }) => {
+      const body = (await request.json()) as { role: UserRole };
+      roleBodies.push({ userId: params.id, ...body });
+      const previousRole = role;
+      role = body.role;
+      return HttpResponse.json({
+        userId: params.id,
+        role,
+        previousRole,
+        changed: previousRole !== role,
+      });
+    }),
   );
-  return activationBodies;
+  return { activationBodies, roleBodies };
 }
 
 function renderDetail() {
@@ -60,7 +78,10 @@ beforeEach(() => {
 
 describe('AdminDetailPage actions', () => {
   it('takes an active instructor offline only after confirming', async () => {
-    const bodies = serveRecord({ approvalStatus: 'approved', isActive: true });
+    const { activationBodies: bodies } = serveRecord({
+      approvalStatus: 'approved',
+      isActive: true,
+    });
     renderDetail();
 
     expect(await screen.findByText('Active')).toBeInTheDocument();
@@ -82,7 +103,10 @@ describe('AdminDetailPage actions', () => {
   });
 
   it('puts an inactive instructor back online after confirming', async () => {
-    const bodies = serveRecord({ approvalStatus: 'approved', isActive: false });
+    const { activationBodies: bodies } = serveRecord({
+      approvalStatus: 'approved',
+      isActive: false,
+    });
     renderDetail();
 
     expect(await screen.findByText('Inactive')).toBeInTheDocument();
@@ -92,7 +116,10 @@ describe('AdminDetailPage actions', () => {
   });
 
   it('cancelling the confirm step sends nothing', async () => {
-    const bodies = serveRecord({ approvalStatus: 'approved', isActive: true });
+    const { activationBodies: bodies } = serveRecord({
+      approvalStatus: 'approved',
+      isActive: true,
+    });
     renderDetail();
 
     await userEvent.click(
@@ -116,6 +143,59 @@ describe('AdminDetailPage actions', () => {
     expect(screen.getByText('Pending')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Take offline' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminDetailPage role', () => {
+  it('shows the instructor role and only allows promoting', async () => {
+    const { roleBodies } = serveRecord({}, 'instructor');
+    renderDetail();
+
+    expect(await screen.findByText('Instructor')).toBeInTheDocument();
+    const promote = screen.getByRole('button', { name: 'Promote to admin' });
+    const demote = screen.getByRole('button', { name: 'Demote to instructor' });
+    expect(promote).toBeEnabled();
+    expect(demote).toBeDisabled();
+    expect(demote).toHaveAccessibleDescription('Already an instructor.');
+
+    await userEvent.click(promote);
+    await waitFor(() =>
+      expect(roleBodies).toEqual([{ userId: 'auth-1', role: 'admin' }]),
+    );
+    expect(await screen.findByText('Admin')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Promote to admin' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Demote to instructor' }),
+    ).toBeEnabled();
+  });
+
+  it('shows the admin role and only allows demoting', async () => {
+    serveRecord({}, 'admin');
+    renderDetail();
+
+    expect(await screen.findByText('Admin')).toBeInTheDocument();
+    const promote = screen.getByRole('button', { name: 'Promote to admin' });
+    expect(promote).toBeDisabled();
+    expect(promote).toHaveAccessibleDescription('Already an admin.');
+    expect(
+      screen.getByRole('button', { name: 'Demote to instructor' }),
+    ).toBeEnabled();
+  });
+
+  it('keeps the self-edit guard', async () => {
+    session.userId = 'auth-1';
+    serveRecord({}, 'admin');
+    renderDetail();
+
+    expect(await screen.findByText('Admin')).toBeInTheDocument();
+    expect(
+      screen.getByText('You can’t change your own role.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Promote to admin' }),
     ).not.toBeInTheDocument();
   });
 });

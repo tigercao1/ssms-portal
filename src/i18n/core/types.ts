@@ -168,6 +168,10 @@ export interface Messages {
     roleSection: string;
     makeAdmin: string;
     makeInstructor: string;
+    roleAdmin: string;
+    roleInstructor: string;
+    alreadyAdmin: string;
+    alreadyInstructor: string;
     cantChangeOwnRole: string;
     editProfile: string;
     actionDone: string;

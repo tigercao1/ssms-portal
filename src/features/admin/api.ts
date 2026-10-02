@@ -3,8 +3,10 @@ import { api } from '@/lib/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
+  CurrentUserRole,
   ReferenceRecord,
   UpdateProfileBody,
+  UserRole,
   UserRoleRecord,
 } from '@/lib/types';
 
@@ -15,6 +17,7 @@ export interface AdminListFilter {
 
 const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
 const detailKey = (id: string) => ['admin', 'instructor', id] as const;
+const roleKey = (authUserId: string) => ['admin', 'user-role', authUserId] as const;
 
 /** W2.7 — list instructors with optional status/active filters. */
 export function useAdminInstructors(filter: AdminListFilter) {
@@ -73,17 +76,26 @@ export function useSetActivation(id: string) {
   });
 }
 
+export function useAdminUserRole(authUserId: string) {
+  return useQuery({
+    queryKey: roleKey(authUserId),
+    queryFn: () => api<CurrentUserRole>(`/admin/users/${authUserId}/role`),
+  });
+}
+
 /** W2.11 — promote / demote (id = authUserId). */
 export function useSetRole(authUserId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (role: 'admin' | 'instructor') =>
+    mutationFn: (role: UserRole) =>
       api<UserRoleRecord>(`/admin/users/${authUserId}/role`, {
         method: 'PATCH',
         body: { role },
       }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['admin', 'instructors'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'instructors'] });
+      void qc.invalidateQueries({ queryKey: roleKey(authUserId) });
+    },
   });
 }
 
