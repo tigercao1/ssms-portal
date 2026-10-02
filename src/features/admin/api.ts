@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { uploadAvatar } from '@/features/instructor/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
   CurrentUserRole,
+  InstructorProfile,
   ReferenceRecord,
   UpdateProfileBody,
   UserRole,
@@ -17,6 +19,8 @@ export interface AdminListFilter {
 
 const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
 const detailKey = (id: string) => ['admin', 'instructor', id] as const;
+const profileKey = (id: string) =>
+  ['admin', 'instructor', id, 'profile'] as const;
 const roleKey = (authUserId: string) => ['admin', 'user-role', authUserId] as const;
 
 /** W2.7 — list instructors with optional status/active filters. */
@@ -38,6 +42,13 @@ export function useAdminInstructor(id: string) {
   return useQuery({
     queryKey: detailKey(id),
     queryFn: () => api<AdminInstructorRecord>(`/admin/instructors/${id}`),
+  });
+}
+
+export function useAdminInstructorProfile(id: string) {
+  return useQuery({
+    queryKey: profileKey(id),
+    queryFn: () => api<InstructorProfile>(`/admin/instructors/${id}/profile`),
   });
 }
 
@@ -99,13 +110,34 @@ export function useSetRole(authUserId: string) {
   });
 }
 
-/** W2.12 — admin edits any instructor's profile (core fields). */
-export function useAdminUpdateProfile(id: string) {
+function useSyncProfile(id: string) {
+  const qc = useQueryClient();
   const sync = useInvalidate(id);
+  return (profile: InstructorProfile) => {
+    qc.setQueryData(profileKey(id), profile);
+    sync();
+  };
+}
+
+/** W2.12 — admin edits any instructor's profile. */
+export function useAdminUpdateProfile(id: string) {
+  const sync = useSyncProfile(id);
   return useMutation({
     mutationFn: (body: UpdateProfileBody) =>
-      api(`/admin/instructors/${id}`, { method: 'PATCH', body }),
-    onSuccess: () => sync(),
+      api<InstructorProfile>(`/admin/instructors/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: sync,
+  });
+}
+
+export function useAdminUploadPhoto(id: string) {
+  const sync = useSyncProfile(id);
+  return useMutation({
+    mutationFn: (file: File) =>
+      uploadAvatar(file, `/admin/instructors/${id}/photo`),
+    onSuccess: sync,
   });
 }
 

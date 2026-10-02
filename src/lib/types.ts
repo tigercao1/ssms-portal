@@ -50,6 +50,7 @@ export interface InstructorProfile {
   approvalStatus: ApprovalStatus;
   isActive: boolean;
   profilePhotoUrl: string | null;
+  minStudentAge: number;
   teachingLocations: RefItem[];
   languages: RefItem[];
   courseLevelsOffered: RefItem[];
@@ -66,6 +67,7 @@ export interface UpdateProfileBody {
   dateOfBirth?: string | null;
   preferredLanguage?: PreferredLanguage;
   profilePhotoUrl?: string | null;
+  minStudentAge?: number;
   teachingLocationIds?: string[];
   languageIds?: string[];
   courseLevelOfferedIds?: string[];

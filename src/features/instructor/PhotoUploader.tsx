@@ -1,15 +1,33 @@
 import { useRef, useState } from 'react';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Banner, Button } from '@/components';
 import { useUploadAvatar, validateAvatar } from './api';
 import type { InstructorProfile } from '@/lib/types';
 
+type PhotoSubject = Pick<
+  InstructorProfile,
+  'displayNameEn' | 'displayNameZh' | 'profilePhotoUrl'
+>;
+
 /** W2.3 — avatar picker + three-step signed upload. */
 export function PhotoUploader({ profile }: { profile: InstructorProfile }) {
+  const upload = useUploadAvatar();
+  return <PhotoPicker profile={profile} upload={upload} />;
+}
+
+export function PhotoPicker({
+  profile,
+  upload,
+  remove,
+}: {
+  profile: PhotoSubject;
+  upload: UseMutationResult<InstructorProfile, Error, File>;
+  remove?: { onRemove: () => void; isPending: boolean };
+}) {
   const t = useT();
   const { locale } = useLocale();
-  const upload = useUploadAvatar();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +78,17 @@ export function PhotoUploader({ profile }: { profile: InstructorProfile }) {
         >
           {upload.isPending ? t.profile.uploading : t.profile.uploadPhoto}
         </Button>
+        {remove && profile.profilePhotoUrl && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            loading={remove.isPending}
+            onClick={remove.onRemove}
+          >
+            {t.profile.removePhoto}
+          </Button>
+        )}
         <span className="text-xs text-slate">{t.profile.photoHint}</span>
         {error && (
           <Banner tone="error">

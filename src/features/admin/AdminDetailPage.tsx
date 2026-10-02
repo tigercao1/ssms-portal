@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
@@ -8,33 +8,30 @@ import {
   Button,
   Card,
   Field,
-  Input,
-  Select,
   Spinner,
   StatusPill,
   Textarea,
 } from '@/components';
 import {
   useAdminInstructor,
+  useAdminInstructorProfile,
   useAdminUserRole,
-  useAdminUpdateProfile,
   useSetActivation,
   useSetApproval,
   useSetRole,
 } from './api';
-import type {
-  AdminInstructorRecord,
-  PreferredLanguage,
-  UserRole,
-} from '@/lib/types';
+import { AdminProfileEditor } from './AdminProfileEditor';
+import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
 /** W2.8–W2.12 — admin instructor detail + actions rail. */
 export function AdminDetailPage() {
   const { id = '' } = useParams();
   const t = useT();
+  const { locale } = useLocale();
   const { data: rec, isLoading } = useAdminInstructor(id);
+  const profile = useAdminInstructorProfile(id);
 
-  if (isLoading)
+  if (isLoading || profile.isLoading)
     return (
       <div className="flex justify-center py-16">
         <Spinner className="h-7 w-7" />
@@ -56,126 +53,24 @@ export function AdminDetailPage() {
         <StatusPill status={rec.approvalStatus} isActive={rec.isActive} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <EditCore key={rec.updatedAt} rec={rec} />
-        <ActionsRail rec={rec} />
-      </div>
-    </div>
-  );
-}
-
-/** W2.12 — edit core profile fields (relations/certs aren't returned here). */
-function EditCore({ rec }: { rec: AdminInstructorRecord }) {
-  const t = useT();
-  const { locale } = useLocale();
-  const update = useAdminUpdateProfile(rec.id);
-  const [form, setForm] = useState({
-    displayNameEn: rec.displayNameEn,
-    displayNameZh: rec.displayNameZh ?? '',
-    bioEn: rec.bioEn ?? '',
-    bioZh: rec.bioZh ?? '',
-    dateOfBirth: rec.dateOfBirth ?? '',
-    preferredLanguage: rec.preferredLanguage,
-  });
-
-  function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
-    setForm((f) => ({ ...f, [k]: v }));
-  }
-
-  async function save() {
-    await update.mutateAsync({
-      displayNameEn: form.displayNameEn,
-      displayNameZh: form.displayNameZh || null,
-      bioEn: form.bioEn || null,
-      bioZh: form.bioZh || null,
-      dateOfBirth: form.dateOfBirth || null,
-      preferredLanguage: form.preferredLanguage,
-    });
-  }
-
-  return (
-    <Card className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-1">
         <h1 className="text-2xl">
           {localizeField(rec.displayNameEn, rec.displayNameZh, locale) || rec.email}
         </h1>
-      </div>
-      <p className="font-mono text-xs text-slate">{rec.email}</p>
-
-      <Field label={t.profile.displayNameEn} required>
-        {(p) => (
-          <Input
-            {...p}
-            value={form.displayNameEn}
-            onChange={(e) => set('displayNameEn', e.target.value)}
-          />
-        )}
-      </Field>
-      <Field label={t.profile.displayNameZh}>
-        {(p) => (
-          <Input
-            {...p}
-            value={form.displayNameZh}
-            onChange={(e) => set('displayNameZh', e.target.value)}
-          />
-        )}
-      </Field>
-      <Field label={t.profile.bioEn}>
-        {(p) => (
-          <Textarea
-            {...p}
-            rows={3}
-            value={form.bioEn}
-            onChange={(e) => set('bioEn', e.target.value)}
-          />
-        )}
-      </Field>
-      <Field label={t.profile.bioZh}>
-        {(p) => (
-          <Textarea
-            {...p}
-            rows={3}
-            value={form.bioZh}
-            onChange={(e) => set('bioZh', e.target.value)}
-          />
-        )}
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t.profile.dateOfBirth} hint={t.profile.dobHint}>
-          {(p) => (
-            <Input
-              {...p}
-              type="date"
-              max={new Date().toISOString().slice(0, 10)}
-              value={form.dateOfBirth}
-              onChange={(e) => set('dateOfBirth', e.target.value)}
-            />
-          )}
-        </Field>
-        <Field label={t.settings.languageLabel}>
-          {(p) => (
-            <Select
-              {...p}
-              value={form.preferredLanguage}
-              onChange={(e) =>
-                set('preferredLanguage', e.target.value as PreferredLanguage)
-              }
-            >
-              <option value="en">{t.common.english}</option>
-              <option value="zh-CN">{t.common.chinese}</option>
-            </Select>
-          )}
-        </Field>
+        <p className="font-mono text-xs text-slate">{rec.email}</p>
       </div>
 
-      {update.isError && <Banner tone="error">{t.errors.generic}</Banner>}
-      {update.isSuccess && <Banner tone="approved">{t.common.saved}</Banner>}
-      <div className="flex justify-end">
-        <Button onClick={save} loading={update.isPending}>
-          {t.common.save}
-        </Button>
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        {profile.data ? (
+          <AdminProfileEditor instructorId={rec.id} profile={profile.data} />
+        ) : (
+          <Card>
+            <Banner tone="error">{t.errors.generic}</Banner>
+          </Card>
+        )}
+        <ActionsRail rec={rec} />
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -283,6 +178,7 @@ function RoleCard({ authUserId }: { authUserId: string }) {
   const role = useSetRole(authUserId);
   const currentRole = current.data?.role;
   const isSelf = user?.id === authUserId;
+  const hintId = useId();
 
   return (
     <Card className="flex flex-col gap-3">
@@ -300,7 +196,7 @@ function RoleCard({ authUserId }: { authUserId: string }) {
             onClick={() => role.mutate('admin')}
             loading={role.isPending}
             disabled={currentRole !== 'instructor'}
-            aria-describedby={currentRole === 'admin' ? 'role-hint' : undefined}
+            aria-describedby={currentRole === 'admin' ? hintId : undefined}
           >
             {t.admin.makeAdmin}
           </Button>
@@ -310,13 +206,13 @@ function RoleCard({ authUserId }: { authUserId: string }) {
             loading={role.isPending}
             disabled={currentRole !== 'admin'}
             aria-describedby={
-              currentRole === 'instructor' ? 'role-hint' : undefined
+              currentRole === 'instructor' ? hintId : undefined
             }
           >
             {t.admin.makeInstructor}
           </Button>
           {currentRole && (
-            <p id="role-hint" className="text-xs text-slate">
+            <p id={hintId} className="text-xs text-slate">
               {currentRole === 'admin'
                 ? t.admin.alreadyAdmin
                 : t.admin.alreadyInstructor}

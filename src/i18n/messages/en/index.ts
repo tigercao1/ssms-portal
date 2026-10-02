@@ -108,6 +108,8 @@ export const en: Messages = {
     bioZh: 'Bio (中文)',
     dateOfBirth: 'Date of birth',
     dobHint: 'Admin-only — never shown publicly.',
+    minStudentAge: 'Minimum student age',
+    minStudentAgeRange: 'Enter a whole number from 0 to 18.',
     emailReadonly: 'Email is managed through your account and can’t be changed here.',
     aiFillHint: 'Leave one language empty and we’ll auto-translate it later.',
     photo: 'Profile photo',
@@ -131,6 +133,7 @@ export const en: Messages = {
     uploadPhoto: 'Upload photo',
     photoHint: 'JPEG, PNG or WebP, up to 5 MB.',
     uploading: 'Uploading…',
+    removePhoto: 'Remove photo',
   },
   settings: {
     title: 'Settings',

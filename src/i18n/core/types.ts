@@ -105,6 +105,8 @@ export interface Messages {
     bioZh: string;
     dateOfBirth: string;
     dobHint: string;
+    minStudentAge: string;
+    minStudentAgeRange: string;
     emailReadonly: string;
     aiFillHint: string;
     photo: string;
@@ -128,6 +130,7 @@ export interface Messages {
     uploadPhoto: string;
     photoHint: string;
     uploading: string;
+    removePhoto: string;
   };
   settings: {
     title: string;
