@@ -68,6 +68,8 @@ export const en: Messages = {
     reference: 'Reference data',
     instructorArea: 'Instructor',
     adminArea: 'Admin',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
   },
   status: {
     pending: 'Pending',

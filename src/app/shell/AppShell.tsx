@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useSession } from '@/auth/SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Brandmark, Contour } from '@/components';
@@ -17,6 +17,34 @@ export function AppShell() {
   const t = useT();
   const { isAdmin, user, signOut } = useSession();
   const [open, setOpen] = useState(false);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (open) {
+      closeButtonRef.current?.focus();
+    } else if (wasOpen.current) {
+      openButtonRef.current?.focus();
+    }
+    wasOpen.current = open;
+    if (!open) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.body.classList.add('overflow-hidden', 'lg:overflow-auto');
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.classList.remove('overflow-hidden', 'lg:overflow-auto');
+    };
+  }, [open]);
 
   const items: NavItem[] = isAdmin
     ? [
@@ -33,10 +61,13 @@ export function AppShell() {
     <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
       {/* Sidebar */}
       <aside
+        id="app-nav"
         className={cn(
-          'relative z-20 flex flex-col overflow-hidden bg-navy text-white',
-          'lg:translate-x-0',
-          open ? 'fixed inset-y-0 left-0 w-60' : 'hidden lg:flex',
+          'flex-col overflow-hidden bg-navy text-white',
+          'lg:relative lg:z-20 lg:flex lg:translate-x-0',
+          open
+            ? 'fixed inset-0 z-50 flex overflow-y-auto lg:overflow-hidden'
+            : 'hidden',
         )}
       >
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
@@ -45,6 +76,25 @@ export function AppShell() {
           <span className="rounded-sm bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
             {isAdmin ? t.nav.adminArea : t.nav.instructorArea}
           </span>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label={t.nav.closeMenu}
+            className="ml-auto rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white lg:hidden"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+            >
+              <path d="M5 5l10 10M15 5L5 15" />
+            </svg>
+          </button>
         </div>
         <nav
           aria-label={isAdmin ? t.nav.adminArea : t.nav.instructorArea}
@@ -80,22 +130,17 @@ export function AppShell() {
         </div>
       </aside>
 
-      {/* Backdrop for mobile drawer */}
-      {open && (
-        <button
-          aria-label="Close menu"
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-10 bg-ink/40 lg:hidden"
-        />
-      )}
-
       {/* Main column */}
       <div className="flex min-w-0 flex-col">
         <header className="flex items-center justify-between border-b border-grey/60 bg-surface px-4 py-3 lg:px-8">
           <button
+            ref={openButtonRef}
+            type="button"
             onClick={() => setOpen(true)}
             className="rounded-md p-2 text-navy hover:bg-navy-tint lg:hidden"
-            aria-label="Open menu"
+            aria-label={t.nav.openMenu}
+            aria-expanded={open}
+            aria-controls="app-nav"
           >
             <span className="block h-0.5 w-5 bg-current" />
             <span className="mt-1 block h-0.5 w-5 bg-current" />
