@@ -65,6 +65,8 @@ export const zhCN: Messages = {
     reference: '参考数据',
     instructorArea: '教练',
     adminArea: '管理员',
+    openMenu: '打开菜单',
+    closeMenu: '关闭菜单',
   },
   status: {
     pending: '待审核',

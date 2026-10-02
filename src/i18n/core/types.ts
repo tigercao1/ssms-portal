@@ -67,6 +67,8 @@ export interface Messages {
     reference: string;
     instructorArea: string;
     adminArea: string;
+    openMenu: string;
+    closeMenu: string;
   };
   status: {
     pending: string;
