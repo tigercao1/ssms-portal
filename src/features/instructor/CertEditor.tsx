@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Button, Select, Toggle } from '@/components';
 import type {
@@ -11,6 +12,42 @@ type CertDraft = NonNullable<UpdateProfileBody['certifications']>[number];
 type TrainerDraft = NonNullable<UpdateProfileBody['trainerStatus']>[number];
 
 const LEVELS = [1, 2, 3, 4];
+
+function EditorRow({
+  children,
+  toggle,
+  onRemove,
+}: {
+  children: ReactNode;
+  toggle?: { label: string; checked: boolean; onChange: (v: boolean) => void };
+  onRemove: () => void;
+}) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-grey/60 bg-sunken p-3 sm:flex-row sm:items-end">
+      <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
+        {children}
+        {toggle && (
+          <label className="flex flex-col gap-1 text-xs text-slate sm:col-start-4">
+            {toggle.label}
+            <span className="flex h-11 items-center">
+              <Toggle
+                checked={toggle.checked}
+                onChange={toggle.onChange}
+                label={toggle.label}
+              />
+            </span>
+          </label>
+        )}
+      </div>
+      <div className="flex h-11 items-center justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+          {t.common.remove}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * W2.2 — certifications editor. Mirrors the DB CHECKs for instant feedback:
@@ -40,9 +77,18 @@ export function CertEditor({
       {value.map((c, i) => {
         const canBePartial = c.track === 'regular';
         return (
-          <div
+          <EditorRow
             key={i}
-            className="grid grid-cols-2 gap-3 rounded-md border border-grey/60 bg-sunken p-3 sm:grid-cols-4"
+            toggle={
+              canBePartial
+                ? {
+                    label: t.profile.partial,
+                    checked: Boolean(c.isPartial),
+                    onChange: (v) => update(i, { isPartial: v }),
+                  }
+                : undefined
+            }
+            onRemove={() => onChange(value.filter((_, idx) => idx !== i))}
           >
             <label className="flex flex-col gap-1 text-xs text-slate">
               {t.profile.org}
@@ -81,27 +127,7 @@ export function CertEditor({
                 ))}
               </Select>
             </label>
-            <div className="flex items-end justify-between gap-2">
-              {canBePartial && (
-                <label className="flex items-center gap-2 text-xs text-slate">
-                  <Toggle
-                    checked={Boolean(c.isPartial)}
-                    onChange={(v) => update(i, { isPartial: v })}
-                    label={t.profile.partial}
-                  />
-                  {t.profile.partial}
-                </label>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => onChange(value.filter((_, idx) => idx !== i))}
-              >
-                {t.common.remove}
-              </Button>
-            </div>
-          </div>
+          </EditorRow>
         );
       })}
       <Button
@@ -130,6 +156,7 @@ export function TrainerEditor({
   onChange: (next: TrainerDraft[]) => void;
 }) {
   const t = useT();
+  const [edited, setEdited] = useState<TrainerDraft[]>([]);
 
   function update(i: number, patch: Partial<TrainerDraft>) {
     const next = value.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
@@ -137,15 +164,21 @@ export function TrainerEditor({
     if (row.trainerLevel != null && !row.rookieSessionCompleted) {
       row.rookieSessionCompleted = true; // enforce CHECK
     }
+    setEdited((prev) => [...prev.filter((r) => r !== value[i]), row]);
     onChange(next);
   }
 
   return (
     <div className="flex flex-col gap-3">
       {value.map((r, i) => (
-        <div
+        <EditorRow
           key={i}
-          className="grid grid-cols-2 gap-3 rounded-md border border-grey/60 bg-sunken p-3 sm:grid-cols-4"
+          toggle={{
+            label: t.profile.rookieDone,
+            checked: Boolean(r.rookieSessionCompleted),
+            onChange: (v) => update(i, { rookieSessionCompleted: v }),
+          }}
+          onRemove={() => onChange(value.filter((_, idx) => idx !== i))}
         >
           <label className="flex flex-col gap-1 text-xs text-slate">
             {t.profile.discipline}
@@ -155,21 +188,22 @@ export function TrainerEditor({
                 update(i, { discipline: e.target.value as Discipline })
               }
             >
-              <option value="ski">ski</option>
-              <option value="snowboard">snowboard</option>
+              <option value="ski">{t.profile.disciplineSki}</option>
+              <option value="snowboard">{t.profile.disciplineSnowboard}</option>
             </Select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate">
             {t.profile.trainerLevel}
             <Select
               value={r.trainerLevel ?? ''}
-              onChange={(e) =>
-                update(i, {
-                  trainerLevel: e.target.value ? Number(e.target.value) : null,
-                })
-              }
+              required={r.trainerLevel == null && edited.includes(r)}
+              onChange={(e) => update(i, { trainerLevel: Number(e.target.value) })}
             >
-              <option value="">{t.common.none}</option>
+              {r.trainerLevel == null && (
+                <option value="" disabled>
+                  {t.profile.selectTrainerLevel}
+                </option>
+              )}
               {LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -177,25 +211,7 @@ export function TrainerEditor({
               ))}
             </Select>
           </label>
-          <label className="flex items-center gap-2 text-xs text-slate">
-            <Toggle
-              checked={Boolean(r.rookieSessionCompleted)}
-              onChange={(v) => update(i, { rookieSessionCompleted: v })}
-              label={t.profile.rookieDone}
-            />
-            {t.profile.rookieDone}
-          </label>
-          <div className="flex items-end justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onChange(value.filter((_, idx) => idx !== i))}
-            >
-              {t.common.remove}
-            </Button>
-          </div>
-        </div>
+        </EditorRow>
       ))}
       <Button
         type="button"
@@ -204,7 +220,7 @@ export function TrainerEditor({
         onClick={() =>
           onChange([
             ...value,
-            { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: null },
+            { discipline: 'ski', rookieSessionCompleted: true, trainerLevel: 1 },
           ])
         }
       >

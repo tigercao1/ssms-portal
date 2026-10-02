@@ -117,7 +117,10 @@ export interface Messages {
     components: string;
     achievedOn: string;
     discipline: string;
+    disciplineSki: string;
+    disciplineSnowboard: string;
     trainerLevel: string;
+    selectTrainerLevel: string;
     rookieDone: string;
     examPassed: string;
     saveChanges: string;
