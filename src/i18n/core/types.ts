@@ -105,6 +105,9 @@ export interface Messages {
     bioZh: string;
     dateOfBirth: string;
     dobHint: string;
+    minStudentAge: string;
+    minStudentAgeRange: string;
+    minStudentAgeValue: string;
     emailReadonly: string;
     aiFillHint: string;
     photo: string;

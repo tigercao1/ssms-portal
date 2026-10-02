@@ -27,6 +27,9 @@ import type {
 
 const MAX_NAME = 100;
 const MAX_BIO = 1000;
+const MIN_STUDENT_AGE = 0;
+const MAX_STUDENT_AGE = 18;
+const DEFAULT_MIN_STUDENT_AGE = 5;
 
 interface ProfileDraft {
   displayNameEn: string;
@@ -34,6 +37,7 @@ interface ProfileDraft {
   bioEn: string;
   bioZh: string;
   dateOfBirth: string;
+  minStudentAge: string;
   teachingLocationIds: string[];
   languageIds: string[];
   courseLevelOfferedIds: string[];
@@ -48,6 +52,7 @@ function toDraft(p: InstructorProfile): ProfileDraft {
     bioEn: p.bioEn ?? '',
     bioZh: p.bioZh ?? '',
     dateOfBirth: p.dateOfBirth ?? '',
+    minStudentAge: String(p.minStudentAge ?? DEFAULT_MIN_STUDENT_AGE),
     teachingLocationIds: p.teachingLocations.map((r) => r.id),
     languageIds: p.languages.map((r) => r.id),
     courseLevelOfferedIds: p.courseLevelsOffered.map((r) => r.id),
@@ -66,6 +71,17 @@ function toDraft(p: InstructorProfile): ProfileDraft {
       trainerLevel: tr.trainerLevel,
     })),
   };
+}
+
+function validateMinStudentAge(
+  value: string,
+  t: ReturnType<typeof useT>,
+): string | null {
+  if (!value.trim()) return t.validation.required;
+  const age = Number(value);
+  if (!/^\d+$/.test(value.trim()) || age < MIN_STUDENT_AGE || age > MAX_STUDENT_AGE)
+    return t.profile.minStudentAgeRange;
+  return null;
 }
 
 /** W2.2 — instructor self profile edit form. */
@@ -110,6 +126,7 @@ function Form({
   const initial = useMemo(() => toDraft(profile), [profile]);
   const [draft, setDraft] = useState(initial);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [ageError, setAgeError] = useState<string | null>(null);
 
   function set<K extends keyof typeof draft>(key: K, val: (typeof draft)[K]) {
     setDraft((d) => ({ ...d, [key]: val }));
@@ -117,16 +134,18 @@ function Form({
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!draft.displayNameEn.trim()) {
-      setNameError(t.validation.required);
-      return;
-    }
+    const nextNameError = draft.displayNameEn.trim() ? null : t.validation.required;
+    const nextAgeError = validateMinStudentAge(draft.minStudentAge, t);
+    setNameError(nextNameError);
+    setAgeError(nextAgeError);
+    if (nextNameError || nextAgeError) return;
     const body: UpdateProfileBody = {
       ...draft,
       displayNameZh: draft.displayNameZh || null,
       bioEn: draft.bioEn || null,
       bioZh: draft.bioZh || null,
       dateOfBirth: draft.dateOfBirth || null,
+      minStudentAge: Number(draft.minStudentAge),
     };
     await update.mutateAsync(body);
     navigate('/profile');
@@ -207,6 +226,27 @@ function Form({
 
       <Card className="flex flex-col gap-5">
         <h2 className="text-lg">{t.profile.teachingSection}</h2>
+        <div className="sm:max-w-xs">
+          <Field
+            label={t.profile.minStudentAge}
+            required
+            error={ageError ?? undefined}
+          >
+            {(p) => (
+              <Input
+                {...p}
+                type="number"
+                inputMode="numeric"
+                required
+                min={MIN_STUDENT_AGE}
+                max={MAX_STUDENT_AGE}
+                step={1}
+                value={draft.minStudentAge}
+                onChange={(e) => set('minStudentAge', e.target.value)}
+              />
+            )}
+          </Field>
+        </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium text-navy">{t.profile.locations}</span>
           <MultiSelectChips
