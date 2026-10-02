@@ -24,13 +24,14 @@ const rows: ReferenceRecord[] = [
 
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
+const addMutateAsync = vi.fn();
 const usageCalls: Array<string | null> = [];
 let instructorCount = 3;
 
 vi.mock('./api', () => ({
   useAdminReferences: () => ({ data: rows, isLoading: false }),
   useAddReference: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: addMutateAsync,
     isPending: false,
     isSuccess: false,
   }),
@@ -63,6 +64,7 @@ describe('ReferenceManagerPage', () => {
   beforeEach(() => {
     updateMutate.mockReset();
     deleteMutate.mockReset();
+    addMutateAsync.mockReset();
     usageCalls.length = 0;
     instructorCount = 3;
   });
@@ -131,5 +133,19 @@ describe('ReferenceManagerPage', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(deleteMutate).not.toHaveBeenCalled();
     expect(updateMutate).not.toHaveBeenCalled();
+  });
+
+  it('adds a row with the entered values', async () => {
+    addMutateAsync.mockResolvedValue(rows[0]);
+    renderWithProviders(<ReferenceManagerPage />);
+    await userEvent.type(screen.getByLabelText(/^Key/), ' loc.blackcomb ');
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Blackcomb');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(addMutateAsync).toHaveBeenCalledWith({
+      key: 'loc.blackcomb',
+      name: 'Blackcomb',
+      sortOrder: 0,
+      isActive: true,
+    });
   });
 });

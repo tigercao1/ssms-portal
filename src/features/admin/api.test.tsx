@@ -4,7 +4,13 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/msw';
-import { useDeleteReference, useUpdateReference } from './api';
+import {
+  useAddReference,
+  useAdminReferences,
+  useDeleteReference,
+  useReferenceUsage,
+  useUpdateReference,
+} from './api';
 
 const API = 'http://localhost:3000';
 const record = { id: 'r1', key: 'k', name: 'n', sortOrder: 0, isActive: false };
@@ -65,6 +71,63 @@ describe('admin reference hooks', () => {
     await act(() => result.current.mutateAsync('r1'));
 
     expect(method).toBe('DELETE');
+    await waitFor(() =>
+      expect(invalidatedKeys(invalidate)).toEqual(
+        expect.arrayContaining([
+          ['admin', 'reference', 'languages'],
+          ['reference', 'languages'],
+        ]),
+      ),
+    );
+  });
+
+  it('lists every row from the admin endpoint, including inactive ones', async () => {
+    server.use(
+      http.get(`${API}/admin/reference/languages`, () =>
+        HttpResponse.json([record]),
+      ),
+    );
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useAdminReferences('languages'), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.data).toEqual([record]));
+  });
+
+  it('fetches usage only once a row is chosen', async () => {
+    let hits = 0;
+    server.use(
+      http.get(`${API}/admin/reference/languages/r1/usage`, () => {
+        hits += 1;
+        return HttpResponse.json({ instructorCount: 4 });
+      }),
+    );
+    const { wrapper } = setup();
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string | null }) => useReferenceUsage('languages', id),
+      { wrapper, initialProps: { id: null as string | null } },
+    );
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(hits).toBe(0);
+    rerender({ id: 'r1' });
+    await waitFor(() =>
+      expect(result.current.data).toEqual({ instructorCount: 4 }),
+    );
+  });
+
+  it('adding a row refreshes the admin and public lists', async () => {
+    server.use(
+      http.post(`${API}/admin/reference/languages`, () =>
+        HttpResponse.json(record),
+      ),
+    );
+    const { invalidate, wrapper } = setup();
+    const { result } = renderHook(() => useAddReference('languages'), {
+      wrapper,
+    });
+
+    await act(() => result.current.mutateAsync({ key: 'k', name: 'n' }));
+
     await waitFor(() =>
       expect(invalidatedKeys(invalidate)).toEqual(
         expect.arrayContaining([
