@@ -177,6 +177,13 @@ export interface Messages {
     activeLabel: string;
     addedRow: string;
     duplicateKey: string;
+    refActive: string;
+    refInactive: string;
+    removeRow: string;
+    removeTitle: string;
+    removePermanent: string;
+    removeUsage: string;
+    removeConfirm: string;
   };
   reference: {
     teachingLocations: string;

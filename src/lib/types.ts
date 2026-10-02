@@ -123,6 +123,14 @@ export interface ReferenceRecord {
   isActive: boolean;
 }
 
+export interface ReferenceUsage {
+  instructorCount: number;
+}
+
+export interface DeletedReferenceRecord extends ReferenceRecord {
+  removedLinkCount: number;
+}
+
 export interface UserRoleRecord {
   userId: string;
   role: 'admin' | 'instructor';

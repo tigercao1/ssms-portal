@@ -180,6 +180,14 @@ export const en: Messages = {
     activeLabel: 'Active',
     addedRow: 'Row added.',
     duplicateKey: 'That key already exists.',
+    refActive: 'Active',
+    refInactive: 'Inactive',
+    removeRow: 'Remove',
+    removeTitle: 'Remove “{name}”?',
+    removePermanent:
+      'This permanently deletes the value. This can’t be undone.',
+    removeUsage: 'It will be removed from {count} instructor profiles.',
+    removeConfirm: 'Remove permanently',
   },
   reference: {
     teachingLocations: 'Teaching locations',
