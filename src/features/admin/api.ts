@@ -119,7 +119,6 @@ function useSyncProfile(id: string) {
   };
 }
 
-/** W2.12 — admin edits any instructor's profile. */
 export function useAdminUpdateProfile(id: string) {
   const sync = useSyncProfile(id);
   return useMutation({

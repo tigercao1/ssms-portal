@@ -199,6 +199,34 @@ describe('AdminDetailPage actions', () => {
       screen.queryByRole('button', { name: 'Take offline' }),
     ).not.toBeInTheDocument();
   });
+
+  it('shows an error when the approval request fails', async () => {
+    serveRecord({ approvalStatus: 'pending', isActive: true });
+    const approvalBodies: unknown[] = [];
+    server.use(
+      http.patch(
+        `${API}/admin/instructors/:id/approval`,
+        async ({ request }) => {
+          approvalBodies.push(await request.json());
+          return HttpResponse.json({}, { status: 500 });
+        },
+      ),
+    );
+    renderDetail();
+
+    expect(
+      screen.queryByText('Something went wrong.'),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Approve' }),
+    );
+
+    expect(
+      await screen.findByText('Something went wrong.'),
+    ).toBeInTheDocument();
+    expect(approvalBodies).toEqual([{ approvalStatus: 'approved' }]);
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+  });
 });
 
 describe('AdminDetailPage role', () => {

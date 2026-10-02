@@ -115,6 +115,9 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
             >
               {t.admin.reject}
             </Button>
+            {approval.isError && (
+              <Banner tone="error">{t.errors.generic}</Banner>
+            )}
           </>
         )}
 
