@@ -131,6 +131,7 @@ export interface Messages {
     uploadPhoto: string;
     photoHint: string;
     uploading: string;
+    removePhoto: string;
   };
   settings: {
     title: string;
@@ -163,9 +164,18 @@ export interface Messages {
     rejectReason: string;
     activate: string;
     deactivate: string;
+    takeOffline: string;
+    putOnline: string;
+    takeOfflineConfirm: string;
+    putOnlineConfirm: string;
+    confirm: string;
     roleSection: string;
     makeAdmin: string;
     makeInstructor: string;
+    roleAdmin: string;
+    roleInstructor: string;
+    alreadyAdmin: string;
+    alreadyInstructor: string;
     cantChangeOwnRole: string;
     editProfile: string;
     actionDone: string;

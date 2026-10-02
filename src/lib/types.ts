@@ -131,6 +131,12 @@ export interface DeletedReferenceRecord extends ReferenceRecord {
   removedLinkCount: number;
 }
 
+export type UserRole = 'admin' | 'instructor';
+
+export interface CurrentUserRole {
+  role: UserRole;
+}
+
 export interface UserRoleRecord {
   userId: string;
   role: 'admin' | 'instructor';

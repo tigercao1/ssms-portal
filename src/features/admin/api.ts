@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { uploadAvatar } from '@/features/instructor/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
+  CurrentUserRole,
   DeletedReferenceRecord,
+  InstructorProfile,
   ReferenceRecord,
   ReferenceUsage,
   UpdateProfileBody,
+  UserRole,
   UserRoleRecord,
 } from '@/lib/types';
 
@@ -17,6 +21,9 @@ export interface AdminListFilter {
 
 const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
 const detailKey = (id: string) => ['admin', 'instructor', id] as const;
+const profileKey = (id: string) =>
+  ['admin', 'instructor', id, 'profile'] as const;
+const roleKey = (authUserId: string) => ['admin', 'user-role', authUserId] as const;
 
 /** W2.7 — list instructors with optional status/active filters. */
 export function useAdminInstructors(filter: AdminListFilter) {
@@ -37,6 +44,13 @@ export function useAdminInstructor(id: string) {
   return useQuery({
     queryKey: detailKey(id),
     queryFn: () => api<AdminInstructorRecord>(`/admin/instructors/${id}`),
+  });
+}
+
+export function useAdminInstructorProfile(id: string) {
+  return useQuery({
+    queryKey: profileKey(id),
+    queryFn: () => api<InstructorProfile>(`/admin/instructors/${id}/profile`),
   });
 }
 
@@ -78,27 +92,56 @@ export function useSetActivation(id: string) {
   });
 }
 
+export function useAdminUserRole(authUserId: string) {
+  return useQuery({
+    queryKey: roleKey(authUserId),
+    queryFn: () => api<CurrentUserRole>(`/admin/users/${authUserId}/role`),
+  });
+}
+
 /** W2.11 — promote / demote (id = authUserId). */
 export function useSetRole(authUserId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (role: 'admin' | 'instructor') =>
+    mutationFn: (role: UserRole) =>
       api<UserRoleRecord>(`/admin/users/${authUserId}/role`, {
         method: 'PATCH',
         body: { role },
       }),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['admin', 'instructors'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'instructors'] });
+      void qc.invalidateQueries({ queryKey: roleKey(authUserId) });
+    },
   });
 }
 
-/** W2.12 — admin edits any instructor's profile (core fields). */
-export function useAdminUpdateProfile(id: string) {
+function useSyncProfile(id: string) {
+  const qc = useQueryClient();
   const sync = useInvalidate(id);
+  return (profile: InstructorProfile) => {
+    qc.setQueryData(profileKey(id), profile);
+    sync();
+  };
+}
+
+export function useAdminUpdateProfile(id: string) {
+  const sync = useSyncProfile(id);
   return useMutation({
     mutationFn: (body: UpdateProfileBody) =>
-      api(`/admin/instructors/${id}`, { method: 'PATCH', body }),
-    onSuccess: () => sync(),
+      api<InstructorProfile>(`/admin/instructors/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: sync,
+  });
+}
+
+export function useAdminUploadPhoto(id: string) {
+  const sync = useSyncProfile(id);
+  return useMutation({
+    mutationFn: (file: File) =>
+      uploadAvatar(file, `/admin/instructors/${id}/photo`),
+    onSuccess: sync,
   });
 }
 

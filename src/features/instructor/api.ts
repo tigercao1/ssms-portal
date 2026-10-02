@@ -44,33 +44,38 @@ export function validateAvatar(file: File): string | null {
  * W2.3 — three-step avatar upload: get a signed URL from the API, PUT the bytes
  * to Supabase Storage, then confirm so the API persists the public URL.
  */
+export async function uploadAvatar(
+  file: File,
+  photoPath: string,
+): Promise<InstructorProfile> {
+  const contentType = file.type as AllowedAvatarMime;
+  const ticket = await api<AvatarUploadTicket>(
+    `${photoPath}/signed-upload-url`,
+    { method: 'POST', body: { contentType, contentLength: file.size } },
+  );
+
+  const put = await fetch(ticket.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType, 'x-upsert': 'true' },
+    body: file,
+  });
+  if (!put.ok) {
+    const detail = await put.text().catch(() => '');
+    throw new Error(
+      `Storage upload failed (${put.status}). ${detail.slice(0, 300)}`,
+    );
+  }
+
+  return api<InstructorProfile>(`${photoPath}/confirm`, {
+    method: 'POST',
+    body: { contentType },
+  });
+}
+
 export function useUploadAvatar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (file: File): Promise<InstructorProfile> => {
-      const contentType = file.type as AllowedAvatarMime;
-      const ticket = await api<AvatarUploadTicket>(
-        '/me/instructor/photo/signed-upload-url',
-        { method: 'POST', body: { contentType, contentLength: file.size } },
-      );
-
-      const put = await fetch(ticket.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': contentType, 'x-upsert': 'true' },
-        body: file,
-      });
-      if (!put.ok) {
-        const detail = await put.text().catch(() => '');
-        throw new Error(
-          `Storage upload failed (${put.status}). ${detail.slice(0, 300)}`,
-        );
-      }
-
-      return api<InstructorProfile>('/me/instructor/photo/confirm', {
-        method: 'POST',
-        body: { contentType },
-      });
-    },
+    mutationFn: (file: File) => uploadAvatar(file, '/me/instructor/photo'),
     onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
   });
 }

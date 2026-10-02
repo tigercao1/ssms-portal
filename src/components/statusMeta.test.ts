@@ -1,16 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { statusMeta } from './statusMeta';
 import { en } from '@/i18n/messages/en';
+import { zhCN } from '@/i18n/messages/zh-CN';
 
 describe('statusMeta', () => {
-  it('labels pending/approved/rejected', () => {
-    expect(statusMeta('pending', true, en).label).toBe(en.status.pending);
-    expect(statusMeta('approved', true, en).label).toBe(en.status.approved);
-    expect(statusMeta('rejected', true, en).label).toBe(en.status.rejected);
+  it.each([
+    ['pending', true, 'Pending', '待审核'],
+    ['approved', true, 'Active', '已上线'],
+    ['approved', false, 'Inactive', '已下线'],
+    ['rejected', true, 'Rejected', '已拒绝'],
+  ] as const)(
+    'labels %s (active=%s) as %s / %s',
+    (status, isActive, enLabel, zhLabel) => {
+      expect(statusMeta(status, isActive, en).label).toBe(enLabel);
+      expect(statusMeta(status, isActive, zhCN).label).toBe(zhLabel);
+    },
+  );
+
+  it('keeps the approved colour for active instructors', () => {
+    expect(statusMeta('approved', true, en).color).toBe(
+      'var(--status-approved)',
+    );
   });
-  it('shows inactive when approved but not active', () => {
-    const meta = statusMeta('approved', false, en);
-    expect(meta.label).toBe(en.status.inactive);
-    expect(meta.color).toBe('var(--status-inactive)');
+
+  it('uses the inactive colour when approved but not active', () => {
+    expect(statusMeta('approved', false, en).color).toBe(
+      'var(--status-inactive)',
+    );
   });
 });
