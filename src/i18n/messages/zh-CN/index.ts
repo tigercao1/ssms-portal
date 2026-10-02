@@ -104,6 +104,7 @@ export const zhCN: Messages = {
     dobHint: '仅管理员可见，绝不公开显示。',
     minStudentAge: '最小学员年龄',
     minStudentAgeRange: '请输入 0 到 18 之间的整数。',
+    minStudentAgeValue: '{n} 岁及以上',
     emailReadonly: '邮箱由您的账户管理，无法在此更改。',
     aiFillHint: '留空一种语言，我们稍后会自动翻译。',
     photo: '头像',

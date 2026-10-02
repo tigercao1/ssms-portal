@@ -107,6 +107,7 @@ export interface Messages {
     dobHint: string;
     minStudentAge: string;
     minStudentAgeRange: string;
+    minStudentAgeValue: string;
     emailReadonly: string;
     aiFillHint: string;
     photo: string;

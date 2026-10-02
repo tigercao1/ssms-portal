@@ -110,6 +110,7 @@ export const en: Messages = {
     dobHint: 'Admin-only — never shown publicly.',
     minStudentAge: 'Minimum student age',
     minStudentAgeRange: 'Enter a whole number from 0 to 18.',
+    minStudentAgeValue: 'Ages {n}+',
     emailReadonly: 'Email is managed through your account and can’t be changed here.',
     aiFillHint: 'Leave one language empty and we’ll auto-translate it later.',
     photo: 'Profile photo',
