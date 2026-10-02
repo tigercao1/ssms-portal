@@ -106,6 +106,16 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
             </ul>
           )}
         </Section>
+        {typeof profile.minStudentAge === 'number' && (
+          <Section title={t.profile.minStudentAge}>
+            <p className="text-sm text-ink">
+              {t.profile.minStudentAgeValue.replace(
+                '{n}',
+                String(profile.minStudentAge),
+              )}
+            </p>
+          </Section>
+        )}
         <Section title={t.profile.locations}>
           <Chips items={profile.teachingLocations} />
         </Section>

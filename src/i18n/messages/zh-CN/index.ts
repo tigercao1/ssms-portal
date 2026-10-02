@@ -184,6 +184,13 @@ export const zhCN: Messages = {
     activeLabel: '启用',
     addedRow: '已添加。',
     duplicateKey: '该键已存在。',
+    refActive: '启用',
+    refInactive: '停用',
+    removeRow: '删除',
+    removeTitle: '删除“{name}”？',
+    removePermanent: '该值将被永久删除，此操作无法撤销。',
+    removeUsage: '将从 {count} 位教练的资料中移除。',
+    removeConfirm: '永久删除',
   },
   reference: {
     teachingLocations: '授课地点',
