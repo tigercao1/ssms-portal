@@ -22,6 +22,7 @@ export const fakeProfile: InstructorProfile = {
   approvalStatus: 'pending',
   isActive: true,
   profilePhotoUrl: null,
+  minStudentAge: 5,
   teachingLocations: [{ id: 'l1', key: 'loc.whistler', name: 'Whistler' }],
   languages: [{ id: 'la1', key: 'lang.en', name: 'English' }],
   courseLevelsOffered: [],
