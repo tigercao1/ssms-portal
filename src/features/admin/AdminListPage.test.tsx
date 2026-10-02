@@ -12,5 +12,6 @@ describe('AdminListPage (W2.7)', () => {
     expect(screen.getAllByText('jane@example.com').length).toBeGreaterThan(0);
     // both filter dropdowns render
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByText('Online')).toBeInTheDocument();
   });
 });

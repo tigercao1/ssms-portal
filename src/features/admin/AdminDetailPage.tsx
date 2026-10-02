@@ -13,7 +13,6 @@ import {
   Spinner,
   StatusPill,
   Textarea,
-  Toggle,
 } from '@/components';
 import {
   useAdminInstructor,
@@ -180,7 +179,6 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
   const t = useT();
   const { user } = useSession();
   const approval = useSetApproval(rec.id);
-  const activation = useSetActivation(rec.id);
   const role = useSetRole(rec.authUserId);
   const [reason, setReason] = useState('');
 
@@ -224,16 +222,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
           </>
         )}
 
-        <div className="flex items-center justify-between border-t border-grey/40 pt-3">
-          <span className="text-sm text-navy">
-            {rec.isActive ? t.admin.deactivate : t.admin.activate}
-          </span>
-          <Toggle
-            checked={rec.isActive}
-            onChange={(v) => activation.mutate(v)}
-            label={t.admin.activate}
-          />
-        </div>
+        <VisibilityAction rec={rec} />
       </Card>
 
       <Card className="flex flex-col gap-3">
@@ -262,6 +251,51 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+function VisibilityAction({ rec }: { rec: AdminInstructorRecord }) {
+  const t = useT();
+  const activation = useSetActivation(rec.id);
+  const [confirming, setConfirming] = useState(false);
+
+  if (rec.isActive && rec.approvalStatus !== 'approved') return null;
+  const goOnline = !rec.isActive;
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-grey/40 pt-3">
+      {confirming ? (
+        <>
+          <p className="text-sm text-navy">
+            {goOnline ? t.admin.putOnlineConfirm : t.admin.takeOfflineConfirm}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant={goOnline ? 'primary' : 'danger'}
+              loading={activation.isPending}
+              onClick={() =>
+                activation.mutate(goOnline, {
+                  onSuccess: () => setConfirming(false),
+                })
+              }
+            >
+              {t.admin.confirm}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              {t.common.cancel}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <Button
+          variant={goOnline ? 'secondary' : 'danger'}
+          onClick={() => setConfirming(true)}
+        >
+          {goOnline ? t.admin.putOnline : t.admin.takeOffline}
+        </Button>
+      )}
+      {activation.isError && <Banner tone="error">{t.errors.generic}</Banner>}
     </div>
   );
 }

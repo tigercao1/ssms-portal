@@ -160,6 +160,11 @@ export interface Messages {
     rejectReason: string;
     activate: string;
     deactivate: string;
+    takeOffline: string;
+    putOnline: string;
+    takeOfflineConfirm: string;
+    putOnlineConfirm: string;
+    confirm: string;
     roleSection: string;
     makeAdmin: string;
     makeInstructor: string;
