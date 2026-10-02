@@ -193,6 +193,7 @@ function ConfirmRemove({
   const usage = useReferenceUsage(slug, row.id);
   const remove = useDeleteReference(slug);
   const count = usage.data?.instructorCount ?? 0;
+  const usageFresh = usage.isSuccess && !usage.isFetching;
 
   return (
     <div
@@ -203,7 +204,7 @@ function ConfirmRemove({
       <p id="confirm-remove-title" className="font-semibold">
         {t.admin.removeTitle.replace('{name}', row.name)}
       </p>
-      {usage.isLoading ? (
+      {usage.isFetching ? (
         <Spinner />
       ) : (
         <>
@@ -230,7 +231,7 @@ function ConfirmRemove({
           variant="danger"
           onClick={() => remove.mutate(row.id, { onSuccess: onClose })}
           loading={remove.isPending}
-          disabled={!usage.isSuccess}
+          disabled={!usageFresh}
         >
           {t.admin.removeConfirm}
         </Button>
