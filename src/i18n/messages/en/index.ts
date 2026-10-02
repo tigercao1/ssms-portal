@@ -38,6 +38,10 @@ export const en: Messages = {
     signUpTitle: 'Apply as an instructor',
     signUpSubtitle:
       'Create an account to start your profile. An admin reviews every application.',
+    firstName: 'First name',
+    lastName: 'Last name',
+    nickname: 'Nickname',
+    nicknameHint: 'WeChat name or the name you’re known for (optional).',
     signUpButton: 'Create account',
     signingUp: 'Creating account…',
     passwordHint: 'At least 6 characters.',

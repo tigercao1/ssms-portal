@@ -9,10 +9,20 @@ describe('SignUpPage', () => {
     expect(
       screen.getByRole('heading', { name: 'Apply as an instructor' }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText(/First name/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Last name/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Nickname/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Email/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Password/)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Create account' }),
     ).toBeInTheDocument();
+  });
+
+  it('marks first/last name as required but nickname as optional', () => {
+    renderWithProviders(<SignUpPage />, { route: '/signup' });
+    expect(screen.getByLabelText(/First name/)).toBeRequired();
+    expect(screen.getByLabelText(/Last name/)).toBeRequired();
+    expect(screen.getByLabelText(/Nickname/)).not.toBeRequired();
   });
 });
