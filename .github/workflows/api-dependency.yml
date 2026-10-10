@@ -1,0 +1,40 @@
+name: API dependency
+
+# Required check: a portal PR that declares `Requires API: ssms-api#N` cannot
+# merge until that API PR is merged and deployed to production. See
+# .github/scripts/api-dependency.mjs and README § Changes that span the API.
+#
+# pull_request_target runs this workflow from main with a token that can post
+# statuses, and never checks out or runs code from the PR. The schedule
+# re-checks open PRs so they go green soon after the API deploys.
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: api-dependency-${{ github.event.pull_request.number || 'all' }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check API dependency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          sparse-checkout: .github/scripts
+
+      - run: node .github/scripts/api-dependency.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

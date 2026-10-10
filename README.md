@@ -32,6 +32,25 @@ src/
   styles/     tokens.css + global.css (W0.2)
 ```
 
+## Deploys
+
+`.github/workflows/deploy.yml` builds and deploys to Cloudflare after Portal CI
+passes on `main`, from the commit CI tested. It is the only deploy path; the
+production `VITE_*` values are variables in the `production` GitHub Environment.
+
+## Changes that span the API
+
+The API deploys first and the portal follows:
+
+1. API changes must keep working with the portal that is live now: add fields
+   and endpoints, do not remove or rename ones the portal uses until a portal
+   release has stopped using them.
+2. A portal PR that needs an API change says so in its description:
+   `Requires API: ssms-api#60`. The required **API dependency** check stays
+   pending until that API PR is merged and deployed to production, then turns
+   green (it re-checks every 10 minutes).
+3. Merge the API PR, let its Release workflow deploy it, then merge the portal PR.
+
 ## Scripts
 `dev` · `build` · `preview` · `lint` · `format`
 
