@@ -1,0 +1,66 @@
+name: Deploy
+
+# Deploys the portal to Cloudflare after Portal CI passes on a push to main,
+# building the exact commit CI tested. This is the only deploy path: automatic
+# deploys from Cloudflare's Git integration are turned off.
+#
+# VITE_* values are public (they ship in the browser bundle) and live as
+# variables in the `production` environment, which only main can use.
+
+on:
+  workflow_run:
+    workflows: ['Portal CI']
+    types: [completed]
+    branches: [main]
+  # Re-deploy main's head, e.g. after changing a VITE_* variable.
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+      - name: Check the bundle points at production
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          for v in "$VITE_API_BASE_URL" "$VITE_SUPABASE_URL"; do
+            [ -n "$v" ] || { echo "::error::a VITE_* variable is empty"; exit 1; }
+            grep -rqF "$v" dist/assets || { echo "::error::$v not found in the build"; exit 1; }
+          done
+
+      - name: Deploy
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
