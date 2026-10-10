@@ -61,8 +61,14 @@ async function startEditing(
   await user.click(await screen.findByRole('button', { name: `Edit ${name}` }));
 }
 
-function addRowShown() {
-  return screen.queryByRole('heading', { name: 'Add row' }) !== null;
+function panel() {
+  return screen
+    .getByRole('heading', { name: 'Edit row' })
+    .closest('tr') as HTMLElement;
+}
+
+function editShown() {
+  return screen.queryByRole('heading', { name: 'Edit row' }) !== null;
 }
 
 describe('ReferenceManagerPage edit panel', () => {
@@ -70,7 +76,7 @@ describe('ReferenceManagerPage edit panel', () => {
     delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 
-  it('loads the row into the panel, highlights it and focuses the Chinese name', async () => {
+  it('expands the edit form beneath the row, highlights it and focuses the Chinese name', async () => {
     serve([whistler, cypress]);
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
@@ -80,20 +86,32 @@ describe('ReferenceManagerPage edit panel', () => {
     expect(
       screen.getByRole('heading', { name: 'Edit row' }),
     ).toBeInTheDocument();
-    expect(addRowShown()).toBe(false);
+    expect(rowFor('Whistler').nextElementSibling).toBe(panel());
+    expect(screen.getAllByRole('heading', { name: 'Edit row' })).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Add row' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Editing Whistler')).toBeInTheDocument();
     expect(screen.getByText('Key: loc.whistler')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toHaveValue('Whistler');
-    expect(screen.getByLabelText('Chinese name')).toHaveValue('惠斯勒');
-    expect(screen.getByLabelText('Chinese name')).toHaveFocus();
-    expect(screen.getByLabelText('Sort order')).toHaveValue(0);
-    expect(screen.getByRole('switch', { name: 'Active' })).toBeChecked();
+    expect(within(panel()).getByLabelText('Name')).toHaveValue('Whistler');
+    expect(within(panel()).getByLabelText('Chinese name')).toHaveValue(
+      '惠斯勒',
+    );
+    expect(within(panel()).getByLabelText('Chinese name')).toHaveFocus();
+    expect(within(panel()).getByLabelText('Sort order')).toHaveValue(0);
+    expect(
+      within(panel()).getByRole('switch', { name: 'Active' }),
+    ).toBeChecked();
     expect(
       screen.getByText(/Editing this text replaces the machine translation/),
     ).toBeInTheDocument();
     expect(rowFor('Whistler')).toHaveAttribute('aria-current', 'true');
     expect(rowFor('Cypress')).not.toHaveAttribute('aria-current');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(
+      within(panel()).getByRole('button', { name: 'Save' }),
+    ).toBeDisabled();
   });
 
   it('scrolls the panel into view smoothly', async () => {
@@ -111,21 +129,21 @@ describe('ReferenceManagerPage edit panel', () => {
     });
   });
 
-  it('saves only the changed fields and returns to Add row', async () => {
+  it('saves only the changed fields and closes the edit row', async () => {
     const api = serve([whistler]);
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    const nameZh = screen.getByLabelText('Chinese name');
+    const nameZh = within(panel()).getByLabelText('Chinese name');
     await user.clear(nameZh);
     await user.type(nameZh, '威斯勒');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
       expect(api.patches).toEqual([{ id: 'r1', nameZh: '威斯勒' }]),
     );
-    await waitFor(() => expect(addRowShown()).toBe(true));
+    await waitFor(() => expect(editShown()).toBe(false));
     expect(
       await within(rowFor('Whistler')).findByText('威斯勒'),
     ).toBeInTheDocument();
@@ -138,8 +156,8 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    await user.clear(screen.getByLabelText('Chinese name'));
-    const sort = screen.getByLabelText('Sort order');
+    await user.clear(within(panel()).getByLabelText('Chinese name'));
+    const sort = within(panel()).getByLabelText('Sort order');
     await user.clear(sort);
     await user.type(sort, '5{Enter}');
 
@@ -154,9 +172,11 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Cypress');
-    expect(screen.getByRole('switch', { name: 'Active' })).not.toBeChecked();
-    await user.click(screen.getByRole('switch', { name: 'Active' }));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(
+      within(panel()).getByRole('switch', { name: 'Active' }),
+    ).not.toBeChecked();
+    await user.click(within(panel()).getByRole('switch', { name: 'Active' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
       expect(api.patches).toEqual([{ id: 'r2', isActive: true }]),
@@ -166,32 +186,32 @@ describe('ReferenceManagerPage edit panel', () => {
     ).toBeInTheDocument();
   });
 
-  it('Cancel and Escape restore Add row without saving', async () => {
+  it('Cancel and Escape close the edit row without saving', async () => {
     const api = serve([whistler]);
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    await user.type(screen.getByLabelText('Name'), ' Resort');
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(addRowShown()).toBe(true);
+    await user.type(within(panel()).getByLabelText('Name'), ' Resort');
+    await user.click(within(panel()).getByRole('button', { name: 'Cancel' }));
+    expect(editShown()).toBe(false);
     expect(rowFor('Whistler')).not.toHaveAttribute('aria-current');
 
     await startEditing(user, 'Whistler');
-    expect(screen.getByLabelText('Name')).toHaveValue('Whistler');
+    expect(within(panel()).getByLabelText('Name')).toHaveValue('Whistler');
     await user.keyboard('{Escape}');
-    expect(addRowShown()).toBe(true);
+    expect(editShown()).toBe(false);
     expect(api.patches).toHaveLength(0);
   });
 
-  it('switching tabs returns the card to Add row', async () => {
+  it('switching tabs closes the edit row', async () => {
     serve([whistler]);
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
     await user.click(screen.getByRole('button', { name: 'Languages' }));
-    expect(addRowShown()).toBe(true);
+    expect(editShown()).toBe(false);
   });
 
   it('switches to another row when Edit is clicked while editing', async () => {
@@ -200,14 +220,18 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    await user.type(screen.getByLabelText('Chinese name'), '!');
+    await user.type(within(panel()).getByLabelText('Chinese name'), '!');
     await startEditing(user, 'Cypress');
 
     expect(screen.getByText('Editing Cypress')).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toHaveValue('Cypress');
-    expect(screen.getByLabelText('Chinese name')).toHaveValue('');
-    expect(screen.getByLabelText('Chinese name')).toHaveFocus();
+    expect(within(panel()).getByLabelText('Name')).toHaveValue('Cypress');
+    expect(within(panel()).getByLabelText('Chinese name')).toHaveValue('');
+    expect(within(panel()).getByLabelText('Chinese name')).toHaveFocus();
     expect(rowFor('Cypress')).toHaveAttribute('aria-current', 'true');
+    expect(rowFor('Cypress').nextElementSibling).toBe(panel());
+    expect(screen.getAllByRole('heading', { name: 'Edit row' })).toHaveLength(
+      1,
+    );
     expect(rowFor('Whistler')).not.toHaveAttribute('aria-current');
   });
 
@@ -225,8 +249,8 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    await user.type(screen.getByLabelText('Chinese name'), '村');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.type(within(panel()).getByLabelText('Chinese name'), '村');
+    await user.click(within(panel()).getByRole('button', { name: 'Save' }));
 
     expect(
       await screen.findByText(
@@ -249,8 +273,8 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    await user.click(screen.getByRole('switch', { name: 'Active' }));
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(within(panel()).getByRole('switch', { name: 'Active' }));
+    await user.click(within(panel()).getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByText(/English name required/)).not.toBeInTheDocument();
@@ -262,11 +286,13 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await startEditing(user, 'Whistler');
-    await user.clear(screen.getByLabelText('Name'));
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    await user.clear(within(panel()).getByLabelText('Name'));
+    expect(
+      within(panel()).getByRole('button', { name: 'Save' }),
+    ).toBeDisabled();
   });
 
-  it('returns to Add row when the edited row is removed', async () => {
+  it('closes the edit row when that row is removed', async () => {
     serve([whistler]);
     server.use(
       http.get(`${BASE}/r1/usage`, () =>
@@ -292,7 +318,7 @@ describe('ReferenceManagerPage edit panel', () => {
     await waitFor(() => expect(confirm).toBeEnabled());
     await user.click(confirm);
 
-    await waitFor(() => expect(addRowShown()).toBe(true));
+    await waitFor(() => expect(editShown()).toBe(false));
   });
 
   it('shows Chinese wording for the edit panel', async () => {

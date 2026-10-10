@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -67,22 +67,14 @@ export function ReferenceManagerPage() {
         <ReferenceTable
           key={slug}
           slug={slug}
-          selectedId={editing?.id ?? null}
+          editing={editing}
           onEdit={setEditing}
+          onDoneEditing={() => setEditing(null)}
           onRemoved={(id) =>
             setEditing((current) => (current?.id === id ? null : current))
           }
         />
-        {editing ? (
-          <EditRow
-            key={editing.id}
-            slug={slug}
-            row={editing}
-            onDone={() => setEditing(null)}
-          />
-        ) : (
-          <AddRow slug={slug} />
-        )}
+        <AddRow slug={slug} />
       </div>
     </div>
   );
@@ -90,13 +82,15 @@ export function ReferenceManagerPage() {
 
 function ReferenceTable({
   slug,
-  selectedId,
+  editing,
   onEdit,
+  onDoneEditing,
   onRemoved,
 }: {
   slug: ReferenceSlug;
-  selectedId: string | null;
+  editing: ReferenceRecord | null;
   onEdit: (row: ReferenceRecord) => void;
+  onDoneEditing: () => void;
   onRemoved: (id: string) => void;
 }) {
   const t = useT();
@@ -133,77 +127,86 @@ function ReferenceTable({
             </thead>
             <tbody>
               {(rows.data ?? []).map((r, i) => {
-                const selected = r.id === selectedId;
+                const selected = r.id === editing?.id;
                 return (
-                  <tr
-                    key={r.id}
-                    aria-current={selected || undefined}
-                    className={cn(
-                      selected
-                        ? 'bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]'
-                        : i % 2 === 1 && 'bg-sunken',
-                      !r.isActive && 'text-slate',
+                  <Fragment key={r.id}>
+                    <tr
+                      aria-current={selected || undefined}
+                      className={cn(
+                        selected
+                          ? 'bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]'
+                          : i % 2 === 1 && 'bg-sunken',
+                        !r.isActive && 'text-slate',
+                      )}
+                    >
+                      <td
+                        className={cn(
+                          'hidden whitespace-nowrap px-4 py-2 font-mono text-xs text-slate xl:table-cell',
+                          !r.isActive && 'opacity-60',
+                        )}
+                      >
+                        {r.key}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-4 py-2',
+                          r.isActive ? 'text-ink' : 'opacity-60',
+                        )}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <span>{r.name}</span>
+                          <span className="whitespace-nowrap font-mono text-xs text-slate xl:hidden">
+                            {r.key}
+                          </span>
+                          <TranslatedByBadge model={r.nameEnTranslatedBy} />
+                        </div>
+                      </td>
+                      <td
+                        className={cn(
+                          'px-4 py-2',
+                          r.isActive ? 'text-ink' : 'opacity-60',
+                        )}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <span>{r.nameZh || '—'}</span>
+                          <TranslatedByBadge model={r.nameZhTranslatedBy} />
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2">
+                        <RefStatus isActive={r.isActive} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            aria-label={t.admin.editRowFor.replace(
+                              '{name}',
+                              r.name,
+                            )}
+                            onClick={() => onEdit(r)}
+                          >
+                            {t.common.edit}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRemoving(r)}
+                          >
+                            {t.admin.removeRow}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                    {selected && (
+                      <EditRow
+                        key={editing.id}
+                        slug={slug}
+                        row={editing}
+                        onDone={onDoneEditing}
+                      />
                     )}
-                  >
-                    <td
-                      className={cn(
-                        'hidden whitespace-nowrap px-4 py-2 font-mono text-xs text-slate xl:table-cell',
-                        !r.isActive && 'opacity-60',
-                      )}
-                    >
-                      {r.key}
-                    </td>
-                    <td
-                      className={cn(
-                        'px-4 py-2',
-                        r.isActive ? 'text-ink' : 'opacity-60',
-                      )}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span>{r.name}</span>
-                        <span className="whitespace-nowrap font-mono text-xs text-slate xl:hidden">
-                          {r.key}
-                        </span>
-                        <TranslatedByBadge model={r.nameEnTranslatedBy} />
-                      </div>
-                    </td>
-                    <td
-                      className={cn(
-                        'px-4 py-2',
-                        r.isActive ? 'text-ink' : 'opacity-60',
-                      )}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span>{r.nameZh || '—'}</span>
-                        <TranslatedByBadge model={r.nameZhTranslatedBy} />
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2">
-                      <RefStatus isActive={r.isActive} />
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          aria-label={t.admin.editRowFor.replace(
-                            '{name}',
-                            r.name,
-                          )}
-                          onClick={() => onEdit(r)}
-                        >
-                          {t.common.edit}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setRemoving(r)}
-                        >
-                          {t.admin.removeRow}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -429,7 +432,7 @@ function EditRow({
 }) {
   const t = useT();
   const update = useUpdateReference(slug);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLTableRowElement>(null);
   const nameZhRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(row.name);
   const [nameZh, setNameZh] = useState(row.nameZh ?? '');
@@ -438,7 +441,7 @@ function EditRow({
 
   useEffect(() => {
     nameZhRef.current?.focus({ preventScroll: true });
-    cardRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    rowRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   }, []);
 
   const nameChanged = name.trim() !== row.name;
@@ -460,100 +463,107 @@ function EditRow({
   }
 
   return (
-    <div
-      ref={cardRef}
-      className="scroll-mb-6 scroll-mt-6"
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !update.isPending) onDone();
-      }}
+    <tr
+      ref={rowRef}
+      className="scroll-my-6 bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]"
     >
-      <Card className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg">{t.admin.editRow}</h2>
-          <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-slate">
-            <span>{t.admin.editingName.replace('{name}', row.name)}</span>
-            <span className="break-all font-mono text-xs">
-              {t.admin.keyLabel}: {row.key}
-            </span>
-          </p>
-        </div>
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Field label={t.admin.nameLabel}>
+      <td
+        colSpan={5}
+        className="px-4 pb-4 pt-1"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && !update.isPending) onDone();
+        }}
+      >
+        <div className="flex flex-col gap-4 rounded-md border border-grey/60 bg-surface p-4 shadow-card sm:p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg">{t.admin.editRow}</h2>
+            <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-slate">
+              <span>{t.admin.editingName.replace('{name}', row.name)}</span>
+              <span className="break-all font-mono text-xs">
+                {t.admin.keyLabel}: {row.key}
+              </span>
+            </p>
+          </div>
+          <form className="flex flex-col gap-4" onSubmit={submit}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Field label={t.admin.nameLabel}>
+                  {(p) => (
+                    <Input
+                      {...p}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  )}
+                </Field>
+                {!nameChanged && (
+                  <MachineTranslationNote model={row.nameEnTranslatedBy} />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <Field label={t.translation.nameZhLabel}>
+                  {(p) => (
+                    <Input
+                      {...p}
+                      ref={nameZhRef}
+                      value={nameZh}
+                      onChange={(e) => setNameZh(e.target.value)}
+                    />
+                  )}
+                </Field>
+                {!nameZhChanged && (
+                  <MachineTranslationNote model={row.nameZhTranslatedBy} />
+                )}
+              </div>
+              <Field label={t.admin.sortOrder}>
                 {(p) => (
                   <Input
                     {...p}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    type="number"
+                    min={0}
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
                   />
                 )}
               </Field>
-              {!nameChanged && (
-                <MachineTranslationNote model={row.nameEnTranslatedBy} />
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Field label={t.translation.nameZhLabel}>
-                {(p) => (
-                  <Input
-                    {...p}
-                    ref={nameZhRef}
-                    value={nameZh}
-                    onChange={(e) => setNameZh(e.target.value)}
-                  />
-                )}
-              </Field>
-              {!nameZhChanged && (
-                <MachineTranslationNote model={row.nameZhTranslatedBy} />
-              )}
-            </div>
-            <Field label={t.admin.sortOrder}>
-              {(p) => (
-                <Input
-                  {...p}
-                  type="number"
-                  min={0}
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value)}
+              <div className="flex items-center gap-2 sm:mt-7">
+                <Toggle
+                  checked={isActive}
+                  onChange={setIsActive}
+                  label={t.admin.activeLabel}
                 />
-              )}
-            </Field>
-            <div className="flex items-center gap-2 sm:mt-7">
-              <Toggle
-                checked={isActive}
-                onChange={setIsActive}
-                label={t.admin.activeLabel}
-              />
-              <span className="text-sm text-slate">{t.admin.activeLabel}</span>
+                <span className="text-sm text-slate">
+                  {t.admin.activeLabel}
+                </span>
+              </div>
             </div>
-          </div>
-          {update.isError && (
-            <Banner tone="error">
-              {isEnglishNameRequired(update.error)
-                ? t.translation.englishNameRequired
-                : t.errors.generic}
-            </Banner>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onDone}
-              disabled={update.isPending}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              type="submit"
-              loading={update.isPending}
-              disabled={!dirty || !name.trim()}
-            >
-              {t.common.save}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+            {update.isError && (
+              <Banner tone="error">
+                {isEnglishNameRequired(update.error)
+                  ? t.translation.englishNameRequired
+                  : t.errors.generic}
+              </Banner>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onDone}
+                disabled={update.isPending}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                type="submit"
+                loading={update.isPending}
+                disabled={!dirty || !name.trim()}
+              >
+                {t.common.save}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </td>
+    </tr>
   );
 }
