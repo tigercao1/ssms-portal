@@ -1,6 +1,10 @@
 import { useT } from '@/i18n/core/I18nProvider';
 
-export function TranslatedByBadge({ model }: { model: string | null | undefined }) {
+export function TranslatedByBadge({
+  model,
+}: {
+  model: string | null | undefined;
+}) {
   const t = useT();
   if (!model) return null;
   return (
@@ -20,7 +24,9 @@ export function MachineTranslationNote({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <TranslatedByBadge model={model} />
-      <span className="text-xs text-slate">{t.translation.editReplacesHint}</span>
+      <span className="text-xs text-slate">
+        {t.translation.editReplacesHint}
+      </span>
     </div>
   );
 }

@@ -16,9 +16,11 @@ describe('MultiSelectChips', () => {
     renderWithProviders(
       <MultiSelectChips options={options} selected={[]} onChange={vi.fn()} />,
     );
-    expect(
-      screen.getAllByRole('button').map((b) => b.textContent),
-    ).toEqual(['Whistler', 'Cypress', 'Seymour']);
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
+      'Whistler',
+      'Cypress',
+      'Seymour',
+    ]);
   });
 
   it('shows Chinese names in Chinese and falls back to English', () => {
@@ -26,16 +28,22 @@ describe('MultiSelectChips', () => {
     renderWithProviders(
       <MultiSelectChips options={options} selected={[]} onChange={vi.fn()} />,
     );
-    expect(
-      screen.getAllByRole('button').map((b) => b.textContent),
-    ).toEqual(['惠斯勒', 'Cypress', 'Seymour']);
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
+      '惠斯勒',
+      'Cypress',
+      'Seymour',
+    ]);
   });
 
   it('toggles selection by id whatever the label language', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     const onChange = vi.fn();
     renderWithProviders(
-      <MultiSelectChips options={options} selected={['l2']} onChange={onChange} />,
+      <MultiSelectChips
+        options={options}
+        selected={['l2']}
+        onChange={onChange}
+      />,
     );
     expect(screen.getByRole('button', { name: 'Cypress' })).toHaveAttribute(
       'aria-pressed',
