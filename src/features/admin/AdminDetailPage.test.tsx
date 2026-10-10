@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
@@ -481,3 +481,119 @@ describe('AdminDetailPage Shopify panel', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('AdminDetailPage more photos', () => {
+  function serveSlots(initial: Partial<InstructorProfile> = {}) {
+    const calls: { route: string; body?: unknown }[] = [];
+    let profile: InstructorProfile = { ...fakeProfile, ...initial };
+    server.use(
+      http.get(`${API}/admin/instructors/:id/profile`, () =>
+        HttpResponse.json(profile),
+      ),
+      http.post(
+        `${API}/admin/instructors/:id/photo/signed-upload-url`,
+        async ({ request, params }) => {
+          calls.push({
+            route: `POST /admin/instructors/${params.id}/photo/signed-upload-url`,
+            body: await request.json(),
+          });
+          return HttpResponse.json({
+            uploadUrl: 'http://storage.test/upload',
+            token: 'tok',
+            publicUrl: 'http://storage.test/p2.png',
+            path: 'inst-1/photo-2.png',
+          });
+        },
+      ),
+      http.post(
+        `${API}/admin/instructors/:id/photo/confirm`,
+        async ({ request, params }) => {
+          calls.push({
+            route: `POST /admin/instructors/${params.id}/photo/confirm`,
+            body: await request.json(),
+          });
+          profile = { ...profile, photo2Url: 'http://storage.test/p2.png' };
+          return HttpResponse.json(profile);
+        },
+      ),
+      http.delete(`${API}/admin/instructors/:id/photo/:slot`, ({ params }) => {
+        calls.push({
+          route: `DELETE /admin/instructors/${params.id}/photo/${params.slot}`,
+        });
+        profile = { ...profile, photo3Url: null };
+        return HttpResponse.json(profile);
+      }),
+    );
+    return calls;
+  }
+
+  it('uploads slot 2 through the admin photo routes with its slot', async () => {
+    serveRecord({});
+    const calls = serveSlots();
+    renderDetail();
+
+    const photo2 = await screen.findByRole('group', { name: 'Photo 2' });
+    await userEvent.upload(
+      photo2.querySelector('input[type="file"]') as HTMLInputElement,
+      new File(['abcd'], 'p2.png', { type: 'image/png' }),
+    );
+
+    expect(await within(photo2).findByRole('img')).toHaveAttribute(
+      'src',
+      'http://storage.test/p2.png',
+    );
+    expect(calls).toEqual([
+      {
+        route: 'POST /admin/instructors/inst-1/photo/signed-upload-url',
+        body: { contentType: 'image/png', contentLength: 4, slot: 2 },
+      },
+      {
+        route: 'POST /admin/instructors/inst-1/photo/confirm',
+        body: { contentType: 'image/png', slot: 2 },
+      },
+    ]);
+  });
+
+  it('removes slot 3 through the admin delete route', async () => {
+    serveRecord({});
+    const calls = serveSlots({ photo3Url: 'http://storage.test/p3.png' });
+    renderDetail();
+
+    const photo3 = await screen.findByRole('group', { name: 'Photo 3' });
+    expect(within(photo3).getByRole('img')).toBeInTheDocument();
+    await userEvent.click(
+      within(photo3).getByRole('button', { name: 'Remove photo' }),
+    );
+
+    await waitFor(() =>
+      expect(within(photo3).queryByRole('img')).not.toBeInTheDocument(),
+    );
+    expect(calls).toEqual([
+      { route: 'DELETE /admin/instructors/inst-1/photo/3' },
+    ]);
+  });
+
+  it('refetches the profile when the delete returns no body', async () => {
+    let photo2Url: string | null = 'http://storage.test/p2.png';
+    serveRecord({});
+    server.use(
+      http.get(`${API}/admin/instructors/:id/profile`, () =>
+        HttpResponse.json({ ...fakeProfile, photo2Url }),
+      ),
+      http.delete(`${API}/admin/instructors/:id/photo/2`, () => {
+        photo2Url = null;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderDetail();
+
+    const photo2 = await screen.findByRole('group', { name: 'Photo 2' });
+    await userEvent.click(
+      within(photo2).getByRole('button', { name: 'Remove photo' }),
+    );
+    await waitFor(() =>
+      expect(within(photo2).queryByRole('img')).not.toBeInTheDocument(),
+    );
+  });
+});
+

@@ -16,7 +16,7 @@ import {
   useTeachingLocations,
 } from '@/features/reference/api';
 import { useMyProfile, useUpdateProfile } from './api';
-import { PhotoUploader } from './PhotoUploader';
+import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
 import { MachineTranslationNote } from '@/features/translation/TranslatedByBadge';
 import { MultiSelectChips } from './MultiSelectChips';
 import { CertEditor, TrainerEditor } from './CertEditor';
@@ -160,6 +160,7 @@ function Form({
       <Card className="flex flex-col gap-4">
         <h2 className="text-lg">{t.profile.identitySection}</h2>
         <PhotoUploader profile={profile} />
+        <MorePhotosUploader profile={profile} />
         <Field label={t.profile.displayNameEn} required error={nameError ?? undefined}>
           {(p) => (
             <Input

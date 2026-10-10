@@ -169,3 +169,38 @@ describe('ProfileViewPage certification tracks', () => {
     expect(screen.getByText('CSIA 级别 3 部分完成')).toBeInTheDocument();
   });
 });
+
+describe('ProfileViewPage more photos', () => {
+  it('shows photos 2 and 3 when present', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          photo2Url: 'http://storage.test/p2.png',
+          photo3Url: 'http://storage.test/p3.png',
+        }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByRole('heading', { name: 'More photos' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Jane Snow — Photo 2' }),
+    ).toHaveAttribute('src', 'http://storage.test/p2.png');
+    expect(
+      screen.getByRole('img', { name: 'Jane Snow — Photo 3' }),
+    ).toHaveAttribute('src', 'http://storage.test/p3.png');
+  });
+
+  it('hides the section when there are no extra photos', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, photo2Url: null }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
+    expect(screen.queryByText('More photos')).not.toBeInTheDocument();
+  });
+});

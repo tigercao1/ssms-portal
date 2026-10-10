@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { uploadAvatar } from '@/features/instructor/api';
+import { removePhoto, uploadAvatar } from '@/features/instructor/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
   CurrentUserRole,
   DeletedReferenceRecord,
+  ExtraPhotoSlot,
   InstructorProfile,
   ReferenceRecord,
   ReferenceUsage,
@@ -136,12 +137,24 @@ export function useAdminUpdateProfile(id: string) {
   });
 }
 
-export function useAdminUploadPhoto(id: string) {
+export function useAdminUploadPhoto(id: string, slot?: ExtraPhotoSlot) {
   const sync = useSyncProfile(id);
   return useMutation({
     mutationFn: (file: File) =>
-      uploadAvatar(file, `/admin/instructors/${id}/photo`),
+      uploadAvatar(file, `/admin/instructors/${id}/photo`, slot),
     onSuccess: sync,
+  });
+}
+
+export function useAdminRemovePhoto(id: string, slot: ExtraPhotoSlot) {
+  const qc = useQueryClient();
+  const sync = useSyncProfile(id);
+  return useMutation({
+    mutationFn: () => removePhoto(`/admin/instructors/${id}/photo`, slot),
+    onSuccess: (profile) => {
+      if (profile) sync(profile);
+      else void qc.invalidateQueries({ queryKey: profileKey(id) });
+    },
   });
 }
 

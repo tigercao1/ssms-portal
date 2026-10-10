@@ -7,11 +7,13 @@ import type {
   Discipline,
   UpdateProfileBody,
 } from '@/lib/types';
+import { trackLabel } from './certLabels';
 
 type CertDraft = NonNullable<UpdateProfileBody['certifications']>[number];
 type TrainerDraft = NonNullable<UpdateProfileBody['trainerStatus']>[number];
 
 const LEVELS = [1, 2, 3, 4];
+const TRACKS: CertTrack[] = ['regular', 'park', 'carving'];
 
 function EditorRow({
   children,
@@ -109,9 +111,11 @@ export function CertEditor({
                   update(i, { track: e.target.value as CertTrack })
                 }
               >
-                <option value="regular">{t.profile.trackRegular}</option>
-                <option value="park">{t.profile.trackPark}</option>
-                <option value="carving">{t.profile.trackCarving}</option>
+                {TRACKS.map((track) => (
+                  <option key={track} value={track}>
+                    {trackLabel(track, t)}
+                  </option>
+                ))}
               </Select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate">

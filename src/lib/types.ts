@@ -53,6 +53,8 @@ export interface InstructorProfile {
   approvalStatus: ApprovalStatus;
   isActive: boolean;
   profilePhotoUrl: string | null;
+  photo2Url?: string | null;
+  photo3Url?: string | null;
   minStudentAge: number;
   teachingLocations: RefItem[];
   languages: RefItem[];
@@ -89,6 +91,9 @@ export interface UpdateProfileBody {
     trainerLevel?: number | null;
   }>;
 }
+
+export type PhotoSlot = 1 | 2 | 3;
+export type ExtraPhotoSlot = 2 | 3;
 
 export type AllowedAvatarMime = 'image/jpeg' | 'image/png' | 'image/webp';
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;

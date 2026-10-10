@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { EditProfilePage } from './EditProfilePage';
@@ -131,5 +131,86 @@ describe('EditProfilePage machine-translation badge', () => {
     expect(
       screen.queryByText(/replaces the machine translation/),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('EditProfilePage more photos', () => {
+  it('shows photo slots 2 and 3 and updates a slot after upload', async () => {
+    const confirms: unknown[] = [];
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          photo2Url: 'http://storage.test/p2.png',
+          photo3Url: null,
+        }),
+      ),
+      http.post(`${API}/me/instructor/photo/signed-upload-url`, () =>
+        HttpResponse.json({
+          uploadUrl: 'http://storage.test/upload',
+          token: 'tok',
+          publicUrl: 'http://storage.test/p3.png',
+          path: 'inst-1/photo-3.png',
+        }),
+      ),
+      http.put(
+        'http://storage.test/upload',
+        () => new HttpResponse(null, { status: 200 }),
+      ),
+      http.post(`${API}/me/instructor/photo/confirm`, async ({ request }) => {
+        confirms.push(await request.json());
+        return HttpResponse.json({
+          ...fakeProfile,
+          photo2Url: 'http://storage.test/p2.png',
+          photo3Url: 'http://storage.test/p3.png',
+        });
+      }),
+    );
+    renderWithProviders(<EditProfilePage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'More photos' }),
+    ).toBeInTheDocument();
+    const photo2 = screen.getByRole('group', { name: 'Photo 2' });
+    expect(within(photo2).getByRole('img')).toHaveAttribute(
+      'src',
+      'http://storage.test/p2.png',
+    );
+    const photo3 = screen.getByRole('group', { name: 'Photo 3' });
+    expect(within(photo3).queryByRole('img')).not.toBeInTheDocument();
+
+    await userEvent.upload(
+      photo3.querySelector('input[type="file"]') as HTMLInputElement,
+      new File(['abcd'], 'p3.png', { type: 'image/png' }),
+    );
+
+    expect(await within(photo3).findByRole('img')).toHaveAttribute(
+      'src',
+      'http://storage.test/p3.png',
+    );
+    expect(confirms).toEqual([{ contentType: 'image/png', slot: 3 }]);
+    expect(screen.getByDisplayValue('Jane Snow')).toBeInTheDocument();
+  });
+
+  it('refetches the profile when a slot delete returns no body', async () => {
+    let photo2Url: string | null = 'http://storage.test/p2.png';
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, photo2Url }),
+      ),
+      http.delete(`${API}/me/instructor/photo/2`, () => {
+        photo2Url = null;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithProviders(<EditProfilePage />);
+
+    const photo2 = await screen.findByRole('group', { name: 'Photo 2' });
+    await userEvent.click(
+      within(photo2).getByRole('button', { name: 'Remove photo' }),
+    );
+    await waitFor(() =>
+      expect(within(photo2).queryByRole('img')).not.toBeInTheDocument(),
+    );
   });
 });

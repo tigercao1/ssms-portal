@@ -3,7 +3,9 @@ import { api } from '@/lib/api';
 import type {
   AllowedAvatarMime,
   AvatarUploadTicket,
+  ExtraPhotoSlot,
   InstructorProfile,
+  PhotoSlot,
   UpdateProfileBody,
 } from '@/lib/types';
 import { MAX_AVATAR_BYTES } from '@/lib/types';
@@ -67,12 +69,17 @@ export async function prepareAvatar(file: Blob): Promise<Blob> {
 export async function uploadAvatar(
   original: File,
   photoPath: string,
+  slot?: PhotoSlot,
 ): Promise<InstructorProfile> {
   const file = await prepareAvatar(original);
   const contentType = file.type as AllowedAvatarMime;
+  const slotBody = slot === undefined ? {} : { slot };
   const ticket = await api<AvatarUploadTicket>(
     `${photoPath}/signed-upload-url`,
-    { method: 'POST', body: { contentType, contentLength: file.size } },
+    {
+      method: 'POST',
+      body: { contentType, contentLength: file.size, ...slotBody },
+    },
   );
 
   const put = await fetch(ticket.uploadUrl, {
@@ -89,7 +96,16 @@ export async function uploadAvatar(
 
   return api<InstructorProfile>(`${photoPath}/confirm`, {
     method: 'POST',
-    body: { contentType },
+    body: { contentType, ...slotBody },
+  });
+}
+
+export function removePhoto(
+  photoPath: string,
+  slot: PhotoSlot,
+): Promise<InstructorProfile | undefined> {
+  return api<InstructorProfile | undefined>(`${photoPath}/${slot}`, {
+    method: 'DELETE',
   });
 }
 
@@ -98,6 +114,26 @@ export function useUploadAvatar() {
   return useMutation({
     mutationFn: (file: File) => uploadAvatar(file, '/me/instructor/photo'),
     onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
+  });
+}
+
+export function useUploadPhoto(slot: ExtraPhotoSlot) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) =>
+      uploadAvatar(file, '/me/instructor/photo', slot),
+    onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
+  });
+}
+
+export function useRemovePhoto(slot: ExtraPhotoSlot) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => removePhoto('/me/instructor/photo', slot),
+    onSuccess: (profile) => {
+      if (profile) qc.setQueryData(PROFILE_KEY, profile);
+      else void qc.invalidateQueries({ queryKey: PROFILE_KEY });
+    },
   });
 }
 
