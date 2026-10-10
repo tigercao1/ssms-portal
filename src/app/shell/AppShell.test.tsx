@@ -119,3 +119,13 @@ describe('AppShell mobile menu', () => {
     expect(menu()).not.toHaveClass('lg:z-auto');
   });
 });
+
+describe('AppShell admin nav', () => {
+  it('links to the Shopify sync page', () => {
+    renderShell();
+    expect(screen.getByRole('link', { name: 'Shopify sync' })).toHaveAttribute(
+      'href',
+      '/admin/shopify-sync',
+    );
+  });
+});

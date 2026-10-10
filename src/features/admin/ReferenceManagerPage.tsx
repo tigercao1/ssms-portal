@@ -56,7 +56,7 @@ export function ReferenceManagerPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
         <ReferenceTable key={slug} slug={slug} />
         <AddRow slug={slug} />
       </div>
@@ -250,7 +250,7 @@ function RefStatus({ isActive }: { isActive: boolean }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium',
         isActive ? 'border-status-approved text-ink' : 'border-grey text-slate',
       )}
     >
