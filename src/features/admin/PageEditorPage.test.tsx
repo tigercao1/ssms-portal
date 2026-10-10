@@ -14,6 +14,7 @@ const HTML = '<!doctype html><h1>Guide</h1><script>alert(1)</script>';
 
 interface Calls {
   uploads: { contentType: string | null; body: string }[];
+  uploadBytes: number[][];
   actions: string[];
   patches: unknown[];
   contentGets: number;
@@ -23,6 +24,7 @@ function serve(initial: Partial<PublicPage> = {}) {
   let page = fakePage(initial);
   const calls: Calls = {
     uploads: [],
+    uploadBytes: [],
     actions: [],
     patches: [],
     contentGets: 0,
@@ -36,11 +38,13 @@ function serve(initial: Partial<PublicPage> = {}) {
       });
     }),
     http.put(`${API}/admin/pages/:id/content`, async ({ request }) => {
-      const body = await request.text();
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      const body = new TextDecoder().decode(bytes);
       calls.uploads.push({
         contentType: request.headers.get('content-type'),
         body,
       });
+      calls.uploadBytes.push(Array.from(bytes));
       page = {
         ...page,
         hasContent: true,
@@ -93,6 +97,26 @@ function fileInput() {
 }
 
 describe('PageEditorPage upload', () => {
+  it('sends the original file bytes, including ones that are not UTF-8', async () => {
+    const calls = serve();
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByRole('heading', { name: 'Winter guide' });
+    const latin1 = [
+      0x3c, 0x70, 0x3e, 0x63, 0x61, 0x66, 0xe9, 0x3c, 0x2f, 0x70, 0x3e,
+    ];
+
+    await user.upload(
+      fileInput(),
+      new File([new Uint8Array(latin1)], 'latin1.html', { type: 'text/html' }),
+    );
+
+    expect(
+      await screen.findByText('Uploaded latin1.html.'),
+    ).toBeInTheDocument();
+    expect(calls.uploadBytes).toEqual([latin1]);
+  });
+
   it('sends the file as raw text/html and refreshes the preview', async () => {
     const calls = serve();
     const user = userEvent.setup();

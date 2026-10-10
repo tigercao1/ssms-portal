@@ -29,12 +29,12 @@ export function usePageContent(id: string, enabled: boolean) {
   });
 }
 
-function readFileText(file: File): Promise<string> {
+function readFileBytes(file: File): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
     reader.onerror = () => reject(reader.error);
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -76,7 +76,7 @@ export function useUploadPageContent(id: string) {
     mutationFn: async (file: File) =>
       api<PublicPage>(`/admin/pages/${id}/content`, {
         method: 'PUT',
-        body: await readFileText(file),
+        body: await readFileBytes(file),
         contentType: 'text/html',
       }),
     onSuccess: (page) =>

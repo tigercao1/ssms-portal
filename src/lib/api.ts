@@ -64,7 +64,7 @@ export async function api<T>(
       body === undefined
         ? undefined
         : contentType
-          ? (body as string)
+          ? (body as BodyInit)
           : JSON.stringify(body),
     signal,
   });
