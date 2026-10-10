@@ -201,6 +201,17 @@ export const en: Messages = {
     removeUsage: 'It will be removed from {count} instructor profiles.',
     removeConfirm: 'Remove permanently',
   },
+  translation: {
+    badge: 'Translated by {model}',
+    editReplacesHint:
+      'Machine-translated. Editing this text replaces the machine translation.',
+    nameZhLabel: 'Chinese name',
+    addNameHint:
+      'Fill in either name and the other is translated automatically.',
+    englishNameRequired:
+      'English name required (translation unavailable). Enter the English name and try again.',
+    editNameZh: 'Edit Chinese name for {name}',
+  },
   reference: {
     teachingLocations: 'Teaching locations',
     languages: 'Languages',

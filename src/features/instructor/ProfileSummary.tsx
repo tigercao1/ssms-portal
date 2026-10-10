@@ -1,6 +1,7 @@
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Card } from '@/components';
+import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
 import type { InstructorProfile } from '@/lib/types';
 
 function Avatar({ url, name }: { url: string | null; name: string }) {
@@ -60,6 +61,12 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
   const { locale } = useLocale();
   const name = localizeField(profile.displayNameEn, profile.displayNameZh, locale);
   const bio = localizeField(profile.bioEn, profile.bioZh, locale);
+  const showsZhBio = locale === 'zh-CN' && Boolean(profile.bioZh?.trim());
+  const bioTranslatedBy = !bio
+    ? null
+    : showsZhBio
+      ? profile.bioZhTranslatedBy
+      : profile.bioEnTranslatedBy;
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,6 +83,7 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
           <p className="whitespace-pre-wrap text-sm text-ink">
             {bio || <span className="text-slate">{t.profile.noneYet}</span>}
           </p>
+          <TranslatedByBadge model={bioTranslatedBy} />
         </Section>
         <Section title={t.profile.certifications}>
           {profile.certifications.length === 0 ? (

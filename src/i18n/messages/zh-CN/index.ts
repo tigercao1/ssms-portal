@@ -192,6 +192,14 @@ export const zhCN: Messages = {
     removeUsage: '将从 {count} 位教练的资料中移除。',
     removeConfirm: '永久删除',
   },
+  translation: {
+    badge: '由 {model} 翻译',
+    editReplacesHint: '此内容为机器翻译。编辑后将替换机器翻译。',
+    nameZhLabel: '中文名称',
+    addNameHint: '任填一种名称，另一种将自动翻译。',
+    englishNameRequired: '需要填写英文名称（翻译暂不可用）。请填写英文名称后重试。',
+    editNameZh: '编辑“{name}”的中文名称',
+  },
   reference: {
     teachingLocations: '授课地点',
     languages: '语言',

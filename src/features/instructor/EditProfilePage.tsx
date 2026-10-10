@@ -17,6 +17,7 @@ import {
 } from '@/features/reference/api';
 import { useMyProfile, useUpdateProfile } from './api';
 import { PhotoUploader } from './PhotoUploader';
+import { MachineTranslationNote } from '@/features/translation/TranslatedByBadge';
 import { MultiSelectChips } from './MultiSelectChips';
 import { CertEditor, TrainerEditor } from './CertEditor';
 import type {
@@ -196,6 +197,7 @@ function Form({
             />
           )}
         </Field>
+        <MachineTranslationNote model={profile.bioEnTranslatedBy} />
         <Field label={t.profile.bioZh} hint={`${draft.bioZh.length}/${MAX_BIO}`}>
           {(p) => (
             <Textarea
@@ -207,6 +209,7 @@ function Form({
             />
           )}
         </Field>
+        <MachineTranslationNote model={profile.bioZhTranslatedBy} />
       </Card>
 
       <Card className="grid gap-4 sm:grid-cols-2">
