@@ -3,6 +3,7 @@ import { localizeField } from '@/i18n/core/localize';
 import { Card } from '@/components';
 import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
 import type { InstructorProfile, RefItem } from '@/lib/types';
+import { certificationLabel } from './certLabels';
 
 function Avatar({ url, name }: { url: string | null; name: string }) {
   if (url) {
@@ -93,7 +94,7 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
             <ul className="flex flex-col gap-1">
               {profile.certifications.map((c, i) => (
                 <li key={i} className="text-sm text-ink">
-                  {c.display}
+                  {certificationLabel(c, t)}
                 </li>
               ))}
             </ul>

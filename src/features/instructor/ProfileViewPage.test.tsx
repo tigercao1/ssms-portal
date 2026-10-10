@@ -14,7 +14,7 @@ describe('ProfileViewPage (W2.1)', () => {
     expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
     // pending status pill
     expect(screen.getByText('Pending')).toBeInTheDocument();
-    // cert display string from the API
+    // certification label
     expect(screen.getByText('CSIA Level 4')).toBeInTheDocument();
     // location chip
     expect(screen.getByText('Whistler')).toBeInTheDocument();
@@ -111,5 +111,61 @@ describe('ProfileViewPage reference names', () => {
     renderWithProviders(<ProfileViewPage />);
     expect(await screen.findByText('惠斯勒')).toBeInTheDocument();
     expect(screen.getByText('English')).toBeInTheDocument();
+  });
+});
+
+describe('ProfileViewPage certification tracks', () => {
+  const tracked: InstructorProfile = {
+    ...fakeProfile,
+    certifications: [
+      {
+        org: 'csia',
+        track: 'park',
+        level: 1,
+        isPartial: false,
+        partialComponents: [],
+        achievedOn: null,
+        display: 'CSIA Park Level 1',
+      },
+      {
+        org: 'casi',
+        track: 'carving',
+        level: 2,
+        isPartial: false,
+        partialComponents: [],
+        achievedOn: null,
+        display: 'CASI Carving Level 2',
+      },
+      {
+        org: 'csia',
+        track: 'regular',
+        level: 3,
+        isPartial: true,
+        partialComponents: [],
+        achievedOn: null,
+        display: 'CSIA Level 3 Partial',
+      },
+    ],
+  };
+
+  it('shows track names in English', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () => HttpResponse.json(tracked)),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('CSIA Park Level 1')).toBeInTheDocument();
+    expect(screen.getByText('CASI Carving Level 2')).toBeInTheDocument();
+    expect(screen.getByText('CSIA Level 3 Partial')).toBeInTheDocument();
+  });
+
+  it('shows track names in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    server.use(
+      http.get(`${API}/me/instructor`, () => HttpResponse.json(tracked)),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('CSIA 公园 级别 1')).toBeInTheDocument();
+    expect(screen.getByText('CASI 刻滑 级别 2')).toBeInTheDocument();
+    expect(screen.getByText('CSIA 级别 3 部分完成')).toBeInTheDocument();
   });
 });

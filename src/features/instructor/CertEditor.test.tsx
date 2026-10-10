@@ -80,8 +80,11 @@ describe('TrainerEditor', () => {
       screen.getByRole('button', { name: 'Add trainer status' }),
     );
     expect(onChange).toHaveBeenLastCalledWith([
-      { discipline: 'ski', rookieSessionCompleted: true, trainerLevel: 1 },
+      { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: 1 },
     ]);
+    expect(
+      screen.getByRole('switch', { name: 'Rookie session completed' }),
+    ).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('combobox', { name: 'Trainer level' })).toHaveValue(
       '1',
     );
@@ -132,6 +135,39 @@ describe('TrainerEditor', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the rookie toggle off when a trainer level is chosen', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <Harness
+        initial={[
+          { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: 1 },
+        ]}
+        onChange={onChange}
+      />,
+    );
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Trainer level' }),
+      '3',
+    );
+    expect(onChange).toHaveBeenLastCalledWith([
+      { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: 3 },
+    ]);
+    expect(
+      screen.getByRole('switch', { name: 'Rookie session completed' }),
+    ).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggles the rookie session without changing the trainer level', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<Harness initial={[trainedSki]} onChange={onChange} />);
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Rookie session completed' }),
+    );
+    expect(onChange).toHaveBeenLastCalledWith([
+      { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: 2 },
+    ]);
+  });
+
   it('removes a row', async () => {
     const onChange = vi.fn();
     renderWithProviders(<Harness initial={[trainedSki]} onChange={onChange} />);
@@ -141,10 +177,66 @@ describe('TrainerEditor', () => {
 });
 
 describe('CertEditor', () => {
-  function CertHarness({ initial }: { initial: CertDraft[] }) {
+  function CertHarness({
+    initial,
+    onChange,
+  }: {
+    initial: CertDraft[];
+    onChange?: (next: CertDraft[]) => void;
+  }) {
     const [value, setValue] = useState(initial);
-    return <CertEditor value={value} onChange={setValue} />;
+    return (
+      <CertEditor
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          onChange?.(next);
+        }}
+      />
+    );
   }
+
+  it('shows localised track labels while keeping API values', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <CertHarness
+        initial={[{ org: 'csia', track: 'regular', level: 1, isPartial: false }]}
+        onChange={onChange}
+      />,
+    );
+    const select = screen.getByRole('combobox', { name: 'Track' });
+    const options = within(select).getAllByRole('option');
+    expect(options.map((o) => o.textContent)).toEqual([
+      'Regular',
+      'Park',
+      'Carving',
+    ]);
+    expect(options.map((o) => (o as HTMLOptionElement).value)).toEqual([
+      'regular',
+      'park',
+      'carving',
+    ]);
+    await userEvent.selectOptions(select, 'Carving');
+    expect(onChange).toHaveBeenLastCalledWith([
+      { org: 'casi', track: 'carving', level: 1, isPartial: false },
+    ]);
+  });
+
+  it('shows Chinese track labels under zh-CN', () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(
+      <CertHarness
+        initial={[{ org: 'csia', track: 'park', level: 1, isPartial: false }]}
+      />,
+    );
+    const select = screen.getByRole('combobox', { name: '类别' });
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['常规', '公园', '刻滑']);
+    expect(select).toHaveValue('park');
+  });
 
   it('shows the partial toggle only for the regular track', async () => {
     renderWithProviders(

@@ -109,9 +109,9 @@ export function CertEditor({
                   update(i, { track: e.target.value as CertTrack })
                 }
               >
-                <option value="regular">regular</option>
-                <option value="park">park</option>
-                <option value="carving">carving</option>
+                <option value="regular">{t.profile.trackRegular}</option>
+                <option value="park">{t.profile.trackPark}</option>
+                <option value="carving">{t.profile.trackCarving}</option>
               </Select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate">
@@ -147,7 +147,7 @@ export function CertEditor({
   );
 }
 
-/** W2.2 — trainer-status editor. trainerLevel requires rookieSessionCompleted. */
+/** W2.2 — trainer-status editor. The rookie toggle is independent of trainerLevel. */
 export function TrainerEditor({
   value,
   onChange,
@@ -161,9 +161,6 @@ export function TrainerEditor({
   function update(i: number, patch: Partial<TrainerDraft>) {
     const next = value.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
     const row = next[i]!;
-    if (row.trainerLevel != null && !row.rookieSessionCompleted) {
-      row.rookieSessionCompleted = true; // enforce CHECK
-    }
     setEdited((prev) => [...prev.filter((r) => r !== value[i]), row]);
     onChange(next);
   }
@@ -220,7 +217,7 @@ export function TrainerEditor({
         onClick={() =>
           onChange([
             ...value,
-            { discipline: 'ski', rookieSessionCompleted: true, trainerLevel: 1 },
+            { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: 1 },
           ])
         }
       >
