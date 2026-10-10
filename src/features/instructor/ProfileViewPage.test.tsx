@@ -49,3 +49,67 @@ describe('ProfileViewPage (W2.1)', () => {
     expect(screen.queryByText('Minimum student age')).not.toBeInTheDocument();
   });
 });
+
+describe('ProfileViewPage machine-translation badge', () => {
+  const translated: InstructorProfile = {
+    ...fakeProfile,
+    bioEn: 'Veteran instructor.',
+    bioZh: '资深教练。',
+    bioZhMachineTranslated: true,
+    bioZhTranslatedBy: 'gemini-2.5-flash',
+  };
+
+  it('shows the model name next to a machine-translated bio', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    server.use(
+      http.get(`${API}/me/instructor`, () => HttpResponse.json(translated)),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('资深教练。')).toBeInTheDocument();
+    expect(screen.getByText('由 gemini-2.5-flash 翻译')).toBeInTheDocument();
+  });
+
+  it('hides the badge when the displayed bio was written by the instructor', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () => HttpResponse.json(translated)),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('Veteran instructor.')).toBeInTheDocument();
+    expect(screen.queryByText(/Translated by/)).not.toBeInTheDocument();
+  });
+
+  it('badges the English bio when it was machine-translated', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          bioEn: 'Veteran instructor.',
+          bioEnTranslatedBy: 'gemini-2.5-flash',
+        }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('Translated by gemini-2.5-flash'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('ProfileViewPage reference names', () => {
+  it('shows Chinese reference names in Chinese when the API provides them', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          teachingLocations: [
+            { id: 'l1', key: 'loc.whistler', name: 'Whistler', nameZh: '惠斯勒' },
+          ],
+        }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('惠斯勒')).toBeInTheDocument();
+    expect(screen.getByText('English')).toBeInTheDocument();
+  });
+});

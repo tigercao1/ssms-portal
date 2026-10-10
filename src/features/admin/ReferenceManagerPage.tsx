@@ -12,6 +12,7 @@ import {
   Toggle,
 } from '@/components';
 import type { ReferenceSlug } from '@/features/reference/api';
+import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
 import {
   useAddReference,
   useAdminReferences,
@@ -81,6 +82,9 @@ function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
             <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
               <th className="px-4 py-2 font-medium">{t.admin.keyLabel}</th>
               <th className="px-4 py-2 font-medium">{t.admin.nameLabel}</th>
+              <th className="px-4 py-2 font-medium">
+                {t.translation.nameZhLabel}
+              </th>
               <th className="px-4 py-2 font-medium">{t.admin.colStatus}</th>
               <th className="px-4 py-2 text-right font-medium">
                 {t.admin.actions}
@@ -110,7 +114,18 @@ function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
                     r.isActive ? 'text-ink' : 'opacity-60',
                   )}
                 >
-                  {r.name}
+                  <div className="flex flex-col gap-1">
+                    <span>{r.name}</span>
+                    <TranslatedByBadge model={r.nameEnTranslatedBy} />
+                  </div>
+                </td>
+                <td
+                  className={cn(
+                    'px-4 py-2',
+                    r.isActive ? 'text-ink' : 'opacity-60',
+                  )}
+                >
+                  <NameZhCell row={r} update={update} />
                 </td>
                 <td className="px-4 py-2">
                   <RefStatus isActive={r.isActive} />
@@ -145,7 +160,11 @@ function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
       )}
       {update.isError && (
         <div className="px-4 pb-4">
-          <Banner tone="error">{t.errors.generic}</Banner>
+          <Banner tone="error">
+            {isEnglishNameRequired(update.error)
+              ? t.translation.englishNameRequired
+              : t.errors.generic}
+          </Banner>
         </div>
       )}
       {removing && (
@@ -156,6 +175,73 @@ function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
         />
       )}
     </Card>
+  );
+}
+
+function isEnglishNameRequired(err: unknown) {
+  return err instanceof ApiError && err.status === 422;
+}
+
+function NameZhCell({
+  row,
+  update,
+}: {
+  row: ReferenceRecord;
+  update: ReturnType<typeof useUpdateReference>;
+}) {
+  const t = useT();
+  const [draft, setDraft] = useState<string | null>(null);
+  const saving = update.isPending && update.variables?.id === row.id;
+
+  if (draft === null) {
+    return (
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-1">
+          <span>{row.nameZh || '–'}</span>
+          <TranslatedByBadge model={row.nameZhTranslatedBy} />
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={t.translation.editNameZh.replace('{name}', row.name)}
+          onClick={() => setDraft(row.nameZh ?? '')}
+        >
+          {t.common.edit}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        update.mutate(
+          { id: row.id, nameZh: draft.trim() || null },
+          { onSuccess: () => setDraft(null) },
+        );
+      }}
+    >
+      <Input
+        aria-label={t.translation.editNameZh.replace('{name}', row.name)}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        autoFocus
+      />
+      <Button size="sm" type="submit" loading={saving}>
+        {t.common.save}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        type="button"
+        onClick={() => setDraft(null)}
+        disabled={saving}
+      >
+        {t.common.cancel}
+      </Button>
+    </form>
   );
 }
 
@@ -245,25 +331,32 @@ function AddRow({ slug }: { slug: ReferenceSlug }) {
   const add = useAddReference(slug);
   const [key, setKey] = useState('');
   const [name, setName] = useState('');
+  const [nameZh, setNameZh] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState('0');
   const [isActive, setIsActive] = useState(true);
   const [keyError, setKeyError] = useState<string | null>(null);
 
   async function submit() {
     setKeyError(null);
+    setNameError(null);
     try {
       await add.mutateAsync({
         key: key.trim(),
-        name: name.trim(),
+        ...(name.trim() && { name: name.trim() }),
+        ...(nameZh.trim() && { nameZh: nameZh.trim() }),
         sortOrder: Number(sortOrder) || 0,
         isActive,
       });
       setKey('');
       setName('');
+      setNameZh('');
       setSortOrder('0');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setKeyError(t.admin.duplicateKey);
+      } else if (isEnglishNameRequired(err)) {
+        setNameError(t.translation.englishNameRequired);
       }
     }
   }
@@ -276,9 +369,18 @@ function AddRow({ slug }: { slug: ReferenceSlug }) {
           <Input {...p} value={key} onChange={(e) => setKey(e.target.value)} />
         )}
       </Field>
-      <Field label={t.admin.nameLabel} required>
+      <Field label={t.admin.nameLabel} error={nameError ?? undefined}>
         {(p) => (
           <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />
+        )}
+      </Field>
+      <Field label={t.translation.nameZhLabel} hint={t.translation.addNameHint}>
+        {(p) => (
+          <Input
+            {...p}
+            value={nameZh}
+            onChange={(e) => setNameZh(e.target.value)}
+          />
         )}
       </Field>
       <Field label={t.admin.sortOrder}>
@@ -299,7 +401,7 @@ function AddRow({ slug }: { slug: ReferenceSlug }) {
       <Button
         onClick={submit}
         loading={add.isPending}
-        disabled={!key.trim() || !name.trim()}
+        disabled={!key.trim() || (!name.trim() && !nameZh.trim())}
       >
         {t.common.add}
       </Button>

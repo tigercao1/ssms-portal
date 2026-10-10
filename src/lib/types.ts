@@ -14,6 +14,7 @@ export interface RefItem {
   id: string;
   key: string;
   name: string;
+  nameZh?: string | null;
   sortOrder?: number;
 }
 
@@ -45,6 +46,8 @@ export interface InstructorProfile {
   bioZh: string | null;
   bioEnMachineTranslated: boolean;
   bioZhMachineTranslated: boolean;
+  bioEnTranslatedBy?: string | null;
+  bioZhTranslatedBy?: string | null;
   dateOfBirth: string | null;
   preferredLanguage: PreferredLanguage;
   approvalStatus: ApprovalStatus;
@@ -119,6 +122,9 @@ export interface ReferenceRecord {
   id: string;
   key: string;
   name: string;
+  nameZh?: string | null;
+  nameEnTranslatedBy?: string | null;
+  nameZhTranslatedBy?: string | null;
   sortOrder: number;
   isActive: boolean;
 }
@@ -142,4 +148,44 @@ export interface UserRoleRecord {
   role: 'admin' | 'instructor';
   previousRole: 'admin' | 'instructor' | null;
   changed: boolean;
+}
+
+export interface ShopifySyncStatus {
+  enabled: boolean;
+  masterSwitch: boolean;
+  configured: boolean;
+  lastTickAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  queue: {
+    pending: number;
+    retrying: number;
+    oldestEnqueuedAt: string | null;
+  };
+  entries: {
+    synced: number;
+    active: number;
+    draft: number;
+    failed: number;
+  };
+  storefrontPreviewBaseUrl: string;
+}
+
+export interface ShopifySyncRunResult {
+  enqueued: number;
+  processing: boolean;
+}
+
+export type ShopifyEntryStatus = 'active' | 'draft';
+
+export interface ShopifyInstructorSync {
+  handle: string | null;
+  metaobjectId: string | null;
+  status: ShopifyEntryStatus | null;
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  queued: boolean;
+  attempts: number;
+  previewUrl: string | null;
 }

@@ -170,7 +170,8 @@ export function useAddReference(slug: string) {
   return useMutation({
     mutationFn: (body: {
       key: string;
-      name: string;
+      name?: string;
+      nameZh?: string;
       sortOrder?: number;
       isActive?: boolean;
     }) =>
@@ -192,6 +193,7 @@ export function useUpdateReference(slug: string) {
       id: string;
       isActive?: boolean;
       name?: string;
+      nameZh?: string | null;
       sortOrder?: number;
     }) =>
       api<ReferenceRecord>(`/admin/reference/${slug}/${id}`, {

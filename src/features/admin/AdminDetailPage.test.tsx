@@ -214,9 +214,7 @@ describe('AdminDetailPage actions', () => {
     );
     renderDetail();
 
-    expect(
-      screen.queryByText('Something went wrong.'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Something went wrong.')).not.toBeInTheDocument();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Approve' }),
     );
@@ -435,5 +433,51 @@ describe('AdminDetailPage photo', () => {
         screen.queryByRole('img', { name: 'Jane Snow' }),
       ).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe('AdminDetailPage machine-translation badge', () => {
+  it('marks the machine-translated bio with the model name', async () => {
+    serveRecord({}, 'instructor', {
+      bioEn: 'Veteran instructor.',
+      bioZh: '资深教练。',
+      bioZhMachineTranslated: true,
+      bioZhTranslatedBy: 'gemini-2.5-flash',
+    });
+    renderDetail();
+
+    expect(await screen.findByDisplayValue('资深教练。')).toBeInTheDocument();
+    expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(1);
+    expect(
+      screen.getByText(/Editing this text replaces the machine translation/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no badge for human-written bios', async () => {
+    serveRecord({}, 'instructor', {
+      bioEnTranslatedBy: null,
+      bioZhTranslatedBy: null,
+    });
+    renderDetail();
+
+    expect(
+      await screen.findByDisplayValue('Veteran instructor.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Translated by/)).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminDetailPage Shopify panel', () => {
+  it('shows the instructor Shopify sync state', async () => {
+    serveRecord({ approvalStatus: 'approved', isActive: true });
+    renderDetail();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Shopify' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('jane-snow')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sync this instructor now' }),
+    ).toBeInTheDocument();
   });
 });
