@@ -196,3 +196,19 @@ export interface ShopifyInstructorSync {
   attempts: number;
   previewUrl: string | null;
 }
+
+export type PublicPageStatus = 'draft' | 'published';
+
+export interface PublicPage {
+  id: string;
+  slug: string;
+  title: string;
+  status: PublicPageStatus;
+  hasContent: boolean;
+  sizeBytes: number | null;
+  hasUnpublishedChanges: boolean;
+  url: string;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

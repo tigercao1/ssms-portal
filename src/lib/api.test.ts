@@ -54,4 +54,51 @@ describe('api client', () => {
       message: 'duplicate key',
     });
   });
+
+  it('sends a raw body with the given content type', async () => {
+    mockFetch(200, { id: 'p1' });
+    await api('/admin/pages/p1/content', {
+      method: 'PUT',
+      body: '<h1>Hi</h1>',
+      contentType: 'text/html',
+    });
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    const init = call[1] as RequestInit;
+    expect(init.method).toBe('PUT');
+    expect(init.body).toBe('<h1>Hi</h1>');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+      'text/html',
+    );
+  });
+
+  it('returns text responses unparsed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('<h1>{"not": json}</h1>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        }),
+      ),
+    );
+    await expect(api('/page', { responseType: 'text' })).resolves.toBe(
+      '<h1>{"not": json}</h1>',
+    );
+  });
+
+  it('normalizes errors on text requests, JSON or not', async () => {
+    mockFetch(404, { message: 'No content' });
+    await expect(api('/page', { responseType: 'text' })).rejects.toMatchObject({
+      status: 404,
+      message: 'No content',
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('Bad gateway', { status: 502 })),
+    );
+    await expect(api('/page', { responseType: 'text' })).rejects.toMatchObject({
+      status: 502,
+      message: 'Request failed (502)',
+    });
+  });
 });

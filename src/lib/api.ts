@@ -14,8 +14,12 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
+  /** Send `body` (a string) as-is with this Content-Type instead of JSON. */
+  contentType?: string;
+  /** Return the response body as text instead of parsing JSON. */
+  responseType?: 'json' | 'text';
   /** Skip attaching the bearer token (public/health calls). */
   anonymous?: boolean;
   signal?: AbortSignal;
@@ -23,8 +27,9 @@ interface RequestOptions {
 
 /**
  * Single API entry point (W0.3). Attaches the Supabase JWT as
- * `Authorization: Bearer`, sends/receives JSON, and normalizes errors. A 401
- * signs the user out so the route guards bounce them to /login.
+ * `Authorization: Bearer`, sends/receives JSON (or raw text when asked), and
+ * normalizes errors. A 401 signs the user out so the route guards bounce them
+ * to /login.
  *
  * The NestJS API must allow-list this origin (CORS_ALLOWED_ORIGINS) for these
  * calls to succeed from the browser.
@@ -33,10 +38,20 @@ export async function api<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { method = 'GET', body, anonymous = false, signal } = options;
+  const {
+    method = 'GET',
+    body,
+    contentType,
+    responseType = 'json',
+    anonymous = false,
+    signal,
+  } = options;
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const headers: Record<string, string> = {
+    Accept: responseType === 'text' ? 'text/plain' : 'application/json',
+  };
+  if (body !== undefined)
+    headers['Content-Type'] = contentType ?? 'application/json';
   if (!anonymous) {
     const token = await getAccessToken();
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -45,7 +60,12 @@ export async function api<T>(
   const res = await fetch(`${env.apiBaseUrl}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body:
+      body === undefined
+        ? undefined
+        : contentType
+          ? (body as string)
+          : JSON.stringify(body),
     signal,
   });
 
@@ -55,7 +75,8 @@ export async function api<T>(
   }
 
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : undefined;
+  if (responseType === 'text' && res.ok) return text as T;
+  const data = text ? parseBody(text, responseType) : undefined;
 
   if (!res.ok) {
     const message =
@@ -65,4 +86,13 @@ export async function api<T>(
   }
 
   return data as T;
+}
+
+function parseBody(text: string, responseType: 'json' | 'text'): unknown {
+  if (responseType === 'json') return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
