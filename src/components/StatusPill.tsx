@@ -13,7 +13,7 @@ export function StatusPill({
   const meta = statusMeta(status, isActive, t);
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium"
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium"
       style={{ borderColor: meta.color }}
     >
       <span
