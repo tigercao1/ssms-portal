@@ -14,3 +14,19 @@ export function formatDate(iso: string | null | undefined, locale: Locale): stri
     day: 'numeric',
   }).format(d);
 }
+
+export function formatDateTime(
+  iso: string | null | undefined,
+  locale: Locale,
+): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat(locale === 'zh-CN' ? 'zh-CN' : 'en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
