@@ -17,7 +17,7 @@ const OBJECT_KEY_PATTERN = /^(?:drafts|published)\/([^/]+)\.html$/;
 
 const SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy':
-    "sandbox allow-popups allow-popups-to-escape-sandbox; frame-ancestors 'none'",
+    "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
 };
