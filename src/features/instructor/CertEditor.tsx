@@ -7,11 +7,13 @@ import type {
   Discipline,
   UpdateProfileBody,
 } from '@/lib/types';
+import { trackLabel } from './certLabels';
 
 type CertDraft = NonNullable<UpdateProfileBody['certifications']>[number];
 type TrainerDraft = NonNullable<UpdateProfileBody['trainerStatus']>[number];
 
 const LEVELS = [1, 2, 3, 4];
+const TRACKS: CertTrack[] = ['regular', 'park', 'carving'];
 
 function EditorRow({
   children,
@@ -109,9 +111,11 @@ export function CertEditor({
                   update(i, { track: e.target.value as CertTrack })
                 }
               >
-                <option value="regular">regular</option>
-                <option value="park">park</option>
-                <option value="carving">carving</option>
+                {TRACKS.map((track) => (
+                  <option key={track} value={track}>
+                    {trackLabel(track, t)}
+                  </option>
+                ))}
               </Select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-slate">
@@ -147,7 +151,7 @@ export function CertEditor({
   );
 }
 
-/** W2.2 — trainer-status editor. trainerLevel requires rookieSessionCompleted. */
+/** W2.2 — trainer-status editor. The rookie toggle is independent of trainerLevel. */
 export function TrainerEditor({
   value,
   onChange,
@@ -161,9 +165,6 @@ export function TrainerEditor({
   function update(i: number, patch: Partial<TrainerDraft>) {
     const next = value.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
     const row = next[i]!;
-    if (row.trainerLevel != null && !row.rookieSessionCompleted) {
-      row.rookieSessionCompleted = true; // enforce CHECK
-    }
     setEdited((prev) => [...prev.filter((r) => r !== value[i]), row]);
     onChange(next);
   }
@@ -220,7 +221,7 @@ export function TrainerEditor({
         onClick={() =>
           onChange([
             ...value,
-            { discipline: 'ski', rookieSessionCompleted: true, trainerLevel: 1 },
+            { discipline: 'ski', rookieSessionCompleted: false, trainerLevel: 1 },
           ])
         }
       >

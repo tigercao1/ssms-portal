@@ -17,9 +17,18 @@ import {
 import { MachineTranslationNote } from '@/features/translation/TranslatedByBadge';
 import { MultiSelectChips } from '@/features/instructor/MultiSelectChips';
 import { CertEditor, TrainerEditor } from '@/features/instructor/CertEditor';
-import { PhotoPicker } from '@/features/instructor/PhotoUploader';
-import { useAdminUpdateProfile, useAdminUploadPhoto } from './api';
+import {
+  EXTRA_PHOTO_SLOTS,
+  MorePhotos,
+  PhotoPicker,
+} from '@/features/instructor/PhotoUploader';
+import {
+  useAdminRemovePhoto,
+  useAdminUpdateProfile,
+  useAdminUploadPhoto,
+} from './api';
 import type {
+  ExtraPhotoSlot,
   InstructorProfile,
   PreferredLanguage,
   UpdateProfileBody,
@@ -87,6 +96,31 @@ function minStudentAgeError(
   return null;
 }
 
+function AdminPhotoSlot({
+  instructorId,
+  profile,
+  slot,
+}: {
+  instructorId: string;
+  profile: InstructorProfile;
+  slot: ExtraPhotoSlot;
+}) {
+  const upload = useAdminUploadPhoto(instructorId, slot);
+  const remove = useAdminRemovePhoto(instructorId, slot);
+  return (
+    <PhotoPicker
+      profile={profile}
+      slot={slot}
+      upload={upload}
+      remove={{
+        onRemove: () => remove.mutate(),
+        isPending: remove.isPending,
+        isError: remove.isError,
+      }}
+    />
+  );
+}
+
 export function AdminProfileEditor({
   instructorId,
   profile,
@@ -143,6 +177,16 @@ export function AdminProfileEditor({
         {removePhoto.isError && (
           <Banner tone="error">{t.errors.generic}</Banner>
         )}
+        <MorePhotos>
+          {EXTRA_PHOTO_SLOTS.map((slot) => (
+            <AdminPhotoSlot
+              key={slot}
+              instructorId={instructorId}
+              profile={profile}
+              slot={slot}
+            />
+          ))}
+        </MorePhotos>
         <Field
           label={t.profile.displayNameEn}
           required

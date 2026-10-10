@@ -1,15 +1,39 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Banner, Button } from '@/components';
-import { useUploadAvatar, validateAvatarType } from './api';
-import type { InstructorProfile } from '@/lib/types';
+import {
+  useRemovePhoto,
+  useUploadAvatar,
+  useUploadPhoto,
+  validateAvatarType,
+} from './api';
+import type {
+  ExtraPhotoSlot,
+  InstructorProfile,
+  PhotoSlot,
+} from '@/lib/types';
 
 type PhotoSubject = Pick<
   InstructorProfile,
-  'displayNameEn' | 'displayNameZh' | 'profilePhotoUrl'
+  | 'displayNameEn'
+  | 'displayNameZh'
+  | 'profilePhotoUrl'
+  | 'photo2Url'
+  | 'photo3Url'
 >;
+
+export const EXTRA_PHOTO_SLOTS: readonly ExtraPhotoSlot[] = [2, 3];
+
+export function photoUrlForSlot(
+  profile: PhotoSubject,
+  slot: PhotoSlot,
+): string | null {
+  if (slot === 2) return profile.photo2Url ?? null;
+  if (slot === 3) return profile.photo3Url ?? null;
+  return profile.profilePhotoUrl;
+}
 
 /** W2.3 — avatar picker + three-step signed upload. */
 export function PhotoUploader({ profile }: { profile: InstructorProfile }) {
@@ -17,16 +41,70 @@ export function PhotoUploader({ profile }: { profile: InstructorProfile }) {
   return <PhotoPicker profile={profile} upload={upload} />;
 }
 
+export function MorePhotos({ children }: { children: ReactNode }) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-3 border-t border-grey/40 pt-4">
+      <h3 className="text-base">{t.profile.morePhotos}</h3>
+      <div className="flex flex-col gap-4">{children}</div>
+    </div>
+  );
+}
+
+function MyPhotoSlot({
+  profile,
+  slot,
+}: {
+  profile: InstructorProfile;
+  slot: ExtraPhotoSlot;
+}) {
+  const upload = useUploadPhoto(slot);
+  const remove = useRemovePhoto(slot);
+  return (
+    <PhotoPicker
+      profile={profile}
+      slot={slot}
+      upload={upload}
+      remove={{
+        onRemove: () => remove.mutate(),
+        isPending: remove.isPending,
+        isError: remove.isError,
+      }}
+    />
+  );
+}
+
+export function MorePhotosUploader({ profile }: { profile: InstructorProfile }) {
+  return (
+    <MorePhotos>
+      {EXTRA_PHOTO_SLOTS.map((slot) => (
+        <MyPhotoSlot key={slot} profile={profile} slot={slot} />
+      ))}
+    </MorePhotos>
+  );
+}
+
 export function PhotoPicker({
   profile,
   upload,
   remove,
+  slot = 1,
 }: {
   profile: PhotoSubject;
   upload: UseMutationResult<InstructorProfile, Error, File>;
-  remove?: { onRemove: () => void; isPending: boolean };
+  remove?: { onRemove: () => void; isPending: boolean; isError?: boolean };
+  slot?: PhotoSlot;
 }) {
   const t = useT();
+  const url = photoUrlForSlot(profile, slot);
+  const slotLabel =
+    slot === 2 ? t.profile.photo2 : slot === 3 ? t.profile.photo3 : null;
+  const uploadLabel = slotLabel
+    ? url
+      ? t.profile.slotReplacePhoto
+      : t.profile.slotUploadPhoto
+    : t.profile.uploadPhoto;
+  const removeLabel = slotLabel ? t.profile.slotRemovePhoto : t.profile.removePhoto;
   const { locale } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,11 +127,15 @@ export function PhotoPicker({
   }
 
   return (
-    <div className="flex items-center gap-4">
-      {profile.profilePhotoUrl ? (
+    <div
+      className="flex items-center gap-4"
+      role={slotLabel ? 'group' : undefined}
+      aria-label={slotLabel ?? undefined}
+    >
+      {url ? (
         <img
-          src={profile.profilePhotoUrl}
-          alt={name}
+          src={url}
+          alt={slotLabel ? `${name} — ${slotLabel}` : name}
           className="h-16 w-16 rounded-lg object-cover"
         />
       ) : (
@@ -62,6 +144,9 @@ export function PhotoPicker({
         </div>
       )}
       <div className="flex flex-col gap-1.5">
+        {slotLabel && (
+          <span className="text-sm font-medium text-navy">{slotLabel}</span>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -76,9 +161,9 @@ export function PhotoPicker({
           loading={upload.isPending}
           onClick={() => inputRef.current?.click()}
         >
-          {upload.isPending ? t.profile.uploading : t.profile.uploadPhoto}
+          {upload.isPending ? t.profile.uploading : uploadLabel}
         </Button>
-        {remove && profile.profilePhotoUrl && (
+        {remove && url && (
           <Button
             type="button"
             variant="ghost"
@@ -86,8 +171,13 @@ export function PhotoPicker({
             loading={remove.isPending}
             onClick={remove.onRemove}
           >
-            {t.profile.removePhoto}
+            {removeLabel}
           </Button>
+        )}
+        {remove?.isError && (
+          <Banner tone="error">
+            <span className="text-xs">{t.errors.generic}</span>
+          </Banner>
         )}
         <span className="text-xs text-slate">{t.profile.photoHint}</span>
         {error && (

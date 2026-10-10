@@ -133,6 +133,15 @@ export interface Messages {
     photoHint: string;
     uploading: string;
     removePhoto: string;
+    trackRegular: string;
+    trackPark: string;
+    trackCarving: string;
+    morePhotos: string;
+    photo2: string;
+    photo3: string;
+    slotUploadPhoto: string;
+    slotReplacePhoto: string;
+    slotRemovePhoto: string;
   };
   settings: {
     title: string;
@@ -196,6 +205,8 @@ export interface Messages {
     editRow: string;
     editRowFor: string;
     editingName: string;
+    displayOrder: string;
+    displayOrderInvalid: string;
   };
   translation: {
     badge: string;

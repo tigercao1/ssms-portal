@@ -3,6 +3,7 @@ import { localizeField } from '@/i18n/core/localize';
 import { Card } from '@/components';
 import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
 import type { InstructorProfile, RefItem } from '@/lib/types';
+import { certificationLabel } from './certLabels';
 
 function Avatar({ url, name }: { url: string | null; name: string }) {
   if (url) {
@@ -68,6 +69,12 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
     : showsZhBio
       ? profile.bioZhTranslatedBy
       : profile.bioEnTranslatedBy;
+  const extraPhotos = [
+    { label: t.profile.photo2, url: profile.photo2Url },
+    { label: t.profile.photo3, url: profile.photo3Url },
+  ].filter((photo): photo is { label: string; url: string } =>
+    Boolean(photo.url),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,6 +85,22 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
           <p className="font-mono text-sm text-slate">{profile.email}</p>
         </div>
       </Card>
+
+      {extraPhotos.length > 0 && (
+        <Card className="flex flex-col gap-3">
+          <h3 className="text-lg">{t.profile.morePhotos}</h3>
+          <div className="flex flex-wrap gap-4">
+            {extraPhotos.map((photo) => (
+              <img
+                key={photo.label}
+                src={photo.url}
+                alt={`${name} — ${photo.label}`}
+                className="h-32 w-32 rounded-lg object-cover"
+              />
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="grid gap-6 sm:grid-cols-2">
         <Section title={t.profile.bio}>
@@ -93,7 +116,7 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
             <ul className="flex flex-col gap-1">
               {profile.certifications.map((c, i) => (
                 <li key={i} className="text-sm text-ink">
-                  {c.display}
+                  {certificationLabel(c, t)}
                 </li>
               ))}
             </ul>
