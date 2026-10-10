@@ -7,6 +7,7 @@ import type {
   UpdateProfileBody,
 } from '@/lib/types';
 import { MAX_AVATAR_BYTES } from '@/lib/types';
+import { resizeImage } from '@/lib/resizeImage';
 
 const PROFILE_KEY = ['me', 'instructor'] as const;
 
@@ -30,24 +31,44 @@ export function useUpdateProfile() {
 
 const ALLOWED: AllowedAvatarMime[] = ['image/jpeg', 'image/png', 'image/webp'];
 
-export function validateAvatar(file: File): string | null {
+export function validateAvatarType(file: Blob): string | null {
   if (!ALLOWED.includes(file.type as AllowedAvatarMime)) {
     return 'Use a JPEG, PNG or WebP image.';
   }
+  return null;
+}
+
+export function validateAvatar(file: Blob): string | null {
+  const typeError = validateAvatarType(file);
+  if (typeError) return typeError;
   if (file.size > MAX_AVATAR_BYTES) {
     return 'Image must be 5 MB or smaller.';
   }
   return null;
 }
 
+export async function prepareAvatar(file: Blob): Promise<Blob> {
+  const typeError = validateAvatarType(file);
+  if (typeError) throw new Error(typeError);
+  const resized = await resizeImage(file).catch(() => null);
+  const keepOriginal =
+    !resized || (resized.size >= file.size && validateAvatar(file) === null);
+  const chosen = keepOriginal ? file : resized;
+  const error = validateAvatar(chosen);
+  if (error) throw new Error(error);
+  return chosen;
+}
+
 /**
- * W2.3 — three-step avatar upload: get a signed URL from the API, PUT the bytes
- * to Supabase Storage, then confirm so the API persists the public URL.
+ * W2.3 — resize, then three-step avatar upload: get a signed URL from the API,
+ * PUT the bytes to Supabase Storage, then confirm so the API persists the
+ * public URL.
  */
 export async function uploadAvatar(
-  file: File,
+  original: File,
   photoPath: string,
 ): Promise<InstructorProfile> {
+  const file = await prepareAvatar(original);
   const contentType = file.type as AllowedAvatarMime;
   const ticket = await api<AvatarUploadTicket>(
     `${photoPath}/signed-upload-url`,

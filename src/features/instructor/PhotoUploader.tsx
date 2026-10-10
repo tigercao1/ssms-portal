@@ -3,7 +3,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Banner, Button } from '@/components';
-import { useUploadAvatar, validateAvatar } from './api';
+import { useUploadAvatar, validateAvatarType } from './api';
 import type { InstructorProfile } from '@/lib/types';
 
 type PhotoSubject = Pick<
@@ -39,7 +39,7 @@ export function PhotoPicker({
 
   function pick(file?: File) {
     if (!file) return;
-    const err = validateAvatar(file);
+    const err = validateAvatarType(file);
     if (err) {
       setError(err);
       return;
