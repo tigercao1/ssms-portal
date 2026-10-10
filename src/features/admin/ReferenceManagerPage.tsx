@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -12,7 +12,10 @@ import {
   Toggle,
 } from '@/components';
 import type { ReferenceSlug } from '@/features/reference/api';
-import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
+import {
+  MachineTranslationNote,
+  TranslatedByBadge,
+} from '@/features/translation/TranslatedByBadge';
 import {
   useAddReference,
   useAdminReferences,
@@ -30,10 +33,11 @@ const TABS: { slug: ReferenceSlug; labelKey: keyof ReturnType<typeof useT>['refe
     { slug: 'exam-preparations', labelKey: 'examPreps' },
   ];
 
-/** W2.13 — admin reference-data manager: tabs, row status/actions, add-row form. */
+/** W2.13 — admin reference-data manager: tabs, row status/actions, add/edit-row form. */
 export function ReferenceManagerPage() {
   const t = useT();
   const [slug, setSlug] = useState<ReferenceSlug>('teaching-locations');
+  const [editing, setEditing] = useState<ReferenceRecord | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,7 +47,10 @@ export function ReferenceManagerPage() {
         {TABS.map((tab) => (
           <button
             key={tab.slug}
-            onClick={() => setSlug(tab.slug)}
+            onClick={() => {
+              setSlug(tab.slug);
+              setEditing(null);
+            }}
             className={
               'border-b-2 px-3 py-2 text-sm transition-colors ' +
               (slug === tab.slug
@@ -56,18 +63,44 @@ export function ReferenceManagerPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
-        <ReferenceTable key={slug} slug={slug} />
-        <AddRow slug={slug} />
+      <div className="flex flex-col gap-6">
+        <ReferenceTable
+          key={slug}
+          slug={slug}
+          selectedId={editing?.id ?? null}
+          onEdit={setEditing}
+          onRemoved={(id) =>
+            setEditing((current) => (current?.id === id ? null : current))
+          }
+        />
+        {editing ? (
+          <EditRow
+            key={editing.id}
+            slug={slug}
+            row={editing}
+            onDone={() => setEditing(null)}
+          />
+        ) : (
+          <AddRow slug={slug} />
+        )}
       </div>
     </div>
   );
 }
 
-function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
+function ReferenceTable({
+  slug,
+  selectedId,
+  onEdit,
+  onRemoved,
+}: {
+  slug: ReferenceSlug;
+  selectedId: string | null;
+  onEdit: (row: ReferenceRecord) => void;
+  onRemoved: (id: string) => void;
+}) {
   const t = useT();
   const rows = useAdminReferences(slug);
-  const update = useUpdateReference(slug);
   const [removing, setRemoving] = useState<ReferenceRecord | null>(null);
 
   return (
@@ -77,100 +110,111 @@ function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
           <Spinner />
         </div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
-              <th className="px-4 py-2 font-medium">{t.admin.keyLabel}</th>
-              <th className="px-4 py-2 font-medium">{t.admin.nameLabel}</th>
-              <th className="px-4 py-2 font-medium">
-                {t.translation.nameZhLabel}
-              </th>
-              <th className="px-4 py-2 font-medium">{t.admin.colStatus}</th>
-              <th className="px-4 py-2 text-right font-medium">
-                {t.admin.actions}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {(rows.data ?? []).map((r, i) => (
-              <tr
-                key={r.id}
-                className={cn(
-                  i % 2 === 1 && 'bg-sunken',
-                  !r.isActive && 'text-slate',
-                )}
-              >
-                <td
-                  className={cn(
-                    'px-4 py-2 font-mono text-xs text-slate',
-                    !r.isActive && 'opacity-60',
-                  )}
-                >
-                  {r.key}
-                </td>
-                <td
-                  className={cn(
-                    'px-4 py-2',
-                    r.isActive ? 'text-ink' : 'opacity-60',
-                  )}
-                >
-                  <div className="flex flex-col gap-1">
-                    <span>{r.name}</span>
-                    <TranslatedByBadge model={r.nameEnTranslatedBy} />
-                  </div>
-                </td>
-                <td
-                  className={cn(
-                    'px-4 py-2',
-                    r.isActive ? 'text-ink' : 'opacity-60',
-                  )}
-                >
-                  <NameZhCell row={r} update={update} />
-                </td>
-                <td className="px-4 py-2">
-                  <RefStatus isActive={r.isActive} />
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={
-                        update.isPending && update.variables?.id === r.id
-                      }
-                      onClick={() =>
-                        update.mutate({ id: r.id, isActive: !r.isActive })
-                      }
-                    >
-                      {r.isActive ? t.admin.deactivate : t.admin.activate}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setRemoving(r)}
-                    >
-                      {t.admin.removeRow}
-                    </Button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-sm">
+            <thead>
+              <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
+                <th className="hidden whitespace-nowrap px-4 py-2 font-medium xl:table-cell">
+                  {t.admin.keyLabel}
+                </th>
+                <th className="min-w-[12rem] px-4 py-2 font-medium">
+                  {t.admin.nameLabel}
+                </th>
+                <th className="min-w-[9rem] whitespace-nowrap px-4 py-2 font-medium">
+                  {t.translation.nameZhLabel}
+                </th>
+                <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
+                  {t.admin.colStatus}
+                </th>
+                <th className="w-px whitespace-nowrap px-4 py-2 text-right font-medium">
+                  {t.admin.actions}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {update.isError && (
-        <div className="px-4 pb-4">
-          <Banner tone="error">
-            {isEnglishNameRequired(update.error)
-              ? t.translation.englishNameRequired
-              : t.errors.generic}
-          </Banner>
+            </thead>
+            <tbody>
+              {(rows.data ?? []).map((r, i) => {
+                const selected = r.id === selectedId;
+                return (
+                  <tr
+                    key={r.id}
+                    aria-current={selected || undefined}
+                    className={cn(
+                      selected
+                        ? 'bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]'
+                        : i % 2 === 1 && 'bg-sunken',
+                      !r.isActive && 'text-slate',
+                    )}
+                  >
+                    <td
+                      className={cn(
+                        'hidden whitespace-nowrap px-4 py-2 font-mono text-xs text-slate xl:table-cell',
+                        !r.isActive && 'opacity-60',
+                      )}
+                    >
+                      {r.key}
+                    </td>
+                    <td
+                      className={cn(
+                        'px-4 py-2',
+                        r.isActive ? 'text-ink' : 'opacity-60',
+                      )}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span>{r.name}</span>
+                        <span className="whitespace-nowrap font-mono text-xs text-slate xl:hidden">
+                          {r.key}
+                        </span>
+                        <TranslatedByBadge model={r.nameEnTranslatedBy} />
+                      </div>
+                    </td>
+                    <td
+                      className={cn(
+                        'px-4 py-2',
+                        r.isActive ? 'text-ink' : 'opacity-60',
+                      )}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span>{r.nameZh || '—'}</span>
+                        <TranslatedByBadge model={r.nameZhTranslatedBy} />
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <RefStatus isActive={r.isActive} />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          aria-label={t.admin.editRowFor.replace(
+                            '{name}',
+                            r.name,
+                          )}
+                          onClick={() => onEdit(r)}
+                        >
+                          {t.common.edit}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRemoving(r)}
+                        >
+                          {t.admin.removeRow}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
       {removing && (
         <ConfirmRemove
           slug={slug}
           row={removing}
+          onRemoved={() => onRemoved(removing.id)}
           onClose={() => setRemoving(null)}
         />
       )}
@@ -180,69 +224,6 @@ function ReferenceTable({ slug }: { slug: ReferenceSlug }) {
 
 function isEnglishNameRequired(err: unknown) {
   return err instanceof ApiError && err.status === 422;
-}
-
-function NameZhCell({
-  row,
-  update,
-}: {
-  row: ReferenceRecord;
-  update: ReturnType<typeof useUpdateReference>;
-}) {
-  const t = useT();
-  const [draft, setDraft] = useState<string | null>(null);
-  const saving = update.isPending && update.variables?.id === row.id;
-
-  if (draft === null) {
-    return (
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <span>{row.nameZh || '–'}</span>
-          <TranslatedByBadge model={row.nameZhTranslatedBy} />
-        </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label={t.translation.editNameZh.replace('{name}', row.name)}
-          onClick={() => setDraft(row.nameZh ?? '')}
-        >
-          {t.common.edit}
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <form
-      className="flex items-center gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        update.mutate(
-          { id: row.id, nameZh: draft.trim() || null },
-          { onSuccess: () => setDraft(null) },
-        );
-      }}
-    >
-      <Input
-        aria-label={t.translation.editNameZh.replace('{name}', row.name)}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        autoFocus
-      />
-      <Button size="sm" type="submit" loading={saving}>
-        {t.common.save}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        type="button"
-        onClick={() => setDraft(null)}
-        disabled={saving}
-      >
-        {t.common.cancel}
-      </Button>
-    </form>
-  );
 }
 
 function RefStatus({ isActive }: { isActive: boolean }) {
@@ -269,10 +250,12 @@ function RefStatus({ isActive }: { isActive: boolean }) {
 function ConfirmRemove({
   slug,
   row,
+  onRemoved,
   onClose,
 }: {
   slug: ReferenceSlug;
   row: ReferenceRecord;
+  onRemoved: () => void;
   onClose: () => void;
 }) {
   const t = useT();
@@ -315,7 +298,14 @@ function ConfirmRemove({
         <Button
           size="sm"
           variant="danger"
-          onClick={() => remove.mutate(row.id, { onSuccess: onClose })}
+          onClick={() =>
+            remove.mutate(row.id, {
+              onSuccess: () => {
+                onRemoved();
+                onClose();
+              },
+            })
+          }
           loading={remove.isPending}
           disabled={!usageFresh}
         >
@@ -362,49 +352,208 @@ function AddRow({ slug }: { slug: ReferenceSlug }) {
   }
 
   return (
-    <Card className="flex h-fit flex-col gap-4">
+    <Card className="flex flex-col gap-4">
       <h2 className="text-lg">{t.admin.addRow}</h2>
-      <Field label={t.admin.keyLabel} required error={keyError ?? undefined}>
-        {(p) => (
-          <Input {...p} value={key} onChange={(e) => setKey(e.target.value)} />
-        )}
-      </Field>
-      <Field label={t.admin.nameLabel} error={nameError ?? undefined}>
-        {(p) => (
-          <Input {...p} value={name} onChange={(e) => setName(e.target.value)} />
-        )}
-      </Field>
-      <Field label={t.translation.nameZhLabel} hint={t.translation.addNameHint}>
-        {(p) => (
-          <Input
-            {...p}
-            value={nameZh}
-            onChange={(e) => setNameZh(e.target.value)}
-          />
-        )}
-      </Field>
-      <Field label={t.admin.sortOrder}>
-        {(p) => (
-          <Input
-            {...p}
-            type="number"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-          />
-        )}
-      </Field>
-      <div className="flex items-center gap-2">
-        <Toggle checked={isActive} onChange={setIsActive} label={t.admin.activeLabel} />
-        <span className="text-sm text-slate">{t.admin.activeLabel}</span>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label={t.admin.keyLabel} required error={keyError ?? undefined}>
+          {(p) => (
+            <Input
+              {...p}
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t.admin.nameLabel} error={nameError ?? undefined}>
+          {(p) => (
+            <Input
+              {...p}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field
+          label={t.translation.nameZhLabel}
+          hint={t.translation.addNameHint}
+        >
+          {(p) => (
+            <Input
+              {...p}
+              value={nameZh}
+              onChange={(e) => setNameZh(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t.admin.sortOrder}>
+          {(p) => (
+            <Input
+              {...p}
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+            />
+          )}
+        </Field>
       </div>
       {add.isSuccess && <Banner tone="approved">{t.admin.addedRow}</Banner>}
-      <Button
-        onClick={submit}
-        loading={add.isPending}
-        disabled={!key.trim() || (!name.trim() && !nameZh.trim())}
-      >
-        {t.common.add}
-      </Button>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Toggle
+            checked={isActive}
+            onChange={setIsActive}
+            label={t.admin.activeLabel}
+          />
+          <span className="text-sm text-slate">{t.admin.activeLabel}</span>
+        </div>
+        <Button
+          onClick={submit}
+          loading={add.isPending}
+          disabled={!key.trim() || (!name.trim() && !nameZh.trim())}
+        >
+          {t.common.add}
+        </Button>
+      </div>
     </Card>
+  );
+}
+
+function EditRow({
+  slug,
+  row,
+  onDone,
+}: {
+  slug: ReferenceSlug;
+  row: ReferenceRecord;
+  onDone: () => void;
+}) {
+  const t = useT();
+  const update = useUpdateReference(slug);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const nameZhRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState(row.name);
+  const [nameZh, setNameZh] = useState(row.nameZh ?? '');
+  const [sortOrder, setSortOrder] = useState(String(row.sortOrder));
+  const [isActive, setIsActive] = useState(row.isActive);
+
+  useEffect(() => {
+    nameZhRef.current?.focus({ preventScroll: true });
+    cardRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, []);
+
+  const nameChanged = name.trim() !== row.name;
+  const nextNameZh = nameZh.trim() || null;
+  const nameZhChanged = nextNameZh !== (row.nameZh || null);
+  const nextSortOrder = Number(sortOrder) || 0;
+  const changes = {
+    ...(nameChanged && { name: name.trim() }),
+    ...(nameZhChanged && { nameZh: nextNameZh }),
+    ...(nextSortOrder !== row.sortOrder && { sortOrder: nextSortOrder }),
+    ...(isActive !== row.isActive && { isActive }),
+  };
+  const dirty = Object.keys(changes).length > 0;
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!dirty || !name.trim() || update.isPending) return;
+    update.mutate({ id: row.id, ...changes }, { onSuccess: onDone });
+  }
+
+  return (
+    <div
+      ref={cardRef}
+      className="scroll-mb-6 scroll-mt-6"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && !update.isPending) onDone();
+      }}
+    >
+      <Card className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg">{t.admin.editRow}</h2>
+          <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-slate">
+            <span>{t.admin.editingName.replace('{name}', row.name)}</span>
+            <span className="break-all font-mono text-xs">
+              {t.admin.keyLabel}: {row.key}
+            </span>
+          </p>
+        </div>
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Field label={t.admin.nameLabel}>
+                {(p) => (
+                  <Input
+                    {...p}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                )}
+              </Field>
+              {!nameChanged && (
+                <MachineTranslationNote model={row.nameEnTranslatedBy} />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Field label={t.translation.nameZhLabel}>
+                {(p) => (
+                  <Input
+                    {...p}
+                    ref={nameZhRef}
+                    value={nameZh}
+                    onChange={(e) => setNameZh(e.target.value)}
+                  />
+                )}
+              </Field>
+              {!nameZhChanged && (
+                <MachineTranslationNote model={row.nameZhTranslatedBy} />
+              )}
+            </div>
+            <Field label={t.admin.sortOrder}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type="number"
+                  min={0}
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                />
+              )}
+            </Field>
+            <div className="flex items-center gap-2 sm:mt-7">
+              <Toggle
+                checked={isActive}
+                onChange={setIsActive}
+                label={t.admin.activeLabel}
+              />
+              <span className="text-sm text-slate">{t.admin.activeLabel}</span>
+            </div>
+          </div>
+          {update.isError && (
+            <Banner tone="error">
+              {isEnglishNameRequired(update.error)
+                ? t.translation.englishNameRequired
+                : t.errors.generic}
+            </Banner>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onDone}
+              disabled={update.isPending}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button
+              type="submit"
+              loading={update.isPending}
+              disabled={!dirty || !name.trim()}
+            >
+              {t.common.save}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
   );
 }

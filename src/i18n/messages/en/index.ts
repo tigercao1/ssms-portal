@@ -166,8 +166,6 @@ export const en: Messages = {
     approve: 'Approve',
     reject: 'Reject',
     rejectReason: 'Reason (optional)',
-    activate: 'Activate',
-    deactivate: 'Deactivate',
     takeOffline: 'Take offline',
     putOnline: 'Put online',
     takeOfflineConfirm:
@@ -201,6 +199,9 @@ export const en: Messages = {
       'This permanently deletes the value. This can’t be undone.',
     removeUsage: 'It will be removed from {count} instructor profiles.',
     removeConfirm: 'Remove permanently',
+    editRow: 'Edit row',
+    editRowFor: 'Edit {name}',
+    editingName: 'Editing {name}',
   },
   translation: {
     badge: 'Translated by {model}',
@@ -211,7 +212,6 @@ export const en: Messages = {
       'Fill in either name and the other is translated automatically.',
     englishNameRequired:
       'English name required (translation unavailable). Enter the English name and try again.',
-    editNameZh: 'Edit Chinese name for {name}',
   },
   shopifySync: {
     title: 'Shopify sync',

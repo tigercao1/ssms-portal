@@ -163,8 +163,6 @@ export interface Messages {
     approve: string;
     reject: string;
     rejectReason: string;
-    activate: string;
-    deactivate: string;
     takeOffline: string;
     putOnline: string;
     takeOfflineConfirm: string;
@@ -195,6 +193,9 @@ export interface Messages {
     removePermanent: string;
     removeUsage: string;
     removeConfirm: string;
+    editRow: string;
+    editRowFor: string;
+    editingName: string;
   };
   translation: {
     badge: string;
@@ -202,7 +203,6 @@ export interface Messages {
     nameZhLabel: string;
     addNameHint: string;
     englishNameRequired: string;
-    editNameZh: string;
   };
   shopifySync: {
     title: string;
