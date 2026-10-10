@@ -179,6 +179,8 @@ function VisibilityAction({ rec }: { rec: AdminInstructorRecord }) {
   );
 }
 
+const MAX_DISPLAY_ORDER = 2_147_483_647;
+
 function DisplayOrderCard({ rec }: { rec: AdminInstructorRecord }) {
   const t = useT();
   const save = useSetDisplayOrder(rec.id);
@@ -190,7 +192,10 @@ function DisplayOrderCard({ rec }: { rec: AdminInstructorRecord }) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = value.trim();
-    if (trimmed && !/^\d+$/.test(trimmed)) {
+    if (
+      trimmed &&
+      (!/^\d+$/.test(trimmed) || Number(trimmed) > MAX_DISPLAY_ORDER)
+    ) {
       setError(t.admin.displayOrderInvalid);
       return;
     }
@@ -208,6 +213,7 @@ function DisplayOrderCard({ rec }: { rec: AdminInstructorRecord }) {
               type="number"
               inputMode="numeric"
               min={0}
+              max={MAX_DISPLAY_ORDER}
               step={1}
               value={value}
               onChange={(e) => {

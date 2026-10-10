@@ -654,7 +654,7 @@ describe('AdminDetailPage display order', () => {
     ).toHaveValue(null);
   });
 
-  it.each(['-1', '2.5'])(
+  it.each(['-1', '2.5', '2147483648'])(
     'rejects %j without saving',
     async (value) => {
       serveRecord({});
