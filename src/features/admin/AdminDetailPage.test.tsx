@@ -214,9 +214,7 @@ describe('AdminDetailPage actions', () => {
     );
     renderDetail();
 
-    expect(
-      screen.queryByText('Something went wrong.'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Something went wrong.')).not.toBeInTheDocument();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Approve' }),
     );
@@ -435,5 +433,20 @@ describe('AdminDetailPage photo', () => {
         screen.queryByRole('img', { name: 'Jane Snow' }),
       ).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe('AdminDetailPage Shopify panel', () => {
+  it('shows the instructor Shopify sync state', async () => {
+    serveRecord({ approvalStatus: 'approved', isActive: true });
+    renderDetail();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Shopify' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('jane-snow')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Sync this instructor now' }),
+    ).toBeInTheDocument();
   });
 });

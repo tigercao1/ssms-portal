@@ -21,6 +21,7 @@ import {
   useSetRole,
 } from './api';
 import { AdminProfileEditor } from './AdminProfileEditor';
+import { ShopifyInstructorPanel } from './ShopifyInstructorPanel';
 import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
 /** W2.8–W2.12 — admin instructor detail + actions rail. */
@@ -125,6 +126,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
       </Card>
 
       <RoleCard authUserId={rec.authUserId} />
+      <ShopifyInstructorPanel instructorId={rec.id} />
     </div>
   );
 }
