@@ -160,8 +160,6 @@ export const zhCN: Messages = {
     approve: '通过',
     reject: '拒绝',
     rejectReason: '原因（可选）',
-    activate: '启用',
-    deactivate: '停用',
     takeOffline: '下线',
     putOnline: '重新上线',
     takeOfflineConfirm: '确定下线该教练？其资料将不在公开目录中显示，并会通过邮件通知教练。',
@@ -192,6 +190,9 @@ export const zhCN: Messages = {
     removePermanent: '该值将被永久删除，此操作无法撤销。',
     removeUsage: '将从 {count} 位教练的资料中移除。',
     removeConfirm: '永久删除',
+    editRow: '编辑条目',
+    editRowFor: '编辑 {name}',
+    editingName: '正在编辑 {name}',
   },
   translation: {
     badge: '由 {model} 翻译',
@@ -199,7 +200,6 @@ export const zhCN: Messages = {
     nameZhLabel: '中文名称',
     addNameHint: '任填一种名称，另一种将自动翻译。',
     englishNameRequired: '需要填写英文名称（翻译暂不可用）。请填写英文名称后重试。',
-    editNameZh: '编辑“{name}”的中文名称',
   },
   shopifySync: {
     title: 'Shopify 同步',

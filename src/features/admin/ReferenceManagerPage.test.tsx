@@ -75,19 +75,20 @@ describe('ReferenceManagerPage', () => {
     expect(within(rowFor('Cypress')).getByText('Inactive')).toBeInTheDocument();
   });
 
-  it('deactivates an active row and activates an inactive one', async () => {
+  it('renders a read-only table with Edit and Remove per row', () => {
     renderWithProviders(<ReferenceManagerPage />);
-    await userEvent.click(
-      within(rowFor('Whistler')).getByRole('button', { name: 'Deactivate' }),
-    );
-    expect(updateMutate).toHaveBeenLastCalledWith({
-      id: 'r1',
-      isActive: false,
-    });
-    await userEvent.click(
-      within(rowFor('Cypress')).getByRole('button', { name: 'Activate' }),
-    );
-    expect(updateMutate).toHaveBeenLastCalledWith({ id: 'r2', isActive: true });
+    for (const name of ['Whistler', 'Cypress']) {
+      const row = rowFor(name);
+      expect(within(row).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(within(row).queryByRole('spinbutton')).not.toBeInTheDocument();
+      expect(within(row).queryByRole('switch')).not.toBeInTheDocument();
+      expect(
+        within(row)
+          .getAllByRole('button')
+          .map((b) => b.textContent),
+      ).toEqual(['Edit', 'Remove']);
+    }
+    expect(within(rowFor('Whistler')).getByText('—')).toBeInTheDocument();
   });
 
   it('shows the usage count and deletes only after confirming', async () => {
