@@ -204,6 +204,70 @@ describe('ReferenceManagerPage edit panel', () => {
     expect(api.patches).toHaveLength(0);
   });
 
+  it('wires the Edit button to the panel with aria-expanded and aria-controls', async () => {
+    serve([whistler, cypress]);
+    const user = userEvent.setup();
+    renderWithProviders(<ReferenceManagerPage />);
+
+    const edit = await screen.findByRole('button', { name: 'Edit Whistler' });
+    const other = screen.getByRole('button', { name: 'Edit Cypress' });
+    expect(edit).toHaveAttribute('aria-expanded', 'false');
+    expect(edit).toHaveAttribute('aria-controls', 'ref-edit-r1');
+    expect(other).toHaveAttribute('aria-controls', 'ref-edit-r2');
+
+    await user.click(edit);
+    expect(edit).toHaveAttribute('aria-expanded', 'true');
+    expect(other).toHaveAttribute('aria-expanded', 'false');
+    expect(panel()).toHaveAttribute('id', 'ref-edit-r1');
+
+    await user.click(other);
+    expect(edit).toHaveAttribute('aria-expanded', 'false');
+    expect(other).toHaveAttribute('aria-expanded', 'true');
+    expect(panel()).toHaveAttribute('id', 'ref-edit-r2');
+
+    await user.keyboard('{Escape}');
+    expect(other).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('returns focus to the row Edit button after Cancel, Escape and Save', async () => {
+    serve([whistler, cypress]);
+    const user = userEvent.setup();
+    renderWithProviders(<ReferenceManagerPage />);
+    const editButton = (name: string) =>
+      screen.getByRole('button', { name: `Edit ${name}` });
+
+    await startEditing(user, 'Cypress');
+    await user.click(within(panel()).getByRole('button', { name: 'Cancel' }));
+    expect(editButton('Cypress')).toHaveFocus();
+
+    await startEditing(user, 'Whistler');
+    await user.keyboard('{Escape}');
+    expect(editButton('Whistler')).toHaveFocus();
+
+    await startEditing(user, 'Whistler');
+    await user.type(within(panel()).getByLabelText('Chinese name'), '!');
+    await user.click(within(panel()).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(editShown()).toBe(false));
+    expect(editButton('Whistler')).toHaveFocus();
+  });
+
+  it('shows translation badges on a contrasting background in the selected row', async () => {
+    serve([whistler]);
+    const user = userEvent.setup();
+    renderWithProviders(<ReferenceManagerPage />);
+
+    await screen.findByText('Whistler');
+    const badge = within(rowFor('Whistler')).getByText(/gemini-2\.5-flash/);
+    expect(badge).toHaveClass('bg-navy-tint');
+
+    await startEditing(user, 'Whistler');
+    const selectedBadge = within(rowFor('Whistler')).getByText(
+      /gemini-2\.5-flash/,
+    );
+    expect(selectedBadge).toHaveClass('bg-surface');
+    expect(selectedBadge).not.toHaveClass('bg-navy-tint');
+  });
+
   it('switching tabs closes the edit row', async () => {
     serve([whistler]);
     const user = userEvent.setup();

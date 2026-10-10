@@ -96,6 +96,24 @@ function ReferenceTable({
   const t = useT();
   const rows = useAdminReferences(slug);
   const [removing, setRemoving] = useState<ReferenceRecord | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const returnFocusTo = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (editing || !returnFocusTo.current) return;
+    const id = returnFocusTo.current;
+    returnFocusTo.current = null;
+    const target =
+      document.getElementById(editTriggerId(id)) ??
+      tableRef.current?.querySelector<HTMLElement>('[data-edit-trigger]') ??
+      tableRef.current;
+    target?.focus();
+  }, [editing]);
+
+  function doneEditing() {
+    if (editing) returnFocusTo.current = editing.id;
+    onDoneEditing();
+  }
 
   return (
     <Card className="flex flex-col gap-4 p-0">
@@ -104,7 +122,7 @@ function ReferenceTable({
           <Spinner />
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div ref={tableRef} tabIndex={-1} className="overflow-x-auto">
           <table className="w-full min-w-[36rem] text-sm">
             <thead>
               <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
@@ -158,7 +176,10 @@ function ReferenceTable({
                           <span className="whitespace-nowrap font-mono text-xs text-slate xl:hidden">
                             {r.key}
                           </span>
-                          <TranslatedByBadge model={r.nameEnTranslatedBy} />
+                          <TranslatedByBadge
+                            model={r.nameEnTranslatedBy}
+                            onTint={selected}
+                          />
                         </div>
                       </td>
                       <td
@@ -169,7 +190,10 @@ function ReferenceTable({
                       >
                         <div className="flex flex-col gap-1">
                           <span>{r.nameZh || '—'}</span>
-                          <TranslatedByBadge model={r.nameZhTranslatedBy} />
+                          <TranslatedByBadge
+                            model={r.nameZhTranslatedBy}
+                            onTint={selected}
+                          />
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">
@@ -178,8 +202,12 @@ function ReferenceTable({
                       <td className="whitespace-nowrap px-4 py-2">
                         <div className="flex justify-end gap-2">
                           <Button
+                            id={editTriggerId(r.id)}
+                            data-edit-trigger
                             size="sm"
                             variant="secondary"
+                            aria-expanded={selected}
+                            aria-controls={editPanelId(r.id)}
                             aria-label={t.admin.editRowFor.replace(
                               '{name}',
                               r.name,
@@ -203,7 +231,7 @@ function ReferenceTable({
                         key={editing.id}
                         slug={slug}
                         row={editing}
-                        onDone={onDoneEditing}
+                        onDone={doneEditing}
                       />
                     )}
                   </Fragment>
@@ -223,6 +251,14 @@ function ReferenceTable({
       )}
     </Card>
   );
+}
+
+function editPanelId(id: string) {
+  return `ref-edit-${id}`;
+}
+
+function editTriggerId(id: string) {
+  return `ref-edit-trigger-${id}`;
 }
 
 function isEnglishNameRequired(err: unknown) {
@@ -465,6 +501,7 @@ function EditRow({
   return (
     <tr
       ref={rowRef}
+      id={editPanelId(row.id)}
       className="scroll-my-6 bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]"
     >
       <td

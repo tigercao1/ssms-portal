@@ -1,14 +1,22 @@
 import { useT } from '@/i18n/core/I18nProvider';
+import { cn } from '@/lib/cn';
 
 export function TranslatedByBadge({
   model,
+  onTint = false,
 }: {
   model: string | null | undefined;
+  onTint?: boolean;
 }) {
   const t = useT();
   if (!model) return null;
   return (
-    <span className="inline-flex w-fit items-center rounded-sm bg-navy-tint px-2 py-0.5 text-xs font-medium text-navy">
+    <span
+      className={cn(
+        'inline-flex w-fit items-center rounded-sm px-2 py-0.5 text-xs font-medium text-navy',
+        onTint ? 'bg-surface' : 'bg-navy-tint',
+      )}
+    >
       {t.translation.badge.replace('{model}', model)}
     </span>
   );
