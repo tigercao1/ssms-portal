@@ -195,8 +195,19 @@ describe('public pages', () => {
 
       expect(response.status).toBe(405);
       expect(response.headers.get('Allow')).toBe('GET, HEAD');
+      expectSecurityHeaders(response);
     },
   );
+
+  it.each([
+    ['/', 302],
+    ['/winter-lessons/', 301],
+  ])('sends the security headers on the %s redirect', async (path, status) => {
+    const response = await call(path, { redirect: 'manual' });
+
+    expect(response.status).toBe(status);
+    expectSecurityHeaders(response);
+  });
 
   it('rejects POST on / with 405', async () => {
     expect((await call('/', { method: 'POST' })).status).toBe(405);

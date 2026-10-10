@@ -58,17 +58,26 @@ async function handlePublic(
   search: string,
 ): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } });
+    return new Response(null, {
+      status: 405,
+      headers: { ...SECURITY_HEADERS, Allow: 'GET, HEAD' },
+    });
   }
   if (pathname === '/') {
-    return new Response(null, { status: 302, headers: { Location: HOME_URL } });
+    return new Response(null, {
+      status: 302,
+      headers: { ...SECURITY_HEADERS, Location: HOME_URL },
+    });
   }
 
   const segment = pathname.slice(1);
   if (segment.endsWith('/') && isValidSlug(segment.slice(0, -1))) {
     return new Response(null, {
       status: 301,
-      headers: { Location: `/${segment.slice(0, -1)}${search}` },
+      headers: {
+        ...SECURITY_HEADERS,
+        Location: `/${segment.slice(0, -1)}${search}`,
+      },
     });
   }
   if (!isValidSlug(segment)) return notFound(request);
