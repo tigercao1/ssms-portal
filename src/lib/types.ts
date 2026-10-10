@@ -55,6 +55,7 @@ export interface InstructorProfile {
   profilePhotoUrl: string | null;
   photo2Url?: string | null;
   photo3Url?: string | null;
+  displayOrder?: number | null;
   minStudentAge: number;
   teachingLocations: RefItem[];
   languages: RefItem[];
@@ -119,6 +120,7 @@ export interface AdminInstructorRecord {
   preferredLanguage: PreferredLanguage;
   approvalStatus: ApprovalStatus;
   isActive: boolean;
+  displayOrder?: number | null;
   insertedAt: string;
   updatedAt: string;
 }

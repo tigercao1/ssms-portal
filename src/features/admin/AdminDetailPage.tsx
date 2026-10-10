@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Field,
+  Input,
   Spinner,
   StatusPill,
   Textarea,
@@ -18,6 +19,7 @@ import {
   useAdminUserRole,
   useSetActivation,
   useSetApproval,
+  useSetDisplayOrder,
   useSetRole,
 } from './api';
 import { AdminProfileEditor } from './AdminProfileEditor';
@@ -125,6 +127,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
         <VisibilityAction rec={rec} />
       </Card>
 
+      <DisplayOrderCard rec={rec} />
       <RoleCard authUserId={rec.authUserId} />
       <ShopifyInstructorPanel instructorId={rec.id} />
     </div>
@@ -173,6 +176,54 @@ function VisibilityAction({ rec }: { rec: AdminInstructorRecord }) {
       )}
       {activation.isError && <Banner tone="error">{t.errors.generic}</Banner>}
     </div>
+  );
+}
+
+function DisplayOrderCard({ rec }: { rec: AdminInstructorRecord }) {
+  const t = useT();
+  const save = useSetDisplayOrder(rec.id);
+  const [value, setValue] = useState(
+    rec.displayOrder == null ? '' : String(rec.displayOrder),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (trimmed && !/^\d+$/.test(trimmed)) {
+      setError(t.admin.displayOrderInvalid);
+      return;
+    }
+    setError(null);
+    save.mutate(trimmed ? Number(trimmed) : null);
+  }
+
+  return (
+    <Card>
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+        <Field label={t.admin.displayOrder} error={error ?? undefined}>
+          {(p) => (
+            <Input
+              {...p}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                save.reset();
+              }}
+            />
+          )}
+        </Field>
+        <Button type="submit" variant="secondary" loading={save.isPending}>
+          {t.common.save}
+        </Button>
+        {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
+        {save.isSuccess && <Banner tone="approved">{t.common.saved}</Banner>}
+      </form>
+    </Card>
   );
 }
 

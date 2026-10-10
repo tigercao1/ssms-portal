@@ -158,6 +158,18 @@ export function useAdminRemovePhoto(id: string, slot: ExtraPhotoSlot) {
   });
 }
 
+export function useSetDisplayOrder(id: string) {
+  const sync = useInvalidate(id);
+  return useMutation({
+    mutationFn: (displayOrder: number | null) =>
+      api<AdminInstructorRecord>(`/admin/instructors/${id}/display-order`, {
+        method: 'PATCH',
+        body: { displayOrder },
+      }),
+    onSuccess: sync,
+  });
+}
+
 const adminReferenceKey = (slug: string) =>
   ['admin', 'reference', slug] as const;
 

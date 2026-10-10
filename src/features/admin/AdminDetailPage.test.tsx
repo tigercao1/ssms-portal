@@ -597,3 +597,110 @@ describe('AdminDetailPage more photos', () => {
   });
 });
 
+describe('AdminDetailPage display order', () => {
+  function serveDisplayOrder() {
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(
+        `${API}/admin/instructors/:id/display-order`,
+        async ({ request }) => {
+          const body = (await request.json()) as { displayOrder: number | null };
+          bodies.push(body);
+          return HttpResponse.json({
+            ...fakeAdminList[0],
+            displayOrder: body.displayOrder,
+          });
+        },
+      ),
+    );
+    return bodies;
+  }
+
+  const label = 'Display order (lower shows first)';
+
+  it('prefills the current order and saves a new one', async () => {
+    serveRecord({ displayOrder: 4 });
+    const bodies = serveDisplayOrder();
+    renderDetail();
+
+    const input = await screen.findByRole('spinbutton', { name: label });
+    expect(input).toHaveValue(4);
+    await userEvent.clear(input);
+    await userEvent.type(input, '2');
+    const card = input.closest('form') as HTMLFormElement;
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(bodies).toEqual([{ displayOrder: 2 }]));
+    expect(await within(card).findByText('Saved')).toBeInTheDocument();
+  });
+
+  it('sends null when the field is cleared', async () => {
+    serveRecord({ displayOrder: 7 });
+    const bodies = serveDisplayOrder();
+    renderDetail();
+
+    const input = await screen.findByRole('spinbutton', { name: label });
+    await userEvent.clear(input);
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(bodies).toEqual([{ displayOrder: null }]));
+  });
+
+  it('starts empty when no order is set', async () => {
+    serveRecord({ displayOrder: null });
+    renderDetail();
+    expect(
+      await screen.findByRole('spinbutton', { name: label }),
+    ).toHaveValue(null);
+  });
+
+  it.each(['-1', '2.5'])(
+    'rejects %j without saving',
+    async (value) => {
+      serveRecord({});
+      const bodies = serveDisplayOrder();
+      renderDetail();
+
+      const input = await screen.findByRole('spinbutton', { name: label });
+      await userEvent.type(input, value);
+      fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+      expect(
+        await screen.findByText(
+          'Enter a whole number, 0 or more, or leave it empty.',
+        ),
+      ).toBeInTheDocument();
+      expect(bodies).toHaveLength(0);
+    },
+  );
+
+  it('shows an error when saving fails', async () => {
+    serveRecord({});
+    server.use(
+      http.patch(
+        `${API}/admin/instructors/:id/display-order`,
+        () => new HttpResponse(null, { status: 500 }),
+      ),
+    );
+    renderDetail();
+
+    const input = await screen.findByRole('spinbutton', { name: label });
+    await userEvent.type(input, '1');
+    const card = input.closest('form') as HTMLFormElement;
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(
+      await within(card).findByText('Something went wrong.'),
+    ).toBeInTheDocument();
+  });
+
+  it('labels the field in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveRecord({});
+    renderDetail();
+    expect(
+      await screen.findByRole('spinbutton', {
+        name: '显示顺序（数字越小越靠前）',
+      }),
+    ).toBeInTheDocument();
+  });
+});
