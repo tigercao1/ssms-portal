@@ -6,7 +6,7 @@ const TOKEN = 'test-internal-token-0123456789abcdef';
 const ORIGIN = 'https://docs.ssnow.club';
 const PAGE_HTML = '<!doctype html><title>Lessons</title><h1>Lessons</h1>';
 const CSP =
-  "sandbox allow-popups allow-popups-to-escape-sandbox; frame-ancestors 'none'";
+  "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 interface StoredObject {
   bytes: Uint8Array;
