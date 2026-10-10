@@ -4,6 +4,7 @@ import { Banner, Button, Card, Spinner } from '@/components';
 import { ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/date';
 import type { Messages } from '@/i18n/core/types';
+import type { ShopifyEntryStatus } from '@/lib/types';
 import {
   isSyncEffective,
   useRunShopifySync,
@@ -11,20 +12,14 @@ import {
   useShopifySyncStatus,
 } from './shopifySyncApi';
 
-function statusText(status: string | null, t: Messages) {
+function statusText(status: ShopifyEntryStatus | null, t: Messages) {
   switch (status) {
-    case null:
-      return t.shopifySync.notSynced;
-    case 'synced':
-      return t.shopifySync.synced;
     case 'active':
       return t.shopifySync.active;
     case 'draft':
       return t.shopifySync.draft;
-    case 'failed':
-      return t.shopifySync.failed;
     default:
-      return status;
+      return t.shopifySync.notSynced;
   }
 }
 

@@ -168,12 +168,15 @@ export interface ShopifySyncStatus {
 
 export interface ShopifySyncRunResult {
   enqueued: number;
+  processing: boolean;
 }
+
+export type ShopifyEntryStatus = 'active' | 'draft';
 
 export interface ShopifyInstructorSync {
   handle: string | null;
   metaobjectId: string | null;
-  status: string | null;
+  status: ShopifyEntryStatus | null;
   lastSyncedAt: string | null;
   lastError: string | null;
   queued: boolean;

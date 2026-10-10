@@ -34,7 +34,7 @@ function serve(
     http.post(`${API}/admin/shopify-sync/run`, async ({ request }) => {
       runBodies.push(await request.json());
       sync = { ...sync, queued: true, attempts: 0 };
-      return HttpResponse.json({ enqueued: 1 });
+      return HttpResponse.json({ enqueued: 1, processing: true });
     }),
   );
   return { runBodies, requestedIds };
@@ -84,9 +84,9 @@ describe('ShopifyInstructorPanel', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
-  it('renders the last error, queue state and unknown statuses', async () => {
+  it('renders the last error and queue state', async () => {
     serve({
-      status: 'archived',
+      status: 'draft',
       lastError: 'Handle already taken',
       queued: true,
       attempts: 2,
@@ -95,7 +95,7 @@ describe('ShopifyInstructorPanel', () => {
 
     expect(await screen.findByText('Handle already taken')).toBeInTheDocument();
     expect(screen.getByText('Status').nextSibling).toHaveTextContent(
-      'archived',
+      'Draft',
     );
     expect(
       screen.getByText(/Queued for sync · Attempts: 2/),
@@ -103,10 +103,9 @@ describe('ShopifyInstructorPanel', () => {
   });
 
   it.each([
-    ['synced', 'Synced'],
+    ['active', 'Active'],
     ['draft', 'Draft'],
-    ['failed', 'Failed'],
-  ])('labels the %s status', async (status, label) => {
+  ] as const)('labels the %s status', async (status, label) => {
     serve({ status });
     renderPanel();
 

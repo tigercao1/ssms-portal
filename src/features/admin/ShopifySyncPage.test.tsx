@@ -27,7 +27,7 @@ function serveStatus(overrides: Partial<ShopifySyncStatus> = {}) {
     }),
     http.post(`${API}/admin/shopify-sync/run`, async ({ request }) => {
       runBodies.push(await request.json());
-      return HttpResponse.json({ enqueued: 14 });
+      return HttpResponse.json({ enqueued: 14, processing: true });
     }),
   );
   return { patchBodies, runBodies, statusCalls: () => statusCalls };
