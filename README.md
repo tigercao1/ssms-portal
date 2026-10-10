@@ -38,6 +38,19 @@ src/
 passes on `main`, from the commit CI tested. It is the only deploy path; the
 production `VITE_*` values are variables in the `production` GitHub Environment.
 
+## Docs pages Worker
+
+`docs-worker/` is a separate Worker, `ssms-docs`, that serves published HTML pages
+at `https://docs.ssnow.club/<slug>` from the R2 bucket `ssms-docs`, and an
+internal object API (`/_internal/objects/...`) that `ssms-api` uses to upload,
+read and delete pages. The Deploy workflow deploys it right after the portal.
+Before the first deploy, the R2 bucket `ssms-docs` and the Worker secret
+`DOCS_INTERNAL_TOKEN` (same value as the API's) must exist; the secret is never
+in the repo.
+
+`npm run typecheck:docs-worker` and `npm run test:docs-worker` check it locally
+and in CI.
+
 ## Changes that span the API
 
 The API deploys first and the portal follows:

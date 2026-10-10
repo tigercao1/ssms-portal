@@ -36,3 +36,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Typecheck docs Worker
+        run: npm run typecheck:docs-worker
+
+      - name: Test docs Worker
+        run: npm run test:docs-worker
