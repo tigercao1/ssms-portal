@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import type {
   AdminInstructorRecord,
   InstructorProfile,
+  PublicPage,
   RefItem,
   ShopifyInstructorSync,
   ShopifySyncStatus,
@@ -84,6 +85,24 @@ export const fakeShopifyInstructorSync: ShopifyInstructorSync = {
   attempts: 0,
   previewUrl: 'https://ssnow.club/pages/our-team-preview/jane-snow',
 };
+
+export function fakePage(overrides: Partial<PublicPage> = {}): PublicPage {
+  const slug = overrides.slug ?? 'winter-guide';
+  return {
+    id: 'p1',
+    slug,
+    title: 'Winter guide',
+    status: 'draft',
+    hasContent: false,
+    sizeBytes: null,
+    hasUnpublishedChanges: false,
+    url: `https://docs.ssnow.club/${slug}`,
+    publishedAt: null,
+    createdAt: '2026-10-01T10:00:00Z',
+    updatedAt: '2026-10-02T10:00:00Z',
+    ...overrides,
+  };
+}
 
 const refs: RefItem[] = [{ id: 'l1', key: 'loc.whistler', name: 'Whistler' }];
 

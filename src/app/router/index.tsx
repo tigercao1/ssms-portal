@@ -14,6 +14,8 @@ import { AdminListPage } from '@/features/admin/AdminListPage';
 import { AdminDetailPage } from '@/features/admin/AdminDetailPage';
 import { ReferenceManagerPage } from '@/features/admin/ReferenceManagerPage';
 import { ShopifySyncPage } from '@/features/admin/ShopifySyncPage';
+import { PagesListPage } from '@/features/admin/PagesListPage';
+import { PageEditorPage } from '@/features/admin/PageEditorPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -78,6 +80,22 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <ReferenceManagerPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/pages',
+        element: (
+          <RequireAdmin>
+            <PagesListPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/pages/:id',
+        element: (
+          <RequireAdmin>
+            <PageEditorPage />
           </RequireAdmin>
         ),
       },

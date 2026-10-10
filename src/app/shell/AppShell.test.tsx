@@ -128,4 +128,18 @@ describe('AppShell admin nav', () => {
       '/admin/shopify-sync',
     );
   });
+
+  it('links to Pages after Reference data', () => {
+    renderShell();
+    const links = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(screen.getByRole('link', { name: 'Pages' })).toHaveAttribute(
+      'href',
+      '/admin/pages',
+    );
+    expect(links.indexOf('/admin/pages')).toBe(
+      links.indexOf('/admin/reference') + 1,
+    );
+  });
 });
