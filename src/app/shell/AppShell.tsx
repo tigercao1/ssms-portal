@@ -51,6 +51,7 @@ export function AppShell() {
         { to: '/admin', label: t.nav.dashboard, end: true },
         { to: '/admin/instructors', label: t.nav.instructors },
         { to: '/admin/reference', label: t.nav.reference },
+        { to: '/admin/shopify-sync', label: t.nav.shopifySync },
       ]
     : [
         { to: '/profile', label: t.nav.profile },
