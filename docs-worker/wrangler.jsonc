@@ -1,0 +1,9 @@
+// Docs pages Worker: serves docs.ssnow.club from the ssms-docs R2 bucket. DOCS_INTERNAL_TOKEN is a Worker secret.
+{
+  "name": "ssms-docs",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": false,
+  "routes": [{ "pattern": "docs.ssnow.club", "custom_domain": true }],
+  "r2_buckets": [{ "binding": "DOCS", "bucket_name": "ssms-docs" }]
+}

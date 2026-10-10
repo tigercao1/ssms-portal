@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
@@ -12,6 +12,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    exclude: [...configDefaults.exclude, 'docs-worker/**'],
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     // Provide stable env so the supabase client + api base resolve in tests.
