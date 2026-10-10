@@ -14,6 +14,7 @@ export interface RefItem {
   id: string;
   key: string;
   name: string;
+  nameZh?: string | null;
   sortOrder?: number;
 }
 
@@ -45,6 +46,8 @@ export interface InstructorProfile {
   bioZh: string | null;
   bioEnMachineTranslated: boolean;
   bioZhMachineTranslated: boolean;
+  bioEnTranslatedBy?: string | null;
+  bioZhTranslatedBy?: string | null;
   dateOfBirth: string | null;
   preferredLanguage: PreferredLanguage;
   approvalStatus: ApprovalStatus;
@@ -119,6 +122,9 @@ export interface ReferenceRecord {
   id: string;
   key: string;
   name: string;
+  nameZh?: string | null;
+  nameEnTranslatedBy?: string | null;
+  nameZhTranslatedBy?: string | null;
   sortOrder: number;
   isActive: boolean;
 }

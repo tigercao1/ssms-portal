@@ -103,3 +103,33 @@ describe('EditProfilePage (W2.2)', () => {
     );
   });
 });
+
+describe('EditProfilePage machine-translation badge', () => {
+  it('flags the machine-translated bio and explains that editing replaces it', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          bioZh: '资深教练。',
+          bioZhMachineTranslated: true,
+          bioZhTranslatedBy: 'gemini-2.5-flash',
+        }),
+      ),
+    );
+    renderWithProviders(<EditProfilePage />);
+    expect(await screen.findByDisplayValue('资深教练。')).toBeInTheDocument();
+    expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(1);
+    expect(
+      screen.getByText(/Editing this text replaces the machine translation/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no badge or hint for human-written bios', async () => {
+    renderWithProviders(<EditProfilePage />);
+    expect(await screen.findByDisplayValue('Jane Snow')).toBeInTheDocument();
+    expect(screen.queryByText(/Translated by/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/replaces the machine translation/),
+    ).not.toBeInTheDocument();
+  });
+});

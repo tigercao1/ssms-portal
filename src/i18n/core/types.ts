@@ -196,6 +196,14 @@ export interface Messages {
     removeUsage: string;
     removeConfirm: string;
   };
+  translation: {
+    badge: string;
+    editReplacesHint: string;
+    nameZhLabel: string;
+    addNameHint: string;
+    englishNameRequired: string;
+    editNameZh: string;
+  };
   shopifySync: {
     title: string;
     stateOn: string;

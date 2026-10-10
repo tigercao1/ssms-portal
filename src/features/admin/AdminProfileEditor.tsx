@@ -14,6 +14,7 @@ import {
   useLanguages,
   useTeachingLocations,
 } from '@/features/reference/api';
+import { MachineTranslationNote } from '@/features/translation/TranslatedByBadge';
 import { MultiSelectChips } from '@/features/instructor/MultiSelectChips';
 import { CertEditor, TrainerEditor } from '@/features/instructor/CertEditor';
 import { PhotoPicker } from '@/features/instructor/PhotoUploader';
@@ -184,6 +185,7 @@ export function AdminProfileEditor({
             />
           )}
         </Field>
+        <MachineTranslationNote model={profile.bioEnTranslatedBy} />
         <Field
           label={t.profile.bioZh}
           hint={`${draft.bioZh.length}/${MAX_BIO}`}
@@ -198,6 +200,7 @@ export function AdminProfileEditor({
             />
           )}
         </Field>
+        <MachineTranslationNote model={profile.bioZhTranslatedBy} />
       </Card>
 
       <Card className="grid gap-4 sm:grid-cols-2">
