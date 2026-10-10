@@ -1,3 +1,5 @@
+import { useLocale } from '@/i18n/core/I18nProvider';
+import { localizeField } from '@/i18n/core/localize';
 import { cn } from '@/lib/cn';
 import type { RefItem } from '@/lib/types';
 
@@ -11,6 +13,7 @@ export function MultiSelectChips({
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const { locale } = useLocale();
   function toggle(id: string) {
     onChange(
       selected.includes(id)
@@ -35,7 +38,7 @@ export function MultiSelectChips({
                 : 'border-grey bg-surface text-ink hover:bg-navy-tint',
             )}
           >
-            {o.name}
+            {localizeField(o.name, o.nameZh, locale)}
           </button>
         );
       })}

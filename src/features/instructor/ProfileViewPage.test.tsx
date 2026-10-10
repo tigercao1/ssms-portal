@@ -94,3 +94,22 @@ describe('ProfileViewPage machine-translation badge', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('ProfileViewPage reference names', () => {
+  it('shows Chinese reference names in Chinese when the API provides them', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          teachingLocations: [
+            { id: 'l1', key: 'loc.whistler', name: 'Whistler', nameZh: '惠斯勒' },
+          ],
+        }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('惠斯勒')).toBeInTheDocument();
+    expect(screen.getByText('English')).toBeInTheDocument();
+  });
+});

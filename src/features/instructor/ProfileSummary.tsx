@@ -2,7 +2,7 @@ import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Card } from '@/components';
 import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
-import type { InstructorProfile } from '@/lib/types';
+import type { InstructorProfile, RefItem } from '@/lib/types';
 
 function Avatar({ url, name }: { url: string | null; name: string }) {
   if (url) {
@@ -22,8 +22,9 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
   );
 }
 
-function Chips({ items }: { items: { id: string; name: string }[] }) {
+function Chips({ items }: { items: RefItem[] }) {
   const t = useT();
+  const { locale } = useLocale();
   if (items.length === 0)
     return <span className="text-sm text-slate">{t.common.none}</span>;
   return (
@@ -33,7 +34,7 @@ function Chips({ items }: { items: { id: string; name: string }[] }) {
           key={it.id}
           className="rounded-md bg-sunken px-2.5 py-1 text-sm text-ink"
         >
-          {it.name}
+          {localizeField(it.name, it.nameZh, locale)}
         </span>
       ))}
     </div>
