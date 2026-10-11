@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { ApiError } from '@/lib/api';

@@ -11,9 +11,9 @@ function urlHasAuthError(): boolean {
   const query = new URLSearchParams(window.location.search);
   return Boolean(
     hash.get('error') ||
-      hash.get('error_code') ||
-      query.get('error') ||
-      query.get('error_code'),
+    hash.get('error_code') ||
+    query.get('error') ||
+    query.get('error_code'),
   );
 }
 

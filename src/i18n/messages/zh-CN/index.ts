@@ -70,7 +70,8 @@ export const zhCN: Messages = {
     verifyingTitle: '正在激活您的账户…',
     verifyingBody: '正在验证您的邀请链接，请稍候。',
     expiredTitle: '此链接已过期',
-    expiredBody: '激活链接的有效期为 30 天。请输入您的邮箱，我们会为您发送新的链接。',
+    expiredBody:
+      '激活链接的有效期为 30 天。请输入您的邮箱，我们会为您发送新的链接。',
     resendButton: '发送新链接',
     resendSent: '如果该邮箱有对应的邀请，新的激活链接已发送至您的邮箱。',
     networkTitle: '无法连接服务器',
