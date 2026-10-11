@@ -176,7 +176,7 @@ function ClassRow({
   const { locale } = useLocale();
   return (
     <div className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-start sm:gap-6">
-      <div className="whitespace-nowrap font-mono text-xs text-slate sm:w-32 sm:pt-0.5">
+      <div className="shrink-0 whitespace-nowrap font-mono text-xs text-slate sm:w-44 sm:pt-0.5">
         {formatTime(item.startsAt, locale)} – {formatTime(item.endsAt, locale)}
       </div>
       <div className="flex flex-1 flex-col gap-1">

@@ -341,10 +341,9 @@ export interface Messages {
     emptyIgnored: string;
     colProduct: string;
     colPrice: string;
-    colType: string;
+    colLesson: string;
     colSize: string;
     colSessions: string;
-    colDuration: string;
     colInstructor: string;
     typePrivate: string;
     typeSemiPrivate: string;

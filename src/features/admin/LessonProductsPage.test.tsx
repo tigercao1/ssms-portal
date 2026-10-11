@@ -100,12 +100,16 @@ describe('LessonProductsPage table', () => {
     expect(within(semi).getByText('per student')).toBeInTheDocument();
     expect(within(semi).getByText(/400\.00/)).toBeInTheDocument();
     expect(within(semi).getByText('Eddie Lee')).toBeInTheDocument();
-    expect(within(semi).getByText('4')).toBeInTheDocument();
+    expect(
+      within(semi).getByText('Size 2 · Sessions 4 · —'),
+    ).toBeInTheDocument();
 
     const single = rowFor('一对一');
     expect(within(single).getByText('Private')).toBeInTheDocument();
     expect(within(single).getByText(/120\.00/)).toBeInTheDocument();
-    expect(within(single).getByText('120 min')).toBeInTheDocument();
+    expect(
+      within(single).getByText('Size 1 · Sessions 1 · 120 min'),
+    ).toBeInTheDocument();
     expect(within(single).getByText('Jane Snow')).toBeInTheDocument();
     expect(within(single).queryByRole('textbox')).not.toBeInTheDocument();
     expect(within(single).queryByRole('combobox')).not.toBeInTheDocument();
@@ -275,7 +279,9 @@ describe('LessonProductsPage edit row', () => {
         },
       },
     ]);
-    expect(await screen.findByText('90 min')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Size 2 · Sessions 4 · 90 min'),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Edit 一对二 · 四次' }),
     ).toHaveFocus();

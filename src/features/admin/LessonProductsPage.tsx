@@ -257,26 +257,17 @@ function ProductsTable({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[48rem] text-sm">
+            <table className="w-full min-w-[44rem] text-sm">
               <thead>
                 <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
-                  <th className="min-w-[14rem] px-4 py-2 font-medium">
+                  <th className="min-w-[10rem] px-4 py-2 font-medium">
                     {t.lessons.colProduct}
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 font-medium">
                     {t.lessons.colPrice}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 font-medium">
-                    {t.lessons.colType}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-2 font-medium">
-                    {t.lessons.colSize}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-2 font-medium">
-                    {t.lessons.colSessions}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-2 font-medium">
-                    {t.lessons.colDuration}
+                  <th className="min-w-[12rem] px-4 py-2 font-medium">
+                    {t.lessons.colLesson}
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 font-medium">
                     {t.lessons.colInstructor}
@@ -322,22 +313,13 @@ function ProductsTable({
                             )}
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-2">
-                          {typeLabel(p.lessonType)}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2">
-                          {p.groupSize ?? '—'}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2">
-                          {p.sessions ?? '—'}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2">
-                          {p.durationMin
-                            ? t.lessons.minutes.replace(
-                                '{n}',
-                                String(p.durationMin),
-                              )
-                            : '—'}
+                        <td className="px-4 py-2">
+                          <div className="flex flex-col">
+                            <span>{typeLabel(p.lessonType)}</span>
+                            <span className="text-xs text-slate">
+                              {lessonDetails(p, t.lessons)}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-4 py-2">
                           {p.instructorId
@@ -562,7 +544,7 @@ function EditRow({
       className="scroll-my-6 bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]"
     >
       <td
-        colSpan={8}
+        colSpan={5}
         className="px-4 pb-4 pt-1"
         onKeyDown={(e) => {
           if (e.key === 'Escape' && !update.isPending) onDone();
@@ -692,6 +674,15 @@ function EditRow({
       </td>
     </tr>
   );
+}
+
+function lessonDetails(p: LessonProduct, t: Messages['lessons']) {
+  const dash = '—';
+  return [
+    `${t.colSize} ${p.groupSize ?? dash}`,
+    `${t.colSessions} ${p.sessions ?? dash}`,
+    p.durationMin ? t.minutes.replace('{n}', String(p.durationMin)) : dash,
+  ].join(' · ');
 }
 
 function numText(n: number | null) {
