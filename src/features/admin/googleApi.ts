@@ -3,19 +3,12 @@ import { api } from '@/lib/api';
 import { navigateExternal } from '@/lib/navigation';
 import type {
   GoogleCalendar,
-  GoogleCalendarAccessRole,
   GoogleConnectionStatus,
   GoogleConnectResponse,
 } from '@/lib/types';
 
 const statusKey = ['admin', 'google', 'status'] as const;
 const calendarsKey = ['admin', 'google', 'calendars'] as const;
-
-const WRITABLE_ROLES: readonly GoogleCalendarAccessRole[] = ['owner', 'writer'];
-
-export function canWriteEvents(role: GoogleCalendarAccessRole) {
-  return WRITABLE_ROLES.includes(role);
-}
 
 export function useGoogleStatus() {
   return useQuery({
@@ -42,11 +35,12 @@ export function useDisconnectGoogle() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
-      api<unknown>('/admin/google/disconnect', { method: 'POST' }),
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({ queryKey: statusKey }),
-        qc.removeQueries({ queryKey: calendarsKey }),
-      ]),
+      api<GoogleConnectionStatus>('/admin/google/disconnect', {
+        method: 'POST',
+      }),
+    onSuccess: (status) => {
+      qc.setQueryData(statusKey, status);
+      qc.removeQueries({ queryKey: calendarsKey });
+    },
   });
 }

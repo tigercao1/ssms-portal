@@ -214,6 +214,7 @@ export interface PublicPage {
 }
 
 export interface GoogleConnectionStatus {
+  configured: boolean;
   connected: boolean;
   accountEmail: string | null;
   scopes: string[];
@@ -235,4 +236,5 @@ export interface GoogleCalendar {
   id: string;
   summary: string;
   accessRole: GoogleCalendarAccessRole;
+  canWrite: boolean;
 }

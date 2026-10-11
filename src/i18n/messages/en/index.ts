@@ -318,10 +318,15 @@ export const en: Messages = {
     },
     returnErrors: {
       access_denied: 'Access was declined on the Google consent screen.',
-      wrong_account: 'That Google account isn’t allowed. Sign in with admin@ssnow.club.',
-      missing_scopes: 'Not every permission was granted. Connect again and tick every box.',
+      wrong_account: 'Sign in with admin@ssnow.club.',
+      missing_scopes: 'Accept all calendar permissions and try again.',
       invalid_state: 'The connect link expired or was invalid. Try connecting again.',
-      exchange_failed: 'Google didn’t complete the sign-in. Try connecting again.',
+      token_exchange_failed: 'Google didn’t complete the sign-in. Try connecting again.',
+      no_refresh_token: 'Google didn’t return offline access. Disconnect the app in your Google account settings and connect again.',
+      not_configured: 'Google isn’t configured on the server.',
+      oauth_error: 'Google reported an error during sign-in. Try connecting again.',
+      missing_code: 'Google didn’t send an authorization code. Try connecting again.',
+      server_error: 'Something went wrong on the server. Try connecting again.',
     },
   },
   pages: {

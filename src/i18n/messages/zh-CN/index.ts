@@ -300,10 +300,15 @@ export const zhCN: Messages = {
     },
     returnErrors: {
       access_denied: '在 Google 授权页面上拒绝了访问。',
-      wrong_account: '不允许使用该 Google 账号。请使用 admin@ssnow.club 登录。',
-      missing_scopes: '未授予全部权限。请重新连接并勾选所有选项。',
+      wrong_account: '请使用 admin@ssnow.club 登录。',
+      missing_scopes: '请接受所有日历权限后重试。',
       invalid_state: '连接链接已过期或无效。请重新连接。',
-      exchange_failed: 'Google 未能完成登录。请重新连接。',
+      token_exchange_failed: 'Google 未能完成登录。请重新连接。',
+      no_refresh_token: 'Google 未返回离线授权。请在 Google 账号设置中移除此应用后重新连接。',
+      not_configured: '服务器未配置 Google。',
+      oauth_error: 'Google 登录时报告了错误。请重新连接。',
+      missing_code: 'Google 未返回授权码。请重新连接。',
+      server_error: '服务器出错。请重新连接。',
     },
   },
   pages: {

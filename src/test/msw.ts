@@ -89,6 +89,7 @@ export const fakeShopifyInstructorSync: ShopifyInstructorSync = {
 };
 
 export const fakeGoogleStatus: GoogleConnectionStatus = {
+  configured: true,
   connected: true,
   accountEmail: 'admin@ssnow.club',
   scopes: [
@@ -101,17 +102,29 @@ export const fakeGoogleStatus: GoogleConnectionStatus = {
 };
 
 export const fakeGoogleCalendars: GoogleCalendar[] = [
-  { id: 'admin@ssnow.club', summary: 'SSNOW Admin', accessRole: 'owner' },
+  {
+    id: 'admin@ssnow.club',
+    summary: 'SSNOW Admin',
+    accessRole: 'owner',
+    canWrite: true,
+  },
   {
     id: 'jane.snow@ssnow.club',
     summary: 'Jane Snow',
     accessRole: 'writer',
+    canWrite: true,
   },
-  { id: 'li.wei@gmail.com', summary: 'Li Wei', accessRole: 'reader' },
+  {
+    id: 'li.wei@gmail.com',
+    summary: 'Li Wei',
+    accessRole: 'reader',
+    canWrite: false,
+  },
   {
     id: 'sam.ski@gmail.com',
     summary: 'Sam Ski',
     accessRole: 'freeBusyReader',
+    canWrite: false,
   },
 ];
 

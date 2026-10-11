@@ -7,7 +7,6 @@ import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/date';
 import type { GoogleConnectionStatus } from '@/lib/types';
 import {
-  canWriteEvents,
   useConnectGoogle,
   useDisconnectGoogle,
   useGoogleCalendars,
@@ -104,31 +103,34 @@ function ConnectionCard({ status }: { status: GoogleConnectionStatus }) {
             {status.connected ? t.google.connected : t.google.notConnected}
           </span>
         </div>
-        {status.connected ? (
-          !confirming && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                disconnect.reset();
-                setConfirming(true);
-              }}
-            >
-              {t.google.disconnect}
-            </Button>
-          )
-        ) : (
-          <Button
-            loading={connect.isPending || connect.isSuccess}
-            onClick={() => connect.mutate()}
-          >
-            {t.google.connect}
-          </Button>
-        )}
+        {status.connected
+          ? !confirming && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  disconnect.reset();
+                  setConfirming(true);
+                }}
+              >
+                {t.google.disconnect}
+              </Button>
+            )
+          : status.configured && (
+              <Button
+                loading={connect.isPending || connect.isSuccess}
+                onClick={() => connect.mutate()}
+              >
+                {t.google.connect}
+              </Button>
+            )}
       </div>
 
-      {!status.connected && (
-        <p className="text-sm text-ink">{t.google.notConnectedBody}</p>
-      )}
+      {!status.connected &&
+        (status.configured ? (
+          <p className="text-sm text-ink">{t.google.notConnectedBody}</p>
+        ) : (
+          <Banner tone="pending">{t.google.returnErrors.not_configured}</Banner>
+        ))}
 
       {connect.isError && (
         <Banner tone="error">
@@ -253,9 +255,7 @@ function CalendarsCard() {
   } else if (!calendars.data?.length) {
     content = <p className="text-sm text-slate">{t.google.calendarsEmpty}</p>;
   } else {
-    const readOnlyCount = calendars.data.filter(
-      (c) => !canWriteEvents(c.accessRole),
-    ).length;
+    const readOnlyCount = calendars.data.filter((c) => !c.canWrite).length;
     content = (
       <>
         {readOnlyCount > 0 && (
@@ -289,7 +289,7 @@ function CalendarsCard() {
                       <span>
                         {roleLabels[cal.accessRole] ?? cal.accessRole}
                       </span>
-                      {!canWriteEvents(cal.accessRole) && (
+                      {!cal.canWrite && (
                         <span
                           className="inline-flex items-center gap-1.5 rounded-sm border-l-[3px] border-status-pending bg-status-pending/10 px-2 py-0.5 text-xs font-medium text-ink"
                           title={t.google.cannotWriteHint}

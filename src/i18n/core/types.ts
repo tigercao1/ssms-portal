@@ -306,7 +306,12 @@ export interface Messages {
       wrong_account: string;
       missing_scopes: string;
       invalid_state: string;
-      exchange_failed: string;
+      token_exchange_failed: string;
+      no_refresh_token: string;
+      not_configured: string;
+      oauth_error: string;
+      missing_code: string;
+      server_error: string;
     };
   };
   pages: {

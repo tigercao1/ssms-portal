@@ -15,6 +15,7 @@ const API = 'http://localhost:3000';
 const ROUTE = '/admin/settings/google';
 
 const disconnectedStatus: GoogleConnectionStatus = {
+  configured: true,
   connected: false,
   accountEmail: null,
   scopes: [],
@@ -46,7 +47,7 @@ function serveGoogle({
     http.post(`${API}/admin/google/disconnect`, () => {
       calls.disconnect += 1;
       current = disconnectedStatus;
-      return HttpResponse.json({ disconnected: true });
+      return HttpResponse.json(current);
     }),
   );
   return calls;
@@ -110,6 +111,24 @@ describe('GoogleSettingsPage when not connected', () => {
       ),
     );
     expect(calls.connect).toBe(1);
+  });
+
+  it('explains that Google is not configured and hides connect', async () => {
+    const calls = serveGoogle({
+      status: { ...disconnectedStatus, configured: false },
+    });
+    renderPage();
+
+    expect(
+      await screen.findByText('Google isn’t configured on the server.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('google-state')).toHaveTextContent(
+      'Not connected',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Connect Google' }),
+    ).not.toBeInTheDocument();
+    expect(calls.connect).toBe(0);
   });
 
   it('shows an error and does not redirect when connect fails', async () => {
@@ -213,11 +232,27 @@ describe('GoogleSettingsPage when connected', () => {
     ).toBeInTheDocument();
   });
 
+  it('trusts canWrite from the server over the access role', async () => {
+    serveGoogle({
+      calendars: [
+        {
+          id: 'shared@ssnow.club',
+          summary: 'Shared',
+          accessRole: 'writer',
+          canWrite: false,
+        },
+      ],
+    });
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Writer')).toBeInTheDocument();
+    expect(within(table).getByText('Can’t add events')).toBeInTheDocument();
+  });
+
   it('omits the write-access summary when every calendar is writable', async () => {
     serveGoogle({
-      calendars: fakeGoogleCalendars.filter((c) =>
-        ['owner', 'writer'].includes(c.accessRole),
-      ),
+      calendars: fakeGoogleCalendars.filter((c) => c.canWrite),
     });
     renderPage();
 
@@ -341,11 +376,34 @@ describe('GoogleSettingsPage return from Google', () => {
   });
 
   it.each([
-    ['wrong_account', 'That Google account isn’t allowed'],
-    ['missing_scopes', 'Not every permission was granted'],
-    ['invalid_state', 'The connect link expired or was invalid'],
-    ['access_denied', 'Access was declined'],
-    ['exchange_failed', 'Google didn’t complete the sign-in'],
+    ['access_denied', 'Access was declined on the Google consent screen.'],
+    ['wrong_account', 'Sign in with admin@ssnow.club.'],
+    ['missing_scopes', 'Accept all calendar permissions and try again.'],
+    [
+      'invalid_state',
+      'The connect link expired or was invalid. Try connecting again.',
+    ],
+    [
+      'token_exchange_failed',
+      'Google didn’t complete the sign-in. Try connecting again.',
+    ],
+    [
+      'no_refresh_token',
+      'Google didn’t return offline access. Disconnect the app in your Google account settings and connect again.',
+    ],
+    ['not_configured', 'Google isn’t configured on the server.'],
+    [
+      'oauth_error',
+      'Google reported an error during sign-in. Try connecting again.',
+    ],
+    [
+      'missing_code',
+      'Google didn’t send an authorization code. Try connecting again.',
+    ],
+    [
+      'server_error',
+      'Something went wrong on the server. Try connecting again.',
+    ],
   ])('explains ?error=%s', async (code, text) => {
     serveGoogle({ status: disconnectedStatus });
     renderPage(`${ROUTE}?error=${code}`);
