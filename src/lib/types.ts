@@ -212,3 +212,27 @@ export interface PublicPage {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface GoogleConnectionStatus {
+  connected: boolean;
+  accountEmail: string | null;
+  scopes: string[];
+  connectedAt: string | null;
+  lastError: string | null;
+}
+
+export interface GoogleConnectResponse {
+  url: string;
+}
+
+export type GoogleCalendarAccessRole =
+  | 'owner'
+  | 'writer'
+  | 'reader'
+  | 'freeBusyReader';
+
+export interface GoogleCalendar {
+  id: string;
+  summary: string;
+  accessRole: GoogleCalendarAccessRole;
+}

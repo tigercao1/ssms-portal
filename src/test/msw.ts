@@ -2,6 +2,8 @@ import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import type {
   AdminInstructorRecord,
+  GoogleCalendar,
+  GoogleConnectionStatus,
   InstructorProfile,
   PublicPage,
   RefItem,
@@ -86,6 +88,33 @@ export const fakeShopifyInstructorSync: ShopifyInstructorSync = {
   previewUrl: 'https://ssnow.club/pages/our-team-preview/jane-snow',
 };
 
+export const fakeGoogleStatus: GoogleConnectionStatus = {
+  connected: true,
+  accountEmail: 'admin@ssnow.club',
+  scopes: [
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/calendar.events.freebusy',
+    'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+  ],
+  connectedAt: '2026-10-10T15:00:00Z',
+  lastError: null,
+};
+
+export const fakeGoogleCalendars: GoogleCalendar[] = [
+  { id: 'admin@ssnow.club', summary: 'SSNOW Admin', accessRole: 'owner' },
+  {
+    id: 'jane.snow@ssnow.club',
+    summary: 'Jane Snow',
+    accessRole: 'writer',
+  },
+  { id: 'li.wei@gmail.com', summary: 'Li Wei', accessRole: 'reader' },
+  {
+    id: 'sam.ski@gmail.com',
+    summary: 'Sam Ski',
+    accessRole: 'freeBusyReader',
+  },
+];
+
 export function fakePage(overrides: Partial<PublicPage> = {}): PublicPage {
   const slug = overrides.slug ?? 'winter-guide';
   return {
@@ -122,6 +151,12 @@ export const handlers = [
   ),
   http.get(`${API}/admin/shopify-sync/instructors/:id`, () =>
     HttpResponse.json(fakeShopifyInstructorSync),
+  ),
+  http.get(`${API}/admin/google/status`, () =>
+    HttpResponse.json(fakeGoogleStatus),
+  ),
+  http.get(`${API}/admin/google/calendars`, () =>
+    HttpResponse.json(fakeGoogleCalendars),
   ),
 ];
 
