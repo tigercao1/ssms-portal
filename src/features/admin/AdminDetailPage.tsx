@@ -24,6 +24,7 @@ import {
 } from './api';
 import { AdminProfileEditor } from './AdminProfileEditor';
 import { ShopifyInstructorPanel } from './ShopifyInstructorPanel';
+import { useSetGoogleCalendarId } from './lessonsApi';
 import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
 /** W2.8–W2.12 — admin instructor detail + actions rail. */
@@ -128,6 +129,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
       </Card>
 
       <DisplayOrderCard rec={rec} />
+      <GoogleCalendarCard rec={rec} />
       <RoleCard authUserId={rec.authUserId} />
       <ShopifyInstructorPanel instructorId={rec.id} />
     </div>
@@ -216,6 +218,46 @@ function DisplayOrderCard({ rec }: { rec: AdminInstructorRecord }) {
               max={MAX_DISPLAY_ORDER}
               step={1}
               value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                save.reset();
+              }}
+            />
+          )}
+        </Field>
+        <Button type="submit" variant="secondary" loading={save.isPending}>
+          {t.common.save}
+        </Button>
+        {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
+        {save.isSuccess && <Banner tone="approved">{t.common.saved}</Banner>}
+      </form>
+    </Card>
+  );
+}
+
+function GoogleCalendarCard({ rec }: { rec: AdminInstructorRecord }) {
+  const t = useT();
+  const save = useSetGoogleCalendarId(rec.id);
+  const [value, setValue] = useState(rec.googleCalendarId ?? '');
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    save.mutate(value.trim() || null);
+  }
+
+  return (
+    <Card>
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+        <Field
+          label={t.lessons.calendarIdLabel}
+          hint={t.lessons.calendarIdHint}
+        >
+          {(p) => (
+            <Input
+              {...p}
+              value={value}
+              spellCheck={false}
+              autoComplete="off"
               onChange={(e) => {
                 setValue(e.target.value);
                 save.reset();
