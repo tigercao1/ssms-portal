@@ -85,13 +85,34 @@ async function handlePublic(
   const object = await env.DOCS.get(`published/${segment}.html`);
   if (object === null) return notFound(request);
 
-  return new Response(request.method === 'HEAD' ? null : object.body, {
+  const params = new URLSearchParams(search);
+  const body =
+    request.method === 'HEAD'
+      ? null
+      : [...params.keys()].length === 0
+        ? object.body
+        : applyQueryState(await new Response(object.body).text(), params);
+
+  return new Response(body, {
     status: 200,
     headers: {
       ...SECURITY_HEADERS,
       'Content-Type': HTML_CONTENT_TYPE,
       'Cache-Control': 'public, max-age=60',
     },
+  });
+}
+
+const QUERY_INPUT = /<input\b[^>]*\bdata-query="([^"=&]+)=([^"&]*)"[^>]*>/gi;
+const CHECKED_ATTR = /\s+checked(?:="[^"]*")?(?=[\s/>])/i;
+
+export function applyQueryState(html: string, params: URLSearchParams): string {
+  return html.replace(QUERY_INPUT, (tag, key: string, value: string) => {
+    if (!params.has(key)) return tag;
+    const unchecked = tag.replace(CHECKED_ATTR, '');
+    return params.get(key) === value
+      ? unchecked.replace(/^<input\b/i, '<input checked')
+      : unchecked;
   });
 }
 
