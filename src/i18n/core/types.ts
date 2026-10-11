@@ -58,6 +58,32 @@ export interface Messages {
     newPassword: string;
     updatePw: string;
     pwUpdated: string;
+    passwordTooShort: string;
+    or: string;
+    magicLinkButton: string;
+    magicLinkSending: string;
+    magicLinkNeedEmail: string;
+    magicLinkSentTitle: string;
+    magicLinkSentBody: string;
+    rateLimited: string;
+  };
+  activation: {
+    verifyingTitle: string;
+    verifyingBody: string;
+    expiredTitle: string;
+    expiredBody: string;
+    resendButton: string;
+    resendSent: string;
+    networkTitle: string;
+    networkBody: string;
+    passwordTitle: string;
+    passwordBody: string;
+    activateButton: string;
+  };
+  authCallback: {
+    signingIn: string;
+    errorTitle: string;
+    errorBody: string;
   };
   nav: {
     profile: string;

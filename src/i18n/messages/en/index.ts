@@ -59,6 +59,38 @@ export const en: Messages = {
     newPassword: 'New password',
     updatePw: 'Update password',
     pwUpdated: 'Password updated. You can sign in now.',
+    passwordTooShort: 'Use at least 6 characters.',
+    or: 'or',
+    magicLinkButton: 'Email me a sign-in link',
+    magicLinkSending: 'Sending link…',
+    magicLinkNeedEmail: 'Enter your email above, then we can send you a link.',
+    magicLinkSentTitle: 'Check your email',
+    magicLinkSentBody:
+      'If an account exists for this address, a sign-in link is on its way. Open it to sign in — no password needed.',
+    rateLimited:
+      'Too many emails were requested. Please wait a minute and try again.',
+  },
+  activation: {
+    verifyingTitle: 'Activating your account…',
+    verifyingBody: 'Hang tight while we check your invitation link.',
+    expiredTitle: 'This link has expired',
+    expiredBody:
+      'Activation links work for 30 days. Enter your email and we’ll send you a new one.',
+    resendButton: 'Send me a new link',
+    resendSent:
+      'If there is an invitation for that email, a new activation link is on its way.',
+    networkTitle: 'We couldn’t reach the server',
+    networkBody: 'Check your connection and try again.',
+    passwordTitle: 'Welcome to Serendipity Snow Club',
+    passwordBody:
+      'Choose a password to finish activating your account. You’ll sign in with your email and this password.',
+    activateButton: 'Activate my account',
+  },
+  authCallback: {
+    signingIn: 'Signing you in…',
+    errorTitle: 'This sign-in link didn’t work',
+    errorBody:
+      'It may have expired or already been used. Go back to sign in and request a new link.',
   },
   nav: {
     profile: 'My profile',
