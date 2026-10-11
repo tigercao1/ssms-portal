@@ -16,6 +16,7 @@ import { ReferenceManagerPage } from '@/features/admin/ReferenceManagerPage';
 import { ShopifySyncPage } from '@/features/admin/ShopifySyncPage';
 import { PagesListPage } from '@/features/admin/PagesListPage';
 import { PageEditorPage } from '@/features/admin/PageEditorPage';
+import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -117,6 +118,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <ShopifySyncPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/settings/google',
+        element: (
+          <RequireAdmin>
+            <GoogleSettingsPage />
           </RequireAdmin>
         ),
       },
