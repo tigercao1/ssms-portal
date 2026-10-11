@@ -246,16 +246,12 @@ function CalendarsCard() {
     );
   } else if (calendars.isError) {
     content = (
-      <div className="p-4">
-        <Banner tone="error">
-          {errorText(calendars.error, t.errors.generic)}
-        </Banner>
-      </div>
+      <Banner tone="error">
+        {errorText(calendars.error, t.errors.generic)}
+      </Banner>
     );
   } else if (!calendars.data?.length) {
-    content = (
-      <p className="px-4 pb-4 text-sm text-slate">{t.google.calendarsEmpty}</p>
-    );
+    content = <p className="text-sm text-slate">{t.google.calendarsEmpty}</p>;
   } else {
     const readOnlyCount = calendars.data.filter(
       (c) => !canWriteEvents(c.accessRole),
@@ -263,23 +259,18 @@ function CalendarsCard() {
     content = (
       <>
         {readOnlyCount > 0 && (
-          <div className="px-4 pb-3">
-            <Banner tone="pending">
-              {t.google.readOnlySummary.replace(
-                '{count}',
-                String(readOnlyCount),
-              )}
-            </Banner>
-          </div>
+          <Banner tone="pending">
+            {t.google.readOnlySummary.replace('{count}', String(readOnlyCount))}
+          </Banner>
         )}
-        <div className="overflow-x-auto">
+        <div className="-mx-6 overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <caption className="sr-only">{t.google.calendarsTitle}</caption>
             <thead>
               <tr className="border-y border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
-                <th className="px-4 py-3 font-medium">{t.google.colName}</th>
-                <th className="px-4 py-3 font-medium">{t.google.colId}</th>
-                <th className="whitespace-nowrap px-4 py-3 font-medium">
+                <th className="px-6 py-3 font-medium">{t.google.colName}</th>
+                <th className="px-6 py-3 font-medium">{t.google.colId}</th>
+                <th className="whitespace-nowrap px-6 py-3 font-medium">
                   {t.google.colAccess}
                 </th>
               </tr>
@@ -287,13 +278,13 @@ function CalendarsCard() {
             <tbody>
               {calendars.data.map((cal, i) => (
                 <tr key={cal.id} className={cn(i % 2 === 1 && 'bg-sunken')}>
-                  <td className="px-4 py-3 font-medium text-ink">
+                  <td className="px-6 py-3 font-medium text-ink">
                     {cal.summary}
                   </td>
-                  <td className="break-all px-4 py-3 font-mono text-xs text-slate">
+                  <td className="break-all px-6 py-3 font-mono text-xs text-slate">
                     {cal.id}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3">
+                  <td className="whitespace-nowrap px-6 py-3">
                     <span className="flex items-center gap-2">
                       <span>
                         {roleLabels[cal.accessRole] ?? cal.accessRole}
@@ -318,8 +309,8 @@ function CalendarsCard() {
   }
 
   return (
-    <Card className="flex flex-col gap-0 p-0">
-      <div className="flex flex-col gap-1 p-4">
+    <Card className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
         <h2 className="text-lg">{t.google.calendarsTitle}</h2>
         <p className="text-sm text-slate">{t.google.calendarsIntro}</p>
       </div>
