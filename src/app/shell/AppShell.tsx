@@ -53,6 +53,7 @@ export function AppShell() {
         { to: '/admin/reference', label: t.nav.reference },
         { to: '/admin/pages', label: t.nav.pages },
         { to: '/admin/shopify-sync', label: t.nav.shopifySync },
+        { to: '/admin/settings/google', label: t.nav.google },
       ]
     : [
         { to: '/profile', label: t.nav.profile },

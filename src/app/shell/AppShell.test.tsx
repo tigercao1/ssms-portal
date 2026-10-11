@@ -129,6 +129,13 @@ describe('AppShell admin nav', () => {
     );
   });
 
+  it('links to the Google Calendar settings page', () => {
+    renderShell();
+    expect(
+      screen.getByRole('link', { name: 'Google Calendar' }),
+    ).toHaveAttribute('href', '/admin/settings/google');
+  });
+
   it('links to Pages after Reference data', () => {
     renderShell();
     const links = screen
