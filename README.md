@@ -48,6 +48,12 @@ Before the first deploy, the R2 bucket `ssms-docs` and the Worker secret
 `DOCS_INTERNAL_TOKEN` (same value as the API's) must exist; the secret is never
 in the repo.
 
+Pages are plain HTML with scripts blocked, so they keep state with CSS
+(`:checked`). To make such state survive a reload or a shared link, give the
+input a `data-query="key=value"` attribute: a request with `?key=value` is served
+with that input checked and the others in the same group unchecked. The winter
+camp page uses `?lang=en` for English.
+
 `npm run typecheck:docs-worker` and `npm run test:docs-worker` check it locally
 and in CI.
 

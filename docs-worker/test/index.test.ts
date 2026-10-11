@@ -1,6 +1,10 @@
 // Tests for the docs Worker fetch handler against an in-memory R2 bucket.
 import { beforeEach, describe, expect, it } from 'vitest';
-import worker, { MAX_OBJECT_BYTES, type Env } from '../src/index';
+import worker, {
+  applyQueryState,
+  MAX_OBJECT_BYTES,
+  type Env,
+} from '../src/index';
 
 const TOKEN = 'test-internal-token-0123456789abcdef';
 const ORIGIN = 'https://docs.ssnow.club';
@@ -385,5 +389,68 @@ describe('internal object API', () => {
 
   it('requires the token on unknown internal paths', async () => {
     expect((await call('/_internal/other')).status).toBe(401);
+  });
+});
+
+const LANG_PAGE =
+  '<!doctype html><input class="sr" type="radio" name="lang" id="lang-zh" data-query="lang=zh" checked>' +
+  '<input class="sr" type="radio" name="lang" id="lang-en" data-query="lang=en"><p>页面</p>';
+
+describe('query state', () => {
+  it('serves the stored bytes unchanged when there is no query string', async () => {
+    seed('published/camp.html', LANG_PAGE);
+
+    const response = await call('/camp');
+
+    expect(await response.text()).toBe(LANG_PAGE);
+  });
+
+  it('checks the input whose data-query matches and unchecks its siblings', async () => {
+    seed('published/camp.html', LANG_PAGE);
+
+    const response = await call('/camp?lang=en');
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain(
+      '<input checked class="sr" type="radio" name="lang" id="lang-en" data-query="lang=en">',
+    );
+    expect(html).toContain(
+      '<input class="sr" type="radio" name="lang" id="lang-zh" data-query="lang=zh">',
+    );
+    expect(html).toContain('<p>页面</p>');
+    expectSecurityHeaders(response);
+  });
+
+  it('keeps the default when the parameter is for something else', async () => {
+    seed('published/camp.html', LANG_PAGE);
+
+    expect(await (await call('/camp?utm_source=wechat')).text()).toBe(
+      LANG_PAGE,
+    );
+  });
+
+  it('returns no body for HEAD even with a query string', async () => {
+    seed('published/camp.html', LANG_PAGE);
+
+    const response = await call('/camp?lang=en', { method: 'HEAD' });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('');
+  });
+
+  it('leaves inputs without data-query alone', () => {
+    const html =
+      '<input type="checkbox" id="zoom" checked><input data-query="lang=en">';
+
+    expect(applyQueryState(html, new URLSearchParams('lang=en'))).toBe(
+      '<input type="checkbox" id="zoom" checked><input checked data-query="lang=en">',
+    );
+  });
+
+  it('unchecks every option when the value matches none of them', () => {
+    expect(
+      applyQueryState(LANG_PAGE, new URLSearchParams('lang=fr')),
+    ).not.toContain(' checked');
   });
 });
