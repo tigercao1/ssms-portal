@@ -21,6 +21,9 @@ import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
 import { RequestResetPage } from '@/auth/RequestResetPage';
 import { UpdatePasswordPage } from '@/auth/UpdatePasswordPage';
+import { ActivatePage } from '@/auth/ActivatePage';
+import { ActivatePasswordPage } from '@/auth/ActivatePasswordPage';
+import { AuthCallbackPage } from '@/auth/AuthCallbackPage';
 
 /**
  * Route tree (W1.4) — mirrors PORTAL_UI_PLAN.md §4. Auth routes are standalone;
@@ -33,6 +36,16 @@ export const router = createBrowserRouter([
   { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/reset-password', element: <RequestResetPage /> },
   { path: '/update-password', element: <UpdatePasswordPage /> },
+  { path: '/activate', element: <ActivatePage /> },
+  {
+    path: '/activate/password',
+    element: (
+      <RequireAuth>
+        <ActivatePasswordPage />
+      </RequireAuth>
+    ),
+  },
+  { path: '/auth/callback', element: <AuthCallbackPage /> },
 
   {
     element: (
