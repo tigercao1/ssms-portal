@@ -142,4 +142,15 @@ describe('AppShell admin nav', () => {
       links.indexOf('/admin/reference') + 1,
     );
   });
+
+  it('links to Lesson products and Classes', () => {
+    renderShell();
+    expect(
+      screen.getByRole('link', { name: 'Lesson products' }),
+    ).toHaveAttribute('href', '/admin/lesson-products');
+    expect(screen.getByRole('link', { name: 'Classes' })).toHaveAttribute(
+      'href',
+      '/admin/classes',
+    );
+  });
 });

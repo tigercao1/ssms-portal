@@ -121,6 +121,7 @@ export interface AdminInstructorRecord {
   approvalStatus: ApprovalStatus;
   isActive: boolean;
   displayOrder?: number | null;
+  googleCalendarId?: string | null;
   insertedAt: string;
   updatedAt: string;
 }
@@ -211,4 +212,65 @@ export interface PublicPage {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type LessonType = 'private' | 'semi_private' | 'group' | 'other';
+export type LessonProductStatus = 'suggested' | 'confirmed' | 'ignored';
+
+export interface LessonProduct {
+  id: string;
+  shopifyProductId: number | string;
+  shopifyVariantId: number | string;
+  productTitle: string;
+  variantTitle: string | null;
+  lessonType: LessonType;
+  groupSize: number | null;
+  sessions: number | null;
+  durationMin: number | null;
+  pricedPerStudent: boolean;
+  instructorId: string | null;
+  status: LessonProductStatus;
+  price: number | string | null;
+  currency: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LessonProductPatch {
+  lessonType?: LessonType;
+  groupSize?: number | null;
+  sessions?: number | null;
+  durationMin?: number | null;
+  pricedPerStudent?: boolean;
+  instructorId?: string | null;
+  status?: LessonProductStatus;
+}
+
+export type LessonProductSyncResult = Record<string, unknown>;
+
+export type ClassStatus = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
+export type ClassSource = 'ssms' | 'app_import' | 'app_webhook';
+export type Attendance = 'expected' | 'attended' | 'no_show';
+
+export interface ClassParticipant {
+  customerId: string;
+  name: string | null;
+  email?: string | null;
+  purchaseId: string | null;
+  attendance: Attendance;
+}
+
+export interface AdminClass {
+  id: string;
+  instructorId: string;
+  lessonProductId: string | null;
+  locationId: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: ClassStatus;
+  source: ClassSource;
+  googleCalendarId: string | null;
+  googleEventId: string | null;
+  notes: string | null;
+  participants: ClassParticipant[];
 }
