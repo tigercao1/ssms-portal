@@ -476,7 +476,15 @@ describe('LessonProductsPage sync', () => {
     server.use(
       http.post(`${API}/admin/lesson-products/sync`, () => {
         calls += 1;
-        return HttpResponse.json({ fetched: 12, created: 3, updated: 9 });
+        return HttpResponse.json({
+          productsScanned: 46,
+          lessonProducts: 12,
+          variants: 30,
+          inserted: 3,
+          updated: 9,
+          unchanged: 18,
+          truncatedProductIds: [],
+        });
       }),
     );
     const user = userEvent.setup();
@@ -484,11 +492,62 @@ describe('LessonProductsPage sync', () => {
     await user.click(screen.getByRole('button', { name: 'Sync from Shopify' }));
 
     expect(await screen.findByText('Sync finished.')).toBeInTheDocument();
-    expect(screen.getByText('Fetched:').textContent).toBe('Fetched: 12');
-    expect(screen.getByText('Created:').textContent).toBe('Created: 3');
-    expect(screen.getByText('Updated:').textContent).toBe('Updated: 9');
-    expect(screen.queryByText(/Skipped/)).not.toBeInTheDocument();
+    const counts = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(counts).toEqual([
+      'Products scanned: 46',
+      'Lesson products: 12',
+      'Variants: 30',
+      'New: 3',
+      'Updated: 9',
+      'Unchanged: 18',
+    ]);
+    expect(screen.queryByText(/check them in Shopify/)).not.toBeInTheDocument();
     expect(calls).toBe(1);
+  });
+
+  it('warns when some products were only partly read', async () => {
+    serve([]);
+    server.use(
+      http.post(`${API}/admin/lesson-products/sync`, () =>
+        HttpResponse.json({
+          productsScanned: 2,
+          inserted: 0,
+          truncatedProductIds: [11, 12],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LessonProductsPage />);
+    await user.click(screen.getByRole('button', { name: 'Sync from Shopify' }));
+
+    expect(
+      await screen.findByText(
+        'Not every variant of 2 products was read; check them in Shopify.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('shows the sync-disabled message from the API', async () => {
+    serve([]);
+    server.use(
+      http.post(`${API}/admin/lesson-products/sync`, () =>
+        HttpResponse.json(
+          {
+            message:
+              'Lesson product sync is off; set LESSON_PRODUCT_SYNC_ENABLED=true to enable it.',
+          },
+          { status: 503 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LessonProductsPage />);
+    await user.click(screen.getByRole('button', { name: 'Sync from Shopify' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Lesson product sync is off',
+    );
   });
 
   it('shows the scope-missing error from the API', async () => {

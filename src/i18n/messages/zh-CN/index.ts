@@ -393,12 +393,14 @@ export const zhCN: Messages = {
     calendarIdLabel: 'Google 日历 ID',
     calendarIdHint: '该教练预约写入的日历。留空即清除。',
     syncCounters: {
-      fetched: '已获取',
-      created: '新增',
+      productsScanned: '已扫描商品',
+      lessonProducts: '课程商品',
+      variants: '款式',
+      inserted: '新增',
       updated: '已更新',
       unchanged: '未变化',
-      skipped: '已跳过',
     },
+    syncTruncated: '有 {count} 个商品的款式未全部读取，请在 Shopify 中检查。',
   },
   validation: {
     required: '此字段为必填项。',

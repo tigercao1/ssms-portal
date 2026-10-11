@@ -411,12 +411,14 @@ export const en: Messages = {
     calendarIdLabel: 'Google Calendar ID',
     calendarIdHint: 'The calendar this instructor\'s bookings go into. Leave empty to clear.',
     syncCounters: {
-      fetched: 'Fetched',
-      created: 'Created',
+      productsScanned: 'Products scanned',
+      lessonProducts: 'Lesson products',
+      variants: 'Variants',
+      inserted: 'New',
       updated: 'Updated',
       unchanged: 'Unchanged',
-      skipped: 'Skipped',
     },
+    syncTruncated: 'Not every variant of {count} products was read; check them in Shopify.',
   },
   validation: {
     required: 'This field is required.',

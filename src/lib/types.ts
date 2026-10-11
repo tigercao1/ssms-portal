@@ -246,7 +246,15 @@ export interface LessonProductPatch {
   status?: LessonProductStatus;
 }
 
-export type LessonProductSyncResult = Record<string, unknown>;
+export interface LessonProductSyncResult {
+  productsScanned: number;
+  lessonProducts: number;
+  variants: number;
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  truncatedProductIds: number[];
+}
 
 export type ClassStatus = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
 export type ClassSource = 'ssms' | 'app_import' | 'app_webhook';

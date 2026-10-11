@@ -53,11 +53,12 @@ const LESSON_TYPES: { value: LessonType; labelKey: LessonsKey }[] = [
 ];
 
 const SYNC_COUNTERS = [
-  'fetched',
-  'created',
+  'productsScanned',
+  'lessonProducts',
+  'variants',
+  'inserted',
   'updated',
   'unchanged',
-  'skipped',
 ] as const;
 
 function errorText(error: unknown, fallback: string) {
@@ -153,6 +154,7 @@ function SyncCard() {
 function SyncResult({ result }: { result: LessonProductSyncResult }) {
   const t = useT();
   const counters = SYNC_COUNTERS.filter((k) => typeof result?.[k] === 'number');
+  const truncated = result?.truncatedProductIds?.length ?? 0;
   return (
     <Banner tone="approved" title={t.lessons.syncDone}>
       {counters.length > 0 && (
@@ -164,6 +166,11 @@ function SyncResult({ result }: { result: LessonProductSyncResult }) {
             </li>
           ))}
         </ul>
+      )}
+      {truncated > 0 && (
+        <p className="mt-1">
+          {t.lessons.syncTruncated.replace('{count}', String(truncated))}
+        </p>
       )}
     </Banner>
   );

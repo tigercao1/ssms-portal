@@ -396,12 +396,14 @@ export interface Messages {
     calendarIdLabel: string;
     calendarIdHint: string;
     syncCounters: {
-      fetched: string;
-      created: string;
+      productsScanned: string;
+      lessonProducts: string;
+      variants: string;
+      inserted: string;
       updated: string;
       unchanged: string;
-      skipped: string;
     };
+    syncTruncated: string;
   };
   validation: {
     required: string;
