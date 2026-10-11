@@ -14,7 +14,7 @@ function isUnreachable(err: AuthError) {
   return err.name === 'AuthRetryableFetchError' || (err.status ?? 0) >= 500;
 }
 
-/** W1.1 — email/password or magic-link sign-in via Supabase. */
+/** Email/password or magic-link sign-in via Supabase. */
 export function LoginPage() {
   const t = useT();
   const navigate = useNavigate();
