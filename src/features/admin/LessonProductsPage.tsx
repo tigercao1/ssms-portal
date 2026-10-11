@@ -33,12 +33,11 @@ import { formatPrice, looksComplete, parsePositiveInt } from './lessonRules';
 
 type LessonsKey = Exclude<keyof Messages['lessons'], 'syncCounters'>;
 
-const TABS: { status: LessonProductStatus; labelKey: LessonsKey }[] =
-  [
-    { status: 'suggested', labelKey: 'tabSuggested' },
-    { status: 'confirmed', labelKey: 'tabConfirmed' },
-    { status: 'ignored', labelKey: 'tabIgnored' },
-  ];
+const TABS: { status: LessonProductStatus; labelKey: LessonsKey }[] = [
+  { status: 'suggested', labelKey: 'tabSuggested' },
+  { status: 'confirmed', labelKey: 'tabConfirmed' },
+  { status: 'ignored', labelKey: 'tabIgnored' },
+];
 
 const EMPTY_KEYS: Record<LessonProductStatus, LessonsKey> = {
   suggested: 'emptySuggested',
@@ -66,7 +65,9 @@ function errorText(error: unknown, fallback: string) {
 }
 
 function productName(p: LessonProduct) {
-  return p.variantTitle ? `${p.productTitle} · ${p.variantTitle}` : p.productTitle;
+  return p.variantTitle
+    ? `${p.productTitle} · ${p.variantTitle}`
+    : p.productTitle;
 }
 
 export function LessonProductsPage() {
@@ -151,9 +152,7 @@ function SyncCard() {
 
 function SyncResult({ result }: { result: LessonProductSyncResult }) {
   const t = useT();
-  const counters = SYNC_COUNTERS.filter(
-    (k) => typeof result?.[k] === 'number',
-  );
+  const counters = SYNC_COUNTERS.filter((k) => typeof result?.[k] === 'number');
   return (
     <Banner tone="approved" title={t.lessons.syncDone}>
       {counters.length > 0 && (
@@ -237,7 +236,9 @@ function ProductsTable({
     <div className="flex flex-col gap-4">
       {status === 'suggested' && <BulkConfirm rows={data} />}
       {update.isError && !editingId && (
-        <Banner tone="error">{errorText(update.error, t.errors.generic)}</Banner>
+        <Banner tone="error">
+          {errorText(update.error, t.errors.generic)}
+        </Banner>
       )}
       <Card className="p-0">
         {rows.isLoading ? (
@@ -246,7 +247,9 @@ function ProductsTable({
           </div>
         ) : rows.isError ? (
           <div className="p-4">
-            <Banner tone="error">{errorText(rows.error, t.errors.generic)}</Banner>
+            <Banner tone="error">
+              {errorText(rows.error, t.errors.generic)}
+            </Banner>
           </div>
         ) : data.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-slate">
@@ -578,7 +581,9 @@ function EditRow({
                     {...p}
                     ref={typeRef}
                     value={lessonType}
-                    onChange={(e) => setLessonType(e.target.value as LessonType)}
+                    onChange={(e) =>
+                      setLessonType(e.target.value as LessonType)
+                    }
                   >
                     {LESSON_TYPES.map((lt) => (
                       <option key={lt.value} value={lt.value}>

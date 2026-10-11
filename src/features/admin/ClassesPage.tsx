@@ -77,9 +77,7 @@ export function ClassesPage() {
       localizeField(i.displayNameEn, i.displayNameZh, locale) || i.email,
     ]),
   );
-  const options = [...names.entries()].sort((a, b) =>
-    a[1].localeCompare(b[1]),
-  );
+  const options = [...names.entries()].sort((a, b) => a[1].localeCompare(b[1]));
 
   return (
     <div className="flex flex-col gap-6">

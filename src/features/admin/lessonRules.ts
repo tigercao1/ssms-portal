@@ -52,8 +52,8 @@ export function localDayKey(iso: string): string {
 export function groupClassesByDay(
   classes: AdminClass[],
 ): { day: string; classes: AdminClass[] }[] {
-  const sorted = [...classes].sort((a, b) =>
-    a.startsAt.localeCompare(b.startsAt),
+  const sorted = [...classes].sort(
+    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
   );
   const groups = new Map<string, AdminClass[]>();
   for (const c of sorted) {
@@ -75,7 +75,10 @@ export function addDays(d: Date, days: number): Date {
   return next;
 }
 
-export function rangeToIso(from: string, to: string): { from: string; to: string } {
+export function rangeToIso(
+  from: string,
+  to: string,
+): { from: string; to: string } {
   const start = new Date(`${from}T00:00:00`);
   const end = addDays(new Date(`${to}T00:00:00`), 1);
   return { from: start.toISOString(), to: end.toISOString() };

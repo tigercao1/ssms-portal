@@ -704,3 +704,71 @@ describe('AdminDetailPage display order', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('AdminDetailPage Google Calendar ID', () => {
+  function serveCalendar(status = 200) {
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(
+        `${API}/admin/instructors/:id/google-calendar`,
+        async ({ request }) => {
+          bodies.push(await request.json());
+          return status === 200
+            ? HttpResponse.json({ ...fakeAdminList[0] })
+            : HttpResponse.json({ message: 'nope' }, { status });
+        },
+      ),
+    );
+    return bodies;
+  }
+
+  const label = 'Google Calendar ID';
+
+  it('prefills the current calendar and saves a trimmed new one', async () => {
+    serveRecord({ googleCalendarId: 'old@group.calendar.google.com' });
+    const bodies = serveCalendar();
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    expect(input).toHaveValue('old@group.calendar.google.com');
+    await userEvent.clear(input);
+    await userEvent.type(input, '  jane@group.calendar.google.com ');
+    const card = input.closest('form') as HTMLFormElement;
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { googleCalendarId: 'jane@group.calendar.google.com' },
+      ]),
+    );
+    expect(await within(card).findByText('Saved')).toBeInTheDocument();
+  });
+
+  it('sends null when the field is cleared', async () => {
+    serveRecord({ googleCalendarId: 'old@group.calendar.google.com' });
+    const bodies = serveCalendar();
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    await userEvent.clear(input);
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(bodies).toEqual([{ googleCalendarId: null }]));
+  });
+
+  it('starts empty and shows an error when saving fails', async () => {
+    serveRecord({});
+    serveCalendar(500);
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    expect(input).toHaveValue('');
+    await userEvent.type(input, 'x@group.calendar.google.com');
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    const card = input.closest('form') as HTMLFormElement;
+    expect(
+      await within(card).findByText('Something went wrong.'),
+    ).toBeInTheDocument();
+  });
+});
