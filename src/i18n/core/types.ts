@@ -58,6 +58,32 @@ export interface Messages {
     newPassword: string;
     updatePw: string;
     pwUpdated: string;
+    passwordTooShort: string;
+    or: string;
+    magicLinkButton: string;
+    magicLinkSending: string;
+    magicLinkNeedEmail: string;
+    magicLinkSentTitle: string;
+    magicLinkSentBody: string;
+    rateLimited: string;
+  };
+  activation: {
+    verifyingTitle: string;
+    verifyingBody: string;
+    expiredTitle: string;
+    expiredBody: string;
+    resendButton: string;
+    resendSent: string;
+    networkTitle: string;
+    networkBody: string;
+    passwordTitle: string;
+    passwordBody: string;
+    activateButton: string;
+  };
+  authCallback: {
+    signingIn: string;
+    errorTitle: string;
+    errorBody: string;
   };
   nav: {
     profile: string;
@@ -69,6 +95,7 @@ export interface Messages {
     shopifySync: string;
     lessonProducts: string;
     classes: string;
+    google: string;
     instructorArea: string;
     adminArea: string;
     openMenu: string;
@@ -263,6 +290,57 @@ export interface Messages {
     syncInstructor: string;
     instructorQueued: string;
     openPreview: string;
+  };
+  google: {
+    title: string;
+    intro: string;
+    connectionTitle: string;
+    connected: string;
+    notConnected: string;
+    notConnectedBody: string;
+    connect: string;
+    disconnect: string;
+    disconnectTitle: string;
+    disconnectBody: string;
+    disconnectConfirm: string;
+    disconnected: string;
+    account: string;
+    connectedAt: string;
+    scopes: string;
+    lastError: string;
+    unknown: string;
+    dismiss: string;
+    returnConnectedTitle: string;
+    returnConnectedBody: string;
+    returnErrorTitle: string;
+    returnErrorUnknown: string;
+    calendarsTitle: string;
+    calendarsIntro: string;
+    calendarsEmpty: string;
+    readOnlySummary: string;
+    colName: string;
+    colId: string;
+    colAccess: string;
+    cannotWrite: string;
+    cannotWriteHint: string;
+    roles: {
+      owner: string;
+      writer: string;
+      reader: string;
+      freeBusyReader: string;
+    };
+    returnErrors: {
+      access_denied: string;
+      wrong_account: string;
+      missing_scopes: string;
+      invalid_state: string;
+      token_exchange_failed: string;
+      no_refresh_token: string;
+      not_configured: string;
+      oauth_error: string;
+      missing_code: string;
+      server_error: string;
+    };
   };
   pages: {
     title: string;
