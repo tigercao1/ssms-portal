@@ -121,7 +121,6 @@ export interface AdminInstructorRecord {
   approvalStatus: ApprovalStatus;
   isActive: boolean;
   displayOrder?: number | null;
-  googleCalendarId?: string | null;
   insertedAt: string;
   updatedAt: string;
 }
@@ -214,46 +213,83 @@ export interface PublicPage {
   updatedAt: string;
 }
 
-export type LessonType = 'private' | 'semi_private' | 'group' | 'other';
-export type LessonProductStatus = 'suggested' | 'confirmed' | 'ignored';
-
-export interface LessonProduct {
+export interface LessonType {
   id: string;
-  shopifyProductId: number | string;
-  shopifyVariantId: number | string;
-  productTitle: string;
-  variantTitle: string | null;
-  lessonType: LessonType;
+  nameEn: string;
+  nameZh: string | null;
   groupSize: number | null;
-  sessions: number | null;
-  durationMin: number | null;
-  pricedPerStudent: boolean;
-  instructorId: string | null;
-  status: LessonProductStatus;
-  price: number | string | null;
-  currency: string | null;
+  durationMin: number;
+  isPromo: boolean;
+  active: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface LessonProductPatch {
-  lessonType?: LessonType;
+export interface LessonTypeInput {
+  nameEn?: string;
+  nameZh?: string | null;
   groupSize?: number | null;
-  sessions?: number | null;
-  durationMin?: number | null;
-  pricedPerStudent?: boolean;
-  instructorId?: string | null;
-  status?: LessonProductStatus;
+  durationMin?: number;
+  isPromo?: boolean;
+  active?: boolean;
+  sortOrder?: number;
 }
 
-export interface LessonProductSyncResult {
-  productsScanned: number;
-  lessonProducts: number;
-  variants: number;
-  inserted: number;
-  updated: number;
-  unchanged: number;
-  truncatedProductIds: number[];
+export interface PayRate {
+  id: string;
+  lessonTypeId: string;
+  instructorId: string | null;
+  hourlyRate: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayRateCreate {
+  lessonTypeId: string;
+  instructorId: string | null;
+  hourlyRate: number;
+  currency?: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface PayRatePatch {
+  hourlyRate?: number;
+  currency?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string | null;
+}
+
+export interface Customer {
+  id: string;
+  shopifyCustomerId: number;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  shopifyUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerCreate {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface CustomerSyncResult {
+  mode: 'backfill' | 'incremental';
+  updatedSince: string | null;
+  pages: number;
+  fetched: number;
+  hasMore: boolean;
+  nextCursor: string | null;
 }
 
 export type ClassStatus = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
@@ -262,17 +298,26 @@ export type Attendance = 'expected' | 'attended' | 'no_show';
 
 export interface ClassParticipant {
   customerId: string;
-  name: string | null;
-  email?: string | null;
-  purchaseId: string | null;
   attendance: Attendance;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
 }
 
 export interface AdminClass {
   id: string;
   instructorId: string;
-  lessonProductId: string | null;
+  instructorName: string | null;
+  instructorNameZh: string | null;
+  lessonTypeId: string | null;
+  lessonTypeNameEn: string | null;
+  lessonTypeNameZh: string | null;
+  durationMin: number | null;
+  groupSize: number | null;
+  isPromo: boolean | null;
   locationId: string | null;
+  locationName: string | null;
   startsAt: string;
   endsAt: string;
   status: ClassStatus;
@@ -281,6 +326,50 @@ export interface AdminClass {
   googleEventId: string | null;
   notes: string | null;
   participants: ClassParticipant[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CalendarMatchStatus = 'suggested' | 'confirmed';
+
+export interface InstructorGoogleCalendar {
+  instructorId: string;
+  googleCalendarId: string | null;
+  calendarSummary: string | null;
+  matchStatus: CalendarMatchStatus | null;
+  updatedAt: string | null;
+}
+
+export interface InstructorGoogleCalendarInput {
+  googleCalendarId: string | null;
+  calendarSummary?: string | null;
+  matchStatus?: CalendarMatchStatus;
+}
+
+export interface CalendarCandidate {
+  calendarId: string;
+  calendarSummary: string;
+  matchedBy: 'email' | 'name';
+}
+
+export interface InstructorCalendarOverview extends InstructorGoogleCalendar {
+  displayNameEn: string;
+  displayNameZh: string | null;
+  email: string | null;
+  approvalStatus: string;
+  isActive: boolean;
+  candidates: CalendarCandidate[];
+  suggestion: CalendarCandidate | null;
+}
+
+export interface InstructorCalendarsOverview {
+  google: { connected: boolean; error: string | null };
+  instructors: InstructorCalendarOverview[];
+}
+
+export interface SuggestCalendarsResult {
+  suggested: number;
+  overview: InstructorCalendarsOverview;
 }
 
 export interface GoogleConnectionStatus {

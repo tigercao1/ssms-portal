@@ -2,15 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type {
   AdminClass,
-  LessonProduct,
-  LessonProductPatch,
-  LessonProductStatus,
-  LessonProductSyncResult,
+  InstructorCalendarsOverview,
+  InstructorGoogleCalendar,
+  InstructorGoogleCalendarInput,
+  LessonType,
+  LessonTypeInput,
+  PayRate,
+  PayRateCreate,
+  PayRatePatch,
+  SuggestCalendarsResult,
 } from '@/lib/types';
 
-const productsKey = ['admin', 'lesson-products'] as const;
-const productsByStatusKey = (status: LessonProductStatus) =>
-  [...productsKey, status] as const;
+const lessonTypesKey = ['admin', 'lesson-types'] as const;
+const payRatesKey = ['admin', 'pay-rates'] as const;
+const instructorCalendarsKey = ['admin', 'instructor-calendars'] as const;
+const googleCalendarKey = (instructorId: string) =>
+  ['admin', 'instructor', instructorId, 'google-calendar'] as const;
 
 export interface ClassFilter {
   from: string;
@@ -18,53 +25,53 @@ export interface ClassFilter {
   instructorId?: string;
 }
 
-export function useLessonProducts(status: LessonProductStatus) {
+export function useLessonTypes() {
   return useQuery({
-    queryKey: productsByStatusKey(status),
-    queryFn: () =>
-      api<LessonProduct[]>(`/admin/lesson-products?status=${status}`),
+    queryKey: lessonTypesKey,
+    queryFn: () => api<LessonType[]>('/admin/lesson-types'),
   });
 }
 
-export function patchLessonProduct(id: string, body: LessonProductPatch) {
-  return api<LessonProduct>(`/admin/lesson-products/${id}`, {
-    method: 'PATCH',
-    body,
-  });
-}
-
-export function useUpdateLessonProduct() {
+export function useCreateLessonType() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: LessonProductPatch & { id: string }) =>
-      patchLessonProduct(id, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: productsKey }),
+    mutationFn: (body: LessonTypeInput) =>
+      api<LessonType>('/admin/lesson-types', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: lessonTypesKey }),
   });
 }
 
-export function useConfirmLessonProducts() {
+export function useUpdateLessonType() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (ids: string[]) => {
-      let confirmed = 0;
-      for (const id of ids) {
-        await patchLessonProduct(id, { status: 'confirmed' });
-        confirmed += 1;
-      }
-      return confirmed;
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: productsKey }),
+    mutationFn: ({ id, ...body }: LessonTypeInput & { id: string }) =>
+      api<LessonType>(`/admin/lesson-types/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: lessonTypesKey }),
   });
 }
 
-export function useSyncLessonProducts() {
+export function usePayRates() {
+  return useQuery({
+    queryKey: payRatesKey,
+    queryFn: () => api<PayRate[]>('/admin/pay-rates'),
+  });
+}
+
+export function useCreatePayRate() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      api<LessonProductSyncResult>('/admin/lesson-products/sync', {
-        method: 'POST',
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: productsKey }),
+    mutationFn: (body: PayRateCreate) =>
+      api<PayRate>('/admin/pay-rates', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: payRatesKey }),
+  });
+}
+
+export function useUpdatePayRate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: PayRatePatch & { id: string }) =>
+      api<PayRate>(`/admin/pay-rates/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: payRatesKey }),
   });
 }
 
@@ -81,20 +88,61 @@ export function useAdminClasses(filter: ClassFilter | null) {
   });
 }
 
-export function useSetGoogleCalendarId(instructorId: string) {
+export function useInstructorGoogleCalendar(instructorId: string) {
+  return useQuery({
+    queryKey: googleCalendarKey(instructorId),
+    queryFn: () =>
+      api<InstructorGoogleCalendar>(
+        `/admin/instructors/${instructorId}/google-calendar`,
+      ),
+  });
+}
+
+export function setInstructorGoogleCalendar(
+  instructorId: string,
+  body: InstructorGoogleCalendarInput,
+) {
+  return api<InstructorGoogleCalendar>(
+    `/admin/instructors/${instructorId}/google-calendar`,
+    { method: 'PATCH', body },
+  );
+}
+
+export function useSetInstructorGoogleCalendar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (googleCalendarId: string | null) =>
-      api<unknown>(`/admin/instructors/${instructorId}/google-calendar`, {
-        method: 'PATCH',
-        body: { googleCalendarId },
+    mutationFn: ({
+      instructorId,
+      ...body
+    }: InstructorGoogleCalendarInput & { instructorId: string }) =>
+      setInstructorGoogleCalendar(instructorId, body),
+    onSuccess: (result) => {
+      qc.setQueryData(googleCalendarKey(result.instructorId), result);
+      return qc.invalidateQueries({ queryKey: instructorCalendarsKey });
+    },
+  });
+}
+
+export function useInstructorCalendars() {
+  return useQuery({
+    queryKey: instructorCalendarsKey,
+    queryFn: () =>
+      api<InstructorCalendarsOverview>('/admin/instructor-calendars'),
+  });
+}
+
+export function useSuggestInstructorCalendars() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<SuggestCalendarsResult>('/admin/instructor-calendars/suggest', {
+        method: 'POST',
       }),
-    onSuccess: () =>
-      Promise.all([
-        qc.invalidateQueries({
-          queryKey: ['admin', 'instructor', instructorId],
-        }),
-        qc.invalidateQueries({ queryKey: ['admin', 'instructors'] }),
-      ]),
+    onSuccess: (result) => {
+      qc.setQueryData(instructorCalendarsKey, result.overview);
+      return qc.invalidateQueries({
+        queryKey: ['admin', 'instructor'],
+      });
+    },
   });
 }

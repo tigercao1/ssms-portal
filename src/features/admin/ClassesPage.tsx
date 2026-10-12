@@ -17,12 +17,14 @@ import { useAdminClasses } from './lessonsApi';
 import { localizeField } from '@/i18n/core/localize';
 import {
   addDays,
+  customerName,
   dateInputValue,
   groupClassesByDay,
   rangeToIso,
 } from './lessonRules';
+import { PromoBadge } from './LessonTypesPage';
 
-type LessonsKey = Exclude<keyof Messages['lessons'], 'syncCounters'>;
+type LessonsKey = keyof Messages['lessons'];
 
 const STATUS_KEYS: Record<ClassStatus, LessonsKey> = {
   scheduled: 'classScheduled',
@@ -153,7 +155,15 @@ export function ClassesPage() {
                   <ClassRow
                     key={c.id}
                     item={c}
-                    instructorName={names.get(c.instructorId) ?? '—'}
+                    instructorName={
+                      localizeField(
+                        c.instructorName,
+                        c.instructorNameZh,
+                        locale,
+                      ) ||
+                      names.get(c.instructorId) ||
+                      '—'
+                    }
                   />
                 ))}
               </Card>
@@ -186,13 +196,36 @@ function ClassRow({
             {t.lessons[STATUS_KEYS[item.status]]}
           </span>
         </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate">
+          <span>
+            {localizeField(
+              item.lessonTypeNameEn,
+              item.lessonTypeNameZh,
+              locale,
+            ) || t.lessons.noLessonType}
+          </span>
+          {item.durationMin !== null && (
+            <span className="text-xs">
+              · {t.lessons.minutes.replace('{n}', String(item.durationMin))}
+            </span>
+          )}
+          {item.groupSize !== null && (
+            <span className="text-xs">
+              · {t.lessons.groupSize.replace('{n}', String(item.groupSize))}
+            </span>
+          )}
+          {item.locationName && (
+            <span className="text-xs">· {item.locationName}</span>
+          )}
+          {item.isPromo && <PromoBadge />}
+        </div>
         {item.participants.length === 0 ? (
           <span className="text-slate">{t.lessons.noParticipants}</span>
         ) : (
           <ul className="flex flex-col gap-0.5">
             {item.participants.map((p) => (
               <li key={p.customerId} className="text-ink">
-                {p.name || p.email || '—'}{' '}
+                {customerName(p) || p.email || p.phone || '—'}{' '}
                 <span className="text-xs text-slate">
                   · {t.lessons[ATTENDANCE_KEYS[p.attendance]]}
                 </span>

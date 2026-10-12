@@ -53,8 +53,10 @@ export function AppShell() {
         { to: '/admin/reference', label: t.nav.reference },
         { to: '/admin/pages', label: t.nav.pages },
         { to: '/admin/shopify-sync', label: t.nav.shopifySync },
-        { to: '/admin/lesson-products', label: t.nav.lessonProducts },
+        { to: '/admin/lesson-types', label: t.nav.lessonTypes },
+        { to: '/admin/customers', label: t.nav.customers },
         { to: '/admin/classes', label: t.nav.classes },
+        { to: '/admin/calendar-matching', label: t.nav.calendarMatching },
         { to: '/admin/settings/google', label: t.nav.google },
       ]
     : [

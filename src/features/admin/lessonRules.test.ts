@@ -1,33 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { fakeClass, fakeLessonProduct } from '@/test/msw';
+import { fakeClass } from '@/test/msw';
 import {
-  formatPrice,
+  customerName,
+  formatRate,
   groupClassesByDay,
-  looksComplete,
   parsePositiveInt,
+  parseRate,
   rangeToIso,
+  rateIsCurrent,
 } from './lessonRules';
-
-describe('looksComplete', () => {
-  const complete = fakeLessonProduct({ durationMin: 120 });
-
-  it('accepts a suggestion with type, size, sessions, duration and instructor', () => {
-    expect(looksComplete(complete)).toBe(true);
-  });
-
-  it.each([
-    ['other type', { lessonType: 'other' as const }],
-    ['no size', { groupSize: null }],
-    ['no sessions', { sessions: null }],
-    ['no duration', { durationMin: null }],
-    ['zero duration', { durationMin: 0 }],
-    ['no instructor', { instructorId: null }],
-    ['already confirmed', { status: 'confirmed' as const }],
-    ['ignored', { status: 'ignored' as const }],
-  ])('rejects %s', (_label, overrides) => {
-    expect(looksComplete({ ...complete, ...overrides })).toBe(false);
-  });
-});
 
 describe('parsePositiveInt', () => {
   it.each([
@@ -45,22 +26,55 @@ describe('parsePositiveInt', () => {
   });
 });
 
-describe('formatPrice', () => {
-  it('formats a numeric string in the store currency', () => {
-    expect(formatPrice('120.00', 'CAD', 'en')).toMatch(/120\.00/);
+describe('parseRate', () => {
+  it.each([
+    ['45', 45],
+    [' 52.5 ', 52.5],
+    ['0', 0],
+    ['60.25', 60.25],
+    ['', 'invalid'],
+    ['-1', 'invalid'],
+    ['1.234', 'invalid'],
+    ['abc', 'invalid'],
+    ['100000000', 'invalid'],
+  ])('%j -> %j', (input, expected) => {
+    expect(parseRate(input)).toBe(expected);
   });
+});
 
-  it('formats a number without a currency', () => {
-    expect(formatPrice(85, null, 'en')).toBe('85.00');
-  });
-
-  it('is empty without a price and passes through unparseable values', () => {
-    expect(formatPrice(null, 'CAD', 'en')).toBe('');
-    expect(formatPrice('n/a', 'CAD', 'zh-CN')).toBe('n/a');
+describe('formatRate', () => {
+  it('formats the amount in its currency', () => {
+    expect(formatRate(45, 'CAD', 'en')).toMatch(/45\.00/);
   });
 
   it('falls back when the currency code is unknown to Intl', () => {
-    expect(formatPrice(10, 'NOT-A-CODE', 'en')).toBe('10.00 NOT-A-CODE');
+    expect(formatRate(10, 'NOT-A-CODE', 'zh-CN')).toBe('10.00 NOT-A-CODE');
+  });
+});
+
+describe('rateIsCurrent', () => {
+  it('includes both bounds and treats a missing end as open', () => {
+    const rate = { effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30' };
+    expect(rateIsCurrent(rate, '2026-11-01')).toBe(true);
+    expect(rateIsCurrent(rate, '2026-11-30')).toBe(true);
+    expect(rateIsCurrent(rate, '2026-12-01')).toBe(false);
+    expect(rateIsCurrent(rate, '2026-10-31')).toBe(false);
+    expect(
+      rateIsCurrent(
+        { effectiveFrom: '2026-11-01', effectiveTo: null },
+        '2030-01-01',
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('customerName', () => {
+  it('joins the names that are present', () => {
+    expect(customerName({ firstName: 'Lily', lastName: 'Chen' })).toBe(
+      'Lily Chen',
+    );
+    expect(customerName({ firstName: null, lastName: 'Chen' })).toBe('Chen');
+    expect(customerName({ firstName: null, lastName: null })).toBe('');
   });
 });
 

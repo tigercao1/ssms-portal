@@ -69,6 +69,13 @@ describe('ClassesPage', () => {
       fakeClass({
         id: 'c2',
         instructorId: 'inst-2',
+        instructorName: 'Eddie Lee',
+        lessonTypeNameEn: 'Promo 1-on-2 1h',
+        lessonTypeNameZh: '特价课 一对二',
+        durationMin: 60,
+        groupSize: 2,
+        isPromo: true,
+        locationName: 'Blue Mountain',
         startsAt: '2026-12-05T13:00:00',
         endsAt: '2026-12-05T15:00:00',
         status: 'completed',
@@ -76,15 +83,18 @@ describe('ClassesPage', () => {
         participants: [
           {
             customerId: 'cu1',
-            name: 'Lily Chen',
-            purchaseId: 'pu1',
+            firstName: 'Lily',
+            lastName: 'Chen',
+            email: 'lily@example.com',
+            phone: null,
             attendance: 'attended',
           },
           {
             customerId: 'cu2',
-            name: null,
+            firstName: null,
+            lastName: null,
             email: 'max@example.com',
-            purchaseId: null,
+            phone: null,
             attendance: 'no_show',
           },
         ],
@@ -124,13 +134,46 @@ describe('ClassesPage', () => {
       'max@example.com · No-show',
     );
     expect(first.getByText('Bring rental skis')).toBeInTheDocument();
+    expect(first.getByText('Private 2h')).toBeInTheDocument();
+    expect(first.getByText('Promo 1-on-2 1h')).toBeInTheDocument();
+    expect(first.getByText('· 60 min')).toBeInTheDocument();
+    expect(first.getByText('· 2 per lesson')).toBeInTheDocument();
+    expect(first.getByText('· Blue Mountain')).toBeInTheDocument();
+    expect(first.getAllByText('Promo')).toHaveLength(1);
     expect(within(dayTwo).getByText('Cancelled')).toBeInTheDocument();
+  });
+
+  it('uses Chinese lesson type and instructor names, and flags a class without a type', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serve([
+      fakeClass({ id: 'c1', instructorNameZh: '简·斯诺' }),
+      fakeClass({
+        id: 'c2',
+        startsAt: '2026-12-05T20:00:00',
+        endsAt: '2026-12-05T21:00:00',
+        lessonTypeId: null,
+        lessonTypeNameEn: null,
+        lessonTypeNameZh: null,
+        durationMin: null,
+        groupSize: null,
+        isPromo: null,
+      }),
+    ]);
+    renderWithProviders(<ClassesPage />);
+
+    expect(await screen.findByText('1对1滑雪课 - 2小时')).toBeInTheDocument();
+    expect(screen.getByText('简·斯诺')).toBeInTheDocument();
+    expect(screen.getByText('未设置课程类型')).toBeInTheDocument();
   });
 
   it('filters by instructor', async () => {
     const queries = serve([
       fakeClass({ id: 'c1' }),
-      fakeClass({ id: 'c2', instructorId: 'inst-2' }),
+      fakeClass({
+        id: 'c2',
+        instructorId: 'inst-2',
+        instructorName: 'Eddie Lee',
+      }),
     ]);
     const user = userEvent.setup();
     renderWithProviders(<ClassesPage />);

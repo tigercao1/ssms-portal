@@ -1,20 +1,5 @@
 import type { Locale } from '@/i18n/core/types';
-import type { AdminClass, LessonProduct } from '@/lib/types';
-
-export function looksComplete(p: LessonProduct): boolean {
-  return (
-    p.status === 'suggested' &&
-    p.lessonType !== 'other' &&
-    isPositive(p.groupSize) &&
-    isPositive(p.sessions) &&
-    isPositive(p.durationMin) &&
-    Boolean(p.instructorId)
-  );
-}
-
-function isPositive(n: number | null | undefined): boolean {
-  return typeof n === 'number' && Number.isInteger(n) && n > 0;
-}
+import type { AdminClass } from '@/lib/types';
 
 export function parsePositiveInt(value: string): number | null | 'invalid' {
   const trimmed = value.trim();
@@ -24,23 +9,43 @@ export function parsePositiveInt(value: string): number | null | 'invalid' {
   return n > 0 && n <= 10_000 ? n : 'invalid';
 }
 
-export function formatPrice(
-  price: LessonProduct['price'],
-  currency: string | null,
+export function parseRate(value: string): number | 'invalid' {
+  const trimmed = value.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return 'invalid';
+  const n = Number(trimmed);
+  return n <= 99_999_999.99 ? n : 'invalid';
+}
+
+export function formatRate(
+  amount: number,
+  currency: string,
   locale: Locale,
 ): string {
-  if (price === null || price === '') return '';
-  const n = typeof price === 'number' ? price : Number(price);
-  if (Number.isNaN(n)) return String(price);
   const tag = locale === 'zh-CN' ? 'zh-CN' : 'en-CA';
-  if (!currency) return n.toFixed(2);
   try {
     return new Intl.NumberFormat(tag, { style: 'currency', currency }).format(
-      n,
+      amount,
     );
   } catch {
-    return `${n.toFixed(2)} ${currency}`;
+    return `${amount.toFixed(2)} ${currency}`;
   }
+}
+
+export function rateIsCurrent(
+  rate: { effectiveFrom: string; effectiveTo: string | null },
+  today: string,
+): boolean {
+  return (
+    rate.effectiveFrom <= today &&
+    (rate.effectiveTo === null || rate.effectiveTo >= today)
+  );
+}
+
+export function customerName(c: {
+  firstName: string | null;
+  lastName: string | null;
+}): string {
+  return [c.firstName, c.lastName].filter(Boolean).join(' ');
 }
 
 export function localDayKey(iso: string): string {

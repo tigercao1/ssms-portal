@@ -3,10 +3,12 @@ import { http, HttpResponse } from 'msw';
 import type {
   AdminClass,
   AdminInstructorRecord,
+  Customer,
   GoogleCalendar,
   GoogleConnectionStatus,
   InstructorProfile,
-  LessonProduct,
+  LessonType,
+  PayRate,
   PublicPage,
   RefItem,
   ShopifyInstructorSync,
@@ -148,24 +150,48 @@ export function fakePage(overrides: Partial<PublicPage> = {}): PublicPage {
   };
 }
 
-export function fakeLessonProduct(
-  overrides: Partial<LessonProduct> = {},
-): LessonProduct {
+export function fakeLessonType(
+  overrides: Partial<LessonType> = {},
+): LessonType {
   return {
-    id: 'lp1',
-    shopifyProductId: 9001,
-    shopifyVariantId: 90011,
-    productTitle: '一对一',
-    variantTitle: '单次',
-    lessonType: 'private',
+    id: 'lt1',
+    nameEn: 'Private 2h',
+    nameZh: '1对1滑雪课 - 2小时',
     groupSize: 1,
-    sessions: 1,
-    durationMin: null,
-    pricedPerStudent: false,
-    instructorId: 'inst-1',
-    status: 'suggested',
-    price: '120.00',
+    durationMin: 120,
+    isPromo: false,
+    active: true,
+    sortOrder: 0,
+    createdAt: '2026-10-10T00:00:00Z',
+    updatedAt: '2026-10-10T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function fakePayRate(overrides: Partial<PayRate> = {}): PayRate {
+  return {
+    id: 'pr1',
+    lessonTypeId: 'lt1',
+    instructorId: null,
+    hourlyRate: 45,
     currency: 'CAD',
+    effectiveFrom: '2026-11-01',
+    effectiveTo: null,
+    createdAt: '2026-10-10T00:00:00Z',
+    updatedAt: '2026-10-10T00:00:00Z',
+    ...overrides,
+  };
+}
+
+export function fakeCustomer(overrides: Partial<Customer> = {}): Customer {
+  return {
+    id: 'cu1',
+    shopifyCustomerId: 7001,
+    firstName: 'Lily',
+    lastName: 'Chen',
+    email: 'lily@example.com',
+    phone: '+16475550100',
+    shopifyUpdatedAt: '2026-10-10T00:00:00Z',
     createdAt: '2026-10-10T00:00:00Z',
     updatedAt: '2026-10-10T00:00:00Z',
     ...overrides,
@@ -176,8 +202,16 @@ export function fakeClass(overrides: Partial<AdminClass> = {}): AdminClass {
   return {
     id: 'c1',
     instructorId: 'inst-1',
-    lessonProductId: 'lp1',
+    instructorName: 'Jane Snow',
+    instructorNameZh: null,
+    lessonTypeId: 'lt1',
+    lessonTypeNameEn: 'Private 2h',
+    lessonTypeNameZh: '1对1滑雪课 - 2小时',
+    durationMin: 120,
+    groupSize: 1,
+    isPromo: false,
     locationId: null,
+    locationName: null,
     startsAt: '2026-12-05T17:00:00Z',
     endsAt: '2026-12-05T19:00:00Z',
     status: 'scheduled',
@@ -186,6 +220,8 @@ export function fakeClass(overrides: Partial<AdminClass> = {}): AdminClass {
     googleEventId: null,
     notes: null,
     participants: [],
+    createdAt: '2026-10-10T00:00:00Z',
+    updatedAt: '2026-10-10T00:00:00Z',
     ...overrides,
   };
 }
@@ -203,8 +239,19 @@ export const handlers = [
     HttpResponse.json(fakeAdminList[0]),
   ),
   http.get(`${API}/reference/:slug`, () => HttpResponse.json(refs)),
-  http.get(`${API}/admin/lesson-products`, () => HttpResponse.json([])),
   http.get(`${API}/admin/classes`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/lesson-types`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/pay-rates`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/customers`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/instructors/:id/google-calendar`, ({ params }) =>
+    HttpResponse.json({
+      instructorId: params.id,
+      googleCalendarId: null,
+      calendarSummary: null,
+      matchStatus: null,
+      updatedAt: null,
+    }),
+  ),
   http.get(`${API}/admin/shopify-sync/status`, () =>
     HttpResponse.json(fakeShopifySyncStatus),
   ),
