@@ -17,9 +17,10 @@ export function useGoogleStatus() {
   });
 }
 
-export function useGoogleCalendars() {
+export function useGoogleCalendars(enabled = true) {
   return useQuery({
     queryKey: calendarsKey,
+    enabled,
     queryFn: () => api<GoogleCalendar[]>('/admin/google/calendars'),
   });
 }

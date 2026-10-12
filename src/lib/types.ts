@@ -213,6 +213,164 @@ export interface PublicPage {
   updatedAt: string;
 }
 
+export interface LessonType {
+  id: string;
+  nameEn: string;
+  nameZh: string | null;
+  groupSize: number | null;
+  durationMin: number;
+  isPromo: boolean;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LessonTypeInput {
+  nameEn?: string;
+  nameZh?: string | null;
+  groupSize?: number | null;
+  durationMin?: number;
+  isPromo?: boolean;
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export interface PayRate {
+  id: string;
+  lessonTypeId: string;
+  instructorId: string | null;
+  hourlyRate: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayRateCreate {
+  lessonTypeId: string;
+  instructorId: string | null;
+  hourlyRate: number;
+  currency?: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface PayRatePatch {
+  hourlyRate?: number;
+  currency?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string | null;
+}
+
+export interface Customer {
+  id: string;
+  shopifyCustomerId: number;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  shopifyUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerCreate {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface CustomerSyncResult {
+  mode: 'backfill' | 'incremental';
+  updatedSince: string | null;
+  pages: number;
+  fetched: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export type ClassStatus = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
+export type ClassSource = 'ssms' | 'app_import' | 'app_webhook';
+export type Attendance = 'expected' | 'attended' | 'no_show';
+
+export interface ClassParticipant {
+  customerId: string;
+  attendance: Attendance;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface AdminClass {
+  id: string;
+  instructorId: string;
+  instructorName: string | null;
+  instructorNameZh: string | null;
+  lessonTypeId: string | null;
+  lessonTypeNameEn: string | null;
+  lessonTypeNameZh: string | null;
+  durationMin: number | null;
+  groupSize: number | null;
+  isPromo: boolean | null;
+  locationId: string | null;
+  locationName: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: ClassStatus;
+  source: ClassSource;
+  googleCalendarId: string | null;
+  googleEventId: string | null;
+  notes: string | null;
+  participants: ClassParticipant[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CalendarMatchStatus = 'suggested' | 'confirmed';
+
+export interface InstructorGoogleCalendar {
+  instructorId: string;
+  googleCalendarId: string | null;
+  calendarSummary: string | null;
+  matchStatus: CalendarMatchStatus | null;
+  updatedAt: string | null;
+}
+
+export interface InstructorGoogleCalendarInput {
+  googleCalendarId: string | null;
+  matchStatus?: CalendarMatchStatus;
+}
+
+export interface CalendarCandidate {
+  calendarId: string;
+  calendarSummary: string;
+  matchedBy: 'email' | 'name';
+}
+
+export interface InstructorCalendarOverview extends InstructorGoogleCalendar {
+  displayNameEn: string;
+  displayNameZh: string | null;
+  email: string | null;
+  approvalStatus: string;
+  isActive: boolean;
+  candidates: CalendarCandidate[];
+  suggestion: CalendarCandidate | null;
+}
+
+export interface InstructorCalendarsOverview {
+  google: { connected: boolean; error: string | null };
+  instructors: InstructorCalendarOverview[];
+}
+
+export interface SuggestCalendarsResult {
+  suggested: number;
+  overview: InstructorCalendarsOverview;
+}
+
 export interface GoogleConnectionStatus {
   configured: boolean;
   connected: boolean;
@@ -230,7 +388,8 @@ export type GoogleCalendarAccessRole =
   | 'owner'
   | 'writer'
   | 'reader'
-  | 'freeBusyReader';
+  | 'freeBusyReader'
+  | (string & {});
 
 export interface GoogleCalendar {
   id: string;

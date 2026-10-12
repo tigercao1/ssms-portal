@@ -8,6 +8,8 @@ import { renderWithProviders } from '@/test/render';
 import { fakeAdminList, fakeProfile, server } from '@/test/msw';
 import type {
   AdminInstructorRecord,
+  InstructorGoogleCalendar,
+  InstructorGoogleCalendarInput,
   InstructorProfile,
   UserRole,
 } from '@/lib/types';
@@ -447,7 +449,9 @@ describe('AdminDetailPage machine-translation badge', () => {
     renderDetail();
 
     expect(await screen.findByDisplayValue('资深教练。')).toBeInTheDocument();
-    expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(1);
+    expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(
+      1,
+    );
     expect(
       screen.getByText(/Editing this text replaces the machine translation/),
     ).toBeInTheDocument();
@@ -604,7 +608,9 @@ describe('AdminDetailPage display order', () => {
       http.patch(
         `${API}/admin/instructors/:id/display-order`,
         async ({ request }) => {
-          const body = (await request.json()) as { displayOrder: number | null };
+          const body = (await request.json()) as {
+            displayOrder: number | null;
+          };
           bodies.push(body);
           return HttpResponse.json({
             ...fakeAdminList[0],
@@ -649,9 +655,9 @@ describe('AdminDetailPage display order', () => {
   it('starts empty when no order is set', async () => {
     serveRecord({ displayOrder: null });
     renderDetail();
-    expect(
-      await screen.findByRole('spinbutton', { name: label }),
-    ).toHaveValue(null);
+    expect(await screen.findByRole('spinbutton', { name: label })).toHaveValue(
+      null,
+    );
   });
 
   it.each(['-1', '2.5', '2147483648'])(
@@ -701,6 +707,181 @@ describe('AdminDetailPage display order', () => {
       await screen.findByRole('spinbutton', {
         name: '显示顺序（数字越小越靠前）',
       }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('AdminDetailPage Google Calendar ID', () => {
+  function serveCalendar(
+    current: Partial<InstructorGoogleCalendar> = {},
+    patchStatus = 200,
+  ) {
+    const bodies: unknown[] = [];
+    let stored: InstructorGoogleCalendar = {
+      instructorId: (fakeAdminList[0] as AdminInstructorRecord).id,
+      googleCalendarId: null,
+      calendarSummary: null,
+      matchStatus: null,
+      updatedAt: null,
+      ...current,
+    };
+    server.use(
+      http.get(`${API}/admin/instructors/:id/google-calendar`, () =>
+        HttpResponse.json(stored),
+      ),
+      http.patch(
+        `${API}/admin/instructors/:id/google-calendar`,
+        async ({ request }) => {
+          const body = (await request.json()) as InstructorGoogleCalendarInput;
+          bodies.push(body);
+          if (patchStatus !== 200) {
+            return HttpResponse.json(
+              {
+                message:
+                  patchStatus === 409
+                    ? 'This calendar is already linked to another instructor'
+                    : 'nope',
+              },
+              { status: patchStatus },
+            );
+          }
+          stored = {
+            ...stored,
+            googleCalendarId: body.googleCalendarId,
+            calendarSummary: body.googleCalendarId
+              ? `Summary of ${body.googleCalendarId}`
+              : null,
+            matchStatus: body.googleCalendarId
+              ? (body.matchStatus ?? 'confirmed')
+              : null,
+          };
+          return HttpResponse.json(stored);
+        },
+      ),
+    );
+    return bodies;
+  }
+
+  const label = 'Google Calendar ID';
+
+  it('loads the linked calendar and saves a trimmed new one as confirmed', async () => {
+    serveRecord({});
+    const bodies = serveCalendar({
+      googleCalendarId: 'old@group.calendar.google.com',
+      calendarSummary: 'Old calendar',
+      matchStatus: 'confirmed',
+    });
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    expect(input).toHaveValue('old@group.calendar.google.com');
+    expect(screen.getByText('Calendar: Old calendar')).toBeInTheDocument();
+    expect(screen.getByText('Confirmed')).toBeInTheDocument();
+    await userEvent.clear(input);
+    await userEvent.type(input, '  jane@group.calendar.google.com ');
+    const card = input.closest('form') as HTMLFormElement;
+    await userEvent.click(within(card).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          googleCalendarId: 'jane@group.calendar.google.com',
+          matchStatus: 'confirmed',
+        },
+      ]),
+    );
+    expect(await screen.findByText('Saved')).toBeInTheDocument();
+  });
+
+  it('confirms a suggested calendar, keeping its summary', async () => {
+    serveRecord({});
+    const bodies = serveCalendar({
+      googleCalendarId: 'jane.snow@ssnow.club',
+      calendarSummary: 'Jane Snow',
+      matchStatus: 'suggested',
+    });
+    renderDetail();
+
+    expect(
+      await screen.findByText(
+        'Suggested match. Confirm it, or enter a different calendar.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          googleCalendarId: 'jane.snow@ssnow.club',
+          matchStatus: 'confirmed',
+        },
+      ]),
+    );
+    expect(await screen.findByText('Confirmed')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Confirm' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends null when the field is cleared', async () => {
+    serveRecord({});
+    const bodies = serveCalendar({
+      googleCalendarId: 'old@group.calendar.google.com',
+      matchStatus: 'confirmed',
+    });
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    await waitFor(() =>
+      expect(input).toHaveValue('old@group.calendar.google.com'),
+    );
+    await userEvent.clear(input);
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    await waitFor(() => expect(bodies).toEqual([{ googleCalendarId: null }]));
+  });
+
+  it('explains a calendar that is already linked to someone else', async () => {
+    serveRecord({});
+    serveCalendar({}, 409);
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    expect(input).toHaveValue('');
+    await userEvent.type(input, 'x@group.calendar.google.com');
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    expect(
+      await screen.findByText(
+        'This calendar is already linked to another instructor.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the API message for other failures', async () => {
+    serveRecord({});
+    serveCalendar({}, 400);
+    renderDetail();
+
+    const input = await screen.findByRole('textbox', { name: label });
+    await userEvent.type(input, 'x@group.calendar.google.com');
+    fireEvent.submit(input.closest('form') as HTMLFormElement);
+
+    expect(await screen.findByText('nope')).toBeInTheDocument();
+  });
+
+  it('shows an error when the calendar cannot be loaded', async () => {
+    serveRecord({});
+    server.use(
+      http.get(`${API}/admin/instructors/:id/google-calendar`, () =>
+        HttpResponse.json({ message: 'boom' }, { status: 500 }),
+      ),
+    );
+    renderDetail();
+
+    expect(await screen.findByText('Google Calendar')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Something went wrong.'),
     ).toBeInTheDocument();
   });
 });
