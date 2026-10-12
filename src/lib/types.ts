@@ -342,7 +342,6 @@ export interface InstructorGoogleCalendar {
 
 export interface InstructorGoogleCalendarInput {
   googleCalendarId: string | null;
-  calendarSummary?: string | null;
   matchStatus?: CalendarMatchStatus;
 }
 
@@ -389,7 +388,8 @@ export type GoogleCalendarAccessRole =
   | 'owner'
   | 'writer'
   | 'reader'
-  | 'freeBusyReader';
+  | 'freeBusyReader'
+  | (string & {});
 
 export interface GoogleCalendar {
   id: string;

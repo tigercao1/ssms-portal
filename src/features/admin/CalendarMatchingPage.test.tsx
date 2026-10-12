@@ -156,7 +156,7 @@ function serve({
               ...i,
               googleCalendarId: body.googleCalendarId,
               calendarSummary: body.googleCalendarId
-                ? (body.calendarSummary ?? null)
+                ? `Summary of ${body.googleCalendarId}`
                 : null,
               matchStatus: body.googleCalendarId
                 ? (body.matchStatus ?? 'confirmed')
@@ -273,7 +273,6 @@ describe('CalendarMatchingPage', () => {
         id: 'inst-1',
         body: {
           googleCalendarId: 'jane@ssnow.club',
-          calendarSummary: 'Jane Snow',
           matchStatus: 'confirmed',
         },
       },
@@ -281,7 +280,6 @@ describe('CalendarMatchingPage', () => {
         id: 'inst-2',
         body: {
           googleCalendarId: 'eddie@ssnow.club',
-          calendarSummary: 'Eddie Lee',
           matchStatus: 'confirmed',
         },
       },
@@ -325,7 +323,6 @@ describe('CalendarMatchingPage', () => {
           id: 'inst-4',
           body: {
             googleCalendarId: 'eddie@ssnow.club',
-            calendarSummary: 'Eddie Lee',
             matchStatus: 'confirmed',
           },
         },

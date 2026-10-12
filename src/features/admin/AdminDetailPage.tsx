@@ -294,7 +294,6 @@ function GoogleCalendarForm({
     save.mutate({
       instructorId: current.instructorId,
       googleCalendarId: current.googleCalendarId,
-      calendarSummary: current.calendarSummary,
       matchStatus: 'confirmed',
     });
   }

@@ -104,7 +104,13 @@ export function setInstructorGoogleCalendar(
 ) {
   return api<InstructorGoogleCalendar>(
     `/admin/instructors/${instructorId}/google-calendar`,
-    { method: 'PATCH', body },
+    {
+      method: 'PATCH',
+      body: {
+        googleCalendarId: body.googleCalendarId,
+        ...(body.matchStatus ? { matchStatus: body.matchStatus } : {}),
+      },
+    },
   );
 }
 

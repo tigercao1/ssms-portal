@@ -214,15 +214,9 @@ function InstructorRow({
   const proposal = !entry.googleCalendarId ? entry.suggestion : null;
   const confirmTarget =
     entry.matchStatus === 'suggested' && entry.googleCalendarId
-      ? {
-          googleCalendarId: entry.googleCalendarId,
-          calendarSummary: entry.calendarSummary,
-        }
+      ? { googleCalendarId: entry.googleCalendarId }
       : proposal
-        ? {
-            googleCalendarId: proposal.calendarId,
-            calendarSummary: proposal.calendarSummary,
-          }
+        ? { googleCalendarId: proposal.calendarId }
         : null;
   const pickedCalendar = calendarById.get(picked);
 
@@ -317,7 +311,6 @@ function InstructorRow({
                     pickedCalendar &&
                     submit({
                       googleCalendarId: pickedCalendar.id,
-                      calendarSummary: pickedCalendar.summary,
                       matchStatus: 'confirmed',
                     })
                   }

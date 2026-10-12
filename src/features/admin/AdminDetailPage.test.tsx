@@ -449,7 +449,9 @@ describe('AdminDetailPage machine-translation badge', () => {
     renderDetail();
 
     expect(await screen.findByDisplayValue('资深教练。')).toBeInTheDocument();
-    expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(1);
+    expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(
+      1,
+    );
     expect(
       screen.getByText(/Editing this text replaces the machine translation/),
     ).toBeInTheDocument();
@@ -606,7 +608,9 @@ describe('AdminDetailPage display order', () => {
       http.patch(
         `${API}/admin/instructors/:id/display-order`,
         async ({ request }) => {
-          const body = (await request.json()) as { displayOrder: number | null };
+          const body = (await request.json()) as {
+            displayOrder: number | null;
+          };
           bodies.push(body);
           return HttpResponse.json({
             ...fakeAdminList[0],
@@ -651,9 +655,9 @@ describe('AdminDetailPage display order', () => {
   it('starts empty when no order is set', async () => {
     serveRecord({ displayOrder: null });
     renderDetail();
-    expect(
-      await screen.findByRole('spinbutton', { name: label }),
-    ).toHaveValue(null);
+    expect(await screen.findByRole('spinbutton', { name: label })).toHaveValue(
+      null,
+    );
   });
 
   it.each(['-1', '2.5', '2147483648'])(
@@ -745,7 +749,7 @@ describe('AdminDetailPage Google Calendar ID', () => {
             ...stored,
             googleCalendarId: body.googleCalendarId,
             calendarSummary: body.googleCalendarId
-              ? (body.calendarSummary ?? null)
+              ? `Summary of ${body.googleCalendarId}`
               : null,
             matchStatus: body.googleCalendarId
               ? (body.matchStatus ?? 'confirmed')
@@ -783,7 +787,6 @@ describe('AdminDetailPage Google Calendar ID', () => {
         {
           googleCalendarId: 'jane@group.calendar.google.com',
           matchStatus: 'confirmed',
-          calendarSummary: null,
         },
       ]),
     );
@@ -810,7 +813,6 @@ describe('AdminDetailPage Google Calendar ID', () => {
       expect(bodies).toEqual([
         {
           googleCalendarId: 'jane.snow@ssnow.club',
-          calendarSummary: 'Jane Snow',
           matchStatus: 'confirmed',
         },
       ]),
