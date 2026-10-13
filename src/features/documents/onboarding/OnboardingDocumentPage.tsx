@@ -92,7 +92,7 @@ function CompletedView({
           {t.onboarding.sha256}: {assignment.signedSha256}
         </p>
       )}
-      <DownloadSigned assignmentId={assignment.id} />
+      {assignment.hasSignedCopy && <DownloadSigned assignmentId={assignment.id} />}
       <BackLink />
     </Card>
   );

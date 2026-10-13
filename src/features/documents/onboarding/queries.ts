@@ -79,11 +79,11 @@ export function useUploadCertification() {
 const DONE_CERT_STATES = new Set(['valid', 'expiring', 'pending']);
 
 export function isItemRequired(item: ChecklistItem): boolean {
-  return item.type === 'certification' || item.template.required !== false;
+  return item.type === 'certification' || item.required !== false;
 }
 
 export function isItemDone(item: ChecklistItem): boolean {
-  if (item.type === 'document') return item.assignment.status === 'completed';
+  if (item.type === 'document') return item.status === 'completed';
   return DONE_CERT_STATES.has(item.state);
 }
 

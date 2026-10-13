@@ -86,37 +86,36 @@ function Row({
 function DocumentRow({ item }: { item: DocumentChecklistItem }) {
   const t = useT();
   const { locale } = useLocale();
-  const { assignment, template } = item;
-  const title = localizeField(template.titleEn, template.titleZh, locale);
+  const title = localizeField(item.titleEn, item.titleZh, locale);
   const kind =
-    template.kind === 'read' ? t.onboarding.kindRead : t.onboarding.kindSign;
+    item.kind === 'read' ? t.onboarding.kindRead : t.onboarding.kindSign;
   const status =
-    assignment.status === 'completed'
+    item.status === 'completed'
       ? t.onboarding.statusCompleted
-      : assignment.status === 'viewed'
+      : item.status === 'viewed'
         ? t.onboarding.statusViewed
         : t.onboarding.statusAssigned;
   const tone: PillTone =
-    assignment.status === 'completed'
+    item.status === 'completed'
       ? 'done'
-      : assignment.status === 'viewed'
+      : item.status === 'viewed'
         ? 'warn'
         : 'muted';
   const actionLabel =
-    assignment.status === 'completed'
+    item.status === 'completed'
       ? t.onboarding.actionOpen
-      : assignment.status === 'viewed'
+      : item.status === 'viewed'
         ? t.onboarding.actionContinue
-        : template.kind === 'read'
+        : item.kind === 'read'
           ? t.onboarding.actionRead
           : t.onboarding.actionSign;
   const subtitle = [
     kind,
-    template.required === false ? t.onboarding.optional : null,
-    assignment.dueAt && assignment.status !== 'completed'
+    item.required === false ? t.onboarding.optional : null,
+    item.dueAt && item.status !== 'completed'
       ? t.onboarding.dueBy.replace(
           '{date}',
-          formatDate(assignment.dueAt, locale),
+          formatDate(item.dueAt, locale),
         )
       : null,
   ]
@@ -125,17 +124,17 @@ function DocumentRow({ item }: { item: DocumentChecklistItem }) {
 
   return (
     <Row
-      done={assignment.status === 'completed'}
+      done={item.status === 'completed'}
       title={title}
       subtitle={subtitle}
       pill={<StatePill tone={tone} label={status} />}
       action={
         <Link
-          to={`/onboarding/${assignment.id}`}
+          to={`/onboarding/${item.assignmentId}`}
           aria-label={`${actionLabel}: ${title}`}
           className={cn(
             'inline-flex h-9 items-center rounded-md px-3 text-sm font-medium',
-            assignment.status === 'completed'
+            item.status === 'completed'
               ? 'text-navy hover:bg-navy-tint'
               : 'border border-navy text-navy hover:bg-navy-tint',
           )}
@@ -195,7 +194,7 @@ function CertRow({
         ) : null
       }
     >
-      {item.state === 'rejected' && item.upload?.reviewNote && (
+      {item.state === 'rejected' && item.reviewNote && (
         <p className="mt-1 text-xs text-status-rejected">
           {t.onboarding.reviewNote.replace('{note}', item.upload.reviewNote)}
         </p>
@@ -250,8 +249,8 @@ export function OnboardingPage() {
   const docs = items.filter(
     (i): i is DocumentChecklistItem => i.type === 'document',
   );
-  const reads = docs.filter((d) => d.template.kind === 'read');
-  const signs = docs.filter((d) => d.template.kind === 'sign');
+  const reads = docs.filter((d) => d.item.kind === 'read');
+  const signs = docs.filter((d) => d.kind === 'sign');
   const certs = items.filter(
     (i): i is CertificationChecklistItem => i.type === 'certification',
   );
@@ -282,14 +281,14 @@ export function OnboardingPage() {
         {reads.length > 0 && (
           <Section title={t.onboarding.sectionRead}>
             {reads.map((item) => (
-              <DocumentRow key={item.assignment.id} item={item} />
+              <DocumentRow key={item.assignmentId} item={item} />
             ))}
           </Section>
         )}
         {signs.length > 0 && (
           <Section title={t.onboarding.sectionSign}>
             {signs.map((item) => (
-              <DocumentRow key={item.assignment.id} item={item} />
+              <DocumentRow key={item.assignmentId} item={item} />
             ))}
           </Section>
         )}
