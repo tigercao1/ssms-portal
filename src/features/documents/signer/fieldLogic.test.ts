@@ -9,7 +9,9 @@ import {
   type SignerFieldLike,
 } from './fieldLogic';
 
-const f = (over: Partial<SignerFieldLike> & Pick<SignerFieldLike, 'id' | 'type'>): SignerFieldLike => ({
+const f = (
+  over: Partial<SignerFieldLike> & Pick<SignerFieldLike, 'id' | 'type'>,
+): SignerFieldLike => ({
   page: 1,
   x: 72,
   y: 100,
@@ -29,7 +31,11 @@ const fields: SignerFieldLike[] = [
   f({ id: 'ini', type: 'initials', page: 2, y: 100 }),
   f({ id: 'mail', type: 'text', prefill: 'email', required: false, y: 300 }),
 ];
-const identity = { signerName: 'Jane Snow', email: 'jane@example.com', today: '2026-10-12' };
+const identity = {
+  signerName: 'Jane Snow',
+  email: 'jane@example.com',
+  today: '2026-10-12',
+};
 
 describe('fieldLogic', () => {
   it('orders fields by page, top to bottom, then left to right', () => {
@@ -65,13 +71,25 @@ describe('fieldLogic', () => {
 
   it('reports missing required fields in reading order', () => {
     const values = initialValues(fields, identity);
-    expect(missingRequired(fields, values, {}).map((x) => x.id)).toEqual(['sig', 'agree', 'ini']);
-    expect(isFieldFilled(f({ id: 'agree', type: 'checkbox' }), { agree: true }, {})).toBe(true);
-    expect(isFieldFilled(f({ id: 'name', type: 'full_name' }), { name: '  ' }, {})).toBe(false);
+    expect(missingRequired(fields, values, {}).map((x) => x.id)).toEqual([
+      'sig',
+      'agree',
+      'ini',
+    ]);
+    expect(
+      isFieldFilled(f({ id: 'agree', type: 'checkbox' }), { agree: true }, {}),
+    ).toBe(true);
+    expect(
+      isFieldFilled(f({ id: 'name', type: 'full_name' }), { name: '  ' }, {}),
+    ).toBe(false);
   });
 
   it('builds the sign body exactly per the contract', () => {
-    const values = { ...initialValues(fields, identity), agree: true, note: '  hi  ' };
+    const values = {
+      ...initialValues(fields, identity),
+      agree: true,
+      note: '  hi  ',
+    };
     const body = buildSignBody(fields, ' Jane Snow ', values, {
       sig: { mode: 'drawn', png: 'iVBOR' },
       ini: { mode: 'typed', text: 'JS' },
@@ -98,5 +116,4 @@ describe('fieldLogic', () => {
     expect(body.values).toEqual({ agree: false });
     expect(body.signatures).toEqual({});
   });
-
 });

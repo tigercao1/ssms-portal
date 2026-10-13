@@ -17,7 +17,13 @@ interface ReadDocumentProps {
 }
 
 /** Read-only document: scroll to the end, tick "I have read and understood", done. */
-export function ReadDocument({ sourceUrl, text, submitting, submitError, onSubmit }: ReadDocumentProps) {
+export function ReadDocument({
+  sourceUrl,
+  text,
+  submitting,
+  submitError,
+  onSubmit,
+}: ReadDocumentProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [reachedEnd, setReachedEnd] = useState(false);

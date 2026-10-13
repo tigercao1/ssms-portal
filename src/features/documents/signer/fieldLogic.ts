@@ -1,4 +1,9 @@
-import type { FieldPrefill, FieldType, SignCompletion, SignatureValue } from '../api';
+import type {
+  FieldPrefill,
+  FieldType,
+  SignCompletion,
+  SignatureValue,
+} from '../api';
 
 /** The parts of a template field the signer needs. */
 export interface SignerFieldLike {
@@ -22,12 +27,16 @@ export interface SignerIdentity {
   today: string;
 }
 
-export function isSignatureField(field: Pick<SignerFieldLike, 'type'>): boolean {
+export function isSignatureField(
+  field: Pick<SignerFieldLike, 'type'>,
+): boolean {
   return field.type === 'signature' || field.type === 'initials';
 }
 
 /** Reading order: page, then top to bottom (PDF y grows upwards), then left to right. */
-export function orderFields<F extends SignerFieldLike>(fields: readonly F[]): F[] {
+export function orderFields<F extends SignerFieldLike>(
+  fields: readonly F[],
+): F[] {
   return [...fields].sort(
     (a, b) => a.page - b.page || b.y + b.h - (a.y + a.h) || a.x - b.x,
   );

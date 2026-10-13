@@ -15,7 +15,10 @@ import type { CertOrg, CertTrack } from '@/lib/types';
 import { prepareCertFile } from './certFile';
 
 export function useMyChecklist() {
-  return useQuery({ queryKey: documentsKeys.myChecklist, queryFn: getMyChecklist });
+  return useQuery({
+    queryKey: documentsKeys.myChecklist,
+    queryFn: getMyChecklist,
+  });
 }
 
 export function useMyDocument(assignmentId: string) {
@@ -30,8 +33,10 @@ export function useMyDocument(assignmentId: string) {
 export function useCompleteMyDocument(assignmentId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CompleteRequest) => completeMyDocument(assignmentId, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
+    mutationFn: (body: CompleteRequest) =>
+      completeMyDocument(assignmentId, body),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
   });
 }
 
@@ -66,7 +71,8 @@ export function useUploadCertification() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: uploadCertification,
-    onSuccess: () => qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
   });
 }
 

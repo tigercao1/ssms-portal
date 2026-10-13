@@ -56,7 +56,9 @@ export function FieldOverlay({
           ? 'border-2 border-dashed border-status-pending bg-[#fdf8ee]'
           : 'border border-dashed border-grey bg-white/60',
   );
-  const accessibleLabel = field.required ? `${label} (${text.requiredMark})` : label;
+  const accessibleLabel = field.required
+    ? `${label} (${text.requiredMark})`
+    : label;
 
   if (isSignatureField(field)) {
     return (
@@ -79,13 +81,20 @@ export function FieldOverlay({
         ) : signature?.mode === 'typed' ? (
           <span
             className="truncate text-navy"
-            style={{ fontFamily: TYPED_SIGNATURE_FONT, fontSize: fontSize * 1.3 }}
+            style={{
+              fontFamily: TYPED_SIGNATURE_FONT,
+              fontSize: fontSize * 1.3,
+            }}
           >
             {signature.text}
           </span>
         ) : (
-          <span className="truncate font-medium text-ink">
-            ✎ {label} — {field.type === 'initials' ? text.tapToInitial : text.tapToSign}
+          <span
+            className="truncate font-medium text-ink"
+            style={{ fontSize: Math.min(fontSize, 13) }}
+          >
+            ✎ {label} ·{' '}
+            {field.type === 'initials' ? text.tapToInitial : text.tapToSign}
           </span>
         )}
       </button>
@@ -123,7 +132,9 @@ export function FieldOverlay({
         aria-label={accessibleLabel}
         onFocus={onFocus}
       >
-        <span className="truncate">{typeof value === 'string' ? value : ''}</span>
+        <span className="truncate">
+          {typeof value === 'string' ? value : ''}
+        </span>
       </div>
     );
   }

@@ -6,7 +6,12 @@ import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
 import { useSession } from '@/auth/SessionProvider';
 import { useMyProfile } from '@/features/instructor/api';
-import { getMySignedUrl, todayIso, type Assignment, type TemplateKind } from '../api';
+import {
+  getMySignedUrl,
+  todayIso,
+  type Assignment,
+  type TemplateKind,
+} from '../api';
 import { ReadDocument } from '../signer/ReadDocument';
 import { SignerDocument } from '../signer/SignerDocument';
 import { useCompleteMyDocument, useMyDocument } from './queries';
@@ -14,7 +19,10 @@ import { useCompleteMyDocument, useMyDocument } from './queries';
 function BackLink() {
   const t = useT();
   return (
-    <Link to="/onboarding" className="text-sm font-medium text-navy hover:text-red">
+    <Link
+      to="/onboarding"
+      className="text-sm font-medium text-navy hover:text-red"
+    >
       ← {t.onboarding.backToChecklist}
     </Link>
   );
@@ -42,7 +50,11 @@ function DownloadSigned({ assignmentId }: { assignmentId: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Button className="self-start" onClick={() => void download()} loading={busy}>
+      <Button
+        className="self-start"
+        onClick={() => void download()}
+        loading={busy}
+      >
         {t.onboarding.downloadSigned}
       </Button>
       {sha256 && (
@@ -55,7 +67,13 @@ function DownloadSigned({ assignmentId }: { assignmentId: string }) {
   );
 }
 
-function CompletedView({ kind, assignment }: { kind: TemplateKind; assignment: Assignment }) {
+function CompletedView({
+  kind,
+  assignment,
+}: {
+  kind: TemplateKind;
+  assignment: Assignment;
+}) {
   const t = useT();
   if (kind === 'read')
     return (
@@ -107,13 +125,15 @@ export function OnboardingDocumentPage() {
 
   const { assignment, template, sourceUrl } = doc.data;
   const title = localizeField(template.titleEn, template.titleZh, locale);
-  const done = completed ?? (assignment.status === 'completed' ? assignment : null);
+  const done =
+    completed ?? (assignment.status === 'completed' ? assignment : null);
   const submitError = complete.error
     ? complete.error instanceof ApiError && complete.error.status === 409
       ? t.onboarding.alreadyCompleted
       : t.signer.submitFailed
     : null;
-  const onDone = (result: { assignment: Assignment }) => setCompleted(result.assignment);
+  const onDone = (result: { assignment: Assignment }) =>
+    setCompleted(result.assignment);
 
   return (
     <div className="flex flex-col gap-4">
@@ -122,7 +142,11 @@ export function OnboardingDocumentPage() {
         <h1 className="text-3xl">{title}</h1>
         {!done && template.descriptionEn && (
           <p className="text-sm text-slate">
-            {localizeField(template.descriptionEn, template.descriptionZh, locale)}
+            {localizeField(
+              template.descriptionEn,
+              template.descriptionZh,
+              locale,
+            )}
           </p>
         )}
       </div>
@@ -148,7 +172,9 @@ export function OnboardingDocumentPage() {
         <SignerDocument
           template={template}
           sourceUrl={sourceUrl}
-          defaultSignerName={assignment.signerName ?? profile.data?.displayNameEn ?? ''}
+          defaultSignerName={
+            assignment.signerName ?? profile.data?.displayNameEn ?? ''
+          }
           signerEmail={profile.data?.email ?? user?.email ?? null}
           today={todayIso()}
           locale={locale}

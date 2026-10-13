@@ -64,7 +64,10 @@ describe('SignatureModal', () => {
     expect(use).toBeDisabled();
     draw();
     await userEvent.click(use);
-    expect(onAdopt).toHaveBeenCalledWith({ mode: 'drawn', png: 'iVBORw0KGgo=' });
+    expect(onAdopt).toHaveBeenCalledWith({
+      mode: 'drawn',
+      png: 'iVBORw0KGgo=',
+    });
   });
 
   it('rejects a drawn signature that stays over 200 KB', async () => {
@@ -84,7 +87,9 @@ describe('SignatureModal', () => {
       />,
     );
     draw();
-    await userEvent.click(screen.getByRole('button', { name: 'Use signature' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use signature' }),
+    );
     expect(onAdopt).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('too large');
   });
@@ -128,7 +133,9 @@ describe('SignatureModal', () => {
     draw();
     expect(screen.getByRole('button', { name: 'Use signature' })).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
-    expect(screen.getByRole('button', { name: 'Use signature' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Use signature' }),
+    ).toBeDisabled();
   });
 });
 

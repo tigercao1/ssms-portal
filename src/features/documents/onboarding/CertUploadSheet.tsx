@@ -80,13 +80,25 @@ export function CertUploadSheet({
           <Button variant="secondary" size="sm" type="button" onClick={onClose}>
             {t.common.cancel}
           </Button>
-          <Button size="sm" type="submit" form="cert-upload-form" loading={upload.isPending}>
-            {upload.isPending ? t.onboarding.uploading : t.onboarding.uploadButton}
+          <Button
+            size="sm"
+            type="submit"
+            form="cert-upload-form"
+            loading={upload.isPending}
+          >
+            {upload.isPending
+              ? t.onboarding.uploading
+              : t.onboarding.uploadButton}
           </Button>
         </>
       }
     >
-      <form id="cert-upload-form" noValidate onSubmit={submit} className="flex flex-col gap-4">
+      <form
+        id="cert-upload-form"
+        noValidate
+        onSubmit={submit}
+        className="flex flex-col gap-4"
+      >
         <Field
           label={t.onboarding.fileLabel}
           hint={t.onboarding.fileHint}

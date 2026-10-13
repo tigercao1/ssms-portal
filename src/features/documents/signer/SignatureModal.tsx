@@ -3,7 +3,11 @@ import { Button, Input } from '@/components';
 import { cn } from '@/lib/cn';
 import { Sheet } from './Sheet';
 import { SignatureCanvas, type SignatureCanvasHandle } from './SignatureCanvas';
-import { MAX_SIGNATURE_PNG_BYTES, type SignatureValue, type SignerText } from './types';
+import {
+  MAX_SIGNATURE_PNG_BYTES,
+  type SignatureValue,
+  type SignerText,
+} from './types';
 
 type Mode = 'drawn' | 'typed';
 
@@ -128,7 +132,10 @@ export function SignatureModal({
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <label className="text-sm font-medium text-navy" htmlFor="typed-signature">
+          <label
+            className="text-sm font-medium text-navy"
+            htmlFor="typed-signature"
+          >
             {text.typeLabel}
           </label>
           <Input

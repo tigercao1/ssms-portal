@@ -1,5 +1,13 @@
 /** Thin progress bar for "x of y done". */
-export function ProgressBar({ done, total, label }: { done: number; total: number; label: string }) {
+export function ProgressBar({
+  done,
+  total,
+  label,
+}: {
+  done: number;
+  total: number;
+  label: string;
+}) {
   const pct = total === 0 ? 100 : Math.round((done / total) * 100);
   return (
     <div

@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Banner, Button, Input } from '@/components';
 import type { Locale } from '@/i18n/core/types';
-import type { Field, SignCompletion, SignatureValue, SignerTemplate } from '../api';
+import type {
+  Field,
+  SignCompletion,
+  SignatureValue,
+  SignerTemplate,
+} from '../api';
 import { PdfPages, type PdfPagesHandle } from '../pdf/PdfPages';
 import { pdfRectToScreen } from '../pdf/transforms';
 import { ConsentBlock } from './ConsentBlock';
@@ -34,11 +39,27 @@ export interface SignerDocumentProps {
 
 const MOBILE_QUERY = '(max-width: 767px)';
 const MOBILE_MIN_FIELD_PX = 220;
+const MOBILE_MIN_TOUCH_PX = 36;
 const MAX_ZOOM = 3;
+const MAX_AUTO_ZOOM = 2.5;
+
+export function zoomForField(
+  field: Field,
+  widthAtOne: number,
+  heightAtOne: number,
+): number {
+  const wanted =
+    field.type === 'checkbox'
+      ? MOBILE_MIN_TOUCH_PX / Math.max(heightAtOne, 1)
+      : MOBILE_MIN_FIELD_PX / Math.max(widthAtOne, 1);
+  return Math.round(Math.min(MAX_AUTO_ZOOM, Math.max(1, wanted)) * 100) / 100;
+}
 
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(
-    () => typeof window !== 'undefined' && !!window.matchMedia?.(MOBILE_QUERY).matches,
+    () =>
+      typeof window !== 'undefined' &&
+      !!window.matchMedia?.(MOBILE_QUERY).matches,
   );
   useEffect(() => {
     const mq = window.matchMedia?.(MOBILE_QUERY);
@@ -54,12 +75,18 @@ function useIsMobile(): boolean {
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return '';
-  if (words.length === 1 && /[\u3400-\u9fff]/.test(words[0] ?? '')) return words[0] ?? '';
+  if (words.length === 1 && /[\u3400-\u9fff]/.test(words[0] ?? ''))
+    return words[0] ?? '';
   return words.map((w) => w[0]?.toUpperCase() ?? '').join('');
 }
 
-export function fieldLabel(field: Field, locale: Locale, text: SignerText): string {
-  const custom = locale === 'zh-CN' && field.labelZh ? field.labelZh : field.labelEn;
+export function fieldLabel(
+  field: Field,
+  locale: Locale,
+  text: SignerText,
+): string {
+  const custom =
+    locale === 'zh-CN' && field.labelZh ? field.labelZh : field.labelEn;
   if (custom?.trim()) return custom;
   switch (field.type) {
     case 'signature':
@@ -97,7 +124,10 @@ export function SignerDocument({
   const pdfRef = useRef<PdfPagesHandle>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  const ordered = useMemo(() => orderFields(template.fields), [template.fields]);
+  const ordered = useMemo(
+    () => orderFields(template.fields),
+    [template.fields],
+  );
   const required = useMemo(() => ordered.filter((f) => f.required), [ordered]);
   const [signerName, setSignerName] = useState(defaultSignerName);
   const identity = useMemo(
@@ -105,16 +135,25 @@ export function SignerDocument({
     [signerName, signerEmail, today],
   );
   const [values, setValues] = useState<FieldValues>(() =>
-    initialValues(template.fields, { signerName: defaultSignerName, email: signerEmail, today }),
+    initialValues(template.fields, {
+      signerName: defaultSignerName,
+      email: signerEmail,
+      today,
+    }),
   );
   const [signatures, setSignatures] = useState<FieldSignatures>({});
-  const [adopted, setAdopted] = useState<Partial<Record<'signature' | 'initials', SignatureValue>>>({});
+  const [adopted, setAdopted] = useState<
+    Partial<Record<'signature' | 'initials', SignatureValue>>
+  >({});
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [signingId, setSigningId] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [problem, setProblem] = useState<string | null>(null);
-  const [scrollTarget, setScrollTarget] = useState<{ id: string; n: number } | null>(null);
+  const [scrollTarget, setScrollTarget] = useState<{
+    id: string;
+    n: number;
+  } | null>(null);
 
   useEffect(() => {
     setValues((v) => syncLockedValues(template.fields, v, identity));
@@ -124,7 +163,9 @@ export function SignerDocument({
     if (!scrollTarget) return;
     const field = ordered.find((f) => f.id === scrollTarget.id);
     if (!field) return;
-    const frame = requestAnimationFrame(() => pdfRef.current?.scrollToRect(field.page, field));
+    const frame = requestAnimationFrame(() =>
+      pdfRef.current?.scrollToRect(field.page, field),
+    );
     return () => cancelAnimationFrame(frame);
   }, [scrollTarget, zoom, ordered]);
 
@@ -139,9 +180,8 @@ export function SignerDocument({
       if (isMobile) {
         const g = pdfRef.current?.getGeometry(field.page);
         if (g) {
-          const widthAtOne = pdfRectToScreen(g, field).width / zoom;
-          const wanted = Math.min(MAX_ZOOM, Math.max(1, MOBILE_MIN_FIELD_PX / widthAtOne));
-          setZoom(Math.round(wanted * 100) / 100);
+          const rect = pdfRectToScreen(g, field);
+          setZoom(zoomForField(field, rect.width / zoom, rect.height / zoom));
         }
       }
       setScrollTarget((prev) => ({ id: field.id, n: (prev?.n ?? 0) + 1 }));
@@ -150,6 +190,7 @@ export function SignerDocument({
   );
 
   const scrollToPanel = () => {
+    setScrollTarget(null);
     setZoom(1);
     panelRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
   };
@@ -209,14 +250,17 @@ export function SignerDocument({
     onSubmit(buildSignBody(template.fields, signerName, values, signatures));
   };
 
-  const filledCount = required.length - remaining.length;
-  const stepLabel = current
-    ? `${text.fieldProgress
-        .replace('{current}', String(currentIndex + 1))
-        .replace('{total}', String(required.length))} · ${fieldLabel(current, locale, text)}`
-    : remaining.length === 0
+  const stepLabel =
+    remaining.length === 0
       ? text.allFieldsDone
-      : text.fieldsRemaining.replace('{count}', String(remaining.length));
+      : current
+        ? `${text.fieldProgress
+            .replace('{current}', String(currentIndex + 1))
+            .replace(
+              '{total}',
+              String(required.length),
+            )} · ${fieldLabel(current, locale, text)}`
+        : text.fieldsRemaining.replace('{count}', String(remaining.length));
 
   return (
     <div className="grid items-start gap-4 pb-24 md:grid-cols-[minmax(0,1fr)_280px] md:pb-0">
@@ -227,17 +271,25 @@ export function SignerDocument({
             size="sm"
             aria-label={text.zoomOut}
             disabled={zoom <= 1}
-            onClick={() => setZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100))}
+            onClick={() =>
+              setZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100))
+            }
           >
             −
           </Button>
-          <span className="w-12 text-center font-mono text-xs text-slate">{Math.round(zoom * 100)}%</span>
+          <span className="w-12 text-center font-mono text-xs text-slate">
+            {Math.round(zoom * 100)}%
+          </span>
           <Button
             variant="ghost"
             size="sm"
             aria-label={text.zoomIn}
             disabled={zoom >= MAX_ZOOM}
-            onClick={() => setZoom((z) => Math.min(MAX_ZOOM, Math.round((z + 0.25) * 100) / 100))}
+            onClick={() =>
+              setZoom((z) =>
+                Math.min(MAX_ZOOM, Math.round((z + 0.25) * 100) / 100),
+              )
+            }
           >
             +
           </Button>
@@ -280,25 +332,30 @@ export function SignerDocument({
 
       <div ref={panelRef} className="flex flex-col gap-4 md:sticky md:top-4">
         <div className="hidden flex-col gap-2 rounded-lg border border-grey/60 bg-surface p-4 md:flex">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate">{text.fieldsTitle}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate">
+            {text.fieldsTitle}
+          </h2>
           <p className="text-sm text-ink">{stepLabel}</p>
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={prev} disabled={required.length === 0}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={prev}
+              disabled={required.length === 0}
+            >
               ← {text.prevField}
             </Button>
             <Button variant="secondary" size="sm" onClick={next}>
               {text.nextField} →
             </Button>
           </div>
-          <p className="text-xs text-slate">
-            {text.fieldProgress
-              .replace('{current}', String(filledCount))
-              .replace('{total}', String(required.length))}
-          </p>
         </div>
         <div className="flex flex-col gap-4 rounded-lg border border-grey/60 bg-surface p-4">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="signer-legal-name" className="text-sm font-medium text-navy">
+            <label
+              htmlFor="signer-legal-name"
+              className="text-sm font-medium text-navy"
+            >
               {text.fullLegalName}
               <span className="ml-0.5 text-red">*</span>
             </label>
@@ -314,8 +371,14 @@ export function SignerDocument({
               {text.fullLegalNameHint}
             </p>
           </div>
-          <ConsentBlock checked={consent} onChange={setConsent} label={text.consentLabel} />
-          {(problem || submitError) && <Banner tone="error">{problem ?? submitError}</Banner>}
+          <ConsentBlock
+            checked={consent}
+            onChange={setConsent}
+            label={text.consentLabel}
+          />
+          {(problem || submitError) && (
+            <Banner tone="error">{problem ?? submitError}</Banner>
+          )}
           <Button onClick={submit} loading={submitting}>
             {text.submit}
           </Button>
@@ -326,10 +389,19 @@ export function SignerDocument({
         className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-grey/60 bg-surface px-3 py-2 md:hidden"
         data-testid="mobile-stepper"
       >
-        <Button variant="ghost" size="sm" onClick={prev} aria-label={text.prevField} disabled={required.length === 0}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={prev}
+          aria-label={text.prevField}
+          disabled={required.length === 0}
+        >
           ←
         </Button>
-        <span className="min-w-0 flex-1 truncate text-center text-sm text-ink" aria-live="polite">
+        <span
+          className="min-w-0 flex-1 truncate text-center text-sm text-ink"
+          aria-live="polite"
+        >
           {stepLabel}
         </span>
         <Button size="sm" onClick={next}>
@@ -341,11 +413,14 @@ export function SignerDocument({
         open={Boolean(signingField)}
         kind={signingField?.type === 'initials' ? 'initials' : 'signature'}
         text={text}
-        defaultTypedText={signingField?.type === 'initials' ? initialsOf(signerName) : signerName}
+        defaultTypedText={
+          signingField?.type === 'initials'
+            ? initialsOf(signerName)
+            : signerName
+        }
         onAdopt={adopt}
         onClose={() => setSigningId(null)}
       />
     </div>
   );
 }
-
