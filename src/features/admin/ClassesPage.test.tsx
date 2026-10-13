@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { fakeAdminList, fakeClass, server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import { ClassesPage } from './ClassesPage';
+import { hideSyncToast } from './booking/syncToast';
 import type { AdminClass, AdminInstructorRecord } from '@/lib/types';
 
 const API = 'http://localhost:3000';
@@ -42,6 +43,85 @@ describe('ClassesPage', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    hideSyncToast();
+  });
+
+  it('flags lessons whose calendar sync failed and retries them', async () => {
+    const failed = fakeClass({
+      id: 'c1',
+      startsAt: '2026-12-05T09:00:00',
+      endsAt: '2026-12-05T11:00:00',
+      googleCalendarId: 'jane@group.calendar.google.com',
+      googleSyncStatus: 'failed',
+      googleSyncError: '503:backendError',
+      googleSyncAttempts: 2,
+    });
+    serve([failed, fakeClass({ id: 'c2', startsAt: '2026-12-05T13:00:00' })]);
+    const retries: string[] = [];
+    server.use(
+      http.get(`${API}/admin/booking/sync-issues`, () =>
+        HttpResponse.json({
+          classes: [
+            {
+              ...failed,
+              calendarSync: 'failed',
+              calendarSyncError: '503:backendError',
+            },
+          ],
+          deletions: [
+            {
+              id: 'd1',
+              googleCalendarId: 'jane@group.calendar.google.com',
+              googleEventId: 'old',
+              classId: null,
+              attempts: 3,
+              lastError: '500',
+              lastAttemptAt: null,
+              createdAt: '2026-12-01T00:00:00Z',
+            },
+          ],
+        }),
+      ),
+      http.post(`${API}/admin/booking/classes/:id/sync`, ({ params }) => {
+        retries.push(params.id as string);
+        return HttpResponse.json({
+          ...failed,
+          googleSyncAttempts: 3,
+          calendarSync: 'failed',
+          calendarSyncError: '503:backendError',
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ClassesPage />);
+
+    const banner = await screen.findByText(
+      /Lessons not yet updated in Google Calendar: 1\./,
+    );
+    expect(banner).toHaveTextContent('Old Google events still to delete: 1.');
+    await user.click(screen.getByRole('button', { name: 'Show list' }));
+    const list = document.getElementById('calendar-sync-issues') as HTMLElement;
+    expect(
+      within(list).getByText('Google said: 503:backendError'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hide list' }));
+    expect(document.getElementById('calendar-sync-issues')).toBeNull();
+
+    const [day] = await screen.findAllByRole('region');
+    const badges = within(day as HTMLElement).getAllByText(
+      'Calendar sync failed',
+    );
+    expect(badges).toHaveLength(1);
+    expect(badges[0]).toHaveAttribute('title', 'Google said: 503:backendError');
+    await user.click(
+      within(day as HTMLElement).getByRole('button', { name: 'Retry' }),
+    );
+    await waitFor(() => expect(retries).toEqual(['c1']));
+    expect(
+      await screen.findByText(
+        'Saved. Google Calendar not updated yet; it will retry.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('shows the empty state and asks for the next four weeks', async () => {
@@ -50,7 +130,7 @@ describe('ClassesPage', () => {
 
     expect(await screen.findByText('No classes yet')).toBeInTheDocument();
     expect(
-      screen.getByText('Booking comes in the next phase.'),
+      screen.getByText('Lessons you book appear here.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('From')).toHaveValue('2026-12-01');
     expect(screen.getByLabelText('To')).toHaveValue('2026-12-29');

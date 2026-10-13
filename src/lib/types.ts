@@ -305,6 +305,8 @@ export interface ClassParticipant {
   phone: string | null;
 }
 
+export type GoogleSyncStatus = 'ok' | 'pending' | 'failed';
+
 export interface AdminClass {
   id: string;
   instructorId: string;
@@ -324,6 +326,10 @@ export interface AdminClass {
   source: ClassSource;
   googleCalendarId: string | null;
   googleEventId: string | null;
+  googleSyncStatus: GoogleSyncStatus;
+  googleSyncError: string | null;
+  googleSyncAttempts: number;
+  googleSyncedAt: string | null;
   notes: string | null;
   participants: ClassParticipant[];
   createdAt: string;
