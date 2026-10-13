@@ -123,7 +123,7 @@ function CancelDialog({
           formatSchoolDateTime(item.startsAt, locale),
         )}
       </p>
-      {item.googleEventId && (
+      {item.googleCalendarId && (
         <p className="text-sm text-slate">{t.booking.cancelGoogle}</p>
       )}
       {cancel.isError && <BookingErrorBanner error={cancel.error} />}
@@ -276,7 +276,7 @@ function MoveDialog({
             />
           )}
         </Field>
-        {item.googleEventId && (
+        {item.googleCalendarId && (
           <p className="text-sm text-slate">{t.booking.moveGoogle}</p>
         )}
         {customers.length === 0 && (

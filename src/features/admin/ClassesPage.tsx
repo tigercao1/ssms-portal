@@ -24,6 +24,11 @@ import {
 } from './lessonRules';
 import { PromoBadge } from './LessonTypesPage';
 import { ClassActions } from './booking/ClassActions';
+import {
+  SyncBadge,
+  SyncIssuesBanner,
+  SyncToastHost,
+} from './booking/CalendarSync';
 
 type LessonsKey = keyof Messages['lessons'];
 
@@ -85,6 +90,8 @@ export function ClassesPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl">{t.lessons.classesTitle}</h1>
+      <SyncIssuesBanner />
+      <SyncToastHost />
 
       <Card className="grid gap-4 sm:grid-cols-3">
         <Field label={t.lessons.filterInstructor}>
@@ -196,6 +203,7 @@ function ClassRow({
           <span className="rounded-sm bg-sunken px-2 py-0.5 text-xs text-slate">
             {t.lessons[STATUS_KEYS[item.status]]}
           </span>
+          <SyncBadge item={item} />
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-slate">
           <span>

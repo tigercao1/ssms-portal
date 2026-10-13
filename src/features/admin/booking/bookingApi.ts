@@ -1,27 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { AdminClass } from '@/lib/types';
+import { warnIfSyncFailed } from './syncToast';
 import type {
   Availability,
   BookableStatus,
+  BookedClass,
   BookingSettings,
   BookingSettingsInput,
   CreateBookingInput,
   LastClass,
+  SyncIssues,
   UpdateBookingInput,
 } from './types';
 
 const settingsKey = ['admin', 'booking', 'settings'] as const;
 const availabilityKey = ['admin', 'booking', 'availability'] as const;
 const classesKey = ['admin', 'classes'] as const;
+const syncIssuesKey = ['admin', 'booking', 'sync-issues'] as const;
 
 function useRefreshBookings() {
   const qc = useQueryClient();
-  return () =>
-    Promise.all([
+  return (saved: BookedClass | BookedClass[]) => {
+    warnIfSyncFailed(saved);
+    return Promise.all([
       qc.invalidateQueries({ queryKey: availabilityKey }),
       qc.invalidateQueries({ queryKey: classesKey }),
+      qc.invalidateQueries({ queryKey: syncIssuesKey }),
     ]);
+  };
 }
 
 export function useBookingSettings() {
@@ -61,7 +67,7 @@ export function useCreateBooking() {
   const refresh = useRefreshBookings();
   return useMutation({
     mutationFn: (body: CreateBookingInput) =>
-      api<AdminClass[]>('/admin/booking/classes', { method: 'POST', body }),
+      api<BookedClass[]>('/admin/booking/classes', { method: 'POST', body }),
     onSuccess: refresh,
   });
 }
@@ -70,7 +76,7 @@ export function useUpdateBooking() {
   const refresh = useRefreshBookings();
   return useMutation({
     mutationFn: ({ id, ...body }: UpdateBookingInput & { id: string }) =>
-      api<AdminClass>(`/admin/booking/classes/${id}`, {
+      api<BookedClass>(`/admin/booking/classes/${id}`, {
         method: 'PATCH',
         body,
       }),
@@ -82,7 +88,7 @@ export function useCancelBooking() {
   const refresh = useRefreshBookings();
   return useMutation({
     mutationFn: (id: string) =>
-      api<AdminClass>(`/admin/booking/classes/${id}/cancel`, {
+      api<BookedClass>(`/admin/booking/classes/${id}/cancel`, {
         method: 'POST',
       }),
     onSuccess: refresh,
@@ -93,11 +99,29 @@ export function useSetClassStatus() {
   const refresh = useRefreshBookings();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: BookableStatus }) =>
-      api<AdminClass>(`/admin/booking/classes/${id}/status`, {
+      api<BookedClass>(`/admin/booking/classes/${id}/status`, {
         method: 'POST',
         body: { status },
       }),
     onSuccess: refresh,
+  });
+}
+
+export function useRetrySync() {
+  const refresh = useRefreshBookings();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<BookedClass>(`/admin/booking/classes/${id}/sync`, {
+        method: 'POST',
+      }),
+    onSuccess: refresh,
+  });
+}
+
+export function useSyncIssues() {
+  return useQuery({
+    queryKey: syncIssuesKey,
+    queryFn: () => api<SyncIssues>('/admin/booking/sync-issues'),
   });
 }
 

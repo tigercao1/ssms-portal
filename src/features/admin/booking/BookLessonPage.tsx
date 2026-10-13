@@ -37,6 +37,7 @@ import {
   schoolParts,
 } from './bookingRules';
 import { BookingSettingsCard } from './BookingSettingsCard';
+import { SyncToastHost } from './CalendarSync';
 import type { BookableStatus, CreateBookingInput } from './types';
 
 type Mode = 'grid' | 'past';
@@ -115,6 +116,7 @@ export function BookLessonPage() {
         <h1 className="text-3xl">{t.booking.title}</h1>
         <p className="max-w-3xl text-slate">{t.booking.intro}</p>
       </div>
+      <SyncToastHost />
 
       {booked && (
         <Banner tone="approved" title={t.booking.bookedTitle}>

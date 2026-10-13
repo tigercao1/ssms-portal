@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { localizeField } from '@/i18n/core/localize';
 import { cn } from '@/lib/cn';
-import { Banner, EmptyState } from '@/components';
+import { Banner, EmptyState, Field, Input } from '@/components';
 import { formatSchoolTime, overlaps } from './bookingRules';
 import type { Availability, UnavailableReason } from './types';
 
@@ -32,17 +33,50 @@ export function AvailabilityGrid({
 }) {
   const t = useT();
   const { locale } = useLocale();
+  const [query, setQuery] = useState('');
 
   if (!availability.window) {
     return <Banner tone="info">{t.booking.dayClosed}</Banner>;
   }
 
+  const needle = query.trim().toLocaleLowerCase();
+  const matches = (row: {
+    displayNameEn: string;
+    displayNameZh: string | null;
+  }) =>
+    !needle ||
+    [row.displayNameEn, row.displayNameZh].some((n) =>
+      n?.toLocaleLowerCase().includes(needle),
+    );
+  const instructors = availability.instructors.filter(matches);
+  const unavailable = availability.unavailable.filter(matches);
+
   return (
     <div className="flex flex-col gap-4">
+      {availability.instructors.length + availability.unavailable.length >
+        0 && (
+        <div className="max-w-xs">
+          <Field label={t.booking.instructorSearch}>
+            {(p) => (
+              <Input
+                {...p}
+                type="search"
+                value={query}
+                placeholder={t.booking.instructorSearchPlaceholder}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            )}
+          </Field>
+        </div>
+      )}
       {availability.instructors.length === 0 ? (
         <EmptyState title={t.booking.noInstructorsTitle}>
           {t.booking.noInstructorsBody}
         </EmptyState>
+      ) : instructors.length === 0 ? (
+        <p className="text-sm text-slate">
+          {t.booking.instructorSearchEmpty.replace('{q}', query.trim())}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-md border border-grey/60">
           <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
@@ -74,7 +108,7 @@ export function AvailabilityGrid({
               </tr>
             </thead>
             <tbody>
-              {availability.instructors.map((row) => {
+              {instructors.map((row) => {
                 const name =
                   localizeField(row.displayNameEn, row.displayNameZh, locale) ||
                   row.displayNameEn;
@@ -158,7 +192,7 @@ export function AvailabilityGrid({
         </span>
       </div>
 
-      {availability.unavailable.length > 0 && (
+      {unavailable.length > 0 && (
         <section
           aria-label={t.booking.unavailableTitle}
           className="flex flex-col gap-2"
@@ -167,7 +201,7 @@ export function AvailabilityGrid({
             {t.booking.unavailableTitle}
           </h3>
           <ul className="flex flex-col gap-1 text-sm">
-            {availability.unavailable.map((u) => (
+            {unavailable.map((u) => (
               <li key={u.instructorId} className="text-ink">
                 {localizeField(u.displayNameEn, u.displayNameZh, locale) ||
                   u.displayNameEn}{' '}

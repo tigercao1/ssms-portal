@@ -1,3 +1,5 @@
+import type { AdminClass } from '@/lib/types';
+
 export const WEEKDAYS = [
   'mon',
   'tue',
@@ -98,6 +100,29 @@ export interface UpdateBookingInput {
   lessonTypeId?: string;
   customerIds?: string[];
   notes?: string | null;
+}
+
+export type CalendarSync = 'ok' | 'failed';
+
+export interface BookedClass extends AdminClass {
+  calendarSync: CalendarSync;
+  calendarSyncError: string | null;
+}
+
+export interface EventDeletionIssue {
+  id: string;
+  googleCalendarId: string;
+  googleEventId: string;
+  classId: string | null;
+  attempts: number;
+  lastError: string | null;
+  lastAttemptAt: string | null;
+  createdAt: string;
+}
+
+export interface SyncIssues {
+  classes: BookedClass[];
+  deletions: EventDeletionIssue[];
 }
 
 export interface LastClass {

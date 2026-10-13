@@ -11,6 +11,7 @@ import {
 } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import { BookLessonPage } from './BookLessonPage';
+import { hideSyncToast } from './syncToast';
 import type {
   Availability,
   BookingSettings,
@@ -180,6 +181,7 @@ describe('BookLessonPage', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    hideSyncToast();
   });
 
   it('books a free slot from the availability grid', async () => {
@@ -316,10 +318,99 @@ describe('BookLessonPage', () => {
     await user.click(screen.getByRole('button', { name: 'Book lesson' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Google Calendar refused the change');
+    expect(alert).toHaveTextContent('Google Calendar could not be checked');
     expect(alert).toHaveTextContent(
       'Nothing was saved. Google said: 403 forbidden.',
     );
+  });
+
+  it('warns when the lesson was saved but Google Calendar was not updated', async () => {
+    serve({
+      bookResponse: () =>
+        HttpResponse.json(
+          [
+            {
+              ...fakeClass({ id: 'new' }),
+              googleSyncStatus: 'failed',
+              calendarSync: 'failed',
+              calendarSyncError: '503:backendError',
+            },
+          ],
+          { status: 201 },
+        ),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    await chooseLesson(user);
+    await user.click(
+      await screen.findByRole('button', { name: 'Book Jane Snow at 10:00' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+
+    expect(await screen.findByText('Booked')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Saved. Google Calendar not updated yet; it will retry.',
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(
+      screen.queryByText(
+        'Saved. Google Calendar not updated yet; it will retry.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it('filters the grid by instructor name', async () => {
+    const base = availability();
+    serve({
+      avail: availability({
+        instructors: [
+          ...base.instructors,
+          {
+            ...base.instructors[0]!,
+            instructorId: 'inst-3',
+            displayNameEn: 'Mia Park',
+            displayNameZh: null,
+          },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await chooseLesson(user);
+    const grid = await screen.findByRole('table');
+    expect(within(grid).getAllByRole('rowheader')).toHaveLength(2);
+
+    const search = screen.getByLabelText('Find instructor');
+    await user.type(search, 'MIA');
+    expect(
+      within(screen.getByRole('table'))
+        .getAllByRole('rowheader')
+        .map((r) => r.textContent),
+    ).toEqual(['Mia Park']);
+    expect(
+      screen.queryByRole('region', { name: 'Not bookable' }),
+    ).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, '简');
+    expect(
+      within(screen.getByRole('table'))
+        .getAllByRole('rowheader')
+        .map((r) => r.textContent),
+    ).toEqual(['Jane Snow']);
+
+    await user.clear(search);
+    await user.type(search, 'eddie');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('No instructor matches “eddie”.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Not bookable' }),
+    ).toHaveTextContent('Eddie Lee');
   });
 
   it('creates a new customer from the dialog and adds them', async () => {

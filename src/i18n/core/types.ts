@@ -832,6 +832,19 @@ export interface Messages {
     moveTitle: string;
     moveGoogle: string;
     saveChanges: string;
+    syncFailedToast: string;
+    syncDismiss: string;
+    syncBadge: string;
+    syncRetry: string;
+    syncErrorCode: string;
+    syncIssuesTitle: string;
+    syncIssuesCount: string;
+    syncIssuesDeletions: string;
+    syncIssuesShow: string;
+    syncIssuesHide: string;
+    instructorSearch: string;
+    instructorSearchPlaceholder: string;
+    instructorSearchEmpty: string;
   };
   validation: {
     required: string;
