@@ -275,6 +275,22 @@ describe('OnboardingDocumentPage — sign', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows an error when the document has no PDF to open', async () => {
+    state.assignments.push(
+      fakeAssignment({ id: 'asg-nosource', templateId: 'tpl-draft' }),
+    );
+    renderAt('asg-nosource');
+    expect(
+      await screen.findByText(
+        'This document is not available to open yet. Ask an admin to check it.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('pdf-pages')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Sign and submit' }),
+    ).toBeNull();
+  });
+
   it('shows an error for an unknown assignment', async () => {
     renderAt('nope');
     expect(

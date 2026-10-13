@@ -75,7 +75,7 @@ describe('OnboardingPage', () => {
     renderWithProviders(<OnboardingPage />);
     expect(
       await screen.findByRole('heading', {
-        name: 'Onboarding · season 2026-27',
+        name: 'Onboarding · season 2026/27',
       }),
     ).toBeInTheDocument();
     expect(screen.getByText('Documents to read')).toBeInTheDocument();
@@ -262,7 +262,7 @@ describe('OnboardingPage', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     renderWithProviders(<OnboardingPage />);
     expect(
-      await screen.findByRole('heading', { name: '入职资料 · 2026-27 雪季' }),
+      await screen.findByRole('heading', { name: '入职资料 · 2026/27 雪季' }),
     ).toBeInTheDocument();
     expect(screen.getAllByText('已完成 5 / 9')[0]).toBeInTheDocument();
     expect(screen.getByText('教练手册')).toBeInTheDocument();
@@ -287,7 +287,7 @@ describe('OnboardingPage', () => {
   it('shows an empty state', async () => {
     server.use(
       http.get(`${API}/me/documents`, () =>
-        HttpResponse.json({ season: '2026-27', items: [] }),
+        HttpResponse.json({ season: '2026/27', items: [] }),
       ),
     );
     renderWithProviders(<OnboardingPage />);
@@ -318,7 +318,7 @@ describe('OnboardingCard', () => {
   it('renders nothing without items', async () => {
     server.use(
       http.get(`${API}/me/documents`, () =>
-        HttpResponse.json({ season: '2026-27', items: [] }),
+        HttpResponse.json({ season: '2026/27', items: [] }),
       ),
     );
     const { container } = renderWithProviders(<OnboardingCard />);

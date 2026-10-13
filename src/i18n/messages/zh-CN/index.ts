@@ -1070,6 +1070,7 @@ export const zhCN: Messages = {
     uploadDone: '已上传，等待审核。',
     uploadFailed: '上传失败，请重试。',
     alreadyCompleted: '本文件已完成。',
+    sourceUnavailable: '此文件暂时无法打开，请联系管理员。',
   },
   signer: {
     signatureTitle: '您的签名',

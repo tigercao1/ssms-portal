@@ -154,6 +154,11 @@ export function OnboardingDocumentPage() {
       </div>
       {done ? (
         <CompletedView kind={template.kind} assignment={done} />
+      ) : !sourceUrl ? (
+        <Card className="flex flex-col gap-3">
+          <Banner tone="error">{t.onboarding.sourceUnavailable}</Banner>
+          <BackLink />
+        </Card>
       ) : template.kind === 'read' ? (
         <ReadDocument
           sourceUrl={sourceUrl}

@@ -1071,6 +1071,7 @@ export interface Messages {
     uploadDone: string;
     uploadFailed: string;
     alreadyCompleted: string;
+    sourceUnavailable: string;
   };
   signer: {
     signatureTitle: string;

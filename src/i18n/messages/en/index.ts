@@ -1092,6 +1092,8 @@ export const en: Messages = {
     uploadDone: 'Uploaded — awaiting review.',
     uploadFailed: 'Upload failed. Try again.',
     alreadyCompleted: 'This document has already been completed.',
+    sourceUnavailable:
+      'This document is not available to open yet. Ask an admin to check it.',
   },
   signer: {
     signatureTitle: 'Your signature',
