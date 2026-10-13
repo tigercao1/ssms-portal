@@ -21,6 +21,7 @@ import { CustomersPage } from '@/features/admin/CustomersPage';
 import { CalendarMatchingPage } from '@/features/admin/CalendarMatchingPage';
 import { ClassesPage } from '@/features/admin/ClassesPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
+import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -122,6 +123,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <ClassesPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/payroll',
+        element: (
+          <RequireAdmin>
+            <PayrollPage />
           </RequireAdmin>
         ),
       },
