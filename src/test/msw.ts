@@ -264,6 +264,12 @@ export const handlers = [
   http.get(`${API}/admin/google/calendars`, () =>
     HttpResponse.json(fakeGoogleCalendars),
   ),
+  http.get(`${API}/admin/instructor-calendars`, () =>
+    HttpResponse.json({
+      google: { connected: true, error: null },
+      instructors: [],
+    }),
+  ),
 ];
 
 export const server = setupServer(...handlers);
