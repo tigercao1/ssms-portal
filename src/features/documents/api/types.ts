@@ -35,8 +35,14 @@ export const FIELD_TYPES: readonly FieldType[] = [
   'checkbox',
 ];
 
-/** Page size of the unrotated page in PDF points, plus its /Rotate. */
+/**
+ * Visible box of the unrotated page in PDF points (CropBox clipped to
+ * MediaBox) plus its /Rotate. `x`, `y` is the box's lower-left corner in user
+ * space, so fields must lie within `[x, x + width] × [y, y + height]`.
+ */
 export interface TemplatePage {
+  x: number;
+  y: number;
   width: number;
   height: number;
   rotate: 0 | 90 | 180 | 270;
@@ -71,28 +77,33 @@ export interface TemplateSummary {
   required: boolean;
   isActive: boolean;
   sortOrder: number;
-  sourceSha256: string | null;
+  hasSource: boolean;
   pageCount: number | null;
-  updatedBy: string | null;
+  fieldCount: number;
   insertedAt: string;
   updatedAt: string;
 }
 
 export interface Template extends TemplateSummary {
+  sourceSha256: string | null;
   pages: TemplatePage[];
   fields: Field[];
   sourceUrl: string | null;
-  /** Set by source confirm when replacing the PDF dropped existing fields. */
-  fieldsCleared?: boolean;
+  updatedBy: string | null;
+}
+
+/** Response of a source confirm: `fieldsCleared` says whether placed fields were dropped. */
+export interface ConfirmedTemplate extends Template {
+  fieldsCleared: boolean;
 }
 
 export interface TemplateCreate {
   kind: TemplateKind;
   audience: TemplateAudience;
   titleEn: string;
-  titleZh?: string;
-  descriptionEn?: string;
-  descriptionZh?: string;
+  titleZh?: string | null;
+  descriptionEn?: string | null;
+  descriptionZh?: string | null;
   required: boolean;
   sortOrder: number;
 }
@@ -123,9 +134,19 @@ export interface FileUrl {
   expiresAt: string;
 }
 
+/** Template columns embedded on an assignment. */
+export interface AssignmentTemplate {
+  id: string;
+  kind: TemplateKind;
+  titleEn: string;
+  titleZh: string | null;
+  required: boolean;
+}
+
 export interface Assignment {
   id: string;
   templateId: string;
+  template: AssignmentTemplate | null;
   subjectType: SubjectType;
   subjectId: string;
   season: string | null;
@@ -138,12 +159,10 @@ export interface Assignment {
   reminderSentAt: string | null;
   signerName: string | null;
   signerEmail: string | null;
-  signerIp?: string | null;
-  signerUserAgent?: string | null;
   consentAt: string | null;
   templateSha256: string | null;
   signedSha256: string | null;
-  fieldValues: Record<string, string | boolean>;
+  hasSignedCopy: boolean;
   insertedAt: string;
   updatedAt: string;
 }
@@ -165,16 +184,17 @@ export interface CertUpload {
   instructorId: string;
   org: CertOrg;
   track: CertTrack;
-  sha256: string;
-  contentType: CertContentType;
+  contentType: string;
   sizeBytes: number;
+  sha256: string;
   reviewStatus: ReviewStatus;
   reviewNote: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
   validUntil: string;
-  expiryReminderSentAt: string | null;
-  aiResult: unknown;
+  current: boolean;
+  state: CertState;
+  aiResult: Record<string, unknown> | null;
   aiModel: string | null;
   aiCheckedAt: string | null;
   insertedAt: string;
@@ -207,8 +227,20 @@ export interface SignerTemplate {
 
 export interface DocumentChecklistItem {
   type: 'document';
-  assignment: Assignment;
-  template: Omit<SignerTemplate, 'pages' | 'fields'>;
+  assignmentId: string;
+  templateId: string;
+  kind: TemplateKind;
+  titleEn: string;
+  titleZh: string | null;
+  descriptionEn: string | null;
+  descriptionZh: string | null;
+  required: boolean;
+  status: AssignmentStatus;
+  season: string | null;
+  assignedAt: string;
+  viewedAt: string | null;
+  completedAt: string | null;
+  dueAt: string | null;
 }
 
 export interface CertificationChecklistItem {
@@ -216,7 +248,9 @@ export interface CertificationChecklistItem {
   org: CertOrg;
   track: CertTrack;
   level: number;
-  upload: CertUpload | null;
+  uploadId: string | null;
+  reviewStatus: ReviewStatus | null;
+  reviewNote: string | null;
   validUntil: string | null;
   state: CertState;
 }
@@ -224,14 +258,21 @@ export interface CertificationChecklistItem {
 export type ChecklistItem = DocumentChecklistItem | CertificationChecklistItem;
 
 export interface MyChecklist {
-  season: string;
+  season: string | null;
   items: ChecklistItem[];
+}
+
+/** E-sign consent wording, owned by the API and shown verbatim. */
+export interface ConsentText {
+  en: string;
+  zh: string;
 }
 
 export interface MyDocument {
   assignment: Assignment;
   template: SignerTemplate;
   sourceUrl: string;
+  consentText: ConsentText;
 }
 
 export type SignatureValue =

@@ -6,6 +6,7 @@ import type {
   CertUploadReview,
   CertUploadUrlRequest,
   CompleteRequest,
+  ConsentText,
   Field,
   Template,
   TemplateCreate,
@@ -13,15 +14,19 @@ import type {
   TemplatePage,
 } from './types';
 import {
+  MOCK_CONSENT_TEXT,
   MOCK_SEASON,
   MOCK_STORAGE_ORIGIN,
   buildChecklist,
   fakeAssignment,
   fakeCertUpload,
+  presentCertUploads,
   sampleAssignments,
   sampleCertUploads,
   sampleTemplates,
+  toAssignmentTemplate,
   toSummary,
+  withDerived,
 } from './fixtures';
 import { buildSamplePdf } from './samplePdf';
 import type { CertOrg, CertTrack } from '@/lib/types';
@@ -35,7 +40,8 @@ export interface DocumentsMockState {
   meCerts: { org: CertOrg; track: CertTrack; level: number }[];
   uploadedSources: Map<string, ArrayBuffer>;
   reminded: string[];
-  season: string;
+  season: string | null;
+  consentText: ConsentText;
 }
 
 /** Fresh, deep-copied mock database seeded with the sample fixtures. */
@@ -55,11 +61,14 @@ export function createDocumentsState(
     uploadedSources: new Map(),
     reminded: [],
     season: MOCK_SEASON,
+    consentText: structuredClone(MOCK_CONSENT_TEXT),
     ...overrides,
   };
 }
 
-const DEFAULT_PAGES: TemplatePage[] = [{ width: 612, height: 792, rotate: 0 }];
+const DEFAULT_PAGES: TemplatePage[] = [
+  { x: 0, y: 0, width: 612, height: 792, rotate: 0 },
+];
 
 const notFound = () =>
   HttpResponse.json({ message: 'Not found' }, { status: 404 });
@@ -76,6 +85,8 @@ function nextId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}${seq}`;
 }
 
+const EDGE_TOLERANCE = 0.01;
+
 /** Mirrors the API's `PUT …/fields` validation. */
 export function validateFields(template: Template, fields: Field[]) {
   const ids = new Set<string>();
@@ -86,8 +97,13 @@ export function validateFields(template: Template, fields: Field[]) {
     if (!page) return `Field ${f.id} is on a page that does not exist`;
     if (!f.labelEn.trim()) return `Field ${f.id} needs an English label`;
     if (f.w <= 0 || f.h <= 0) return `Field ${f.id} has no size`;
-    if (f.x < 0 || f.y < 0 || f.x + f.w > page.width || f.y + f.h > page.height)
-      return `Field ${f.id} is off the page`;
+    if (
+      f.x < page.x - EDGE_TOLERANCE ||
+      f.y < page.y - EDGE_TOLERANCE ||
+      f.x + f.w > page.x + page.width + EDGE_TOLERANCE ||
+      f.y + f.h > page.y + page.height + EDGE_TOLERANCE
+    )
+      return `Field ${f.id} is outside page ${f.page}`;
   }
   return null;
 }
@@ -109,7 +125,17 @@ export function documentsHandlers(
     state.uploadedSources.get(t.id) ??
     buildSamplePdf(
       (t.pages.length ? t.pages : DEFAULT_PAGES).map((p, i) => ({
-        ...p,
+        width: p.x + p.width,
+        height: p.y + p.height,
+        rotate: p.rotate,
+        ...((p.x !== 0 || p.y !== 0) && {
+          cropBox: [p.x, p.y, p.x + p.width, p.y + p.height] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        }),
         lines: [t.titleEn, `Page ${i + 1}`],
       })),
     );
@@ -132,8 +158,10 @@ export function documentsHandlers(
         required: body.required,
         isActive: true,
         sortOrder: body.sortOrder,
+        hasSource: false,
         sourceSha256: null,
         pageCount: null,
+        fieldCount: 0,
         updatedBy: 'auth-admin',
         insertedAt: nowIso(),
         updatedAt: nowIso(),
@@ -146,7 +174,7 @@ export function documentsHandlers(
     }),
     http.get(`${A}/admin/documents/templates/:id`, ({ params }) => {
       const t = findTemplate(params.id);
-      return t ? HttpResponse.json(t) : notFound();
+      return t ? HttpResponse.json(withDerived(t)) : notFound();
     }),
     http.patch(
       `${A}/admin/documents/templates/:id`,
@@ -156,7 +184,7 @@ export function documentsHandlers(
         Object.assign(t, (await request.json()) as TemplatePatch, {
           updatedAt: nowIso(),
         });
-        return HttpResponse.json(t);
+        return HttpResponse.json(withDerived(t));
       },
     ),
     http.post(
@@ -190,7 +218,7 @@ export function documentsHandlers(
           sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`,
           updatedAt: nowIso(),
         });
-        return HttpResponse.json({ ...t, fieldsCleared: false });
+        return HttpResponse.json({ ...withDerived(t), fieldsCleared: false });
       },
     ),
     http.put(
@@ -203,12 +231,13 @@ export function documentsHandlers(
         if (error) return badRequest(error);
         t.fields = fields;
         t.updatedAt = nowIso();
-        return HttpResponse.json(t);
+        return HttpResponse.json(withDerived(t));
       },
     ),
     http.post(`${A}/admin/documents/assignments`, async ({ request }) => {
       const body = (await request.json()) as AssignRequest;
-      if (!findTemplate(body.templateId)) return notFound();
+      const template = findTemplate(body.templateId);
+      if (!template) return notFound();
       if (!body.season?.trim()) return badRequest('season is required');
       const ids = body.allActiveInstructors
         ? state.instructorIds
@@ -232,6 +261,7 @@ export function documentsHandlers(
           fakeAssignment({
             id: nextId('asg'),
             templateId: body.templateId,
+            template: toAssignmentTemplate(template),
             subjectId,
             season: body.season,
             assignedAt: nowIso(),
@@ -245,8 +275,8 @@ export function documentsHandlers(
         assignments: state.assignments.filter(
           (a) => a.subjectType === 'instructor' && a.subjectId === params.id,
         ),
-        certificationUploads: state.certUploads.filter(
-          (u) => u.instructorId === params.id,
+        certificationUploads: presentCertUploads(
+          state.certUploads.filter((u) => u.instructorId === params.id),
         ),
       }),
     ),
@@ -254,7 +284,7 @@ export function documentsHandlers(
       `${A}/admin/documents/assignments/:id/signed-url`,
       ({ params }) => {
         const a = findAssignment(params.id);
-        if (!a?.signedSha256) return notFound();
+        if (!a?.hasSignedCopy || !a.signedSha256) return notFound();
         return HttpResponse.json({
           url: `${MOCK_STORAGE_ORIGIN}/signed/${a.id}.pdf?sig=mock`,
           expiresAt: new Date(Date.now() + 300_000).toISOString(),
@@ -344,6 +374,7 @@ export function documentsHandlers(
           fields: t.fields,
         },
         sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`,
+        consentText: state.consentText,
       });
     }),
     http.post(
@@ -374,10 +405,10 @@ export function documentsHandlers(
             if (!present) return badRequest(`Field ${f.id} is required`);
           }
           a.signerName = body.signerName;
-          a.fieldValues = body.values ?? {};
           a.consentAt = nowIso();
           a.templateSha256 = t.sourceSha256;
           a.signedSha256 = 'e5f6a7b8'.repeat(8);
+          a.hasSignedCopy = true;
         }
         a.status = 'completed';
         a.completedAt = nowIso();
@@ -391,7 +422,11 @@ export function documentsHandlers(
     ),
     http.get(`${A}/me/documents/:assignmentId/signed-url`, ({ params }) => {
       const a = findAssignment(params.assignmentId);
-      if (!a?.signedSha256 || a.subjectId !== state.meInstructorId)
+      if (
+        !a?.hasSignedCopy ||
+        !a.signedSha256 ||
+        a.subjectId !== state.meInstructorId
+      )
         return notFound();
       return HttpResponse.json({
         url: `${MOCK_STORAGE_ORIGIN}/signed/${a.id}.pdf?sig=mock`,

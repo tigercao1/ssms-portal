@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { viewportGeometry } from '../../pdf/transforms';
-import { fakeField } from '../../api/fixtures';
+import { pdfPageBox, viewportGeometry } from '../../pdf/transforms';
+import { validateFields } from '../../api/handlers';
+import { fakeField, fakeTemplate } from '../../api/fixtures';
 import {
   allowedPrefills,
   changeType,
@@ -87,6 +88,31 @@ describe('moving and resizing', () => {
       h: 8,
     });
   });
+
+  it.each([0, 90, 180, 270] as const)(
+    'clamps to the same visible box the API checks on an offset CropBox (rotate %i)',
+    (rotate) => {
+      const page = { x: 36, y: 54.5, width: 520, height: 700, rotate };
+      const g = viewportGeometry({
+        viewBox: [page.x, page.y, page.x + page.width, page.y + page.height],
+        scale: 1.37,
+        rotation: rotate,
+      });
+      const box = pdfPageBox(g);
+      [page.x, page.y, page.x + page.width, page.y + page.height].forEach(
+        (v, i) => expect(box[i]).toBeCloseTo(v, 6),
+      );
+      const template = fakeTemplate({ pages: [page] });
+      const corners = [
+        { x: -500, y: -500, w: 40, h: 20 },
+        { x: 9000, y: 9000, w: 40, h: 20 },
+        { x: 0, y: 0, w: 9000, h: 9000 },
+      ].map((r) => fakeField({ id: `f${r.x}`, ...fitToPage(r, g) }));
+      expect(validateFields(template, corners)).toBeNull();
+      expect(corners[0]).toMatchObject({ x: 36, y: 54.5 });
+      expect(corners[2]).toMatchObject({ x: 36, y: 54.5, w: 520, h: 700 });
+    },
+  );
 
   it('duplicates with a new id, offset down and right', () => {
     const copy = duplicateField(field, upright, 2, [field.id]);

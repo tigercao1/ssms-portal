@@ -3,7 +3,7 @@ import { localizeField } from '@/i18n/core/localize';
 import { cn } from '@/lib/cn';
 import type { Field } from '../../api';
 import type { ScreenRect } from '../../pdf/transforms';
-import { todayIso } from '../../api';
+import { signingDateIso } from '../../api';
 
 /** Read-only rendering of a field roughly as the signer will see it. */
 export function SignerPreviewField({
@@ -22,7 +22,7 @@ export function SignerPreviewField({
       : field.prefill === 'email'
         ? 'alex@example.com'
         : field.prefill === 'date_signed'
-          ? todayIso()
+          ? signingDateIso()
           : null;
   const isSignature = field.type === 'signature' || field.type === 'initials';
 

@@ -15,8 +15,6 @@ import {
 } from '@/components';
 import { formatBytes } from '@/features/admin/PageParts';
 import {
-  certState,
-  currentUploads,
   getAssignmentSignedUrl,
   getCertUploadUrl,
   type Assignment,
@@ -143,7 +141,7 @@ function DocumentsCard({
       !open.some((a) => a.templateId === tpl.id && a.status === 'completed'),
   );
   const assignable = templates.filter(
-    (tpl) => tpl.isActive && tpl.audience === 'instructor' && tpl.sourceSha256,
+    (tpl) => tpl.isActive && tpl.audience === 'instructor' && tpl.hasSource,
   );
 
   return (
@@ -175,7 +173,6 @@ function DocumentsCard({
               key={a.id}
               instructorId={instructorId}
               assignment={a}
-              template={byId.get(a.templateId)}
             />
           ))}
         </ul>
@@ -229,11 +226,9 @@ function DocumentsCard({
 function AssignmentRow({
   instructorId,
   assignment: a,
-  template,
 }: {
   instructorId: string;
   assignment: Assignment;
-  template: TemplateSummary | undefined;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -241,6 +236,7 @@ function AssignmentRow({
   const archive = useArchiveAssignment(instructorId);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [downloadError, setDownloadError] = useState<unknown>(null);
+  const template = a.template;
   const title = template
     ? templateTitle(template, locale)
     : t.documents.unknownTemplate;
@@ -310,7 +306,7 @@ function AssignmentRow({
         )}
       </dl>
       <div className="flex flex-wrap gap-2">
-        {a.status === 'completed' && a.signedSha256 && (
+        {a.status === 'completed' && a.hasSignedCopy && (
           <Button size="sm" variant="secondary" onClick={download}>
             {t.documents.downloadSigned}
           </Button>
@@ -391,12 +387,13 @@ function CertificationsCard({
 }) {
   const t = useT();
   const [showHistory, setShowHistory] = useState(false);
-  const current = currentUploads(uploads).sort(
-    (a, b) => a.org.localeCompare(b.org) || a.track.localeCompare(b.track),
-  );
-  const currentIds = new Set(current.map((u) => u.id));
+  const current = uploads
+    .filter((u) => u.current)
+    .sort(
+      (a, b) => a.org.localeCompare(b.org) || a.track.localeCompare(b.track),
+    );
   const history = uploads
-    .filter((u) => !currentIds.has(u.id))
+    .filter((u) => !u.current)
     .sort((a, b) => b.insertedAt.localeCompare(a.insertedAt));
   const missing = certifications.filter(
     (c) => !current.some((u) => u.org === c.org && u.track === c.track),
@@ -486,7 +483,7 @@ function CertUploadReviewRow({
   const [validUntil, setValidUntil] = useState(u.validUntil);
   const [note, setNote] = useState(u.reviewNote ?? '');
   const [viewError, setViewError] = useState<unknown>(null);
-  const state = certState(u);
+  const state = u.state;
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(validUntil);
   const dateChanged = validUntil !== u.validUntil;
   const name = certName(u.org, u.track, t);

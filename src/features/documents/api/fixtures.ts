@@ -1,17 +1,23 @@
 import type {
   Assignment,
+  AssignmentTemplate,
   CertUpload,
   CertificationChecklistItem,
+  ConsentText,
   DocumentChecklistItem,
   Field,
   MyChecklist,
   Template,
   TemplateSummary,
 } from './types';
-import { certState } from './validity';
+import { certState, currentUploads, todayIso } from './validity';
 
 export const MOCK_STORAGE_ORIGIN = 'https://storage.mock';
 export const MOCK_SEASON = '2026-27';
+export const MOCK_CONSENT_TEXT: ConsentText = {
+  en: 'I agree to sign this document electronically.',
+  zh: '我同意以电子方式签署本文件。',
+};
 const HASH = 'a3f1c9e2'.repeat(8);
 
 export function fakeField(overrides: Partial<Field> = {}): Field {
@@ -67,9 +73,18 @@ export const sampleFields: Field[] = [
   }),
 ];
 
+/** Recomputes the summary flags the API derives from the source and fields. */
+export function withDerived(t: Template): Template {
+  return {
+    ...t,
+    hasSource: t.sourceSha256 !== null,
+    fieldCount: t.fields.length,
+  };
+}
+
 export function fakeTemplate(overrides: Partial<Template> = {}): Template {
   const id = overrides.id ?? 'tpl-conduct';
-  return {
+  return withDerived({
     id,
     kind: 'sign',
     audience: 'instructor',
@@ -80,19 +95,21 @@ export function fakeTemplate(overrides: Partial<Template> = {}): Template {
     required: true,
     isActive: true,
     sortOrder: 10,
+    hasSource: true,
     sourceSha256: HASH,
     pageCount: 2,
+    fieldCount: 0,
     updatedBy: 'auth-admin',
     insertedAt: '2026-10-01T15:00:00Z',
     updatedAt: '2026-10-10T15:00:00Z',
     pages: [
-      { width: 612, height: 792, rotate: 0 },
-      { width: 612, height: 792, rotate: 0 },
+      { x: 0, y: 0, width: 612, height: 792, rotate: 0 },
+      { x: 0, y: 0, width: 612, height: 792, rotate: 0 },
     ],
     fields: sampleFields,
     sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${id}/source.pdf`,
     ...overrides,
-  };
+  });
 }
 
 export function toSummary(t: Template): TemplateSummary {
@@ -107,9 +124,9 @@ export function toSummary(t: Template): TemplateSummary {
     required: t.required,
     isActive: t.isActive,
     sortOrder: t.sortOrder,
-    sourceSha256: t.sourceSha256,
+    hasSource: t.sourceSha256 !== null,
     pageCount: t.pageCount,
-    updatedBy: t.updatedBy,
+    fieldCount: t.fields.length,
     insertedAt: t.insertedAt,
     updatedAt: t.updatedAt,
   };
@@ -127,9 +144,9 @@ export const sampleTemplates: Template[] = [
     sortOrder: 5,
     pageCount: 3,
     pages: [
-      { width: 612, height: 792, rotate: 0 },
-      { width: 612, height: 792, rotate: 0 },
-      { width: 792, height: 612, rotate: 0 },
+      { x: 0, y: 0, width: 612, height: 792, rotate: 0 },
+      { x: 0, y: 0, width: 612, height: 792, rotate: 0 },
+      { x: 0, y: 0, width: 792, height: 612, rotate: 0 },
     ],
     fields: [],
   }),
@@ -141,7 +158,7 @@ export const sampleTemplates: Template[] = [
     descriptionZh: null,
     sortOrder: 20,
     pageCount: 1,
-    pages: [{ width: 612, height: 792, rotate: 90 }],
+    pages: [{ x: 0, y: 0, width: 612, height: 792, rotate: 90 }],
     fields: [fakeField({ id: 'f_w_sig', x: 400, y: 100 })],
   }),
   fakeTemplate({
@@ -161,12 +178,25 @@ export const sampleTemplates: Template[] = [
   }),
 ];
 
+export function toAssignmentTemplate(t: Template): AssignmentTemplate {
+  return {
+    id: t.id,
+    kind: t.kind,
+    titleEn: t.titleEn,
+    titleZh: t.titleZh,
+    required: t.required,
+  };
+}
+
 export function fakeAssignment(
   overrides: Partial<Assignment> = {},
 ): Assignment {
+  const templateId = overrides.templateId ?? 'tpl-conduct';
+  const template = sampleTemplates.find((t) => t.id === templateId);
   return {
     id: 'asg-1',
-    templateId: 'tpl-conduct',
+    templateId,
+    template: template ? toAssignmentTemplate(template) : null,
     subjectType: 'instructor',
     subjectId: 'inst-1',
     season: MOCK_SEASON,
@@ -182,7 +212,7 @@ export function fakeAssignment(
     consentAt: null,
     templateSha256: null,
     signedSha256: null,
-    fieldValues: {},
+    hasSignedCopy: false,
     insertedAt: '2026-10-05T15:00:00Z',
     updatedAt: '2026-10-05T15:00:00Z',
     ...overrides,
@@ -210,6 +240,7 @@ export const sampleAssignments: Assignment[] = [
     consentAt: '2026-10-07T15:05:00Z',
     templateSha256: HASH,
     signedSha256: 'b7e4d2a1'.repeat(8),
+    hasSignedCopy: true,
   }),
   fakeAssignment({
     id: 'asg-waiver',
@@ -236,7 +267,8 @@ export function fakeCertUpload(
     reviewedBy: null,
     reviewedAt: null,
     validUntil: '2027-06-30',
-    expiryReminderSentAt: null,
+    current: true,
+    state: 'pending',
     aiResult: null,
     aiModel: null,
     aiCheckedAt: null,
@@ -257,6 +289,7 @@ export const sampleCertUploads: CertUpload[] = [
     reviewStatus: 'approved',
     reviewedAt: '2026-09-01T15:00:00Z',
     validUntil: '2026-10-31',
+    state: 'expiring',
     insertedAt: '2026-09-01T12:00:00Z',
   }),
   fakeCertUpload({
@@ -266,9 +299,25 @@ export const sampleCertUploads: CertUpload[] = [
     reviewStatus: 'approved',
     reviewedAt: '2025-11-01T15:00:00Z',
     validUntil: '2026-06-30',
+    state: 'expired',
     insertedAt: '2025-11-01T12:00:00Z',
   }),
 ];
+
+/** Uploads newest first, with `current` and `state` set as the API presents them. */
+export function presentCertUploads(
+  uploads: CertUpload[],
+  today: string = todayIso(),
+): CertUpload[] {
+  const currentIds = new Set(currentUploads(uploads).map((u) => u.id));
+  return [...uploads]
+    .sort((a, b) => b.insertedAt.localeCompare(a.insertedAt))
+    .map((u) => ({
+      ...u,
+      current: currentIds.has(u.id),
+      state: certState(u, today),
+    }));
+}
 
 /** Builds a `/me/documents` checklist from templates, assignments and uploads. */
 export function buildChecklist(
@@ -280,42 +329,48 @@ export function buildChecklist(
     level: number;
   }[],
   uploads: CertUpload[],
-  season = MOCK_SEASON,
+  season: string | null = MOCK_SEASON,
+  today: string = todayIso(),
 ): MyChecklist {
   const docs: DocumentChecklistItem[] = assignments
     .filter((a) => a.status !== 'archived')
-    .flatMap((assignment) => {
-      const t = templates.find((x) => x.id === assignment.templateId);
+    .flatMap((a) => {
+      const t = templates.find((x) => x.id === a.templateId);
       if (!t) return [];
       return [
         {
           type: 'document' as const,
-          assignment,
-          template: {
-            id: t.id,
-            kind: t.kind,
-            titleEn: t.titleEn,
-            titleZh: t.titleZh,
-            descriptionEn: t.descriptionEn,
-            descriptionZh: t.descriptionZh,
-            required: t.required,
-          },
+          assignmentId: a.id,
+          templateId: t.id,
+          kind: t.kind,
+          titleEn: t.titleEn,
+          titleZh: t.titleZh,
+          descriptionEn: t.descriptionEn,
+          descriptionZh: t.descriptionZh,
+          required: t.required,
+          status: a.status,
+          season: a.season,
+          assignedAt: a.assignedAt,
+          viewedAt: a.viewedAt,
+          completedAt: a.completedAt,
+          dueAt: a.dueAt,
         },
       ];
     });
+  const current = currentUploads(uploads);
   const certItems: CertificationChecklistItem[] = certs.map((c) => {
     const upload =
-      [...uploads]
-        .filter((u) => u.org === c.org && u.track === c.track)
-        .sort((a, b) => b.insertedAt.localeCompare(a.insertedAt))[0] ?? null;
+      current.find((u) => u.org === c.org && u.track === c.track) ?? null;
     return {
       type: 'certification',
       org: c.org,
       track: c.track,
       level: c.level,
-      upload,
+      uploadId: upload?.id ?? null,
+      reviewStatus: upload?.reviewStatus ?? null,
+      reviewNote: upload?.reviewNote ?? null,
       validUntil: upload?.validUntil ?? null,
-      state: certState(upload),
+      state: certState(upload, today),
     };
   });
   return { season, items: [...docs, ...certItems] };

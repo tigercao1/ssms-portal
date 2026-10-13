@@ -11,7 +11,7 @@ import {
   Spinner,
   Toggle,
 } from '@/components';
-import type { Template, TemplateSummary } from '../api';
+import type { ConfirmedTemplate, TemplateSummary } from '../api';
 import {
   MAX_TEMPLATE_BYTES,
   useCreateTemplate,
@@ -156,7 +156,7 @@ function TemplateRow({
   const upload = useUploadTemplateSource();
   const fileRef = useRef<HTMLInputElement>(null);
   const title = templateTitle(row, locale);
-  const hasPdf = Boolean(row.sourceSha256);
+  const hasPdf = row.hasSource;
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -164,7 +164,7 @@ function TemplateRow({
     upload.mutate(
       { id: row.id, file },
       {
-        onSuccess: (tpl: Template) =>
+        onSuccess: (tpl: ConfirmedTemplate) =>
           onNotice({
             id: row.id,
             tone: tpl.fieldsCleared ? 'pending' : 'approved',

@@ -9,6 +9,7 @@ import type {
   CertUploadUrlRequest,
   CompleteRequest,
   CompleteResult,
+  ConfirmedTemplate,
   Field,
   FileUrl,
   InstructorDocuments,
@@ -62,9 +63,12 @@ export function requestTemplateSourceUpload(id: string, contentLength: number) {
 }
 
 export function confirmTemplateSource(id: string) {
-  return api<Template>(`/admin/documents/templates/${enc(id)}/source/confirm`, {
-    method: 'POST',
-  });
+  return api<ConfirmedTemplate>(
+    `/admin/documents/templates/${enc(id)}/source/confirm`,
+    {
+      method: 'POST',
+    },
+  );
 }
 
 export function saveTemplateFields(id: string, fields: Field[]) {
@@ -100,7 +104,7 @@ export function remindAssignment(assignmentId: string) {
 }
 
 export function archiveAssignment(assignmentId: string) {
-  return api<Assignment | undefined>(
+  return api<Assignment>(
     `/admin/documents/assignments/${enc(assignmentId)}/archive`,
     { method: 'POST' },
   );

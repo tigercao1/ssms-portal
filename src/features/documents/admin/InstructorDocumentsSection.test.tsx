@@ -24,14 +24,14 @@ let tab: {
 
 function daysFromToday(days: number) {
   const d = new Date();
-  d.setDate(d.getDate() + days);
+  d.setUTCDate(d.getUTCDate() + days);
   return todayIso(d);
 }
 
 beforeEach(() => {
   state = createDocumentsState();
   state.certUploads = [
-    fakeCertUpload({ id: 'cu-pending', validUntil: daysFromToday(200) }),
+    fakeCertUpload({ id: 'cu-pending', validUntil: daysFromToday(10) }),
     fakeCertUpload({
       id: 'cu-expiring',
       org: 'casi',
@@ -110,6 +110,29 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(
       within(conduct).queryByRole('button', { name: 'Send reminder' }),
     ).toBeNull();
+  });
+
+  it('titles rows from the embedded template and offers downloads only with a signed copy', async () => {
+    state.templates = state.templates.filter((tpl) => tpl.id !== 'tpl-waiver');
+    state.assignments = state.assignments.map((a) =>
+      a.id === 'asg-conduct' ? { ...a, hasSignedCopy: false } : a,
+    );
+    renderSection();
+    expect(
+      await screen.findByRole('listitem', { name: 'Liability waiver' }),
+    ).toBeInTheDocument();
+    const conduct = screen.getByRole('listitem', { name: 'Code of conduct' });
+    expect(
+      within(conduct).queryByRole('button', { name: 'Download signed copy' }),
+    ).toBeNull();
+  });
+
+  it('shows a deleted-document title when the assignment has no template', async () => {
+    state.assignments = [{ ...state.assignments[2]!, template: null }];
+    renderSection();
+    expect(
+      await screen.findByRole('listitem', { name: 'Deleted document' }),
+    ).toBeInTheDocument();
   });
 
   it('downloads the signed copy through a presigned URL', async () => {
@@ -272,6 +295,7 @@ describe('InstructorDocumentsSection — certification uploads', () => {
     expect(within(csiaPark).getByText('Expired')).toBeInTheDocument();
     const csia = screen.getByRole('listitem', { name: 'CSIA' });
     expect(within(csia).getByText('Awaiting review')).toBeInTheDocument();
+    expect(within(csia).queryByText('Expires within 30 days')).toBeNull();
     expect(
       screen.getByText('Certifications without an upload').parentElement,
     ).toHaveTextContent('CASI Level 1');
