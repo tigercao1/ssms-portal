@@ -126,12 +126,13 @@ export interface UploadUrl {
 export interface SignedUrl {
   url: string;
   expiresAt: string;
-  sha256: string;
+  sha256: string | null;
 }
 
 export interface FileUrl {
   url: string;
   expiresAt: string;
+  sha256: string;
 }
 
 /** Template columns embedded on an assignment. */
@@ -203,7 +204,7 @@ export interface CertUpload {
 
 export interface CertUploadReview {
   reviewStatus: ReviewStatus;
-  reviewNote?: string;
+  reviewNote?: string | null;
   validUntil?: string;
 }
 
@@ -221,6 +222,7 @@ export interface SignerTemplate {
   descriptionEn?: string | null;
   descriptionZh?: string | null;
   required?: boolean;
+  pageCount: number | null;
   pages: TemplatePage[];
   fields: Field[];
 }
@@ -271,7 +273,7 @@ export interface ConsentText {
 export interface MyDocument {
   assignment: Assignment;
   template: SignerTemplate;
-  sourceUrl: string;
+  sourceUrl: string | null;
   consentText: ConsentText;
 }
 

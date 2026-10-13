@@ -15,12 +15,12 @@ import { useCreateAssignments } from './hooks';
 import { Modal } from './Modal';
 import { errorText, templateTitle } from './format';
 
-const SEASON_RE = /^\d{4}-\d{2}$/;
+const SEASON_RE = /^\d{4}\/\d{2}$/;
 
-/** Ski season label for a date, e.g. `2026-27` from August 2026 through July 2027. */
+/** Ski season label for a date, e.g. `2026/27` from August 2026 through July 2027. */
 export function seasonFor(now: Date = new Date()): string {
   const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-  return `${start}-${String((start + 1) % 100).padStart(2, '0')}`;
+  return `${start}/${String((start + 1) % 100).padStart(2, '0')}`;
 }
 
 /** Assigns a template to picked instructors or every active one, for a season. */
@@ -141,7 +141,7 @@ export function AssignDialog({
               <Input
                 {...p}
                 value={season}
-                placeholder="2026-27"
+                placeholder="2026/27"
                 onChange={(e) => setSeason(e.target.value)}
               />
             )}

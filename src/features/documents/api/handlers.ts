@@ -317,6 +317,7 @@ export function documentsHandlers(
       return HttpResponse.json({
         url: `${MOCK_STORAGE_ORIGIN}/certifications/${u.id}?sig=mock`,
         expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        sha256: u.sha256,
       });
     }),
     http.patch(
@@ -329,7 +330,8 @@ export function documentsHandlers(
           return badRequest('validUntil must be YYYY-MM-DD');
         Object.assign(u, {
           reviewStatus: body.reviewStatus,
-          reviewNote: body.reviewNote ?? null,
+          reviewNote:
+            body.reviewNote === undefined ? u.reviewNote : body.reviewNote,
           validUntil: body.validUntil ?? u.validUntil,
           reviewedBy: 'auth-admin',
           reviewedAt: nowIso(),
@@ -370,10 +372,13 @@ export function documentsHandlers(
           descriptionEn: t.descriptionEn,
           descriptionZh: t.descriptionZh,
           required: t.required,
+          pageCount: t.pageCount,
           pages: t.pages,
           fields: t.fields,
         },
-        sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`,
+        sourceUrl: t.hasSource
+          ? `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`
+          : null,
         consentText: state.consentText,
       });
     }),

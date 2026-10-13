@@ -13,7 +13,7 @@ import type {
 import { certState, currentUploads, todayIso } from './validity';
 
 export const MOCK_STORAGE_ORIGIN = 'https://storage.mock';
-export const MOCK_SEASON = '2026-27';
+export const MOCK_SEASON = '2026/27';
 export const MOCK_CONSENT_TEXT: ConsentText = {
   en: 'I agree to sign this document electronically.',
   zh: '我同意以电子方式签署本文件。',

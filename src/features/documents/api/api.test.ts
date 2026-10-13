@@ -123,13 +123,13 @@ describe('admin assignment + cert requests', () => {
     state.instructorIds = ['inst-1', 'inst-2'];
     const first = await createAssignments({
       templateId: 'tpl-conduct',
-      season: '2027-28',
+      season: '2027/28',
       allActiveInstructors: true,
     });
     expect(first).toEqual({ created: 2, skipped: 0 });
     const again = await createAssignments({
       templateId: 'tpl-conduct',
-      season: '2027-28',
+      season: '2027/28',
       instructorIds: ['inst-2'],
     });
     expect(again).toEqual({ created: 0, skipped: 1 });
@@ -182,7 +182,7 @@ describe('admin assignment + cert requests', () => {
 describe('/me requests', () => {
   it('builds the checklist and marks a document viewed', async () => {
     const list = await getMyChecklist();
-    expect(list.season).toBe('2026-27');
+    expect(list.season).toBe('2026/27');
     expect(list.items.filter((i) => i.type === 'certification')).toHaveLength(
       2,
     );
@@ -197,7 +197,7 @@ describe('/me requests', () => {
       descriptionZh: '阅读并确认。',
       required: true,
       status: 'completed',
-      season: '2026-27',
+      season: '2026/27',
       assignedAt: '2026-10-05T15:00:00Z',
       viewedAt: '2026-10-06T15:00:00Z',
       completedAt: '2026-10-06T15:10:00Z',

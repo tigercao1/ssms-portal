@@ -282,10 +282,10 @@ describe('DocumentsListPage', () => {
     await user.type(season, '2027');
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
     expect(
-      within(dialog).getByText('Use the form 2026-27.'),
+      within(dialog).getByText('Use the form 2026/27.'),
     ).toBeInTheDocument();
     await user.clear(season);
-    await user.type(season, '2027-28');
+    await user.type(season, '2027/28');
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
     expect(
       await within(dialog).findByText(
@@ -295,7 +295,7 @@ describe('DocumentsListPage', () => {
     expect(assignBodies).toEqual([
       {
         templateId: 'tpl-conduct',
-        season: '2027-28',
+        season: '2027/28',
         allActiveInstructors: true,
       },
     ]);
@@ -357,8 +357,8 @@ describe('DocumentsListPage', () => {
 
 describe('seasonFor', () => {
   it('rolls over in August', () => {
-    expect(seasonFor(new Date(2026, 6, 31))).toBe('2025-26');
-    expect(seasonFor(new Date(2026, 7, 1))).toBe('2026-27');
-    expect(seasonFor(new Date(2099, 9, 1))).toBe('2099-00');
+    expect(seasonFor(new Date(2026, 6, 31))).toBe('2025/26');
+    expect(seasonFor(new Date(2026, 7, 1))).toBe('2026/27');
+    expect(seasonFor(new Date(2099, 9, 1))).toBe('2099/00');
   });
 });

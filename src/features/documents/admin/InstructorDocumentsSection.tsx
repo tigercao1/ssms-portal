@@ -487,17 +487,19 @@ function CertUploadReviewRow({
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(validUntil);
   const dateChanged = validUntil !== u.validUntil;
   const name = certName(u.org, u.track, t);
+  const trimmedNote = note.trim();
+  const noteEdited = trimmedNote !== (u.reviewNote ?? '');
   const unchangedApproval =
-    u.reviewStatus === 'approved' &&
-    !dateChanged &&
-    note.trim() === (u.reviewNote ?? '');
+    u.reviewStatus === 'approved' && !dateChanged && !noteEdited;
 
   function submit(reviewStatus: CertUpload['reviewStatus']) {
     if (!dateValid) return;
     review.mutate({
       id: u.id,
       reviewStatus,
-      ...(note.trim() && { reviewNote: note.trim() }),
+      ...(trimmedNote
+        ? { reviewNote: trimmedNote }
+        : noteEdited && { reviewNote: null }),
       ...(dateChanged && { validUntil }),
     });
   }

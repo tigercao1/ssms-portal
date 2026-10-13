@@ -97,7 +97,7 @@ describe('InstructorDocumentsSection — documents', () => {
       name: 'Liability waiver',
     });
     expect(within(waiver).getAllByText('Viewed')).toHaveLength(2);
-    expect(within(waiver).getByText('2026-27')).toBeInTheDocument();
+    expect(within(waiver).getByText('2026/27')).toBeInTheDocument();
     expect(within(waiver).getByText('Reminded')).toBeInTheDocument();
     expect(screen.getByText('2 of 3 completed')).toBeInTheDocument();
     const missing = screen.getByText(
@@ -346,6 +346,28 @@ describe('InstructorDocumentsSection — certification uploads', () => {
         },
       ]),
     );
+  });
+
+  it('clears an old rejection note when the note box is emptied', async () => {
+    state.certUploads[0] = fakeCertUpload({
+      id: 'cu-pending',
+      reviewStatus: 'rejected',
+      reviewNote: 'Photo is blurry',
+      validUntil: daysFromToday(10),
+    });
+    const user = userEvent.setup();
+    renderSection();
+    const csia = await screen.findByRole('listitem', { name: 'CSIA' });
+    const note = within(csia).getByLabelText('Note to instructor');
+    expect(note).toHaveValue('Photo is blurry');
+    await user.clear(note);
+    await user.click(within(csia).getByRole('button', { name: 'Approve' }));
+    await waitFor(() =>
+      expect(reviews).toEqual([
+        { id: 'cu-pending', reviewStatus: 'approved', reviewNote: null },
+      ]),
+    );
+    await waitFor(() => expect(state.certUploads[0]?.reviewNote).toBeNull());
   });
 
   it('lets an approved upload save only a changed date', async () => {
