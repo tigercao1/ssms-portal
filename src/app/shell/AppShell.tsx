@@ -57,7 +57,8 @@ export function AppShell() {
         { to: '/admin/customers', label: t.nav.customers },
         { to: '/admin/booking', label: t.nav.booking },
         { to: '/admin/classes', label: t.nav.classes },
-        { to: '/admin/calendar-matching', label: t.nav.calendarMatching },
+        { to: '/admin/payroll', label: t.nav.payroll },
+        { to: '/admin/import-history', label: t.nav.importHistory },
         { to: '/admin/settings/google', label: t.nav.google },
       ]
     : [
