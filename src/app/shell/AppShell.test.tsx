@@ -150,18 +150,20 @@ describe('AppShell admin nav', () => {
     );
   });
 
-  it('links to Lesson types, Customers, Classes and Calendar matching', () => {
+  it('links to Lesson types, Customers and Classes, not Calendar matching', () => {
     renderShell();
     for (const [name, href] of [
       ['Lesson types', '/admin/lesson-types'],
       ['Customers', '/admin/customers'],
       ['Classes', '/admin/classes'],
-      ['Calendar matching', '/admin/calendar-matching'],
     ]) {
       expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
     }
     expect(
       screen.queryByRole('link', { name: 'Lesson products' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Calendar matching' }),
     ).not.toBeInTheDocument();
   });
 });

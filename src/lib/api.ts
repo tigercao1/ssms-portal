@@ -50,7 +50,8 @@ export async function api<T>(
   const headers: Record<string, string> = {
     Accept: responseType === 'text' ? 'text/plain' : 'application/json',
   };
-  if (body !== undefined)
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm)
     headers['Content-Type'] = contentType ?? 'application/json';
   if (!anonymous) {
     const token = await getAccessToken();
@@ -63,7 +64,7 @@ export async function api<T>(
     body:
       body === undefined
         ? undefined
-        : contentType
+        : contentType || isForm
           ? (body as BodyInit)
           : JSON.stringify(body),
     signal,
