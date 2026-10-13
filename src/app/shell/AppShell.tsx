@@ -56,6 +56,7 @@ export function AppShell() {
         { to: '/admin/lesson-types', label: t.nav.lessonTypes },
         { to: '/admin/customers', label: t.nav.customers },
         { to: '/admin/classes', label: t.nav.classes },
+        { to: '/admin/payroll', label: t.nav.payroll },
         { to: '/admin/import-history', label: t.nav.importHistory },
         { to: '/admin/settings/google', label: t.nav.google },
       ]

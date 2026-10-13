@@ -20,6 +20,7 @@ import { LessonTypesPage } from '@/features/admin/LessonTypesPage';
 import { CustomersPage } from '@/features/admin/CustomersPage';
 import { ClassesPage } from '@/features/admin/ClassesPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
+import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
@@ -122,6 +123,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <ClassesPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/payroll',
+        element: (
+          <RequireAdmin>
+            <PayrollPage />
           </RequireAdmin>
         ),
       },
