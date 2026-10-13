@@ -67,8 +67,8 @@ describe('fieldLogic', () => {
   it('reports missing required fields in reading order', () => {
     const values = initialValues(fields, identity);
     expect(missingRequired(fields, values, {}).map((x) => x.id)).toEqual(['sig', 'agree', 'ini']);
-    expect(isFieldFilled(fields[3], { agree: true }, {})).toBe(true);
-    expect(isFieldFilled(fields[1], { name: '  ' }, {})).toBe(false);
+    expect(isFieldFilled(f({ id: 'agree', type: 'checkbox' }), { agree: true }, {})).toBe(true);
+    expect(isFieldFilled(f({ id: 'name', type: 'full_name' }), { name: '  ' }, {})).toBe(false);
   });
 
   it('builds the sign body exactly per the contract', () => {
