@@ -173,13 +173,19 @@ function TemplateRow({
               : t.documents.uploaded
             )
               .replace('{title}', title)
-              .replace('{pages}', String(tpl.pageCount ?? 0)),
+              .replace('{pages}', pagesText(tpl.pageCount)),
           }),
         onError: (err) =>
           onNotice({ id: row.id, tone: 'error', text: uploadError(err) }),
       },
     );
     if (fileRef.current) fileRef.current.value = '';
+  }
+
+  function pagesText(n: number | null) {
+    return n === 1
+      ? t.documents.onePage
+      : t.documents.pages.replace('{n}', String(n ?? 0));
   }
 
   function uploadError(err: unknown) {

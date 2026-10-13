@@ -168,7 +168,7 @@ export function clampPdfRect(r: PdfRect, box: PdfBox): PdfRect {
 /** Rounds every coordinate to `decimals` places (PDF points). */
 export function roundPdfRect(r: PdfRect, decimals = 2): PdfRect {
   const k = 10 ** decimals;
-  const round = (n: number) => Math.round(n * k) / k;
+  const round = (n: number) => Math.round(n * k) / k + 0;
   return { x: round(r.x), y: round(r.y), w: round(r.w), h: round(r.h) };
 }
 
