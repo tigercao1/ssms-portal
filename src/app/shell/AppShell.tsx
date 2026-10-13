@@ -55,6 +55,7 @@ export function AppShell() {
         { to: '/admin/shopify-sync', label: t.nav.shopifySync },
         { to: '/admin/lesson-types', label: t.nav.lessonTypes },
         { to: '/admin/customers', label: t.nav.customers },
+        { to: '/admin/booking', label: t.nav.booking },
         { to: '/admin/classes', label: t.nav.classes },
         { to: '/admin/calendar-matching', label: t.nav.calendarMatching },
         { to: '/admin/settings/google', label: t.nav.google },

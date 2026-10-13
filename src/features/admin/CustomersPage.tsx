@@ -11,7 +11,7 @@ import {
   Input,
   Spinner,
 } from '@/components';
-import type { CustomerCreate } from '@/lib/types';
+import type { Customer, CustomerCreate } from '@/lib/types';
 import {
   useCreateCustomer,
   useCustomerSearch,
@@ -177,7 +177,11 @@ function duplicateField(err: unknown): 'email' | 'phone' | null {
   return /phone/i.test(err.message) ? 'phone' : 'email';
 }
 
-function CreateCustomerCard() {
+export function CreateCustomerCard({
+  onCreated,
+}: {
+  onCreated?: (customer: Customer) => void;
+}) {
   const t = useT();
   const create = useCreateCustomer();
   const [values, setValues] = useState(EMPTY_CUSTOMER);
@@ -203,6 +207,7 @@ function CreateCustomerCard() {
       onSuccess: (customer) => {
         setCreatedName(customerName(customer));
         setValues(EMPTY_CUSTOMER);
+        onCreated?.(customer);
       },
     });
   }

@@ -20,6 +20,7 @@ import { LessonTypesPage } from '@/features/admin/LessonTypesPage';
 import { CustomersPage } from '@/features/admin/CustomersPage';
 import { CalendarMatchingPage } from '@/features/admin/CalendarMatchingPage';
 import { ClassesPage } from '@/features/admin/ClassesPage';
+import { BookLessonPage } from '@/features/admin/booking/BookLessonPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
@@ -114,6 +115,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <CustomersPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/booking',
+        element: (
+          <RequireAdmin>
+            <BookLessonPage />
           </RequireAdmin>
         ),
       },

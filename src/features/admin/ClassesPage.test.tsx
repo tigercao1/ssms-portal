@@ -50,7 +50,7 @@ describe('ClassesPage', () => {
 
     expect(await screen.findByText('No classes yet')).toBeInTheDocument();
     expect(
-      screen.getByText('Booking comes in the next phase.'),
+      screen.getByText('Lessons you book appear here.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('From')).toHaveValue('2026-12-01');
     expect(screen.getByLabelText('To')).toHaveValue('2026-12-29');

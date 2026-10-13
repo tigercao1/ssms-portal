@@ -23,6 +23,7 @@ import {
   rangeToIso,
 } from './lessonRules';
 import { PromoBadge } from './LessonTypesPage';
+import { ClassActions } from './booking/ClassActions';
 
 type LessonsKey = keyof Messages['lessons'];
 
@@ -235,6 +236,7 @@ function ClassRow({
         )}
         {item.notes && <p className="text-slate">{item.notes}</p>}
       </div>
+      <ClassActions item={item} />
     </div>
   );
 }
