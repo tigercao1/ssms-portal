@@ -601,6 +601,7 @@ export interface Messages {
     colRate: string;
     colAmount: string;
     flagNeedsRate: string;
+    flagAlreadyPaid: string;
     fixStatus: string;
     noLessonType: string;
     empty: string;

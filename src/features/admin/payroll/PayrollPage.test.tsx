@@ -97,6 +97,25 @@ function detailFor(p: PayrollPeriod): PayrollPeriodDetail {
         amount: 0,
         flags: ['needs_rate'],
       },
+      {
+        classId: 'c3',
+        instructorId: jane.id,
+        instructorName: 'Jane Snow',
+        lessonTypeId: 'lt1',
+        description: 'Private 90',
+        lessonTypeNameZh: '私教90分钟',
+        classStatus: 'completed',
+        startsAt: '2026-01-10T15:00:00Z',
+        endsAt: '2026-01-10T16:30:00Z',
+        date: '2026-01-10',
+        time: '10:00',
+        customerNames: ['Ava Sun'],
+        minutes: 90,
+        hourlyRate: 37.33,
+        currency: 'CAD',
+        amount: 0,
+        flags: ['already_paid'],
+      },
     ],
     adjustments: [
       {
@@ -516,7 +535,7 @@ describe('PayrollPage', () => {
     await user.click(
       await screen.findByRole('button', { name: '显示 简雪 的课程' }),
     );
-    expect(screen.getByText('私教90分钟')).toBeInTheDocument();
+    expect(screen.getAllByText('私教90分钟')).toHaveLength(2);
     expect(screen.getAllByText('缺少课时费').length).toBeGreaterThan(0);
   });
 

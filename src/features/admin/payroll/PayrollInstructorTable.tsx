@@ -189,6 +189,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
         <tbody>
           {lines.map((line) => {
             const needsRate = line.flags.includes('needs_rate');
+            const alreadyPaid = line.flags.includes('already_paid');
             return (
               <tr
                 key={line.classId}
@@ -228,6 +229,11 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
                   <span className="flex flex-col items-end gap-1">
                     {formatMoney(line.amount, line.currency, locale)}
                     {needsRate && <NeedsRateBadge />}
+                    {alreadyPaid && (
+                      <span className="rounded-sm bg-sunken px-2 py-0.5 text-xs font-medium text-slate">
+                        {t.payroll.flagAlreadyPaid}
+                      </span>
+                    )}
                   </span>
                 </td>
               </tr>

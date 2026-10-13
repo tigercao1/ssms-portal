@@ -622,6 +622,7 @@ export const en: Messages = {
     colRate: 'Rate',
     colAmount: 'Amount',
     flagNeedsRate: 'Needs rate',
+    flagAlreadyPaid: 'Paid in an earlier finalized period',
     fixStatus: 'Fix in Classes',
     noLessonType: 'No lesson type',
     empty: 'No paid lessons or adjustments in this period.',

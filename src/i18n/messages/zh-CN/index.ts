@@ -600,6 +600,7 @@ export const zhCN: Messages = {
     colRate: '时薪',
     colAmount: '金额',
     flagNeedsRate: '缺少课时费',
+    flagAlreadyPaid: '已在之前结算的周期中支付',
     fixStatus: '在课程中修改',
     noLessonType: '无课程类型',
     empty: '该周期没有计酬课程或调整。',
