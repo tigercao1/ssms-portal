@@ -8,7 +8,7 @@ import { useSession } from '@/auth/SessionProvider';
 import { useMyProfile } from '@/features/instructor/api';
 import {
   getMySignedUrl,
-  todayIso,
+  signingDateIso,
   type Assignment,
   type TemplateKind,
 } from '../api';
@@ -92,7 +92,9 @@ function CompletedView({
           {t.onboarding.sha256}: {assignment.signedSha256}
         </p>
       )}
-      {assignment.hasSignedCopy && <DownloadSigned assignmentId={assignment.id} />}
+      {assignment.hasSignedCopy && (
+        <DownloadSigned assignmentId={assignment.id} />
+      )}
       <BackLink />
     </Card>
   );
@@ -123,7 +125,7 @@ export function OnboardingDocumentPage() {
       </Card>
     );
 
-  const { assignment, template, sourceUrl } = doc.data;
+  const { assignment, template, sourceUrl, consentText } = doc.data;
   const title = localizeField(template.titleEn, template.titleZh, locale);
   const done =
     completed ?? (assignment.status === 'completed' ? assignment : null);
@@ -176,7 +178,8 @@ export function OnboardingDocumentPage() {
             assignment.signerName ?? profile.data?.displayNameEn ?? ''
           }
           signerEmail={profile.data?.email ?? user?.email ?? null}
-          today={todayIso()}
+          signingDate={signingDateIso()}
+          consentText={consentText}
           locale={locale}
           text={t.signer}
           submitting={complete.isPending}

@@ -217,6 +217,20 @@ describe('OnboardingPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('sets the valid-until minimum to the UTC date', async () => {
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 13, 1, 30)));
+    const user = userEvent.setup();
+    renderWithProviders(<OnboardingPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Upload: CASI Carving Level 1',
+      }),
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByLabelText(/Valid until/),
+    ).toHaveAttribute('min', '2026-10-13');
+  });
+
   it('shows an upload failure inside the sheet', async () => {
     const user = userEvent.setup();
     server.use(

@@ -111,12 +111,9 @@ function DocumentRow({ item }: { item: DocumentChecklistItem }) {
           : t.onboarding.actionSign;
   const subtitle = [
     kind,
-    item.required === false ? t.onboarding.optional : null,
+    !item.required ? t.onboarding.optional : null,
     item.dueAt && item.status !== 'completed'
-      ? t.onboarding.dueBy.replace(
-          '{date}',
-          formatDate(item.dueAt, locale),
-        )
+      ? t.onboarding.dueBy.replace('{date}', formatDate(item.dueAt, locale))
       : null,
   ]
     .filter(Boolean)
@@ -196,7 +193,7 @@ function CertRow({
     >
       {item.state === 'rejected' && item.reviewNote && (
         <p className="mt-1 text-xs text-status-rejected">
-          {t.onboarding.reviewNote.replace('{note}', item.upload.reviewNote)}
+          {t.onboarding.reviewNote.replace('{note}', item.reviewNote)}
         </p>
       )}
     </Row>
@@ -249,7 +246,7 @@ export function OnboardingPage() {
   const docs = items.filter(
     (i): i is DocumentChecklistItem => i.type === 'document',
   );
-  const reads = docs.filter((d) => d.item.kind === 'read');
+  const reads = docs.filter((d) => d.kind === 'read');
   const signs = docs.filter((d) => d.kind === 'sign');
   const certs = items.filter(
     (i): i is CertificationChecklistItem => i.type === 'certification',

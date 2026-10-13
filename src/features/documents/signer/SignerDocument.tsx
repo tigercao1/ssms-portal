@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Banner, Button, Input } from '@/components';
 import type { Locale } from '@/i18n/core/types';
 import type {
+  ConsentText,
   Field,
   SignCompletion,
   SignatureValue,
@@ -29,7 +30,8 @@ export interface SignerDocumentProps {
   sourceUrl: string;
   defaultSignerName: string;
   signerEmail?: string | null;
-  today: string;
+  signingDate: string;
+  consentText: ConsentText;
   locale: Locale;
   text: SignerText;
   submitting?: boolean;
@@ -114,7 +116,8 @@ export function SignerDocument({
   sourceUrl,
   defaultSignerName,
   signerEmail,
-  today,
+  signingDate,
+  consentText,
   locale,
   text,
   submitting = false,
@@ -131,14 +134,14 @@ export function SignerDocument({
   const required = useMemo(() => ordered.filter((f) => f.required), [ordered]);
   const [signerName, setSignerName] = useState(defaultSignerName);
   const identity = useMemo(
-    () => ({ signerName, email: signerEmail, today }),
-    [signerName, signerEmail, today],
+    () => ({ signerName, email: signerEmail, today: signingDate }),
+    [signerName, signerEmail, signingDate],
   );
   const [values, setValues] = useState<FieldValues>(() =>
     initialValues(template.fields, {
       signerName: defaultSignerName,
       email: signerEmail,
-      today,
+      today: signingDate,
     }),
   );
   const [signatures, setSignatures] = useState<FieldSignatures>({});
@@ -302,8 +305,6 @@ export function SignerDocument({
             ref={pdfRef}
             source={sourceUrl}
             zoom={zoom}
-            className="!items-stretch"
-            pageClassName="mx-auto"
             renderOverlay={({ pageNumber, geometry }) =>
               ordered
                 .filter((f) => f.page === pageNumber)
@@ -372,6 +373,7 @@ export function SignerDocument({
             </p>
           </div>
           <ConsentBlock
+            consentText={consentText}
             checked={consent}
             onChange={setConsent}
             label={text.consentLabel}

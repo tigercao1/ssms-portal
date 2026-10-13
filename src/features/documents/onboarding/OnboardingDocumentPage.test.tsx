@@ -186,6 +186,22 @@ describe('OnboardingDocumentPage — sign', () => {
     expect(await screen.findAllByText(/SHA-256: e5f6a7b8/)).not.toHaveLength(0);
   });
 
+  it('shows the consent text from the API and the Toronto signing date', async () => {
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 13, 2, 30)));
+    state.consentText = {
+      en: 'Server consent wording.',
+      zh: '服务器同意文本。',
+    };
+    renderAt('asg-new');
+    expect(
+      await screen.findByText('Server consent wording.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('服务器同意文本。')).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Date (required)' }),
+    ).toHaveTextContent('2026-10-12');
+  });
+
   it('requires a legal name', async () => {
     const user = userEvent.setup();
     renderAt('asg-new');

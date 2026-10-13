@@ -3,7 +3,7 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SignatureModal } from './SignatureModal';
 import { ConsentBlock } from './ConsentBlock';
-import { CONSENT_TEXT_EN, CONSENT_TEXT_ZH } from './consent';
+import { MOCK_CONSENT_TEXT } from '../api/fixtures';
 import { base64ByteLength } from './SignatureCanvas';
 import { renderWithProviders } from '@/test/render';
 import { en } from '@/i18n/messages/en';
@@ -140,13 +140,18 @@ describe('SignatureModal', () => {
 });
 
 describe('ConsentBlock', () => {
-  it('shows the fixed bilingual consent text and toggles', async () => {
+  it('shows the given bilingual consent text and toggles', async () => {
     const onChange = vi.fn();
     renderWithProviders(
-      <ConsentBlock checked={false} onChange={onChange} label="I agree" />,
+      <ConsentBlock
+        consentText={MOCK_CONSENT_TEXT}
+        checked={false}
+        onChange={onChange}
+        label="I agree"
+      />,
     );
-    expect(screen.getByText(CONSENT_TEXT_EN)).toBeInTheDocument();
-    expect(screen.getByText(CONSENT_TEXT_ZH)).toBeInTheDocument();
+    expect(screen.getByText(MOCK_CONSENT_TEXT.en)).toBeInTheDocument();
+    expect(screen.getByText(MOCK_CONSENT_TEXT.zh)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: 'I agree' }));
     expect(onChange).toHaveBeenCalledWith(true);
   });

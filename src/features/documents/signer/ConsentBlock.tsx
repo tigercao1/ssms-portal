@@ -1,13 +1,19 @@
-import { CONSENT_TEXT_EN, CONSENT_TEXT_ZH } from './consent';
+import type { ConsentText } from '../api';
 
 interface ConsentBlockProps {
+  consentText: ConsentText;
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
 }
 
-/** Fixed bilingual e-sign consent text with the required consent checkbox. */
-export function ConsentBlock({ checked, onChange, label }: ConsentBlockProps) {
+/** The API's bilingual e-sign consent text, shown verbatim, with the required consent checkbox. */
+export function ConsentBlock({
+  consentText,
+  checked,
+  onChange,
+  label,
+}: ConsentBlockProps) {
   return (
     <label className="flex cursor-pointer items-start gap-3 rounded-md border border-grey/60 bg-canvas p-3 text-sm">
       <input
@@ -18,9 +24,9 @@ export function ConsentBlock({ checked, onChange, label }: ConsentBlockProps) {
         onChange={(e) => onChange(e.target.checked)}
       />
       <span className="flex flex-col gap-1.5">
-        <span lang="en">{CONSENT_TEXT_EN}</span>
+        <span lang="en">{consentText.en}</span>
         <span lang="zh-CN" className="font-cjk">
-          {CONSENT_TEXT_ZH}
+          {consentText.zh}
         </span>
       </span>
     </label>

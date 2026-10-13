@@ -1,25 +1,14 @@
-import type {
-  FieldPrefill,
-  FieldType,
-  SignCompletion,
-  SignatureValue,
-} from '../api';
+import type { Field, SignCompletion } from '../api';
 
 /** The parts of a template field the signer needs. */
-export interface SignerFieldLike {
-  id: string;
-  type: FieldType;
-  page: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  required: boolean;
-  prefill?: FieldPrefill;
-}
+export type SignerFieldLike = Pick<
+  Field,
+  'id' | 'type' | 'page' | 'x' | 'y' | 'w' | 'h' | 'required'
+> &
+  Partial<Pick<Field, 'prefill'>>;
 
-export type FieldValues = Record<string, string | boolean>;
-export type FieldSignatures = Record<string, SignatureValue>;
+export type FieldValues = SignCompletion['values'];
+export type FieldSignatures = SignCompletion['signatures'];
 
 export interface SignerIdentity {
   signerName: string;

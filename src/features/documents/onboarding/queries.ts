@@ -12,7 +12,7 @@ import {
   type CompleteRequest,
 } from '../api';
 import type { CertOrg, CertTrack } from '@/lib/types';
-import { prepareCertFile } from './certFile';
+import { isCertContentType, prepareCertFile } from './certFile';
 
 export function useMyChecklist() {
   return useQuery({
@@ -55,7 +55,8 @@ export async function uploadCertification({
   file,
 }: CertUploadInput): Promise<CertUpload> {
   const blob = await prepareCertFile(file);
-  const contentType = blob.type as CertUpload['contentType'];
+  const contentType = blob.type;
+  if (!isCertContentType(contentType)) throw new Error('fileType');
   const ticket = await requestMyCertUpload({
     org,
     track,
@@ -79,7 +80,7 @@ export function useUploadCertification() {
 const DONE_CERT_STATES = new Set(['valid', 'expiring', 'pending']);
 
 export function isItemRequired(item: ChecklistItem): boolean {
-  return item.type === 'certification' || item.required !== false;
+  return item.type === 'certification' || item.required;
 }
 
 export function isItemDone(item: ChecklistItem): boolean {
