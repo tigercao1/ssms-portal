@@ -6,7 +6,6 @@ import {
   missingRequired,
   orderFields,
   syncLockedValues,
-  todayIso,
   type SignerFieldLike,
 } from './fieldLogic';
 
@@ -100,7 +99,4 @@ describe('fieldLogic', () => {
     expect(body.signatures).toEqual({});
   });
 
-  it('formats today in local time', () => {
-    expect(todayIso(new Date(2026, 0, 5, 23, 30))).toBe('2026-01-05');
-  });
 });

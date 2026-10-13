@@ -1,24 +1,16 @@
-import type { SignatureValue } from './types';
-
-export type SignerFieldType =
-  | 'signature'
-  | 'initials'
-  | 'full_name'
-  | 'date'
-  | 'text'
-  | 'checkbox';
+import type { FieldPrefill, FieldType, SignCompletion, SignatureValue } from '../api';
 
 /** The parts of a template field the signer needs. */
 export interface SignerFieldLike {
   id: string;
-  type: SignerFieldType;
+  type: FieldType;
   page: number;
   x: number;
   y: number;
   w: number;
   h: number;
   required: boolean;
-  prefill?: 'full_name' | 'email' | 'date_signed' | null;
+  prefill?: FieldPrefill;
 }
 
 export type FieldValues = Record<string, string | boolean>;
@@ -30,22 +22,8 @@ export interface SignerIdentity {
   today: string;
 }
 
-export interface SignBody {
-  consent: true;
-  signerName: string;
-  values: FieldValues;
-  signatures: FieldSignatures;
-}
-
 export function isSignatureField(field: Pick<SignerFieldLike, 'type'>): boolean {
   return field.type === 'signature' || field.type === 'initials';
-}
-
-export function todayIso(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }
 
 /** Reading order: page, then top to bottom (PDF y grows upwards), then left to right. */
@@ -131,7 +109,7 @@ export function buildSignBody(
   signerName: string,
   values: FieldValues,
   signatures: FieldSignatures,
-): SignBody {
+): SignCompletion {
   const outValues: FieldValues = {};
   const outSignatures: FieldSignatures = {};
   for (const field of fields) {

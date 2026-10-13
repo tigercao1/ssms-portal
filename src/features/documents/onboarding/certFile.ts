@@ -1,16 +1,14 @@
 import { resizeImage } from '@/lib/resizeImage';
-import { todayIso } from '../signer/fieldLogic';
+import { todayIso, type CertContentType } from '../api';
 
 export const MAX_CERT_BYTES = 10 * 1024 * 1024;
 
-export const CERT_CONTENT_TYPES = [
+export const CERT_CONTENT_TYPES: readonly CertContentType[] = [
   'application/pdf',
   'image/jpeg',
   'image/png',
   'image/webp',
-] as const;
-
-export type CertContentType = (typeof CERT_CONTENT_TYPES)[number];
+];
 
 export type CertFileError = 'fileRequired' | 'fileType' | 'fileTooLarge';
 

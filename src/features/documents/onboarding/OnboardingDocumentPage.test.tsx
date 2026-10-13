@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
@@ -15,6 +15,21 @@ vi.mock('../pdf/PdfPages', async () => {
   const m = await import('../testing/fakePdfPages');
   return { PdfPages: m.FakePdfPages };
 });
+vi.mock('signature_pad', () => ({
+  default: class {
+    addEventListener() {}
+    removeEventListener() {}
+    isEmpty() {
+      return true;
+    }
+    clear() {}
+    toData() {
+      return [];
+    }
+    fromData() {}
+    off() {}
+  },
+}));
 vi.mock('@/auth/SessionProvider', () => ({
   useSession: () => ({ user: { email: 'jane@example.com' } }),
 }));
@@ -56,6 +71,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 9, 12, 10, 0, 0));
   fakePdf.pageCount = 2;
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   fakePdf.scrollToRect.mockClear();
   setMobile(false);
   state = createDocumentsState();
@@ -88,7 +104,9 @@ describe('OnboardingDocumentPage — sign', () => {
 
     await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
     expect(screen.getByText('Fill in all required fields first.')).toBeInTheDocument();
-    expect(fakePdf.scrollToRect).toHaveBeenCalledWith(1, expect.objectContaining({ id: 'f_agree' }));
+    await waitFor(() =>
+      expect(fakePdf.scrollToRect).toHaveBeenCalledWith(1, expect.objectContaining({ id: 'f_agree' })),
+    );
 
     await user.click(screen.getByRole('checkbox', { name: 'I agree (required)' }));
     await user.click(screen.getByRole('button', { name: 'Signature (required)' }));
@@ -194,12 +212,16 @@ describe('OnboardingDocumentPage — mobile stepper', () => {
     await user.click(stepper.getByRole('button', { name: 'Next field →' }));
     expect(stepper.getByText('1 of 4 · I agree')).toBeInTheDocument();
     expect(fakePdf.lastZoom).toBe(3);
-    expect(fakePdf.scrollToRect).toHaveBeenLastCalledWith(1, expect.objectContaining({ id: 'f_agree' }));
+    await waitFor(() =>
+      expect(fakePdf.scrollToRect).toHaveBeenLastCalledWith(1, expect.objectContaining({ id: 'f_agree' })),
+    );
 
     await user.click(stepper.getByRole('button', { name: 'Next field →' }));
     expect(stepper.getByText('4 of 4 · Signature')).toBeInTheDocument();
     expect(fakePdf.lastZoom).toBeCloseTo(1.22, 2);
-    expect(fakePdf.scrollToRect).toHaveBeenLastCalledWith(1, expect.objectContaining({ id: 'f_sig' }));
+    await waitFor(() =>
+      expect(fakePdf.scrollToRect).toHaveBeenLastCalledWith(1, expect.objectContaining({ id: 'f_sig' })),
+    );
 
     await user.click(stepper.getByRole('button', { name: 'Previous' }));
     expect(stepper.getByText('3 of 4 · Date')).toBeInTheDocument();

@@ -155,7 +155,7 @@ function CertRow({
       title={label}
       subtitle={
         item.validUntil
-          ? t.onboarding.validUntilOn.replace('{date}', formatDate(item.validUntil, locale))
+          ? t.onboarding.validUntilOn.replace('{date}', formatDate(`${item.validUntil}T00:00:00`, locale))
           : t.onboarding.kindCert
       }
       pill={<StatePill tone={CERT_TONE[item.state]} label={certStateLabel(item.state, t)} />}

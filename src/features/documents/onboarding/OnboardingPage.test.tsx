@@ -176,7 +176,7 @@ describe('OnboardingPage', () => {
     server.use(http.get(`${API}/me/documents`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<OnboardingPage />);
     expect(await screen.findByText('Your onboarding checklist could not be loaded.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
   it('shows an empty state', async () => {
