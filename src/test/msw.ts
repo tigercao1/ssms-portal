@@ -264,6 +264,12 @@ export const handlers = [
   http.get(`${API}/admin/google/calendars`, () =>
     HttpResponse.json(fakeGoogleCalendars),
   ),
+  http.get(`${API}/admin/instructor-calendars`, () =>
+    HttpResponse.json({
+      google: { connected: true, error: null },
+      instructors: [],
+    }),
+  ),
   http.get(`${API}/admin/documents/templates`, () => HttpResponse.json([])),
   http.get(`${API}/admin/instructors/:id/documents`, () =>
     HttpResponse.json({ assignments: [], certificationUploads: [] }),
