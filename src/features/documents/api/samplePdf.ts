@@ -31,7 +31,9 @@ function pageContent(page: SamplePdfPage, index: number): string {
  * Builds a small valid PDF (Helvetica text, no external resources) for mocks,
  * tests and screenshots.
  */
-export function buildSamplePdf(pages: SamplePdfPage[]): Uint8Array {
+export function buildSamplePdf(
+  pages: SamplePdfPage[],
+): Uint8Array<ArrayBuffer> {
   const objects: string[] = [];
   const pageIds = pages.map((_, i) => 4 + i * 2);
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';

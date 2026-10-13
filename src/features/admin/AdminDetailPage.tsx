@@ -30,6 +30,7 @@ import {
   useSetInstructorGoogleCalendar,
 } from './lessonsApi';
 import { CalendarStatusBadge } from './CalendarMatchingPage';
+import { InstructorDocumentsSection } from '@/features/documents/admin/InstructorDocumentsSection';
 import type {
   AdminInstructorRecord,
   InstructorGoogleCalendar,
@@ -83,6 +84,11 @@ export function AdminDetailPage() {
         )}
         <ActionsRail rec={rec} />
       </div>
+
+      <InstructorDocumentsSection
+        instructorId={rec.id}
+        certifications={profile.data?.certifications ?? []}
+      />
     </div>
   );
 }
