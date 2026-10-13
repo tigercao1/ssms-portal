@@ -529,6 +529,10 @@ export interface Messages {
     emailTaken: string;
     phoneTaken: string;
   };
+  pdf: {
+    pageLabel: string;
+    loadError: string;
+  };
   calendarMatching: {
     title: string;
     intro: string;

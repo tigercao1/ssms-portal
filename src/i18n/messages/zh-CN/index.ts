@@ -528,6 +528,10 @@ export const zhCN: Messages = {
     emailTaken: '已有使用该邮箱的 Shopify 客户。',
     phoneTaken: '已有使用该电话号码的 Shopify 客户。',
   },
+  pdf: {
+    pageLabel: '第 {n} 页，共 {total} 页',
+    loadError: '无法打开此 PDF，请刷新页面重试。',
+  },
   calendarMatching: {
     title: '日历匹配',
     intro: '为每位教练关联 Google 日历，以便 SSMS 读取空闲时间并添加课程。',

@@ -550,6 +550,10 @@ export const en: Messages = {
     emailTaken: 'A Shopify customer with this email already exists.',
     phoneTaken: 'A Shopify customer with this phone number already exists.',
   },
+  pdf: {
+    pageLabel: 'Page {n} of {total}',
+    loadError: 'This PDF could not be opened. Try reloading the page.',
+  },
   calendarMatching: {
     title: 'Calendar matching',
     intro: 'Link each instructor to their Google Calendar so SSMS can read availability and add lessons to it.',
