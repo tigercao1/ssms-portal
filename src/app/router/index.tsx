@@ -18,7 +18,6 @@ import { PagesListPage } from '@/features/admin/PagesListPage';
 import { PageEditorPage } from '@/features/admin/PageEditorPage';
 import { LessonTypesPage } from '@/features/admin/LessonTypesPage';
 import { CustomersPage } from '@/features/admin/CustomersPage';
-import { CalendarMatchingPage } from '@/features/admin/CalendarMatchingPage';
 import { ClassesPage } from '@/features/admin/ClassesPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
@@ -129,9 +128,7 @@ export const router = createBrowserRouter([
       {
         path: '/admin/calendar-matching',
         element: (
-          <RequireAdmin>
-            <CalendarMatchingPage />
-          </RequireAdmin>
+          <Navigate to="/admin/instructors" replace />
         ),
       },
       {

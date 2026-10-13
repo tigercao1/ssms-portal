@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { useSession } from '@/auth/SessionProvider';
-import { ApiError } from '@/lib/api';
 import {
   Banner,
   Button,
@@ -25,16 +24,8 @@ import {
 } from './api';
 import { AdminProfileEditor } from './AdminProfileEditor';
 import { ShopifyInstructorPanel } from './ShopifyInstructorPanel';
-import {
-  useInstructorGoogleCalendar,
-  useSetInstructorGoogleCalendar,
-} from './lessonsApi';
-import { CalendarStatusBadge } from './CalendarMatchingPage';
-import type {
-  AdminInstructorRecord,
-  InstructorGoogleCalendar,
-  UserRole,
-} from '@/lib/types';
+import { InstructorCalendarCard } from './InstructorCalendarCard';
+import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
 /** W2.8–W2.12 — admin instructor detail + actions rail. */
 export function AdminDetailPage() {
@@ -138,7 +129,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
       </Card>
 
       <DisplayOrderCard rec={rec} />
-      <GoogleCalendarCard rec={rec} />
+      <InstructorCalendarCard instructorId={rec.id} />
       <RoleCard authUserId={rec.authUserId} />
       <ShopifyInstructorPanel instructorId={rec.id} />
     </div>
@@ -241,117 +232,6 @@ function DisplayOrderCard({ rec }: { rec: AdminInstructorRecord }) {
         {save.isSuccess && <Banner tone="approved">{t.common.saved}</Banner>}
       </form>
     </Card>
-  );
-}
-
-function GoogleCalendarCard({ rec }: { rec: AdminInstructorRecord }) {
-  const t = useT();
-  const current = useInstructorGoogleCalendar(rec.id);
-  const save = useSetInstructorGoogleCalendar();
-  return (
-    <Card className="flex flex-col gap-3">
-      <h2 className="text-lg">{t.lessons.calendarTitle}</h2>
-      {current.isLoading ? (
-        <Spinner />
-      ) : current.isError || !current.data ? (
-        <Banner tone="error">{t.errors.generic}</Banner>
-      ) : (
-        <GoogleCalendarForm
-          key={`${current.data.googleCalendarId}:${current.data.matchStatus}`}
-          current={current.data}
-          save={save}
-        />
-      )}
-    </Card>
-  );
-}
-
-function GoogleCalendarForm({
-  current,
-  save,
-}: {
-  current: InstructorGoogleCalendar;
-  save: ReturnType<typeof useSetInstructorGoogleCalendar>;
-}) {
-  const t = useT();
-  const [value, setValue] = useState(current.googleCalendarId ?? '');
-  const next = value.trim() || null;
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    save.mutate({
-      instructorId: current.instructorId,
-      googleCalendarId: next,
-      ...(next !== null && {
-        matchStatus: 'confirmed' as const,
-        calendarSummary:
-          next === current.googleCalendarId ? current.calendarSummary : null,
-      }),
-    });
-  }
-
-  function confirm() {
-    save.mutate({
-      instructorId: current.instructorId,
-      googleCalendarId: current.googleCalendarId,
-      matchStatus: 'confirmed',
-    });
-  }
-
-  return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
-      {current.matchStatus && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <CalendarStatusBadge status={current.matchStatus} />
-          {current.calendarSummary && (
-            <span className="text-slate">
-              {t.lessons.calendarSummary.replace(
-                '{name}',
-                current.calendarSummary,
-              )}
-            </span>
-          )}
-        </div>
-      )}
-      {current.matchStatus === 'suggested' && (
-        <Banner tone="pending">{t.lessons.calendarSuggested}</Banner>
-      )}
-      <Field label={t.lessons.calendarIdLabel} hint={t.lessons.calendarIdHint}>
-        {(p) => (
-          <Input
-            {...p}
-            value={value}
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => {
-              setValue(e.target.value);
-              save.reset();
-            }}
-          />
-        )}
-      </Field>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="secondary" loading={save.isPending}>
-          {t.common.save}
-        </Button>
-        {current.matchStatus === 'suggested' &&
-          next === current.googleCalendarId && (
-            <Button type="button" disabled={save.isPending} onClick={confirm}>
-              {t.lessons.calendarConfirm}
-            </Button>
-          )}
-      </div>
-      {save.isError && (
-        <Banner tone="error">
-          {save.error instanceof ApiError && save.error.status === 409
-            ? t.lessons.calendarTaken
-            : save.error instanceof ApiError
-              ? save.error.message
-              : t.errors.generic}
-        </Banner>
-      )}
-      {save.isSuccess && <Banner tone="approved">{t.common.saved}</Banner>}
-    </form>
   );
 }
 

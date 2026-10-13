@@ -3,8 +3,18 @@ import { Link } from 'react-router-dom';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { formatDate } from '@/lib/date';
-import { Card, EmptyState, Select, Spinner, StatusPill } from '@/components';
+import { ApiError } from '@/lib/api';
+import {
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  Select,
+  Spinner,
+  StatusPill,
+} from '@/components';
 import { useAdminInstructors, type AdminListFilter } from './api';
+import { useSuggestInstructorCalendars } from './lessonsApi';
 import type { AdminInstructorRecord, ApprovalStatus } from '@/lib/types';
 
 /** W2.7 / W3.4 — admin instructor list + filters; table on desktop, cards on mobile. */
@@ -19,7 +29,10 @@ export function AdminListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl">{t.admin.listTitle}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-3xl">{t.admin.listTitle}</h1>
+        <SuggestCalendarsButton />
+      </div>
 
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1 text-xs text-slate">
@@ -127,6 +140,37 @@ export function AdminListPage() {
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function SuggestCalendarsButton() {
+  const t = useT();
+  const suggest = useSuggestInstructorCalendars();
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <Button
+        variant="secondary"
+        loading={suggest.isPending}
+        onClick={() => suggest.mutate()}
+      >
+        {t.instructorCalendar.suggest}
+      </Button>
+      {suggest.isError && (
+        <Banner tone="error" title={t.instructorCalendar.suggestFailed}>
+          {suggest.error instanceof ApiError
+            ? suggest.error.message
+            : t.errors.generic}
+        </Banner>
+      )}
+      {suggest.isSuccess && (
+        <Banner tone="approved">
+          {t.instructorCalendar.suggested.replace(
+            '{count}',
+            String(suggest.data.suggested),
+          )}
+        </Banner>
       )}
     </div>
   );
