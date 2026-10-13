@@ -64,6 +64,7 @@ export function AppShell() {
       ]
     : [
         { to: '/profile', label: t.nav.profile },
+        { to: '/onboarding', label: t.nav.onboarding },
         { to: '/settings', label: t.nav.settings },
       ];
 
