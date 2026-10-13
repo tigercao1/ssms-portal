@@ -3,6 +3,7 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Card, Spinner, StatusPill } from '@/components';
 import { useMyProfile } from './api';
 import { ProfileSummary } from './ProfileSummary';
+import { OnboardingCard } from '@/features/documents/onboarding/OnboardingCard';
 import type { InstructorProfile } from '@/lib/types';
 
 function statusBanner(profile: InstructorProfile, t: ReturnType<typeof useT>) {
@@ -52,6 +53,7 @@ export function ProfileViewPage() {
       </div>
 
       {statusBanner(profile, t)}
+      <OnboardingCard />
       <ProfileSummary profile={profile} />
     </div>
   );
