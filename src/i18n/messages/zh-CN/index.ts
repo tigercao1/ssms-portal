@@ -548,6 +548,7 @@ export const zhCN: Messages = {
     kindLabel: '类型',
     kindHint: '签署：在 PDF 上放置字段。阅读：教练确认已阅读。',
     kindLocked: '创建后无法更改类型。',
+    onePage: '1 页',
     pages: '{n} 页',
     noPdf: '尚无 PDF',
     requiredFor: '必填：{title}',

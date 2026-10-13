@@ -570,6 +570,7 @@ export const en: Messages = {
     kindLabel: 'Type',
     kindHint: 'Sign: fields placed on the PDF. Read: the instructor confirms they have read it.',
     kindLocked: 'The type cannot be changed after creation.',
+    onePage: '1 page',
     pages: '{n} pages',
     noPdf: 'No PDF yet',
     requiredFor: 'Required: {title}',

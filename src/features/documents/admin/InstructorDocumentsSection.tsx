@@ -490,6 +490,10 @@ function CertUploadReviewRow({
   const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(validUntil);
   const dateChanged = validUntil !== u.validUntil;
   const name = certName(u.org, u.track, t);
+  const unchangedApproval =
+    u.reviewStatus === 'approved' &&
+    !dateChanged &&
+    note.trim() === (u.reviewNote ?? '');
 
   function submit(reviewStatus: CertUpload['reviewStatus']) {
     if (!dateValid) return;
@@ -577,7 +581,7 @@ function CertUploadReviewRow({
           loading={
             review.isPending && review.variables?.reviewStatus === 'approved'
           }
-          disabled={!dateValid || review.isPending}
+          disabled={!dateValid || review.isPending || unchangedApproval}
           onClick={() => submit('approved')}
         >
           {u.reviewStatus === 'approved' && dateChanged

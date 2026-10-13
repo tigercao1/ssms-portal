@@ -8,12 +8,15 @@ export type { PDFDocumentProxy, PDFPageProxy };
 
 const assetBase = `${import.meta.env.BASE_URL}pdfjs/`;
 
-let configured: Promise<typeof import('pdfjs-dist')> | null = null;
+type Pdfjs = typeof import('pdfjs-dist');
+
+let configured: Promise<Pdfjs> | null = null;
 
 function pdfjs() {
-  configured ??= import('pdfjs-dist').then((lib) => {
+  configured ??= import('pdfjs-dist/legacy/build/pdf.mjs').then((mod) => {
+    const lib = mod as unknown as Pdfjs;
     lib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
+      'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
       import.meta.url,
     ).toString();
     return lib;

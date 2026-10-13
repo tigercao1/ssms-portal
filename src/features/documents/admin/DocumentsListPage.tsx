@@ -219,7 +219,11 @@ function TemplateRow({
       </td>
       <td className="whitespace-nowrap px-4 py-2">
         {hasPdf ? (
-          t.documents.pages.replace('{n}', String(row.pageCount ?? 0))
+          row.pageCount === 1 ? (
+            t.documents.onePage
+          ) : (
+            t.documents.pages.replace('{n}', String(row.pageCount ?? 0))
+          )
         ) : (
           <span className="text-status-rejected">{t.documents.noPdf}</span>
         )}

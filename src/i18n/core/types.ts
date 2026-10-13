@@ -549,6 +549,7 @@ export interface Messages {
     kindLabel: string;
     kindHint: string;
     kindLocked: string;
+    onePage: string;
     pages: string;
     noPdf: string;
     requiredFor: string;

@@ -368,52 +368,61 @@ function Editor({ template }: { template: Template }) {
       {!template.sourceUrl ? (
         <Banner tone="pending">{t.documents.noSourceYet}</Banner>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[150px_minmax(0,1fr)_260px]">
-          <Card className="flex h-fit flex-col gap-2 p-3 lg:sticky lg:top-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-slate">
-              {t.documents.palette}
-            </h2>
-            <p className="text-xs text-slate">{t.documents.paletteHint}</p>
-            <div className="flex flex-wrap gap-2 lg:flex-col">
-              {FIELD_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  draggable={canPlace}
-                  disabled={!canPlace}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(DRAG_MIME, type);
-                    e.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onClick={() => addAtCentre(type)}
-                  aria-label={t.documents.addFieldOf.replace(
-                    '{type}',
-                    typeLabel(type),
-                  )}
-                  className="flex cursor-grab items-center gap-2 rounded-md border border-grey/80 bg-surface px-2.5 py-1.5 text-left text-sm text-navy hover:border-navy hover:bg-navy-tint disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <span aria-hidden className="w-5 text-center text-xs">
-                    {FIELD_ICONS[type]}
-                  </span>
-                  {typeLabel(type)}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-slate">
-              {t.documents.fieldCount.replace('{n}', String(fields.length))}
-            </p>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_270px]">
+          <div className="flex min-w-0 flex-col gap-3">
+            {canPlace && (
+              <Card className="sticky top-0 z-30 flex flex-col gap-2 p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <h2 className="text-sm font-medium uppercase tracking-wide text-slate">
+                    {t.documents.palette}
+                  </h2>
+                  <p className="text-xs text-slate">
+                    {t.documents.fieldCount.replace(
+                      '{n}',
+                      String(fields.length),
+                    )}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {FIELD_TYPES.map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      draggable={canPlace}
+                      disabled={!canPlace}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(DRAG_MIME, type);
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      onClick={() => addAtCentre(type)}
+                      aria-label={t.documents.addFieldOf.replace(
+                        '{type}',
+                        typeLabel(type),
+                      )}
+                      className="flex cursor-grab items-center gap-1.5 whitespace-nowrap rounded-md border border-grey/80 bg-surface px-2.5 py-1.5 text-sm text-navy hover:border-navy hover:bg-navy-tint disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span aria-hidden className="text-xs">
+                        {FIELD_ICONS[type]}
+                      </span>
+                      {typeLabel(type)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate">{t.documents.paletteHint}</p>
+              </Card>
+            )}
 
-          <div className="min-w-0 rounded-lg bg-sunken p-3 sm:p-4">
-            <PdfPages
-              ref={pdfRef}
-              source={template.sourceUrl}
-              renderOverlay={renderOverlay}
-              onLoad={(info) => setNumPages(info.numPages)}
-            />
+            <div className="min-w-0 rounded-lg bg-sunken p-3 sm:p-4">
+              <PdfPages
+                ref={pdfRef}
+                source={template.sourceUrl}
+                renderOverlay={renderOverlay}
+                onLoad={(info) => setNumPages(info.numPages)}
+              />
+            </div>
           </div>
 
-          <Card className="h-fit p-4 lg:sticky lg:top-4">
+          <Card className="h-fit p-4 md:sticky md:top-4">
             {selected && canPlace ? (
               <PropertiesPanel
                 field={selected}
