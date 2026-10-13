@@ -270,7 +270,7 @@ export const PdfPages = forwardRef<PdfPagesHandle, PdfPagesProps>(
     return (
       <div
         ref={rootRef}
-        className={cn('flex w-full flex-col items-center gap-4', className)}
+        className={cn('flex w-full flex-col gap-4', className)}
       >
         {error ? (
           <Banner tone="error">{t.pdf.loadError}</Banner>
@@ -292,7 +292,7 @@ export const PdfPages = forwardRef<PdfPagesHandle, PdfPagesProps>(
                   .replace('{n}', String(n))
                   .replace('{total}', String(layout.length))}
                 className={cn(
-                  'relative shrink-0 bg-white shadow-card',
+                  'relative mx-auto shrink-0 bg-white shadow-card',
                   pageClassName,
                 )}
                 style={{ width: geometry.width, height: geometry.height }}
