@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { signOut, getAccessToken } = vi.hoisted(() => ({
+const { signOut, refreshSession, getAccessToken } = vi.hoisted(() => ({
   signOut: vi.fn(),
+  refreshSession: vi.fn(),
   getAccessToken: vi.fn(),
 }));
 vi.mock('@/lib/supabase', () => ({
-  supabase: { auth: { signOut } },
+  supabase: { auth: { signOut, refreshSession } },
   getAccessToken,
 }));
 
@@ -30,6 +31,7 @@ describe('api client', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     signOut.mockClear();
+    refreshSession.mockReset();
   });
 
   it('returns parsed JSON on 200 and attaches the bearer token', async () => {
@@ -115,5 +117,56 @@ describe('api client', () => {
       status: 502,
       message: 'Request failed (502)',
     });
+  });
+
+  it('refreshes the session once on 403 and still throws', async () => {
+    refreshSession.mockResolvedValue({ data: {}, error: null });
+    mockFetch(403, { message: 'Admin role required' });
+    await expect(api('/admin/thing')).rejects.toMatchObject({
+      status: 403,
+      message: 'Admin role required',
+    });
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it('refreshes on 403 from apiWithHeaders too', async () => {
+    refreshSession.mockResolvedValue({ data: {}, error: null });
+    mockFetch(403, { message: 'Admin role required' });
+    await expect(apiWithHeaders('/admin/things')).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('still throws the 403 when the refresh fails', async () => {
+    refreshSession.mockRejectedValue(new Error('network down'));
+    mockFetch(403, { message: 'Admin role required' });
+    await expect(api('/admin/thing')).rejects.toMatchObject({
+      status: 403,
+      message: 'Admin role required',
+    });
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('still throws the 403 when the refresh returns an error', async () => {
+    refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: new Error('refresh token revoked'),
+    });
+    mockFetch(403, { message: 'Admin role required' });
+    await expect(api('/admin/thing')).rejects.toMatchObject({ status: 403 });
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh the session on 200, 401 or 500', async () => {
+    mockFetch(200, { ok: true });
+    await api('/thing');
+    mockFetch(500, { message: 'boom' });
+    await expect(api('/thing')).rejects.toMatchObject({ status: 500 });
+    mockFetch(401, { message: 'nope' });
+    await expect(api('/thing')).rejects.toMatchObject({ status: 401 });
+    expect(refreshSession).not.toHaveBeenCalled();
   });
 });

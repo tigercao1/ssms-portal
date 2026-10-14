@@ -86,6 +86,7 @@ export async function apiWithHeaders<T>(
     await supabase.auth.signOut();
     throw new ApiError(401, 'Session expired — please sign in again.');
   }
+  if (res.status === 403) await refreshSessionQuietly();
 
   const text = await res.text();
   if (responseType === 'text' && res.ok)
@@ -100,6 +101,14 @@ export async function apiWithHeaders<T>(
   }
 
   return { data: data as T, headers: res.headers };
+}
+
+async function refreshSessionQuietly(): Promise<void> {
+  try {
+    await supabase.auth.refreshSession();
+  } catch {
+    return;
+  }
 }
 
 function parseBody(text: string, responseType: 'json' | 'text'): unknown {
