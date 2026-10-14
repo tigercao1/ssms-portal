@@ -127,16 +127,16 @@ function CancelDialog({
         <p className="text-sm text-slate">{t.booking.cancelGoogle}</p>
       )}
       {cancel.isError && <BookingErrorBanner error={cancel.error} />}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" onClick={onClose}>
+          {t.booking.keep}
+        </Button>
         <Button
           variant="danger"
           loading={cancel.isPending}
           onClick={() => cancel.mutate(item.id, { onSuccess: onClose })}
         >
           {t.booking.cancelConfirm}
-        </Button>
-        <Button variant="ghost" onClick={onClose}>
-          {t.booking.keep}
         </Button>
       </div>
     </Dialog>
@@ -209,7 +209,7 @@ function MoveDialog({
   return (
     <Dialog title={t.booking.moveTitle} onClose={onClose}>
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t.booking.date}>
             {(p) => (
               <Input
@@ -283,12 +283,12 @@ function MoveDialog({
           <Banner tone="pending">{t.booking.needCustomer}</Banner>
         )}
         {update.isError && <BookingErrorBanner error={update.error} />}
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit" loading={update.isPending} disabled={!changed}>
-            {t.booking.saveChanges}
-          </Button>
+        <div className="flex flex-wrap justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
             {t.common.cancel}
+          </Button>
+          <Button type="submit" loading={update.isPending} disabled={!changed}>
+            {t.booking.saveChanges}
           </Button>
         </div>
       </form>

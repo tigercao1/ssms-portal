@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
@@ -13,6 +13,7 @@ import {
   Spinner,
   Textarea,
 } from '@/components';
+import { cn } from '@/lib/cn';
 import type { AdminClass, LessonType } from '@/lib/types';
 import { useTeachingLocations } from '@/features/reference/api';
 import { useAdminInstructors } from '../api';
@@ -110,6 +111,66 @@ export function BookLessonPage() {
     setSlot(null);
   }
 
+  const lessonHeader = (
+    <>
+      <h2 className="text-lg">{t.booking.lessonStep}</h2>
+      <div className="flex flex-col gap-1.5">
+        <div
+          role="group"
+          aria-label={t.booking.modeLabel}
+          className="grid w-full grid-cols-2 overflow-hidden rounded-md border border-navy sm:inline-grid sm:w-fit"
+        >
+          {(['grid', 'past'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => {
+                setMode(m);
+                reset();
+              }}
+              className={cn(
+                'min-h-11 px-4 py-1 text-sm leading-tight transition-colors',
+                m === 'past' && 'border-l border-navy',
+                mode === m
+                  ? 'bg-navy text-white'
+                  : 'text-navy hover:bg-navy-tint',
+              )}
+            >
+              {m === 'grid' ? t.booking.modeGrid : t.booking.modePast}
+            </button>
+          ))}
+        </div>
+        {mode === 'past' && (
+          <p className="text-sm text-slate">{t.booking.pastBody}</p>
+        )}
+      </div>
+    </>
+  );
+
+  const lessonTypeField = (
+    <Field label={t.booking.lessonType}>
+      {(p) => (
+        <Select
+          {...p}
+          value={lessonTypeId}
+          onChange={(e) => {
+            setLessonTypeId(e.target.value);
+            reset();
+          }}
+        >
+          <option value="">{t.booking.chooseLessonType}</option>
+          {activeTypes.map((l) => (
+            <option key={l.id} value={l.id}>
+              {localizeField(l.nameEn, l.nameZh, locale)} ·{' '}
+              {t.lessons.minutes.replace('{n}', String(l.durationMin))}
+            </option>
+          ))}
+        </Select>
+      )}
+    </Field>
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
@@ -149,7 +210,6 @@ export function BookLessonPage() {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="secondary"
-              size="sm"
               loading={last.isPending}
               onClick={() => customers[0] && last.mutate(customers[0].id)}
             >
@@ -192,121 +252,77 @@ export function BookLessonPage() {
         )}
       </Card>
 
-      <Card className="flex flex-col gap-4">
-        <h2 className="text-lg">{t.booking.lessonStep}</h2>
-        <div
-          role="group"
-          aria-label={t.booking.modeLabel}
-          className="inline-flex w-fit rounded-md border border-navy"
-        >
-          {(['grid', 'past'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              onClick={() => {
-                setMode(m);
-                reset();
-              }}
-              className={
-                mode === m
-                  ? 'bg-navy px-4 py-2 text-sm text-white'
-                  : 'px-4 py-2 text-sm text-navy hover:bg-navy-tint'
-              }
-            >
-              {m === 'grid' ? t.booking.modeGrid : t.booking.modePast}
-            </button>
-          ))}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t.booking.lessonType}>
-            {(p) => (
-              <Select
-                {...p}
-                value={lessonTypeId}
-                onChange={(e) => {
-                  setLessonTypeId(e.target.value);
-                  reset();
-                }}
-              >
-                <option value="">{t.booking.chooseLessonType}</option>
-                {activeTypes.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {localizeField(l.nameEn, l.nameZh, locale)} ·{' '}
-                    {t.lessons.minutes.replace('{n}', String(l.durationMin))}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          {mode === 'grid' && (
-            <Field label={t.booking.date}>
-              {(p) => (
-                <Input
-                  {...p}
-                  type="date"
-                  min={today}
-                  value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value);
-                    reset();
-                  }}
-                />
-              )}
-            </Field>
-          )}
-        </div>
-
-        {mode === 'grid' &&
-          (!lessonType ? (
-            <p className="text-sm text-slate">{t.booking.pickLessonFirst}</p>
-          ) : availability.isLoading ? (
-            <div className="flex justify-center py-10">
-              <Spinner />
+      {mode === 'grid' ? (
+        <>
+          <Card className="flex flex-col gap-4">
+            {lessonHeader}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {lessonTypeField}
+              <Field label={t.booking.date}>
+                {(p) => (
+                  <Input
+                    {...p}
+                    type="date"
+                    min={today}
+                    value={date}
+                    onChange={(e) => {
+                      setDate(e.target.value);
+                      reset();
+                    }}
+                  />
+                )}
+              </Field>
             </div>
-          ) : availability.isError ? (
-            <Banner tone="error">
-              {errorText(availability.error, t.errors.generic)}
-            </Banner>
-          ) : availability.data ? (
-            <AvailabilityGrid
-              availability={availability.data}
-              selected={slot}
-              onSelect={(choice) => {
-                setSlot(choice);
-                setBooked(null);
+            {!lessonType ? (
+              <p className="text-sm text-slate">{t.booking.pickLessonFirst}</p>
+            ) : availability.isLoading ? (
+              <div className="flex justify-center py-10">
+                <Spinner />
+              </div>
+            ) : availability.isError ? (
+              <Banner tone="error">
+                {errorText(availability.error, t.errors.generic)}
+              </Banner>
+            ) : availability.data ? (
+              <AvailabilityGrid
+                availability={availability.data}
+                selected={slot}
+                onSelect={(choice) => {
+                  setSlot(choice);
+                  setBooked(null);
+                }}
+              />
+            ) : null}
+          </Card>
+          {slot && lessonType && (
+            <ConfirmBooking
+              key={`${slot.instructorId}-${slot.startsAt}`}
+              customers={customers}
+              lessonType={lessonType}
+              instructorId={slot.instructorId}
+              instructorName={
+                chosenRow
+                  ? localizeField(
+                      chosenRow.displayNameEn,
+                      chosenRow.displayNameZh,
+                      locale,
+                    ) || chosenRow.displayNameEn
+                  : '—'
+              }
+              startsAt={slot.startsAt}
+              past={false}
+              onDone={(classes) => {
+                setBooked(classes);
+                setSlot(null);
               }}
+              onCancel={() => setSlot(null)}
             />
-          ) : null)}
-      </Card>
-
-      {mode === 'grid' && slot && lessonType && (
-        <ConfirmBooking
-          key={`${slot.instructorId}-${slot.startsAt}`}
-          customers={customers}
-          lessonType={lessonType}
-          instructorId={slot.instructorId}
-          instructorName={
-            chosenRow
-              ? localizeField(
-                  chosenRow.displayNameEn,
-                  chosenRow.displayNameZh,
-                  locale,
-                ) || chosenRow.displayNameEn
-              : '—'
-          }
-          startsAt={slot.startsAt}
-          past={false}
-          onDone={(classes) => {
-            setBooked(classes);
-            setSlot(null);
-          }}
-          onCancel={() => setSlot(null)}
-        />
-      )}
-
-      {mode === 'past' && (
+          )}
+        </>
+      ) : (
         <PastLessonForm
+          header={lessonHeader}
+          lessonTypeField={lessonTypeField}
           customers={customers}
           lessonType={lessonType}
           today={today}
@@ -397,22 +413,24 @@ function ConfirmBooking({
           </dd>
         </dl>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t.booking.location}>
-            {(p) => (
-              <Select
-                {...p}
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-              >
-                <option value="">{t.booking.noLocation}</option>
-                {(locations.data ?? []).map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
+          <div className={cn(past && 'sm:col-span-2')}>
+            <Field label={t.booking.location}>
+              {(p) => (
+                <Select
+                  {...p}
+                  value={locationId}
+                  onChange={(e) => setLocationId(e.target.value)}
+                >
+                  <option value="">{t.booking.noLocation}</option>
+                  {(locations.data ?? []).map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </div>
           {!past && (
             <Field label={t.booking.repeat}>
               {(p) => (
@@ -444,15 +462,15 @@ function ConfirmBooking({
         </Field>
         {!ready && <Banner tone="pending">{t.booking.needCustomer}</Banner>}
         {create.isError && <BookingErrorBanner error={create.error} />}
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit" loading={create.isPending} disabled={!ready}>
-            {past ? t.booking.savePast : t.booking.book}
-          </Button>
+        <div className="flex flex-wrap justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="ghost" onClick={onCancel}>
               {t.common.cancel}
             </Button>
           )}
+          <Button type="submit" loading={create.isPending} disabled={!ready}>
+            {past ? t.booking.savePast : t.booking.book}
+          </Button>
         </div>
       </form>
     </Card>
@@ -460,11 +478,15 @@ function ConfirmBooking({
 }
 
 function PastLessonForm({
+  header,
+  lessonTypeField,
   customers,
   lessonType,
   today,
   onDone,
 }: {
+  header: ReactNode;
+  lessonTypeField: ReactNode;
   customers: PickedCustomer[];
   lessonType: LessonType | null;
   today: string;
@@ -491,11 +513,25 @@ function PastLessonForm({
   return (
     <>
       <Card className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg">{t.booking.pastTitle}</h2>
-          <p className="text-sm text-slate">{t.booking.pastBody}</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {header}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {lessonTypeField}
+          <Field label={t.booking.instructor}>
+            {(p) => (
+              <Select
+                {...p}
+                value={instructorId}
+                onChange={(e) => setInstructorId(e.target.value)}
+              >
+                <option value="">{t.booking.chooseInstructor}</option>
+                {options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
           <Field label={t.booking.date}>
             {(p) => (
               <Input
@@ -521,22 +557,6 @@ function PastLessonForm({
               />
             )}
           </Field>
-          <Field label={t.booking.instructor}>
-            {(p) => (
-              <Select
-                {...p}
-                value={instructorId}
-                onChange={(e) => setInstructorId(e.target.value)}
-              >
-                <option value="">{t.booking.chooseInstructor}</option>
-                {options.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
           <Field label={t.booking.status}>
             {(p) => (
               <Select
@@ -550,15 +570,15 @@ function PastLessonForm({
               </Select>
             )}
           </Field>
+          <label className="flex items-center gap-2 text-sm text-ink sm:h-11 sm:self-end">
+            <input
+              type="checkbox"
+              checked={addToCalendar}
+              onChange={(e) => setAddToCalendar(e.target.checked)}
+            />
+            {t.booking.addToCalendar}
+          </label>
         </div>
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            checked={addToCalendar}
-            onChange={(e) => setAddToCalendar(e.target.checked)}
-          />
-          {t.booking.addToCalendar}
-        </label>
         {!lessonType && (
           <p className="text-sm text-slate">{t.booking.pickLessonFirst}</p>
         )}

@@ -163,10 +163,10 @@ function serve({
 
 async function pickLily(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Find a customer'), 'lil');
-  const results = await screen.findByRole('list', {
+  const results = await screen.findByRole('listbox', {
     name: 'Matching customers',
   });
-  await user.click(within(results).getByRole('button', { name: /Lily Chen/ }));
+  await user.click(within(results).getByRole('option', { name: /Lily Chen/ }));
 }
 
 async function chooseLesson(user: ReturnType<typeof userEvent.setup>) {
@@ -413,6 +413,48 @@ describe('BookLessonPage', () => {
     ).toHaveTextContent('Eddie Lee');
   });
 
+  it('labels each hour at its first slot and drops start times the lesson cannot fit', async () => {
+    const half = (h: number, m: number) =>
+      new Date(Date.UTC(2026, 11, 12, h + 5, m)).toISOString();
+    const slots = [
+      half(9, 0),
+      half(9, 30),
+      half(10, 0),
+      half(10, 30),
+      half(11, 0),
+      half(11, 30),
+    ];
+    const base = availability();
+    serve({
+      avail: availability({
+        slotMinutes: 30,
+        slots,
+        instructors: [
+          { ...base.instructors[0]!, busy: [], freeSlots: slots.slice(0, 5) },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await chooseLesson(user);
+    const grid = await screen.findByRole('table');
+    const headers = within(grid)
+      .getAllByRole('columnheader')
+      .slice(1)
+      .map((th) => [th.textContent, th.getAttribute('colspan')]);
+    expect(headers).toEqual([
+      ['09:00', '2'],
+      ['10:00', '2'],
+      ['11:00', '1'],
+    ]);
+    expect(
+      within(grid).getAllByRole('button', { name: /^Book Jane Snow/ }),
+    ).toHaveLength(5);
+    expect(
+      within(grid).queryByRole('button', { name: 'Book Jane Snow at 11:30' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('creates a new customer from the dialog and adds them', async () => {
     serve();
     const user = userEvent.setup();
@@ -598,9 +640,9 @@ describe('BookLessonPage', () => {
     const recorded = serve();
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
-    const card = (
-      await screen.findByRole('heading', { name: 'Booking settings' })
-    ).closest('div.flex.flex-col.gap-4') as HTMLElement;
+    const card = await screen.findByRole('region', {
+      name: 'Booking hours and slots',
+    });
     await within(card).findByLabelText('Day starts');
     fireEvent.change(within(card).getByLabelText('Day starts'), {
       target: { value: '09:00' },

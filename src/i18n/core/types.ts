@@ -524,6 +524,19 @@ export interface Messages {
     createFailed: string;
     emailTaken: string;
     phoneTaken: string;
+    showing: string;
+    prevPage: string;
+    nextPage: string;
+    pagination: string;
+    lastSynced: string;
+    notSyncedYet: string;
+    autoEvery: string;
+    autoOff: string;
+    lastAutoFailed: string;
+    justNow: string;
+    minutesAgo: string;
+    hoursAgo: string;
+    daysAgo: string;
   };
   pdf: {
     pageLabel: string;
@@ -873,6 +886,8 @@ export interface Messages {
     customerSearch: string;
     customerSearchHint: string;
     customerResults: string;
+    customerSearching: string;
+    customerResultsCapped: string;
     selectedCustomers: string;
     removeCustomer: string;
     noCustomerMatch: string;
@@ -896,6 +911,8 @@ export interface Messages {
     legendFree: string;
     legendBusy: string;
     legendNoFit: string;
+    legendLabel: string;
+    legendSelected: string;
     dayClosed: string;
     noInstructorsTitle: string;
     noInstructorsBody: string;
@@ -933,7 +950,6 @@ export interface Messages {
     sourceSsms: string;
     googleFailedTitle: string;
     googleFailed: string;
-    pastTitle: string;
     pastBody: string;
     startTime: string;
     pastMustBePast: string;

@@ -311,7 +311,7 @@ describe('ClassActions', () => {
     expect(dialog).toHaveTextContent('Add at least one customer first.');
     await user.type(within(dialog).getByLabelText('Find a customer'), 'max');
     await user.click(
-      await within(dialog).findByRole('button', { name: /Max Wu/ }),
+      await within(dialog).findByRole('option', { name: /Max Wu/ }),
     );
     await user.click(
       within(dialog).getByRole('button', { name: 'Save changes' }),
