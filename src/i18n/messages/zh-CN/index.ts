@@ -679,6 +679,7 @@ export const zhCN: Messages = {
     completedOn: '完成于',
     remindedOn: '提醒于',
     signedAs: '签署人',
+    acknowledgedBy: '阅读确认人',
     downloadSigned: '下载已签署副本',
     remind: '发送提醒',
     reminderSent: '提醒已发送。',

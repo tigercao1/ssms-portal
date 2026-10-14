@@ -701,6 +701,7 @@ export const en: Messages = {
     completedOn: 'Completed',
     remindedOn: 'Reminded',
     signedAs: 'Signed as',
+    acknowledgedBy: 'Acknowledged by',
     downloadSigned: 'Download signed copy',
     remind: 'Send reminder',
     reminderSent: 'Reminder sent.',

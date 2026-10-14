@@ -301,7 +301,11 @@ function AssignmentRow({
         )}
         {a.signerName && (
           <div>
-            <dt className="inline">{t.documents.signedAs} </dt>
+            <dt className="inline">
+              {template?.kind === 'read'
+                ? t.documents.acknowledgedBy
+                : t.documents.signedAs}{' '}
+            </dt>
             <dd className="inline text-ink">{a.signerName}</dd>
           </div>
         )}

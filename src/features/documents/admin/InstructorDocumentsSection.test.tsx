@@ -107,6 +107,12 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(missing).not.toHaveTextContent('Code of conduct');
     const conduct = screen.getByRole('listitem', { name: 'Code of conduct' });
     expect(within(conduct).getByText('b7e4d2a1b7e4…')).toBeInTheDocument();
+    expect(within(conduct).getByText(/Signed as/)).toBeInTheDocument();
+    const handbook = screen.getByRole('listitem', {
+      name: 'Instructor handbook',
+    });
+    expect(within(handbook).getByText(/Acknowledged by/)).toBeInTheDocument();
+    expect(within(handbook).queryByText(/Signed as/)).toBeNull();
     expect(
       within(conduct).queryByRole('button', { name: 'Send reminder' }),
     ).toBeNull();
