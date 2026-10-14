@@ -63,11 +63,20 @@ export function staleSide(p: InstructorProfile): Lang | null {
 
 function limitMessage(t: Messages, usage: BioAiUsage, locale: 'en' | 'zh-CN') {
   const limit = String(usage.limit);
-  return usage.resetsAt
-    ? t.bio.limitReached
-        .replace('{limit}', limit)
-        .replace('{time}', formatDateTime(usage.resetsAt, locale))
-    : t.bio.limitReachedNoTime.replace('{limit}', limit);
+  if (!usage.resetsAt)
+    return t.bio.limitReachedNoTime.replace('{limit}', limit);
+  const [before, after] = t.bio.limitReached
+    .replace('{limit}', limit)
+    .split('{time}');
+  return (
+    <>
+      {before}
+      <span className="whitespace-nowrap">
+        {formatDateTime(usage.resetsAt, locale)}
+      </span>
+      {after}
+    </>
+  );
 }
 
 function UsageCount({ usage }: { usage: BioAiUsage | undefined }) {
@@ -117,14 +126,14 @@ function BioCard({
       <span className="text-sm font-medium text-navy">{title}</span>
       <div
         onClick={onEdit}
-        className="relative min-h-24 cursor-pointer rounded-md border border-grey/60 bg-sunken px-3 py-2 pr-11"
+        className="relative min-h-24 cursor-pointer rounded-md border border-grey bg-sunken px-3 py-2 pr-11"
       >
         <p className="whitespace-pre-wrap break-words text-ink">
           {text || <span className="text-slate">{t.bio.empty}</span>}
         </p>
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-md bg-grey/15"
+          className="pointer-events-none absolute inset-0 rounded-md bg-[color-mix(in_srgb,var(--grey)_15%,transparent)]"
         />
         <button
           type="button"
@@ -372,7 +381,7 @@ function SavedBioCard({
       )}
       {value === null && <MachineTranslationNote model={machineModel} />}
       {stale && (
-        <div className="flex flex-col gap-2 rounded-md border-l-[3px] border-l-status-pending bg-status-pending/10 px-3 py-2 text-sm">
+        <div className="flex flex-col gap-2 rounded-md border-l-[3px] border-l-status-pending bg-[color-mix(in_srgb,var(--status-pending)_10%,transparent)] px-3 py-2 text-sm">
           <p>
             <span className="font-semibold">{t.bio.stale}</span>{' '}
             <span className="text-slate">{t.bio.staleHint}</span>

@@ -195,7 +195,7 @@ export const en: Messages = {
     refine: 'Refine',
     useAsWritten: 'Use as written',
     remaining: '{n} of {limit} left today',
-    limitReached: 'You’ve used all {limit} AI requests for today. Try again after {time}.',
+    limitReached: 'You’ve used all {limit} AI requests for today. Try again after {time}',
     limitReachedNoTime: 'You’ve used all {limit} AI requests for today.',
     unavailable: 'AI is unavailable right now. Your text is kept — try again later.',
     modalTitle: 'Review your bio',
