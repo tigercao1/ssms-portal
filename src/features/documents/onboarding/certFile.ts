@@ -25,7 +25,7 @@ export function validateCertFile(
   return null;
 }
 
-/** A `YYYY-MM-DD` date that is today or later in UTC, the date the API checks against. */
+/** A `YYYY-MM-DD` date that is today or later in Toronto, the date the API checks against. */
 export function isValidUntilAcceptable(
   value: string,
   today: string = todayIso(),

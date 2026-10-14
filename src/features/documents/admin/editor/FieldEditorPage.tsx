@@ -105,6 +105,21 @@ function Editor({ template }: { template: Template }) {
     [geometry, save],
   );
 
+  const patchField = useCallback(
+    (id: string, patch: Partial<Field>) => {
+      setFields((list) =>
+        list.map((f) => {
+          if (f.id !== id) return f;
+          const next = { ...f, ...patch };
+          const g = geometry(next.page);
+          return g ? { ...next, ...fitToPage(next, g) } : next;
+        }),
+      );
+      save.reset();
+    },
+    [geometry, save],
+  );
+
   function addField(field: Field) {
     setFields((list) => [...list, field]);
     setSelectedId(field.id);
@@ -369,9 +384,17 @@ function Editor({ template }: { template: Template }) {
         <Banner tone="pending">{t.documents.noSourceYet}</Banner>
       ) : (
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_270px]">
-          <div className="flex min-w-0 flex-col gap-3">
+          <div className="min-w-0 rounded-lg bg-sunken p-3 sm:p-4">
+            <PdfPages
+              ref={pdfRef}
+              source={template.sourceUrl}
+              renderOverlay={renderOverlay}
+              onLoad={(info) => setNumPages(info.numPages)}
+            />
+          </div>
+          <div className="order-first flex h-fit flex-col gap-4 md:sticky md:top-4 md:order-none md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
             {canPlace && (
-              <Card className="sticky top-0 z-30 flex flex-col gap-2 p-3">
+              <Card className="flex flex-col gap-2 p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <h2 className="text-sm font-medium uppercase tracking-wide text-slate">
                     {t.documents.palette}
@@ -412,39 +435,31 @@ function Editor({ template }: { template: Template }) {
               </Card>
             )}
 
-            <div className="min-w-0 rounded-lg bg-sunken p-3 sm:p-4">
-              <PdfPages
-                ref={pdfRef}
-                source={template.sourceUrl}
-                renderOverlay={renderOverlay}
-                onLoad={(info) => setNumPages(info.numPages)}
-              />
-            </div>
+            <Card className="p-4">
+              {selected && canPlace ? (
+                <PropertiesPanel
+                  key={selected.id}
+                  field={selected}
+                  pageLabel={t.documents.pageOf
+                    .replace('{n}', String(selected.page))
+                    .replace('{total}', String(numPages))}
+                  onChange={(patch) => patchField(selected.id, patch)}
+                  onDuplicate={() => duplicate(selected)}
+                  onDelete={() => removeField(selected.id)}
+                />
+              ) : (
+                <div className="flex flex-col gap-2 text-sm text-slate">
+                  <h2 className="text-lg text-ink">{t.documents.properties}</h2>
+                  <p>
+                    {canPlace
+                      ? t.documents.selectAField
+                      : t.documents.propertiesIdle}
+                  </p>
+                  <p className="text-xs">{t.documents.coordinateNote}</p>
+                </div>
+              )}
+            </Card>
           </div>
-
-          <Card className="h-fit p-4 md:sticky md:top-4">
-            {selected && canPlace ? (
-              <PropertiesPanel
-                field={selected}
-                pageLabel={t.documents.pageOf
-                  .replace('{n}', String(selected.page))
-                  .replace('{total}', String(numPages))}
-                onChange={updateField}
-                onDuplicate={() => duplicate(selected)}
-                onDelete={() => removeField(selected.id)}
-              />
-            ) : (
-              <div className="flex flex-col gap-2 text-sm text-slate">
-                <h2 className="text-lg text-ink">{t.documents.properties}</h2>
-                <p>
-                  {canPlace
-                    ? t.documents.selectAField
-                    : t.documents.propertiesIdle}
-                </p>
-                <p className="text-xs">{t.documents.coordinateNote}</p>
-              </div>
-            )}
-          </Card>
         </div>
       )}
 

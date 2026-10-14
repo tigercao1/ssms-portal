@@ -20,7 +20,7 @@ let state: DocumentsMockState;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(2026, 9, 12, 10, 0, 0));
+  vi.setSystemTime(new Date('2026-10-12T10:00:00-04:00'));
   state = createDocumentsState({
     meCerts: [
       { org: 'csia', track: 'regular', level: 3 },
@@ -217,8 +217,8 @@ describe('OnboardingPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('sets the valid-until minimum to the UTC date', async () => {
-    vi.setSystemTime(new Date(Date.UTC(2026, 9, 13, 1, 30)));
+  it('sets the valid-until minimum to the Toronto date', async () => {
+    vi.setSystemTime(new Date('2026-10-13T22:00:00-04:00'));
     const user = userEvent.setup();
     renderWithProviders(<OnboardingPage />);
     await user.click(

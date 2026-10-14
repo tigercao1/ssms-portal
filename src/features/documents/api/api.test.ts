@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw';
 import { ApiError } from '@/lib/api';
 import {
@@ -24,7 +24,6 @@ import {
   requestTemplateSourceUpload,
   reviewCertUpload,
   saveTemplateFields,
-  signingDateIso,
   todayIso,
   updateTemplate,
 } from './index';
@@ -39,6 +38,7 @@ import {
   fakeCertUpload,
   fakeField,
   fakeTemplate,
+  presentCertUploads,
 } from './fixtures';
 import { buildSamplePdf } from './samplePdf';
 
@@ -275,9 +275,35 @@ describe('validity rules', () => {
     expect(certState(upload, today)).toBe(expected);
   });
 
-  it('uses the UTC date and picks the latest upload per cert', () => {
-    expect(todayIso(new Date('2026-10-13T03:13:00Z'))).toBe('2026-10-13');
-    expect(signingDateIso(new Date('2026-10-13T03:13:00Z'))).toBe('2026-10-12');
+  it('uses the Toronto date for today', () => {
+    expect(todayIso(new Date('2026-10-13T22:00:00-04:00'))).toBe('2026-10-13');
+    expect(todayIso(new Date('2026-10-14T00:30:00-04:00'))).toBe('2026-10-14');
+    expect(todayIso(new Date('2027-01-15T23:30:00-05:00'))).toBe('2027-01-15');
+  });
+
+  describe('at 22:00 Toronto on 2026-10-13', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T22:00:00-04:00'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('treats a cert valid until 2026-10-13 as not yet expired', () => {
+      expect(todayIso()).toBe('2026-10-13');
+      expect(
+        certState({ reviewStatus: 'approved', validUntil: '2026-10-13' }),
+      ).toBe('expiring');
+      expect(
+        certState({ reviewStatus: 'approved', validUntil: '2026-10-12' }),
+      ).toBe('expired');
+      expect(
+        presentCertUploads([fakeCertUpload({ validUntil: '2026-10-13' })])[0]!
+          .state,
+      ).toBe('pending');
+    });
+  });
+
+  it('picks the latest upload per cert', () => {
     const current = currentUploads([
       fakeCertUpload({ id: 'old', insertedAt: '2025-01-01T00:00:00Z' }),
       fakeCertUpload({ id: 'new', insertedAt: '2026-01-01T00:00:00Z' }),

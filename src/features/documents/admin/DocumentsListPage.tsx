@@ -70,7 +70,7 @@ export function DocumentsListPage() {
       ) : (
         <Card className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] text-sm">
+            <table className="w-full min-w-[40rem] text-sm">
               <thead>
                 <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
                   <th className="px-4 py-2 font-medium">
@@ -88,7 +88,7 @@ export function DocumentsListPage() {
                   <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
                     {t.documents.colActive}
                   </th>
-                  <th className="w-px whitespace-nowrap px-4 py-2 text-right font-medium">
+                  <th className="whitespace-nowrap px-4 py-2 text-right font-medium">
                     {t.admin.actions}
                   </th>
                 </tr>
@@ -250,8 +250,8 @@ function TemplateRow({
           onChange={(isActive) => update.mutate({ id: row.id, isActive })}
         />
       </td>
-      <td className="whitespace-nowrap px-4 py-2">
-        <div className="flex justify-end gap-2">
+      <td className="px-4 py-2">
+        <div className="flex min-w-[11.5rem] flex-wrap justify-end gap-2">
           <Button
             size="sm"
             variant="ghost"

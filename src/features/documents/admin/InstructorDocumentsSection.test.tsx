@@ -107,6 +107,12 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(missing).not.toHaveTextContent('Code of conduct');
     const conduct = screen.getByRole('listitem', { name: 'Code of conduct' });
     expect(within(conduct).getByText('b7e4d2a1b7e4…')).toBeInTheDocument();
+    expect(within(conduct).getByText(/Signed as/)).toBeInTheDocument();
+    const handbook = screen.getByRole('listitem', {
+      name: 'Instructor handbook',
+    });
+    expect(within(handbook).getByText(/Acknowledged by/)).toBeInTheDocument();
+    expect(within(handbook).queryByText(/Signed as/)).toBeNull();
     expect(
       within(conduct).queryByRole('button', { name: 'Send reminder' }),
     ).toBeNull();
@@ -135,7 +141,12 @@ describe('InstructorDocumentsSection — documents', () => {
     ).toBeInTheDocument();
   });
 
-  it('downloads the signed copy through a presigned URL', async () => {
+  it('downloads the signed copy in place without opening a tab', async () => {
+    const assign = vi.fn();
+    vi.spyOn(window, 'location', 'get').mockReturnValue({
+      ...window.location,
+      assign,
+    });
     const user = userEvent.setup();
     renderSection();
     const conduct = await screen.findByRole('listitem', {
@@ -145,14 +156,14 @@ describe('InstructorDocumentsSection — documents', () => {
       within(conduct).getByRole('button', { name: 'Download signed copy' }),
     );
     await waitFor(() =>
-      expect(tab.location.href).toBe(
+      expect(assign).toHaveBeenCalledWith(
         'https://storage.mock/signed/asg-conduct.pdf?sig=mock',
       ),
     );
-    expect(tab.opener).toBeNull();
+    expect(window.open).not.toHaveBeenCalled();
   });
 
-  it('reports a failed download and closes the blank tab', async () => {
+  it('reports a failed download', async () => {
     server.use(
       http.get(`${API}/admin/documents/assignments/:id/signed-url`, () =>
         HttpResponse.json({ message: 'Signed copy missing' }, { status: 404 }),
@@ -169,10 +180,10 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(await within(conduct).findByRole('alert')).toHaveTextContent(
       'Signed copy missing',
     );
-    expect(tab.close).toHaveBeenCalled();
+    expect(window.open).not.toHaveBeenCalled();
   });
 
-  it('falls back to same-tab navigation when popups are blocked', async () => {
+  it('opens the file in the same tab when popups are blocked', async () => {
     vi.mocked(window.open).mockReturnValue(null);
     const assign = vi.fn();
     vi.spyOn(window, 'location', 'get').mockReturnValue({
@@ -181,13 +192,29 @@ describe('InstructorDocumentsSection — documents', () => {
     });
     const user = userEvent.setup();
     renderSection();
-    const conduct = await screen.findByRole('listitem', {
-      name: 'Code of conduct',
-    });
-    await user.click(
-      within(conduct).getByRole('button', { name: 'Download signed copy' }),
+    const csia = await screen.findByRole('listitem', { name: 'CSIA' });
+    await user.click(within(csia).getByRole('button', { name: 'View file' }));
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        expect.stringContaining('/certifications/cu-pending'),
+      ),
     );
-    await waitFor(() => expect(assign).toHaveBeenCalled());
+  });
+
+  it('closes the blank tab when the file URL cannot be fetched', async () => {
+    server.use(
+      http.get(`${API}/admin/certification-uploads/:id/url`, () =>
+        HttpResponse.json({ message: 'File missing' }, { status: 404 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderSection();
+    const csia = await screen.findByRole('listitem', { name: 'CSIA' });
+    await user.click(within(csia).getByRole('button', { name: 'View file' }));
+    expect(await within(csia).findByRole('alert')).toHaveTextContent(
+      'File missing',
+    );
+    expect(tab.close).toHaveBeenCalled();
   });
 
   it('sends a reminder and archives with confirmation', async () => {

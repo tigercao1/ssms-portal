@@ -680,6 +680,7 @@ export interface Messages {
     completedOn: string;
     remindedOn: string;
     signedAs: string;
+    acknowledgedBy: string;
     downloadSigned: string;
     remind: string;
     reminderSent: string;

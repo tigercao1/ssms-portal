@@ -2,13 +2,11 @@ import type { CertState, CertUpload } from './types';
 
 export const EXPIRING_WITHIN_DAYS = 30;
 
-/** Today's date as `YYYY-MM-DD` in UTC, the date the API's validity rule uses. */
+/**
+ * Today's date as `YYYY-MM-DD` in America/Toronto: the date the API's validity
+ * rule uses and stamps into `date_signed` fields.
+ */
 export function todayIso(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
-
-/** The `YYYY-MM-DD` date the API stamps into `date_signed` fields (America/Toronto). */
-export function signingDateIso(now: Date = new Date()): string {
   return now.toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 }
 

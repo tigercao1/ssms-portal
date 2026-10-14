@@ -8,7 +8,7 @@ import { useSession } from '@/auth/SessionProvider';
 import { useMyProfile } from '@/features/instructor/api';
 import {
   getMySignedUrl,
-  signingDateIso,
+  todayIso,
   type Assignment,
   type TemplateKind,
 } from '../api';
@@ -183,7 +183,7 @@ export function OnboardingDocumentPage() {
             assignment.signerName ?? profile.data?.displayNameEn ?? ''
           }
           signerEmail={profile.data?.email ?? user?.email ?? null}
-          signingDate={signingDateIso()}
+          signingDate={todayIso()}
           consentText={consentText}
           locale={locale}
           text={t.signer}
