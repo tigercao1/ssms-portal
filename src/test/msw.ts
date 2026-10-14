@@ -288,6 +288,10 @@ export const handlers = [
       instructors: [],
     }),
   ),
+  http.get(`${API}/admin/documents/templates`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/instructors/:id/documents`, () =>
+    HttpResponse.json({ assignments: [], certificationUploads: [] }),
+  ),
 ];
 
 export const server = setupServer(...handlers);

@@ -25,6 +25,7 @@ import {
 import { AdminProfileEditor } from './AdminProfileEditor';
 import { ShopifyInstructorPanel } from './ShopifyInstructorPanel';
 import { InstructorCalendarCard } from './InstructorCalendarCard';
+import { InstructorDocumentsSection } from '@/features/documents/admin/InstructorDocumentsSection';
 import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
 /** W2.8–W2.12 — admin instructor detail + actions rail. */
@@ -74,6 +75,11 @@ export function AdminDetailPage() {
         )}
         <ActionsRail rec={rec} />
       </div>
+
+      <InstructorDocumentsSection
+        instructorId={rec.id}
+        certifications={profile.data?.certifications ?? []}
+      />
     </div>
   );
 }

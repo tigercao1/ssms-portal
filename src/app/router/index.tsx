@@ -23,6 +23,8 @@ import { BookLessonPage } from '@/features/admin/booking/BookLessonPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
 import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
+import { DocumentsListPage } from '@/features/documents/admin/DocumentsListPage';
+import { FieldEditorPage } from '@/features/documents/admin/editor/FieldEditorPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -170,6 +172,22 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <PageEditorPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/documents',
+        element: (
+          <RequireAdmin>
+            <DocumentsListPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/documents/:id/edit',
+        element: (
+          <RequireAdmin>
+            <FieldEditorPage />
           </RequireAdmin>
         ),
       },
