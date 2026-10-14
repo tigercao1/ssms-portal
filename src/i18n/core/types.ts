@@ -23,6 +23,7 @@ export interface Messages {
     yes: string;
     no: string;
     saved: string;
+    close: string;
   };
   auth: {
     signInTitle: string;
@@ -146,7 +147,6 @@ export interface Messages {
     minStudentAgeRange: string;
     minStudentAgeValue: string;
     emailReadonly: string;
-    aiFillHint: string;
     photo: string;
     addCert: string;
     addTrainer: string;
@@ -178,6 +178,31 @@ export interface Messages {
     slotUploadPhoto: string;
     slotReplacePhoto: string;
     slotRemovePhoto: string;
+  };
+  bio: {
+    composeLabel: string;
+    composeHint: string;
+    actionsHint: string;
+    refine: string;
+    useAsWritten: string;
+    remaining: string;
+    limitReached: string;
+    limitReachedNoTime: string;
+    unavailable: string;
+    modalTitle: string;
+    refining: string;
+    translating: string;
+    reviewHint: string;
+    english: string;
+    chinese: string;
+    editEn: string;
+    editZh: string;
+    empty: string;
+    rewrite: string;
+    clear: string;
+    stale: string;
+    staleHint: string;
+    updateTranslation: string;
   };
   settings: {
     title: string;

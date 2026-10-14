@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import type {
   AllowedAvatarMime,
   AvatarUploadTicket,
+  BioAiUsage,
+  BioDraft,
+  BioDraftMode,
   ExtraPhotoSlot,
   InstructorProfile,
   PhotoSlot,
@@ -28,6 +31,43 @@ export function useUpdateProfile() {
     mutationFn: (body: UpdateProfileBody) =>
       api<InstructorProfile>('/me/instructor', { method: 'PATCH', body }),
     onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
+  });
+}
+
+const BIO_USAGE_KEY = ['me', 'instructor', 'bio', 'ai-usage'] as const;
+
+/** Remaining Refine / Use-as-written requests for today. */
+export function useBioAiUsage() {
+  return useQuery({
+    queryKey: BIO_USAGE_KEY,
+    queryFn: () => api<BioAiUsage>('/me/instructor/bio/ai-usage'),
+  });
+}
+
+export type BioDraftError = 'limit' | 'unavailable' | 'generic';
+
+export function bioDraftError(error: unknown): BioDraftError {
+  if (!(error instanceof ApiError)) return 'generic';
+  const code = (error.body as { code?: string } | undefined)?.code;
+  if (error.status === 429 && code === 'bio_ai_limit') return 'limit';
+  if (error.status === 503 && code === 'bio_ai_unavailable') return 'unavailable';
+  return 'generic';
+}
+
+/** Asks the model for both languages; saves nothing. Keeps the usage cache current. */
+export function useBioDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { text: string; mode: BioDraftMode }) =>
+      api<BioDraft>('/me/instructor/bio/draft', { method: 'POST', body }),
+    onSuccess: (draft) => qc.setQueryData(BIO_USAGE_KEY, draft.usage),
+    onError: (error) => {
+      const usage =
+        error instanceof ApiError
+          ? (error.body as { usage?: BioAiUsage } | undefined)?.usage
+          : undefined;
+      if (usage) qc.setQueryData(BIO_USAGE_KEY, usage);
+    },
   });
 }
 

@@ -6,13 +6,13 @@ import {
   Button,
   Field,
   Input,
+  Modal,
   Spinner,
   StatusPill,
 } from '@/components';
 import { useAdminInstructors } from '@/features/admin/api';
 import type { AssignResult, TemplateSummary } from '../api';
 import { useCreateAssignments } from './hooks';
-import { Modal } from './Modal';
 import { errorText, templateTitle } from './format';
 
 const SEASON_RE = /^\d{4}\/\d{2}$/;

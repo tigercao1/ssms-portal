@@ -117,7 +117,7 @@ describe('EditProfilePage machine-translation badge', () => {
       ),
     );
     renderWithProviders(<EditProfilePage />);
-    expect(await screen.findByDisplayValue('资深教练。')).toBeInTheDocument();
+    expect(await screen.findByText('资深教练。')).toBeInTheDocument();
     expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(1);
     expect(
       screen.getByText(/Editing this text replaces the machine translation/),
