@@ -47,8 +47,8 @@ export function certName(org: CertOrg, track: CertTrack, t: Messages): string {
 }
 
 /**
- * Opens a presigned download in a new tab. The tab is opened before the URL
- * is fetched so popup blockers treat it as user-initiated.
+ * Opens a presigned file in a new tab. The tab is opened before the URL is
+ * fetched so popup blockers treat it as user-initiated.
  */
 export async function openPresigned(get: () => Promise<{ url: string }>) {
   const tab = window.open('about:blank', '_blank');
@@ -64,6 +64,15 @@ export async function openPresigned(get: () => Promise<{ url: string }>) {
     tab?.close();
     throw err;
   }
+}
+
+/**
+ * Downloads a presigned file served as an attachment. Navigating this tab to
+ * it starts the download without leaving the page or opening another tab.
+ */
+export async function downloadPresigned(get: () => Promise<{ url: string }>) {
+  const { url } = await get();
+  window.location.assign(url);
 }
 
 /** Documents and certification uploads for one instructor, on the admin detail page. */
@@ -245,7 +254,7 @@ function AssignmentRow({
   async function download() {
     setDownloadError(null);
     try {
-      await openPresigned(() => getAssignmentSignedUrl(a.id));
+      await downloadPresigned(() => getAssignmentSignedUrl(a.id));
     } catch (err) {
       setDownloadError(err);
     }
