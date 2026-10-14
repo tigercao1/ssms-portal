@@ -9,6 +9,8 @@ import { AppShell } from '@/app/shell/AppShell';
 import { ProfileViewPage } from '@/features/instructor/ProfileViewPage';
 import { EditProfilePage } from '@/features/instructor/EditProfilePage';
 import { SettingsPage } from '@/features/instructor/SettingsPage';
+import { OnboardingPage } from '@/features/documents/onboarding/OnboardingPage';
+import { OnboardingDocumentPage } from '@/features/documents/onboarding/OnboardingDocumentPage';
 import { AdminDashboard } from '@/features/admin/AdminDashboard';
 import { AdminListPage } from '@/features/admin/AdminListPage';
 import { AdminDetailPage } from '@/features/admin/AdminDetailPage';
@@ -70,6 +72,8 @@ export const router = createBrowserRouter([
       // Instructor
       { path: '/profile', element: <ProfileViewPage /> },
       { path: '/profile/edit', element: <EditProfilePage /> },
+      { path: '/onboarding', element: <OnboardingPage /> },
+      { path: '/onboarding/:assignmentId', element: <OnboardingDocumentPage /> },
       { path: '/settings', element: <SettingsPage /> },
 
       // Admin (role-gated)
