@@ -9,7 +9,7 @@ vi.mock('@/lib/supabase', () => ({
   getAccessToken,
 }));
 
-import { api, ApiError } from './api';
+import { api, ApiError, apiWithHeaders } from './api';
 
 function mockFetch(status: number, body: unknown) {
   vi.stubGlobal(
@@ -39,6 +39,21 @@ describe('api client', () => {
     const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]!;
     const headers = (call[1] as RequestInit).headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer tok-123');
+  });
+
+  it('can also return the response headers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([1, 2]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'X-Total-Count': '7' },
+        }),
+      ),
+    );
+    const { data, headers } = await apiWithHeaders<number[]>('/things');
+    expect(data).toEqual([1, 2]);
+    expect(headers.get('X-Total-Count')).toBe('7');
   });
 
   it('signs out and throws on 401', async () => {

@@ -292,6 +292,16 @@ export interface CustomerSyncResult {
   nextCursor: string | null;
 }
 
+export interface CustomerSyncStatus {
+  scheduled: boolean;
+  intervalMinutes: number;
+  lastStartedAt: string | null;
+  lastFinishedAt: string | null;
+  lastSuccessAt: string | null;
+  lastFetched: number | null;
+  lastError: string | null;
+}
+
 export type ClassStatus = 'scheduled' | 'completed' | 'no_show' | 'cancelled';
 export type ClassSource = 'ssms' | 'app_import' | 'app_webhook';
 export type Attendance = 'expected' | 'attended' | 'no_show';
