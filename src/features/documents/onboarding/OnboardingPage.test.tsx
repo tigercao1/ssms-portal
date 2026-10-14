@@ -217,8 +217,8 @@ describe('OnboardingPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('sets the valid-until minimum to the UTC date', async () => {
-    vi.setSystemTime(new Date(Date.UTC(2026, 9, 13, 1, 30)));
+  it('sets the valid-until minimum to the Toronto date', async () => {
+    vi.setSystemTime(new Date('2026-10-13T22:00:00-04:00'));
     const user = userEvent.setup();
     renderWithProviders(<OnboardingPage />);
     await user.click(

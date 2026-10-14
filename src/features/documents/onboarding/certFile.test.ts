@@ -36,6 +36,14 @@ describe('certFile', () => {
     expect(isValidUntilAcceptable('12/10/2026', '2026-10-12')).toBe(false);
   });
 
+  it('defaults to the Toronto date at 22:00 Toronto on 2026-10-13', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T22:00:00-04:00'));
+    expect(isValidUntilAcceptable('2026-10-13')).toBe(true);
+    expect(isValidUntilAcceptable('2026-10-12')).toBe(false);
+    vi.useRealTimers();
+  });
+
   it('passes PDFs through untouched', async () => {
     const pdf = sizedFile('c.pdf', 'application/pdf', 2000);
     await expect(prepareCertFile(pdf)).resolves.toBe(pdf);
