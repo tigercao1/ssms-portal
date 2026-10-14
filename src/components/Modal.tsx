@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '@/i18n/core/I18nProvider';
+import { cn } from '@/lib/cn';
 
 /** Centered modal dialog: Escape and the backdrop close it; focus moves in and back. */
 export function Modal({
@@ -8,11 +9,13 @@ export function Modal({
   onClose,
   children,
   footer,
+  size = 'md',
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  size?: 'md' | 'lg';
 }) {
   const t = useT();
   const titleId = useId();
@@ -39,7 +42,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[color-mix(in_srgb,var(--ink)_40%,transparent)] p-0 sm:items-center sm:p-6"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -50,7 +53,11 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-lg bg-surface shadow-pop sm:rounded-lg"
+        className={cn(
+          'flex max-h-[90vh] w-full flex-col',
+          size === 'lg' ? 'max-w-3xl' : 'max-w-lg',
+          'rounded-t-lg bg-surface shadow-pop sm:rounded-lg',
+        )}
       >
         <div className="flex items-center justify-between border-b border-grey/60 px-5 py-4">
           <h2 id={titleId} className="text-lg">
@@ -60,7 +67,7 @@ export function Modal({
             type="button"
             data-modal-close
             onClick={onClose}
-            aria-label={t.documents.close}
+            aria-label={t.common.close}
             className="rounded-md p-1.5 text-slate hover:bg-navy-tint hover:text-navy"
           >
             <svg

@@ -8,7 +8,6 @@ import {
   Field,
   Input,
   Spinner,
-  Textarea,
 } from '@/components';
 import {
   useCourseLevels,
@@ -17,7 +16,7 @@ import {
 } from '@/features/reference/api';
 import { useMyProfile, useUpdateProfile } from './api';
 import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
-import { MachineTranslationNote } from '@/features/translation/TranslatedByBadge';
+import { BioSection } from './BioSection';
 import { MultiSelectChips } from './MultiSelectChips';
 import { CertEditor, TrainerEditor } from './CertEditor';
 import type {
@@ -27,7 +26,6 @@ import type {
 } from '@/lib/types';
 
 const MAX_NAME = 100;
-const MAX_BIO = 1000;
 const MIN_STUDENT_AGE = 0;
 const MAX_STUDENT_AGE = 18;
 const DEFAULT_MIN_STUDENT_AGE = 5;
@@ -35,8 +33,6 @@ const DEFAULT_MIN_STUDENT_AGE = 5;
 interface ProfileDraft {
   displayNameEn: string;
   displayNameZh: string;
-  bioEn: string;
-  bioZh: string;
   dateOfBirth: string;
   minStudentAge: string;
   teachingLocationIds: string[];
@@ -50,8 +46,6 @@ function toDraft(p: InstructorProfile): ProfileDraft {
   return {
     displayNameEn: p.displayNameEn,
     displayNameZh: p.displayNameZh ?? '',
-    bioEn: p.bioEn ?? '',
-    bioZh: p.bioZh ?? '',
     dateOfBirth: p.dateOfBirth ?? '',
     minStudentAge: String(p.minStudentAge ?? DEFAULT_MIN_STUDENT_AGE),
     teachingLocationIds: p.teachingLocations.map((r) => r.id),
@@ -143,8 +137,6 @@ function Form({
     const body: UpdateProfileBody = {
       ...draft,
       displayNameZh: draft.displayNameZh || null,
-      bioEn: draft.bioEn || null,
-      bioZh: draft.bioZh || null,
       dateOfBirth: draft.dateOfBirth || null,
       minStudentAge: Number(draft.minStudentAge),
     };
@@ -186,31 +178,7 @@ function Form({
 
       <Card className="flex flex-col gap-4">
         <h2 className="text-lg">{t.profile.bioSection}</h2>
-        <p className="text-xs text-slate">{t.profile.aiFillHint}</p>
-        <Field label={t.profile.bioEn} hint={`${draft.bioEn.length}/${MAX_BIO}`}>
-          {(p) => (
-            <Textarea
-              {...p}
-              rows={4}
-              maxLength={MAX_BIO}
-              value={draft.bioEn}
-              onChange={(e) => set('bioEn', e.target.value)}
-            />
-          )}
-        </Field>
-        <MachineTranslationNote model={profile.bioEnTranslatedBy} />
-        <Field label={t.profile.bioZh} hint={`${draft.bioZh.length}/${MAX_BIO}`}>
-          {(p) => (
-            <Textarea
-              {...p}
-              rows={4}
-              maxLength={MAX_BIO}
-              value={draft.bioZh}
-              onChange={(e) => set('bioZh', e.target.value)}
-            />
-          )}
-        </Field>
-        <MachineTranslationNote model={profile.bioZhTranslatedBy} />
+        <BioSection profile={profile} />
       </Card>
 
       <Card className="grid gap-4 sm:grid-cols-2">

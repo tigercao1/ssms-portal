@@ -48,6 +48,8 @@ export interface InstructorProfile {
   bioZhMachineTranslated: boolean;
   bioEnTranslatedBy?: string | null;
   bioZhTranslatedBy?: string | null;
+  bioEnUpdatedAt?: string | null;
+  bioZhUpdatedAt?: string | null;
   dateOfBirth: string | null;
   preferredLanguage: PreferredLanguage;
   approvalStatus: ApprovalStatus;
@@ -70,6 +72,8 @@ export interface UpdateProfileBody {
   displayNameZh?: string | null;
   bioEn?: string | null;
   bioZh?: string | null;
+  bioEnMachineTranslated?: boolean;
+  bioZhMachineTranslated?: boolean;
   dateOfBirth?: string | null;
   preferredLanguage?: PreferredLanguage;
   profilePhotoUrl?: string | null;
@@ -91,6 +95,26 @@ export interface UpdateProfileBody {
     trainerExamPassed?: boolean;
     trainerLevel?: number | null;
   }>;
+}
+
+/** Daily Refine/Use-as-written quota (`GET /me/instructor/bio/ai-usage`). */
+export interface BioAiUsage {
+  limit: number;
+  used: number;
+  remaining: number;
+  resetsAt: string | null;
+}
+
+export type BioDraftMode = 'refine' | 'translate';
+
+/** `POST /me/instructor/bio/draft` — nothing is saved. */
+export interface BioDraft {
+  en: string;
+  zh: string;
+  /** Languages present in the instructor's input. */
+  sourceLangs: ('en' | 'zh-CN')[];
+  model: string | null;
+  usage: BioAiUsage;
 }
 
 export type PhotoSlot = 1 | 2 | 3;

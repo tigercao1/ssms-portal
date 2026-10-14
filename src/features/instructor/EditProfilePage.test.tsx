@@ -62,6 +62,16 @@ describe('EditProfilePage (W2.2)', () => {
     );
   });
 
+  it('no longer sends the bios from the main Save', async () => {
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    await minAgeInput();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('bioEn');
+    expect(bodies[0]).not.toHaveProperty('bioZh');
+  });
+
   it.each([
     ['19', 'Enter a whole number from 0 to 18.'],
     ['-1', 'Enter a whole number from 0 to 18.'],
@@ -117,7 +127,7 @@ describe('EditProfilePage machine-translation badge', () => {
       ),
     );
     renderWithProviders(<EditProfilePage />);
-    expect(await screen.findByDisplayValue('资深教练。')).toBeInTheDocument();
+    expect(await screen.findByText('资深教练。')).toBeInTheDocument();
     expect(screen.getAllByText('Translated by gemini-2.5-flash')).toHaveLength(1);
     expect(
       screen.getByText(/Editing this text replaces the machine translation/),
