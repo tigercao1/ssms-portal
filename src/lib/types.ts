@@ -111,6 +111,8 @@ export type BioDraftMode = 'refine' | 'translate';
 export interface BioDraft {
   en: string;
   zh: string;
+  /** Languages present in the instructor's input. */
+  sourceLangs: ('en' | 'zh-CN')[];
   model: string | null;
   usage: BioAiUsage;
 }

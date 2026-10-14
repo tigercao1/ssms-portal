@@ -8,6 +8,7 @@ import {
 import { formatDateTime } from '@/lib/date';
 import type {
   BioAiUsage,
+  BioDraft,
   BioDraftMode,
   InstructorProfile,
   UpdateProfileBody,
@@ -29,15 +30,14 @@ type Messages = ReturnType<typeof useT>;
 interface DraftRequest {
   text: string;
   mode: BioDraftMode;
-  /** The language the instructor wrote; the other side is the model's translation. */
-  source: Lang;
+  /** Set when the source language is known up front (Update translation). */
+  source?: Lang;
 }
 
-/** Dominant script of the instructor's text: CJK characters vs Latin words. */
-export function detectSourceLang(text: string): Lang {
-  const cjk = text.match(/[\u3400-\u9fff\uf900-\ufaff]/g)?.length ?? 0;
-  const words = text.match(/[A-Za-z]+/g)?.length ?? 0;
-  return cjk > words ? 'zh' : 'en';
+/** Languages the instructor wrote; only the other side can be machine-translated. */
+export function writtenLangs(request: DraftRequest, draft?: BioDraft): Lang[] {
+  if (request.source) return [request.source];
+  return (draft?.sourceLangs ?? []).map((l) => (l === 'zh-CN' ? 'zh' : 'en'));
 }
 
 function bioOf(p: InstructorProfile, lang: Lang): string {
@@ -208,8 +208,10 @@ function BioDraftModal({
   });
   const result = draft.data;
   const valueOf = (lang: Lang) => edits[lang] ?? result?.[lang] ?? '';
+  const written = writtenLangs(request, result);
   const machine = (lang: Lang) =>
-    lang !== request.source &&
+    written.length > 0 &&
+    !written.includes(lang) &&
     valueOf(lang) === (result?.[lang] ?? '') &&
     Boolean(valueOf(lang).trim());
 
@@ -511,9 +513,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               type="button"
               variant="secondary"
               disabled={!canAsk}
-              onClick={() =>
-                start({ text, mode: 'refine', source: detectSourceLang(text) })
-              }
+              onClick={() => start({ text, mode: 'refine' })}
             >
               {t.bio.refine}
             </Button>
@@ -521,13 +521,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               type="button"
               variant="secondary"
               disabled={!canAsk}
-              onClick={() =>
-                start({
-                  text,
-                  mode: 'translate',
-                  source: detectSourceLang(text),
-                })
-              }
+              onClick={() => start({ text, mode: 'translate' })}
             >
               {t.bio.useAsWritten}
             </Button>

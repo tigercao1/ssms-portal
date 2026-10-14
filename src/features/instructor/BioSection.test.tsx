@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { EditProfilePage } from './EditProfilePage';
-import { detectSourceLang, staleSide } from './BioSection';
+import { staleSide, writtenLangs } from './BioSection';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
 import type {
@@ -49,6 +49,7 @@ function setup(
       HttpResponse.json({
         en: 'EN draft',
         zh: '中文稿',
+        sourceLangs: ['en'],
         model: 'gemini-test',
         usage: usage(4),
       }),
@@ -116,6 +117,7 @@ describe('BioSection first-time flow', () => {
         return HttpResponse.json({
           en: 'Polished.',
           zh: '润色。',
+          sourceLangs: ['en'],
           model: 'gemini-test',
           usage: usage(4),
         });
@@ -162,6 +164,7 @@ describe('BioSection first-time flow', () => {
         HttpResponse.json({
           en: 'I am a coach.',
           zh: '我是教练。',
+          sourceLangs: ['zh-CN'],
           model: 'gemini-test',
           usage: usage(4),
         }),
@@ -187,6 +190,35 @@ describe('BioSection first-time flow', () => {
       ]),
     );
     expect(drafts).toEqual([{ text: '我是教练。', mode: 'translate' }]);
+  });
+
+  it('flags neither side when the instructor wrote both languages', async () => {
+    const { patches } = setup(noBio, {
+      draft: () =>
+        HttpResponse.json({
+          en: 'I teach beginner skiers. I also teach snowboard.',
+          zh: '我教初学者滑雪。我也教单板。',
+          sourceLangs: ['en', 'zh-CN'],
+          model: 'gemini-test',
+          usage: usage(4),
+        }),
+    });
+    await compose('I teach beginner skiers. 我也教单板。');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use as written' }),
+    );
+    await within(dialog()).findByText('我教初学者滑雪。我也教单板。');
+    await userEvent.click(
+      within(dialog()).getByRole('button', { name: 'Save' }),
+    );
+    await waitFor(() =>
+      expect(patches).toEqual([
+        expect.objectContaining({
+          bioEnMachineTranslated: false,
+          bioZhMachineTranslated: false,
+        }),
+      ]),
+    );
   });
 
   it('drops the machine flag when the translation is edited by hand', async () => {
@@ -416,6 +448,7 @@ describe('BioSection stale warning', () => {
         HttpResponse.json({
           en: 'Updated English.',
           zh: '更新的中文。',
+          sourceLangs: ['en'],
           model: 'gemini-test',
           usage: usage(4),
         }),
@@ -467,10 +500,21 @@ describe('BioSection stale warning', () => {
 });
 
 describe('bio helpers', () => {
-  it('detects the dominant script', () => {
-    expect(detectSourceLang('I teach at Whistler')).toBe('en');
-    expect(detectSourceLang('我是CSIA Level 4教练')).toBe('zh');
-    expect(detectSourceLang('123')).toBe('en');
+  it('takes the written languages from the request, else from the draft', () => {
+    const draft = {
+      en: 'a',
+      zh: 'b',
+      model: null,
+      sourceLangs: ['en', 'zh-CN'],
+    } as never;
+    expect(
+      writtenLangs({ text: 'x', mode: 'translate', source: 'zh' }, draft),
+    ).toEqual(['zh']);
+    expect(writtenLangs({ text: 'x', mode: 'refine' }, draft)).toEqual([
+      'en',
+      'zh',
+    ]);
+    expect(writtenLangs({ text: 'x', mode: 'refine' })).toEqual([]);
   });
 
   it('marks the older side stale, null only when the other side is newer', () => {
