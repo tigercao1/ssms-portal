@@ -38,6 +38,18 @@ export async function api<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
+  return (await apiWithHeaders<T>(path, options)).data;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  headers: Headers;
+}
+
+export async function apiWithHeaders<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<ApiResponse<T>> {
   const {
     method = 'GET',
     body,
@@ -76,7 +88,8 @@ export async function api<T>(
   }
 
   const text = await res.text();
-  if (responseType === 'text' && res.ok) return text as T;
+  if (responseType === 'text' && res.ok)
+    return { data: text as T, headers: res.headers };
   const data = text ? parseBody(text, responseType) : undefined;
 
   if (!res.ok) {
@@ -86,7 +99,7 @@ export async function api<T>(
     throw new ApiError(res.status, message, data);
   }
 
-  return data as T;
+  return { data: data as T, headers: res.headers };
 }
 
 function parseBody(text: string, responseType: 'json' | 'text'): unknown {

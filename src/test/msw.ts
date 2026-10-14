@@ -250,6 +250,17 @@ export const handlers = [
   http.get(`${API}/admin/lesson-types`, () => HttpResponse.json([])),
   http.get(`${API}/admin/pay-rates`, () => HttpResponse.json([])),
   http.get(`${API}/admin/customers`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/customers/sync-status`, () =>
+    HttpResponse.json({
+      scheduled: false,
+      intervalMinutes: 15,
+      lastStartedAt: null,
+      lastFinishedAt: null,
+      lastSuccessAt: null,
+      lastFetched: null,
+      lastError: null,
+    }),
+  ),
   http.get(`${API}/admin/instructors/:id/google-calendar`, ({ params }) =>
     HttpResponse.json({
       instructorId: params.id,

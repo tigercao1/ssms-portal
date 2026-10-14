@@ -523,6 +523,19 @@ export interface Messages {
     createFailed: string;
     emailTaken: string;
     phoneTaken: string;
+    showing: string;
+    prevPage: string;
+    nextPage: string;
+    pagination: string;
+    lastSynced: string;
+    notSyncedYet: string;
+    autoEvery: string;
+    autoOff: string;
+    lastAutoFailed: string;
+    justNow: string;
+    minutesAgo: string;
+    hoursAgo: string;
+    daysAgo: string;
   };
   instructorCalendar: {
     title: string;
