@@ -19,7 +19,10 @@ import { PageEditorPage } from '@/features/admin/PageEditorPage';
 import { LessonTypesPage } from '@/features/admin/LessonTypesPage';
 import { CustomersPage } from '@/features/admin/CustomersPage';
 import { ClassesPage } from '@/features/admin/ClassesPage';
+import { BookLessonPage } from '@/features/admin/booking/BookLessonPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
+import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
+import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
 import { DocumentsListPage } from '@/features/documents/admin/DocumentsListPage';
 import { FieldEditorPage } from '@/features/documents/admin/editor/FieldEditorPage';
 import { LoginPage } from '@/auth/LoginPage';
@@ -119,6 +122,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: '/admin/booking',
+        element: (
+          <RequireAdmin>
+            <BookLessonPage />
+          </RequireAdmin>
+        ),
+      },
+      {
         path: '/admin/classes',
         element: (
           <RequireAdmin>
@@ -127,9 +138,25 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: '/admin/payroll',
+        element: (
+          <RequireAdmin>
+            <PayrollPage />
+          </RequireAdmin>
+        ),
+      },
+      {
         path: '/admin/calendar-matching',
         element: (
           <Navigate to="/admin/instructors" replace />
+        ),
+      },
+      {
+        path: '/admin/import-history',
+        element: (
+          <RequireAdmin>
+            <ImportHistoryPage />
+          </RequireAdmin>
         ),
       },
       {
