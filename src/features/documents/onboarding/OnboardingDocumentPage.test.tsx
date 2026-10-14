@@ -80,7 +80,7 @@ function renderAt(id: string) {
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(2026, 9, 12, 10, 0, 0));
+  vi.setSystemTime(new Date('2026-10-12T10:00:00-04:00'));
   fakePdf.pageCount = 2;
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   fakePdf.scrollToRect.mockClear();
