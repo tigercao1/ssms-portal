@@ -790,7 +790,6 @@ export interface Messages {
     sourceSsms: string;
     googleFailedTitle: string;
     googleFailed: string;
-    pastTitle: string;
     pastBody: string;
     startTime: string;
     pastMustBePast: string;

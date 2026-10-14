@@ -811,7 +811,6 @@ export const en: Messages = {
     sourceSsms: 'another lesson',
     googleFailedTitle: 'Google Calendar could not be checked',
     googleFailed: 'Nothing was saved. Google said: {code}.',
-    pastTitle: 'Past lesson',
     pastBody: 'Record a lesson that already happened, for tracking and payroll. It is only added to Google Calendar if you ask.',
     startTime: 'Start time',
     pastMustBePast: 'This time is in the future. Use Book from availability instead.',

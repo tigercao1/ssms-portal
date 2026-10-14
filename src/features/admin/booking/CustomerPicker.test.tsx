@@ -169,6 +169,29 @@ describe('CustomerPicker typeahead', () => {
     ).toBeInTheDocument();
   });
 
+  it('closes the results with Escape, reopens on typing, and clears on a second Escape', async () => {
+    serveSearch(() => [lily, lin]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    const input = screen.getByRole('combobox', { name: 'Find a customer' });
+    await user.type(input, 'li');
+    await screen.findByRole('listbox', { name: 'Matching customers' });
+
+    await user.keyboard('{Escape}');
+    expect(
+      screen.queryByRole('listbox', { name: 'Matching customers' }),
+    ).not.toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).toHaveValue('li');
+
+    await user.type(input, 'l');
+    await user.keyboard('{Backspace}');
+    await screen.findByRole('listbox', { name: 'Matching customers' });
+
+    await user.keyboard('{Escape}{Escape}');
+    expect(input).toHaveValue('');
+  });
+
   it('starts from the last result with ArrowUp and ignores Enter with nothing highlighted', async () => {
     serveSearch(() => [lily, lin]);
     const onPick = vi.fn();

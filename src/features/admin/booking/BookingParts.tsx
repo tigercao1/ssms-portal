@@ -111,12 +111,13 @@ export function CustomerPicker({
   const q = useDebounced(draft.trim(), TYPEAHEAD_DELAY_MS);
   const results = useCustomerTypeahead(q);
   const [active, setActive] = useState({ q: '', index: -1 });
+  const [dismissed, setDismissed] = useState(false);
   const chosen = new Set(selected.map((c) => c.id));
   const data = results.data;
   const options = (data ?? []).filter((c) => !chosen.has(c.id));
   const open = draft.trim().length >= TYPEAHEAD_MIN;
   const settled = !results.isPlaceholderData && q === draft.trim();
-  const showList = open && !results.isError && options.length > 0;
+  const showList = open && !dismissed && !results.isError && options.length > 0;
   const activeIndex =
     showList && active.q === q && active.index < options.length
       ? active.index
@@ -129,6 +130,16 @@ export function CustomerPicker({
   }
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      if (showList) {
+        e.preventDefault();
+        setDismissed(true);
+      } else if (draft) {
+        e.preventDefault();
+        setDraft('');
+      }
+      return;
+    }
     if (!showList) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
@@ -189,7 +200,10 @@ export function CustomerPicker({
                 activeIndex >= 0 ? optionId(activeIndex) : undefined
               }
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                setDismissed(false);
+              }}
               onKeyDown={onKeyDown}
             />
           )}
@@ -210,6 +224,7 @@ export function CustomerPicker({
         </Button>
       </div>
       {open &&
+        !dismissed &&
         (results.isError ? (
           <Banner tone="error">{t.errors.generic}</Banner>
         ) : options.length === 0 ? (

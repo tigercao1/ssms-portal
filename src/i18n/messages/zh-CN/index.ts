@@ -789,7 +789,6 @@ export const zhCN: Messages = {
     sourceSsms: '其他课程',
     googleFailedTitle: '无法检查 Google 日历',
     googleFailed: '没有保存任何内容。Google 返回：{code}。',
-    pastTitle: '过去的课程',
     pastBody: '补录已经上过的课程，用于记录和工资计算。只有在勾选时才会写入 Google 日历。',
     startTime: '开始时间',
     pastMustBePast: '该时间在将来，请使用“按空闲时段预约”。',
