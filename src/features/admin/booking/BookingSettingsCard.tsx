@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import {
@@ -32,22 +32,45 @@ const DAY_KEYS: Record<Weekday, keyof Messages['booking']> = {
 
 export function BookingSettingsCard() {
   const t = useT();
+  const titleId = useId();
   const settings = useBookingSettings();
   return (
-    <Card className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg">{t.booking.settingsTitle}</h2>
-        <p className="text-sm text-slate">{t.booking.settingsBody}</p>
-      </div>
-      {settings.isLoading ? (
-        <Spinner />
-      ) : settings.isError || !settings.data ? (
-        <Banner tone="error">
-          {errorText(settings.error, t.errors.generic)}
-        </Banner>
-      ) : (
-        <SettingsForm settings={settings.data} />
-      )}
+    <Card>
+      <section aria-labelledby={titleId}>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden">
+            <div className="flex flex-col gap-1">
+              <h2 id={titleId} className="text-lg">
+                {t.booking.settingsTitle}
+              </h2>
+              <p className="text-sm text-slate">{t.booking.settingsBody}</p>
+            </div>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              className="mt-1 h-5 w-5 shrink-0 text-navy transition-transform group-open:rotate-180"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 8l5 5 5-5" />
+            </svg>
+          </summary>
+          <div className="mt-4">
+            {settings.isLoading ? (
+              <Spinner />
+            ) : settings.isError || !settings.data ? (
+              <Banner tone="error">
+                {errorText(settings.error, t.errors.generic)}
+              </Banner>
+            ) : (
+              <SettingsForm settings={settings.data} />
+            )}
+          </div>
+        </details>
+      </section>
     </Card>
   );
 }
@@ -83,7 +106,26 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="col-span-2 sm:col-span-1">
+          <Field label={t.booking.slotMinutes}>
+            {(p) => (
+              <Select
+                {...p}
+                value={draft.slotMinutes}
+                onChange={(e) =>
+                  update({ slotMinutes: Number(e.target.value) })
+                }
+              >
+                {[15, 30, 60].map((n) => (
+                  <option key={n} value={n}>
+                    {t.booking.minutesOption.replace('{n}', String(n))}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        </div>
         <Field label={t.booking.dayStart}>
           {(p) => (
             <Input
@@ -106,25 +148,10 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
             />
           )}
         </Field>
-        <Field label={t.booking.slotMinutes}>
-          {(p) => (
-            <Select
-              {...p}
-              value={draft.slotMinutes}
-              onChange={(e) => update({ slotMinutes: Number(e.target.value) })}
-            >
-              {[15, 30, 60].map((n) => (
-                <option key={n} value={n}>
-                  {t.booking.minutesOption.replace('{n}', String(n))}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium text-navy">
+      <fieldset className="flex flex-col gap-3">
+        <legend className="mb-1.5 text-sm font-medium text-navy">
           {t.booking.weekdayTitle}
         </legend>
         {WEEKDAYS.map((day) => {
@@ -133,21 +160,22 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
           return (
             <div
               key={day}
-              className="grid grid-cols-[4rem_1fr] items-center gap-2 sm:grid-cols-[5rem_10rem_1fr_1fr]"
+              className="grid grid-cols-2 items-center gap-3 sm:grid-cols-3 sm:gap-4"
             >
-              <span className="text-sm text-ink">{label}</span>
-              <Select
-                aria-label={t.booking.dayModeLabel.replace('{day}', label)}
-                value={entry.mode}
-                onChange={(e) =>
-                  updateDay(day, { mode: e.target.value as DayMode })
-                }
-                className="h-9"
-              >
-                <option value="default">{t.booking.dayDefault}</option>
-                <option value="custom">{t.booking.dayCustom}</option>
-                <option value="closed">{t.booking.dayClosedOption}</option>
-              </Select>
+              <div className="col-span-2 grid grid-cols-[3rem_1fr] items-center gap-3 sm:col-span-1">
+                <span className="text-sm text-ink">{label}</span>
+                <Select
+                  aria-label={t.booking.dayModeLabel.replace('{day}', label)}
+                  value={entry.mode}
+                  onChange={(e) =>
+                    updateDay(day, { mode: e.target.value as DayMode })
+                  }
+                >
+                  <option value="default">{t.booking.dayDefault}</option>
+                  <option value="custom">{t.booking.dayCustom}</option>
+                  <option value="closed">{t.booking.dayClosedOption}</option>
+                </Select>
+              </div>
               {entry.mode === 'custom' && (
                 <>
                   <Input
@@ -156,7 +184,6 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
                     aria-label={t.booking.dayStartFor.replace('{day}', label)}
                     value={entry.start}
                     onChange={(e) => updateDay(day, { start: e.target.value })}
-                    className="col-start-2 h-9 sm:col-start-auto"
                   />
                   <Input
                     type="time"
@@ -164,7 +191,6 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
                     aria-label={t.booking.dayEndFor.replace('{day}', label)}
                     value={entry.end}
                     onChange={(e) => updateDay(day, { end: e.target.value })}
-                    className="col-start-2 h-9 sm:col-start-auto"
                   />
                 </>
               )}
@@ -180,7 +206,7 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
       {save.isSuccess && (
         <Banner tone="approved">{t.booking.settingsSaved}</Banner>
       )}
-      <div>
+      <div className="flex justify-end">
         <Button
           type="submit"
           variant="secondary"

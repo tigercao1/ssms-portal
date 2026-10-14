@@ -726,6 +726,8 @@ export interface Messages {
     customerSearch: string;
     customerSearchHint: string;
     customerResults: string;
+    customerSearching: string;
+    customerResultsCapped: string;
     selectedCustomers: string;
     removeCustomer: string;
     noCustomerMatch: string;
@@ -749,6 +751,8 @@ export interface Messages {
     legendFree: string;
     legendBusy: string;
     legendNoFit: string;
+    legendLabel: string;
+    legendSelected: string;
     dayClosed: string;
     noInstructorsTitle: string;
     noInstructorsBody: string;
