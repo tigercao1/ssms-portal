@@ -62,6 +62,16 @@ describe('EditProfilePage (W2.2)', () => {
     );
   });
 
+  it('no longer sends the bios from the main Save', async () => {
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    await minAgeInput();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('bioEn');
+    expect(bodies[0]).not.toHaveProperty('bioZh');
+  });
+
   it.each([
     ['19', 'Enter a whole number from 0 to 18.'],
     ['-1', 'Enter a whole number from 0 to 18.'],

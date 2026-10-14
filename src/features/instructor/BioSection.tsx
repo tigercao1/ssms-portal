@@ -242,7 +242,9 @@ function BioDraftModal({
       {draft.isPending && (
         <div className="flex flex-col items-center gap-3 py-12 text-slate">
           <Spinner className="h-7 w-7" />
-          <p>{request.mode === 'refine' ? t.bio.refining : t.bio.translating}</p>
+          <p>
+            {request.mode === 'refine' ? t.bio.refining : t.bio.translating}
+          </p>
         </div>
       )}
       {error === 'limit' && (
@@ -252,7 +254,9 @@ function BioDraftModal({
             : t.bio.limitReachedNoTime.replace('{limit}', '5')}
         </Banner>
       )}
-      {error === 'unavailable' && <Banner tone="error">{t.bio.unavailable}</Banner>}
+      {error === 'unavailable' && (
+        <Banner tone="error">{t.bio.unavailable}</Banner>
+      )}
       {error === 'generic' && <Banner tone="error">{t.errors.generic}</Banner>}
       {result && (
         <div className="flex flex-col gap-4">
@@ -336,7 +340,11 @@ function SavedBioCard({
         />
       ) : (
         <>
-          <BioTextarea label={titleOf(t, lang)} value={value} onChange={setValue} />
+          <BioTextarea
+            label={titleOf(t, lang)}
+            value={value}
+            onChange={setValue}
+          />
           {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -436,7 +444,11 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               usage={usage.data}
               onUpdateTranslation={() => {
                 const source: Lang = lang === 'en' ? 'zh' : 'en';
-                start({ text: bioOf(profile, source), mode: 'translate', source });
+                start({
+                  text: bioOf(profile, source),
+                  mode: 'translate',
+                  source,
+                });
               }}
             />
           ))}
@@ -445,7 +457,12 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
 
       {hasBio && !composing && (
         <div>
-          <Button type="button" variant="secondary" size="sm" onClick={startRewrite}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={startRewrite}
+          >
             {t.bio.rewrite}
           </Button>
         </div>
@@ -455,7 +472,10 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
         <div className="flex flex-col gap-3">
           <p className="text-sm text-slate">{t.bio.composeHint}</p>
           <div className="relative">
-            <Field label={t.bio.composeLabel} hint={`${text.length}/${MAX_BIO_SOURCE}`}>
+            <Field
+              label={t.bio.composeLabel}
+              hint={`${text.length}/${MAX_BIO_SOURCE}`}
+            >
               {(p) => (
                 <Textarea
                   {...p}
@@ -493,7 +513,11 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               variant="secondary"
               disabled={!canAsk}
               onClick={() =>
-                start({ text, mode: 'translate', source: detectSourceLang(text) })
+                start({
+                  text,
+                  mode: 'translate',
+                  source: detectSourceLang(text),
+                })
               }
             >
               {t.bio.useAsWritten}
@@ -511,7 +535,9 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
             )}
           </div>
           {exhausted && usage.data && (
-            <p className="text-sm text-slate">{limitMessage(t, usage.data, locale)}</p>
+            <p className="text-sm text-slate">
+              {limitMessage(t, usage.data, locale)}
+            </p>
           )}
         </div>
       )}
