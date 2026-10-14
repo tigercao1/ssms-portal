@@ -105,6 +105,21 @@ function Editor({ template }: { template: Template }) {
     [geometry, save],
   );
 
+  const patchField = useCallback(
+    (id: string, patch: Partial<Field>) => {
+      setFields((list) =>
+        list.map((f) => {
+          if (f.id !== id) return f;
+          const next = { ...f, ...patch };
+          const g = geometry(next.page);
+          return g ? { ...next, ...fitToPage(next, g) } : next;
+        }),
+      );
+      save.reset();
+    },
+    [geometry, save],
+  );
+
   function addField(field: Field) {
     setFields((list) => [...list, field]);
     setSelectedId(field.id);
@@ -425,11 +440,12 @@ function Editor({ template }: { template: Template }) {
           <Card className="h-fit p-4 md:sticky md:top-4">
             {selected && canPlace ? (
               <PropertiesPanel
+                key={selected.id}
                 field={selected}
                 pageLabel={t.documents.pageOf
                   .replace('{n}', String(selected.page))
                   .replace('{total}', String(numPages))}
-                onChange={updateField}
+                onChange={(patch) => patchField(selected.id, patch)}
                 onDuplicate={() => duplicate(selected)}
                 onDelete={() => removeField(selected.id)}
               />

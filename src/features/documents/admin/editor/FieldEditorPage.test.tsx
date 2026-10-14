@@ -55,6 +55,7 @@ vi.mock('react-rnd', () => ({
       <div
         data-testid="rnd"
         data-rect={`${position.x},${position.y},${size.width},${size.height}`}
+        onMouseDown={() => onDragStart?.()}
       >
         {children}
         <button
@@ -117,6 +118,9 @@ function renderEditor(id = 'tpl-conduct') {
 const fieldButton = (label: string) =>
   screen.getByRole('button', { name: new RegExp(`field “${label}”`) });
 
+const rectOf = (label: string) =>
+  fieldButton(label).closest<HTMLElement>('[data-testid="rnd"]')!.dataset.rect;
+
 describe('FieldEditorPage', () => {
   it('places saved fields at their PDF-point rects', async () => {
     renderEditor();
@@ -174,6 +178,45 @@ describe('FieldEditorPage', () => {
     });
     expect(state.templates[0]!.fields).toEqual(puts[0]);
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+
+  it('keeps a committed position on its own field when another field is selected', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTestId('page-overlay-1');
+    await user.click(fieldButton('Date'));
+    const panel = () => screen.getByText('Properties').parentElement!;
+    const y = within(panel()).getByLabelText('y');
+    await user.clear(y);
+    await user.type(y, '480{Enter}');
+    await user.click(fieldButton('Signature'));
+    expect(within(panel()).getByLabelText('y')).toHaveValue('120');
+    expect(rectOf('Signature')).toBe('72,636,180,36');
+    expect(rectOf('Date')).toBe('340,288,120,24');
+    await user.click(fieldButton('Date'));
+    expect(within(panel()).getByLabelText('y')).toHaveValue('480');
+  });
+
+  it('commits a typed position to its own field when focus leaves for another field', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTestId('page-overlay-1');
+    await user.click(fieldButton('Date'));
+    const panel = () => screen.getByText('Properties').parentElement!;
+    const x = within(panel()).getByLabelText('x');
+    await user.clear(x);
+    await user.type(x, '300');
+    await user.click(fieldButton('Signature'));
+    expect(within(panel()).getByLabelText('x')).toHaveValue('72');
+    expect(rectOf('Signature')).toBe('72,636,180,36');
+    expect(rectOf('Date')).toBe('300,568,120,24');
+    await user.type(within(panel()).getByLabelText(/Label \(English\)/), '!');
+    await user.click(fieldButton('Date'));
+    expect(within(panel()).getByLabelText('x')).toHaveValue('300');
+    expect(within(panel()).getByLabelText(/Label \(English\)/)).toHaveValue(
+      'Date',
+    );
+    expect(fieldButton('Signature!')).toBeInTheDocument();
   });
 
   it('adds a field from the palette and supports keyboard nudge, duplicate and delete', async () => {

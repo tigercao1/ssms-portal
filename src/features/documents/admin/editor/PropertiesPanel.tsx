@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Button, Field as FormField, Input, Select } from '@/components';
 import {
@@ -20,7 +20,7 @@ export function PropertiesPanel({
 }: {
   field: Field;
   pageLabel: string;
-  onChange: (next: Field) => void;
+  onChange: (patch: Partial<Field>) => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
@@ -28,7 +28,7 @@ export function PropertiesPanel({
   const typeLabel = useFieldTypeLabel();
   const prefillLabel = usePrefillLabel();
   const set = <K extends keyof Field>(key: K, value: Field[K]) =>
-    onChange({ ...field, [key]: value });
+    onChange({ [key]: value });
 
   return (
     <div className="flex flex-col gap-3" aria-label={t.documents.properties}>
@@ -143,11 +143,28 @@ function NumberBox({
   onCommit: (value: number) => void;
 }) {
   const [text, setText] = useState(String(value));
+  const draft = useRef<string | null>(null);
+  const latest = useRef({ min, onCommit });
+  useEffect(() => {
+    latest.current = { min, onCommit };
+  });
   useEffect(() => setText(String(value)), [value]);
+  useEffect(
+    () => () => {
+      const n =
+        draft.current === null
+          ? null
+          : parseAtLeast(draft.current, latest.current.min);
+      if (n !== null) latest.current.onCommit(n);
+    },
+    [],
+  );
   function commit() {
-    const n = Number.parseFloat(text);
-    if (Number.isFinite(n) && n >= min) onCommit(n);
-    else setText(String(value));
+    if (draft.current === null) return;
+    const n = parseAtLeast(draft.current, min);
+    draft.current = null;
+    if (n === null) setText(String(value));
+    else onCommit(n);
   }
   return (
     <label className="flex items-center gap-2 text-sm text-slate">
@@ -157,7 +174,10 @@ function NumberBox({
         aria-label={label}
         className="h-9 font-mono text-sm"
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          draft.current = e.target.value;
+          setText(e.target.value);
+        }}
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit();
@@ -165,4 +185,9 @@ function NumberBox({
       />
     </label>
   );
+}
+
+function parseAtLeast(text: string, min: number): number | null {
+  const n = Number.parseFloat(text);
+  return Number.isFinite(n) && n >= min ? n : null;
 }
