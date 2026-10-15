@@ -13,3 +13,4 @@ export { Contour } from './Contour';
 export { Logo, Brandmark } from './Logo';
 export { statusMeta, type ApprovalStatus, type StatusMeta } from './statusMeta';
 export { Modal } from './Modal';
+export { Pager, type PagerText } from './Pager';

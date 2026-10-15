@@ -1,5 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { api, apiWithHeaders } from '@/lib/api';
 import { removePhoto, uploadAvatar } from '@/features/instructor/api';
 import type {
   AdminInstructorRecord,
@@ -37,6 +42,56 @@ export function useAdminInstructors(filter: AdminListFilter) {
       const suffix = qs.toString() ? `?${qs}` : '';
       return api<AdminInstructorRecord[]>(`/admin/instructors${suffix}`);
     },
+  });
+}
+
+export const INSTRUCTORS_PAGE_SIZE = 50;
+
+export interface AdminInstructorPageQuery extends AdminListFilter {
+  q: string;
+  page: number;
+}
+
+export interface AdminInstructorPage {
+  instructors: AdminInstructorRecord[];
+  total: number;
+  page: number;
+}
+
+export function useAdminInstructorPage({
+  q,
+  status,
+  active,
+  page,
+}: AdminInstructorPageQuery) {
+  return useQuery({
+    queryKey: [
+      'admin',
+      'instructors',
+      'page',
+      { q, status, active, page },
+    ] as const,
+    queryFn: async (): Promise<AdminInstructorPage> => {
+      const qs = new URLSearchParams({
+        limit: String(INSTRUCTORS_PAGE_SIZE),
+        page: String(page),
+      });
+      if (q) qs.set('q', q);
+      if (status) qs.set('status', status);
+      if (active !== undefined) qs.set('active', String(active));
+      const { data, headers } = await apiWithHeaders<AdminInstructorRecord[]>(
+        `/admin/instructors?${qs.toString()}`,
+      );
+      const total = Number(headers.get('X-Total-Count') ?? Number.NaN);
+      return {
+        instructors: data,
+        page,
+        total: Number.isFinite(total)
+          ? total
+          : (page - 1) * INSTRUCTORS_PAGE_SIZE + data.length,
+      };
+    },
+    placeholderData: keepPreviousData,
   });
 }
 
