@@ -819,6 +819,10 @@ export interface Messages {
     rowStatusCompleted: string;
     rowStatusCancelled: string;
     rowsEmpty: string;
+    rowsPagination: string;
+    rowsShowing: string;
+    prevPage: string;
+    nextPage: string;
     rowFailed: string;
     manual: string;
     commitTitle: string;

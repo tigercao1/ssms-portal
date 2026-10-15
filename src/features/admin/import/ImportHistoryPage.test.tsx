@@ -124,24 +124,29 @@ function detail(overrides: Partial<ClassImportDetail> = {}): ClassImportDetail {
 
 interface Calls {
   details: (string | null)[];
+  pages: { id: string; page: string | null; limit: string | null }[];
   uploads: (string | null)[];
   patches: { rowNo: string; body: unknown }[];
   maps: unknown[];
   commits: number;
   discards: number;
+  hold?: Promise<void>;
 }
 
 function serve({
   imports = [record()],
   current = detail(),
   afterCommit,
+  afterPatch,
 }: {
   imports?: ClassImport[];
   current?: ClassImportDetail;
   afterCommit?: ClassImportDetail;
+  afterPatch?: (shown: ClassImportDetail, rowNo: number) => ClassImportDetail;
 } = {}) {
   const calls: Calls = {
     details: [],
+    pages: [],
     uploads: [],
     patches: [],
     maps: [],
@@ -159,18 +164,30 @@ function serve({
     ),
     http.get(`${API}/admin/customers`, () => HttpResponse.json([lily])),
     http.get(`${API}/admin/class-imports`, () => HttpResponse.json(list)),
-    http.get(`${API}/admin/class-imports/:id`, ({ request }) => {
-      const problem = new URL(request.url).searchParams.get('problem');
+    http.get(`${API}/admin/class-imports/:id`, async ({ params, request }) => {
+      const search = new URL(request.url).searchParams;
+      const problem = search.get('problem');
+      const page = search.get('page');
+      const limit = search.get('limit');
       calls.details.push(problem);
-      return HttpResponse.json({
-        ...shown,
-        rows:
-          problem && problem !== 'any'
-            ? shown.rows.filter((r) =>
-                (r.problems as string[]).includes(problem),
-              )
-            : shown.rows,
-      });
+      calls.pages.push({ id: params.id as string, page, limit });
+      await calls.hold;
+      const rows =
+        problem && problem !== 'any'
+          ? shown.rows.filter((r) => (r.problems as string[]).includes(problem))
+          : shown.rows;
+      const size = Number(limit ?? rows.length);
+      const offset = (Number(page ?? 1) - 1) * size;
+      return HttpResponse.json(
+        {
+          ...shown,
+          rows:
+            page === null && limit === null
+              ? rows
+              : rows.slice(offset, offset + size),
+        },
+        { headers: { 'X-Total-Count': String(rows.length) } },
+      );
     }),
     http.post(`${API}/admin/class-imports`, ({ request }) => {
       calls.uploads.push(request.headers.get('content-type'));
@@ -184,6 +201,7 @@ function serve({
           rowNo: params.rowNo as string,
           body: await request.json(),
         });
+        if (afterPatch) shown = afterPatch(shown, Number(params.rowNo));
         return HttpResponse.json(shown);
       },
     ),
@@ -228,6 +246,20 @@ const committed = detail({
   summary: summary({ imported: 2 }),
   rows: [row({ classId: 'class-1' })],
 });
+
+function manyRows(count: number, overrides: Partial<ClassImportRow> = {}) {
+  return Array.from({ length: count }, (_, i) =>
+    row({ rowNo: i + 1, externalId: String(9100000 + i), ...overrides }),
+  );
+}
+
+const unmatched: Partial<ClassImportRow> = {
+  instructorId: null,
+  matchedInstructorName: null,
+  problems: ['instructor_not_found'],
+};
+
+const pager = () => screen.getByRole('navigation', { name: 'Row pages' });
 
 describe('ImportHistoryPage', () => {
   afterEach(() => {
@@ -696,5 +728,249 @@ describe('ImportHistoryPage', () => {
     expect(
       within(rowOne).getByText('CSV: Test Customer · 647 555 0100'),
     ).toBeInTheDocument();
+  });
+
+  it('pages the rows 50 at a time and keeps the page visible while the next loads', async () => {
+    const calls = serve({
+      current: detail({
+        summary: summary({ total: 120 }),
+        rows: manyRows(120),
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 50');
+    expect(screen.queryByLabelText('Instructor for row 51')).toBeNull();
+    expect(
+      within(pager()).getByText('Showing 1–50 of 120'),
+    ).toBeInTheDocument();
+    expect(calls.pages[0]).toEqual({ id: 'imp-1', page: '1', limit: '50' });
+    expect(
+      within(pager()).getByRole('button', { name: 'Previous' }),
+    ).toBeDisabled();
+
+    let release = () => {};
+    calls.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(calls.pages).toHaveLength(2));
+    const firstRow = screen.getByLabelText('Instructor for row 1');
+    expect(firstRow.closest('[aria-busy]')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(
+      within(pager()).getByRole('button', { name: 'Next' }),
+    ).toBeDisabled();
+    release();
+
+    expect(
+      await screen.findByLabelText('Instructor for row 51'),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Instructor for row 1')).toBeNull();
+    expect(
+      within(pager()).getByText('Showing 51–100 of 120'),
+    ).toBeInTheDocument();
+    expect(calls.pages[1]).toEqual({ id: 'imp-1', page: '2', limit: '50' });
+
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    expect(
+      await within(pager()).findByText('Showing 101–120 of 120'),
+    ).toBeInTheDocument();
+    expect(
+      within(pager()).getByRole('button', { name: 'Next' }),
+    ).toBeDisabled();
+    await user.click(within(pager()).getByRole('button', { name: 'Previous' }));
+    expect(
+      await within(pager()).findByText('Showing 51–100 of 120'),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the summary and event names for the whole import on every page', async () => {
+    serve({
+      current: detail({
+        summary: summary({ total: 120, matched: 117 }),
+        rows: manyRows(120),
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    const matched = () =>
+      screen.getByText('Matched').closest('div') as HTMLElement;
+    expect(within(matched()).getByText('117')).toBeInTheDocument();
+    expect(screen.getByText(/120 rows/)).toBeInTheDocument();
+
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await screen.findByLabelText('Instructor for row 51');
+    expect(within(matched()).getByText('117')).toBeInTheDocument();
+    expect(screen.getByText(/120 rows/)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Lesson type for Group Lesson 2h'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Import 1 classes' }),
+    ).toBeInTheDocument();
+  });
+
+  it('goes back to page 1 when the filter changes', async () => {
+    const calls = serve({
+      current: detail({ rows: manyRows(120, unmatched) }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await screen.findByLabelText('Instructor for row 51');
+
+    await user.selectOptions(
+      screen.getByLabelText('Show'),
+      'Instructor not found',
+    );
+
+    expect(
+      await screen.findByLabelText('Instructor for row 1'),
+    ).toBeInTheDocument();
+    expect(calls.pages.at(-1)).toEqual({
+      id: 'imp-1',
+      page: '1',
+      limit: '50',
+    });
+    expect(calls.details.at(-1)).toBe('instructor_not_found');
+    expect(
+      within(pager()).getByText('Showing 1–50 of 120'),
+    ).toBeInTheDocument();
+  });
+
+  it('goes back to page 1 when another import is opened', async () => {
+    const calls = serve({
+      imports: [
+        record(),
+        record({ id: 'imp-0', filename: 'older.csv', status: 'committed' }),
+      ],
+      current: detail({ rows: manyRows(120) }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await screen.findByLabelText('Instructor for row 51');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open import older.csv' }),
+    );
+
+    expect(
+      await screen.findByLabelText('Instructor for row 1'),
+    ).toBeInTheDocument();
+    expect(calls.pages.at(-1)).toEqual({
+      id: 'imp-0',
+      page: '1',
+      limit: '50',
+    });
+    expect(calls.pages.some((c) => c.id === 'imp-0' && c.page !== '1')).toBe(
+      false,
+    );
+  });
+
+  it('starts on page 1 when reopening an import that was left on a later page', async () => {
+    const calls = serve({
+      imports: [
+        record(),
+        record({ id: 'imp-0', filename: 'older.csv', status: 'committed' }),
+      ],
+      current: detail({ rows: manyRows(120) }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await screen.findByLabelText('Instructor for row 51');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open import older.csv' }),
+    );
+    await waitFor(() => expect(calls.pages.at(-1)?.id).toBe('imp-0'));
+    await user.click(
+      screen.getByRole('button', { name: 'Open import bookings.csv' }),
+    );
+
+    await waitFor(() => expect(calls.pages.at(-1)?.id).toBe('imp-1'));
+    expect(
+      await within(pager()).findByText('Showing 1–50 of 120'),
+    ).toBeInTheDocument();
+    expect(calls.pages.at(-1)).toEqual({
+      id: 'imp-1',
+      page: '1',
+      limit: '50',
+    });
+  });
+
+  it('stays on the current page after editing a row', async () => {
+    const calls = serve({ current: detail({ rows: manyRows(120) }) });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await user.selectOptions(
+      await screen.findByLabelText('Instructor for row 60'),
+      'Eddie Lee',
+    );
+
+    await waitFor(() => expect(calls.pages).toHaveLength(3));
+    expect(calls.patches).toEqual([
+      { rowNo: '60', body: { instructorId: 'inst-2' } },
+    ]);
+    expect(calls.pages[2]).toEqual({ id: 'imp-1', page: '2', limit: '50' });
+    expect(screen.getByLabelText('Instructor for row 60')).toBeInTheDocument();
+    expect(
+      within(pager()).getByText('Showing 51–100 of 120'),
+    ).toBeInTheDocument();
+  });
+
+  it('steps back to the last page with rows when an edit empties the current one', async () => {
+    const calls = serve({
+      current: detail({ rows: manyRows(51, unmatched) }),
+      afterPatch: (shown, rowNo) => ({
+        ...shown,
+        rows: shown.rows.map((r) =>
+          r.rowNo === rowNo
+            ? { ...r, instructorId: 'inst-2', problems: [] }
+            : r,
+        ),
+      }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    await user.selectOptions(
+      screen.getByLabelText('Show'),
+      'Instructor not found',
+    );
+    await screen.findByText('Showing 1–50 of 51');
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await user.selectOptions(
+      await screen.findByLabelText('Instructor for row 51'),
+      'Eddie Lee',
+    );
+
+    expect(
+      await screen.findByLabelText('Instructor for row 1'),
+    ).toBeInTheDocument();
+    expect(within(pager()).getByText('Showing 1–50 of 50')).toBeInTheDocument();
+    expect(calls.pages.at(-1)).toEqual({
+      id: 'imp-1',
+      page: '1',
+      limit: '50',
+    });
+    expect(screen.queryByText('No rows match this filter.')).toBeNull();
   });
 });

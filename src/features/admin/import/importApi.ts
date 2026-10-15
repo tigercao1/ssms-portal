@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, apiWithHeaders } from '@/lib/api';
 import type {
   ClassImport,
   ClassImportDetail,
@@ -20,13 +20,41 @@ export function useClassImports() {
   });
 }
 
-export function useClassImport(id: string | null, filter: RowFilter | '') {
+export const IMPORT_ROWS_PAGE_SIZE = 50;
+
+export interface ClassImportPage {
+  detail: ClassImportDetail;
+  total: number;
+  page: number;
+}
+
+export function useClassImport(
+  id: string | null,
+  filter: RowFilter | '',
+  page: number,
+) {
   return useQuery({
-    queryKey: [...importKey(id ?? ''), filter] as const,
-    queryFn: () =>
-      api<ClassImportDetail>(
-        `/admin/class-imports/${id}${filter ? `?problem=${filter}` : ''}`,
-      ),
+    queryKey: [...importKey(id ?? ''), filter, page] as const,
+    queryFn: async (): Promise<ClassImportPage> => {
+      const qs = new URLSearchParams({
+        page: String(page),
+        limit: String(IMPORT_ROWS_PAGE_SIZE),
+      });
+      if (filter) qs.set('problem', filter);
+      const { data, headers } = await apiWithHeaders<ClassImportDetail>(
+        `/admin/class-imports/${id}?${qs.toString()}`,
+      );
+      const total = Number(headers.get('X-Total-Count') ?? Number.NaN);
+      return {
+        detail: data,
+        page,
+        total: Number.isFinite(total)
+          ? total
+          : (page - 1) * IMPORT_ROWS_PAGE_SIZE + data.rows.length,
+      };
+    },
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === id ? previous : undefined,
     enabled: Boolean(id),
   });
 }
