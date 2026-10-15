@@ -15,6 +15,9 @@ import type {
   InstructorDocuments,
   MyChecklist,
   MyDocument,
+  PublishPreview,
+  PublishRequest,
+  PublishResult,
   SignedUrl,
   Template,
   TemplateCreate,
@@ -27,6 +30,8 @@ import type {
 export const documentsKeys = {
   templates: ['admin', 'documents', 'templates'] as const,
   template: (id: string) => ['admin', 'documents', 'templates', id] as const,
+  publishPreview: (id: string, season: string | null) =>
+    ['admin', 'documents', 'templates', id, 'publish-preview', season] as const,
   instructorDocuments: (instructorId: string) =>
     ['admin', 'instructor', instructorId, 'documents'] as const,
   myChecklist: ['me', 'documents'] as const,
@@ -52,6 +57,26 @@ export function updateTemplate(id: string, body: TemplatePatch) {
   return api<Template>(`/admin/documents/templates/${enc(id)}`, {
     method: 'PATCH',
     body,
+  });
+}
+
+export function getPublishPreview(id: string, season?: string) {
+  const query = season ? `?season=${enc(season)}` : '';
+  return api<PublishPreview>(
+    `/admin/documents/templates/${enc(id)}/publish-preview${query}`,
+  );
+}
+
+export function publishTemplate(id: string, body: PublishRequest) {
+  return api<PublishResult>(`/admin/documents/templates/${enc(id)}/publish`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export function retireTemplate(id: string) {
+  return api<Template>(`/admin/documents/templates/${enc(id)}/retire`, {
+    method: 'POST',
   });
 }
 

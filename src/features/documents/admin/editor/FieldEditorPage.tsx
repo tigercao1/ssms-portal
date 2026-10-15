@@ -334,7 +334,7 @@ function Editor({ template }: { template: Template }) {
           <Button
             variant="secondary"
             size="sm"
-            disabled={!template.isActive || !template.sourceUrl}
+            disabled={template.status !== 'live' || !template.sourceUrl}
             onClick={() => setAssigning(true)}
           >
             {t.documents.assignEllipsis}

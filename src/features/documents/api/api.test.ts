@@ -16,12 +16,15 @@ import {
   getMyChecklist,
   getMyDocument,
   getMySignedUrl,
+  getPublishPreview,
   getTemplate,
   listTemplates,
+  publishTemplate,
   putToPresignedUrl,
   remindAssignment,
   requestMyCertUpload,
   requestTemplateSourceUpload,
+  retireTemplate,
   reviewCertUpload,
   saveTemplateFields,
   todayIso,
@@ -94,8 +97,15 @@ describe('admin template requests', () => {
       rotate: 0,
     });
     expect(confirmed.sourceUrl).toMatch(/source\.pdf$/);
-    const patched = await updateTemplate(created.id, { isActive: false });
-    expect(patched.isActive).toBe(false);
+    expect(created).toMatchObject({
+      status: 'draft',
+      assignTo: null,
+      season: null,
+      publishedAt: null,
+      hasCompletedAssignments: false,
+    });
+    const patched = await updateTemplate(created.id, { required: false });
+    expect(patched.required).toBe(false);
     const saved = await saveTemplateFields(created.id, [fakeField()]);
     expect(saved.fields).toHaveLength(1);
     await expect(
@@ -106,7 +116,7 @@ describe('admin template requests', () => {
 
   it('rejects oversize uploads and failed presigned PUTs', async () => {
     await expect(
-      requestTemplateSourceUpload('tpl-conduct', 21 * 1024 * 1024),
+      requestTemplateSourceUpload('tpl-waiver', 21 * 1024 * 1024),
     ).rejects.toMatchObject({ status: 400 });
     await expect(
       putToPresignedUrl(
@@ -115,6 +125,70 @@ describe('admin template requests', () => {
         'application/pdf',
       ),
     ).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('publish lifecycle requests', () => {
+  it('previews, publishes to all approved instructors, retires and re-publishes', async () => {
+    state.instructorIds = ['inst-1', 'inst-2'];
+    state.pendingInstructorIds = ['inst-3'];
+    expect(await getPublishPreview('tpl-draft')).toEqual({
+      season: '2026/27',
+      approvedCount: 2,
+      pendingCount: 1,
+      alreadyAssignedCount: 0,
+    });
+    await expect(
+      publishTemplate('tpl-draft', { assignTo: 'all' }),
+    ).rejects.toMatchObject({ status: 400 });
+    state.templates.find((t) => t.id === 'tpl-handbook')!.status = 'draft';
+    const published = await publishTemplate('tpl-handbook', {
+      assignTo: 'all',
+      season: '2026/27',
+    });
+    expect(published).toMatchObject({ created: 1, skipped: 1 });
+    expect(published.template).toMatchObject({
+      status: 'live',
+      assignTo: 'all',
+      season: '2026/27',
+    });
+    await expect(
+      publishTemplate('tpl-handbook', { assignTo: 'all' }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await getPublishPreview('tpl-handbook', '2027/28')).season).toBe(
+      '2027/28',
+    );
+    expect((await retireTemplate('tpl-handbook')).status).toBe('retired');
+    await expect(retireTemplate('tpl-handbook')).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(
+      createAssignments({
+        templateId: 'tpl-handbook',
+        season: '2026/27',
+        allActiveInstructors: true,
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    const again = await publishTemplate('tpl-handbook', {
+      assignTo: 'selected',
+    });
+    expect(again).toMatchObject({ created: 0, skipped: 0 });
+    expect(again.template.assignTo).toBe('selected');
+  });
+
+  it('blocks source and field changes once a copy is signed and rejects isActive', async () => {
+    await expect(
+      requestTemplateSourceUpload('tpl-conduct', 1000),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(confirmTemplateSource('tpl-conduct')).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(
+      saveTemplateFields('tpl-conduct', [fakeField()]),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      updateTemplate('tpl-conduct', { isActive: false } as never),
+    ).rejects.toMatchObject({ status: 400 });
   });
 });
 
@@ -183,6 +257,8 @@ describe('/me requests', () => {
   it('builds the checklist and marks a document viewed', async () => {
     const list = await getMyChecklist();
     expect(list.season).toBe('2026/27');
+    expect(list.locked).toBe(false);
+    expect(list.lockReason).toBeNull();
     expect(list.items.filter((i) => i.type === 'certification')).toHaveLength(
       2,
     );
@@ -256,6 +332,55 @@ describe('/me requests', () => {
     await putToPresignedUrl(uploadUrl, new Blob(['x']), 'image/png');
     const confirmed = await confirmMyCertUpload(uploadId);
     expect(confirmed.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('returns a locked preview and 403s while pending approval', async () => {
+    state.meApproved = false;
+    const list = await getMyChecklist();
+    expect(list).toMatchObject({
+      season: '2026/27',
+      locked: true,
+      lockReason: 'pending_approval',
+    });
+    expect(list.items.find((i) => i.type === 'document')).toEqual({
+      type: 'document',
+      assignmentId: null,
+      templateId: 'tpl-handbook',
+      kind: 'read',
+      titleEn: 'Instructor handbook',
+      titleZh: '教练手册',
+      descriptionEn: 'Read and acknowledge.',
+      descriptionZh: '阅读并确认。',
+      required: true,
+      status: null,
+      season: '2026/27',
+      assignedAt: null,
+      viewedAt: null,
+      completedAt: null,
+      dueAt: null,
+    });
+    expect(
+      list.items.filter((i) => i.type === 'document').map((i) => i.templateId),
+    ).toEqual(['tpl-handbook', 'tpl-conduct']);
+    expect(list.items.find((i) => i.type === 'certification')).toMatchObject({
+      uploadId: null,
+      state: 'pending',
+    });
+    const forbidden = { status: 403, body: { reason: 'pending_approval' } };
+    await expect(getMyDocument('asg-waiver')).rejects.toMatchObject(forbidden);
+    await expect(
+      completeMyDocument('asg-waiver', { acknowledged: true }),
+    ).rejects.toMatchObject(forbidden);
+    await expect(
+      requestMyCertUpload({
+        org: 'csia',
+        track: 'regular',
+        validUntil: '2027-12-31',
+        contentType: 'image/png',
+        contentLength: 1000,
+      }),
+    ).rejects.toMatchObject(forbidden);
+    await expect(confirmMyCertUpload('cu-1')).rejects.toMatchObject(forbidden);
   });
 });
 

@@ -144,13 +144,14 @@ function DocumentsCard({
   const open = assignments.filter((a) => a.status !== 'archived');
   const missing = templates.filter(
     (tpl) =>
-      tpl.isActive &&
+      tpl.status === 'live' &&
       tpl.required &&
       tpl.audience === 'instructor' &&
       !open.some((a) => a.templateId === tpl.id && a.status === 'completed'),
   );
   const assignable = templates.filter(
-    (tpl) => tpl.isActive && tpl.audience === 'instructor' && tpl.hasSource,
+    (tpl) =>
+      tpl.status === 'live' && tpl.audience === 'instructor' && tpl.hasSource,
   );
 
   return (
