@@ -11,6 +11,7 @@ import { EditProfilePage } from '@/features/instructor/EditProfilePage';
 import { SettingsPage } from '@/features/instructor/SettingsPage';
 import { OnboardingPage } from '@/features/documents/onboarding/OnboardingPage';
 import { OnboardingDocumentPage } from '@/features/documents/onboarding/OnboardingDocumentPage';
+import { LessonsPayPage } from '@/features/lessons/LessonsPayPage';
 import { AdminDashboard } from '@/features/admin/AdminDashboard';
 import { AdminListPage } from '@/features/admin/AdminListPage';
 import { AdminDetailPage } from '@/features/admin/AdminDetailPage';
@@ -73,7 +74,11 @@ export const router = createBrowserRouter([
       { path: '/profile', element: <ProfileViewPage /> },
       { path: '/profile/edit', element: <EditProfilePage /> },
       { path: '/onboarding', element: <OnboardingPage /> },
-      { path: '/onboarding/:assignmentId', element: <OnboardingDocumentPage /> },
+      {
+        path: '/onboarding/:assignmentId',
+        element: <OnboardingDocumentPage />,
+      },
+      { path: '/lessons', element: <LessonsPayPage /> },
       { path: '/settings', element: <SettingsPage /> },
 
       // Admin (role-gated)
@@ -151,9 +156,7 @@ export const router = createBrowserRouter([
       },
       {
         path: '/admin/calendar-matching',
-        element: (
-          <Navigate to="/admin/instructors" replace />
-        ),
+        element: <Navigate to="/admin/instructors" replace />,
       },
       {
         path: '/admin/import-history',

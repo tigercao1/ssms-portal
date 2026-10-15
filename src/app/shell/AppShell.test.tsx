@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Route,
@@ -213,6 +213,49 @@ describe('AppShell instructor nav', () => {
         name: 'Onboarding Locked until your profile is approved',
       }),
     ).toBeInTheDocument();
+  });
+
+  it('lists Lessons & pay right after Onboarding', async () => {
+    renderInstructorShell('approved');
+    const links = within(
+      screen.getByRole('navigation', { name: 'Instructor' }),
+    ).getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([
+      '/profile',
+      '/onboarding',
+      '/lessons',
+      '/settings',
+    ]);
+    const lessons = screen.getByRole('link', { name: 'Lessons & pay' });
+    await waitFor(() => expect(lessons.querySelector('svg')).toBeNull());
+  });
+
+  it('locks Lessons & pay while the profile is pending approval', async () => {
+    renderInstructorShell('pending');
+    expect(
+      await screen.findByRole('link', {
+        name: 'Lessons & pay Locked until your profile is approved',
+      }),
+    ).toHaveAttribute('href', '/lessons');
+  });
+
+  it('shows Lessons & pay without a lock for a rejected instructor', async () => {
+    renderInstructorShell('rejected');
+    await screen.findByRole('link', {
+      name: 'Onboarding Locked until your profile is approved',
+    });
+    const lessons = screen.getByRole('link', { name: 'Lessons & pay' });
+    expect(lessons).toHaveAttribute('href', '/lessons');
+    expect(lessons.querySelector('svg')).toBeNull();
+  });
+
+  it('labels Lessons & pay in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderInstructorShell('approved');
+    expect(screen.getByRole('link', { name: '课程与工资' })).toHaveAttribute(
+      'href',
+      '/lessons',
+    );
   });
 
   it('shows a plain Onboarding link once approved', async () => {

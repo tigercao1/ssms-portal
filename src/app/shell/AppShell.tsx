@@ -73,6 +73,11 @@ export function AppShell() {
           label: t.nav.onboarding,
           locked: checklist.data?.locked ?? false,
         },
+        {
+          to: '/lessons',
+          label: t.nav.lessonsPay,
+          locked: checklist.data?.lockReason === 'pending_approval',
+        },
         { to: '/settings', label: t.nav.settings },
       ];
 
