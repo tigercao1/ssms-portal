@@ -161,6 +161,7 @@ function AdjustmentForm({ periodId }: { periodId: string }) {
         </Field>
         <Field
           label={t.payroll.adjustmentDescription}
+          hint={t.payroll.adjustmentVisibleHint}
           error={touched ? errors.description : undefined}
         >
           {(p) => (

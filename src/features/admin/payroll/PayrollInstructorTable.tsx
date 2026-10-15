@@ -5,6 +5,7 @@ import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import type { Messages } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
+import { withRateUnit } from '@/lib/rateUnit';
 import { formatHours, formatMoney, formatShortDay } from './payrollFormat';
 import type {
   PayrollClassStatus,
@@ -220,10 +221,14 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
                 <td className="py-1.5 pr-3 text-right tabular-nums">
                   {line.minutes}
                 </td>
-                <td className="py-1.5 pr-3 text-right tabular-nums">
+                <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">
                   {line.hourlyRate === null
                     ? '—'
-                    : formatMoney(line.hourlyRate, line.currency, locale)}
+                    : withRateUnit(
+                        formatMoney(line.hourlyRate, line.currency, locale),
+                        line.rateUnit,
+                        t,
+                      )}
                 </td>
                 <td className="py-1.5 text-right tabular-nums">
                   <span className="flex flex-col items-end gap-1">

@@ -439,6 +439,13 @@ describe('LessonTypesPage pay rates', () => {
     fakePayRate({ id: 'pr-promo', lessonTypeId: 'lt2', hourlyRate: 30 }),
   ];
 
+  const dailyRate = fakePayRate({
+    id: 'pr-day',
+    lessonTypeId: 'lt3',
+    hourlyRate: 400,
+    rateUnit: 'day',
+  });
+
   async function openRates(name = 'Private 2h') {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
@@ -460,9 +467,9 @@ describe('LessonTypesPage pay rates', () => {
 
     const rows = panel.getAllByRole('row').slice(1);
     expect(rows.map((r) => r.textContent)).toEqual([
-      expect.stringMatching(/^DefaultCurrent.*45\.00.*2026-11-01No end/),
-      expect.stringMatching(/^Default.*40\.00.*2026-01-012026-10-31/),
-      expect.stringMatching(/^Eddie LeeCurrent.*52\.50.*2026-11-152027-04-30/),
+      expect.stringMatching(/^DefaultCurrent\$45\.00\/h2026-11-01No end/),
+      expect.stringMatching(/^Default\$40\.00\/h2026-01-012026-10-31/),
+      expect.stringMatching(/^Eddie LeeCurrent\$52\.50\/h2026-11-152027-04-30/),
     ]);
     expect(rows[1]).not.toHaveTextContent('Current');
   });
@@ -487,7 +494,7 @@ describe('LessonTypesPage pay rates', () => {
     expect(calls.ratePosts).toHaveLength(0);
 
     await user.type(
-      panel.getByLabelText('Hourly rate', { exact: false }),
+      panel.getByLabelText('Rate', { exact: false, selector: 'input' }),
       '45',
     );
     await user.type(
@@ -501,6 +508,7 @@ describe('LessonTypesPage pay rates', () => {
           lessonTypeId: 'lt1',
           instructorId: null,
           hourlyRate: 45,
+          rateUnit: 'hour',
           currency: 'CAD',
           effectiveFrom: '2026-11-01',
           effectiveTo: null,
@@ -511,7 +519,7 @@ describe('LessonTypesPage pay rates', () => {
 
     await user.selectOptions(panel.getByLabelText('Instructor'), 'inst-2');
     await user.type(
-      panel.getByLabelText('Hourly rate', { exact: false }),
+      panel.getByLabelText('Rate', { exact: false, selector: 'input' }),
       '52.50',
     );
     const currency = panel.getByLabelText('Currency');
@@ -528,6 +536,7 @@ describe('LessonTypesPage pay rates', () => {
         lessonTypeId: 'lt1',
         instructorId: 'inst-2',
         hourlyRate: 52.5,
+        rateUnit: 'hour',
         currency: 'USD',
         effectiveFrom: '2026-12-01',
         effectiveTo: '2027-03-31',
@@ -549,7 +558,7 @@ describe('LessonTypesPage pay rates', () => {
       screen.getByRole('region', { name: 'Pay rates for Private 2h' }),
     );
     await user.type(
-      panel.getByLabelText('Hourly rate', { exact: false }),
+      panel.getByLabelText('Rate', { exact: false, selector: 'input' }),
       '45',
     );
     await user.clear(panel.getByLabelText('Currency'));
@@ -573,7 +582,7 @@ describe('LessonTypesPage pay rates', () => {
     serve({ rates, rateError: { status: 409, message: OVERLAP_API } });
     const { user, panel } = await openRates();
     await user.type(
-      panel.getByLabelText('Hourly rate', { exact: false }),
+      panel.getByLabelText('Rate', { exact: false, selector: 'input' }),
       '50',
     );
     await user.type(
@@ -591,7 +600,7 @@ describe('LessonTypesPage pay rates', () => {
     });
     const { user, panel } = await openRates();
     await user.type(
-      panel.getByLabelText('Hourly rate', { exact: false }),
+      panel.getByLabelText('Rate', { exact: false, selector: 'input' }),
       '50',
     );
     await user.type(
@@ -618,15 +627,20 @@ describe('LessonTypesPage pay rates', () => {
     expect(
       form.getByText('To change the instructor, add a new rate instead.'),
     ).toBeInTheDocument();
-    expect(form.getByLabelText('Hourly rate', { exact: false })).toHaveValue(
-      '52.5',
-    );
+    expect(
+      form.getByLabelText('Rate', { exact: false, selector: 'input' }),
+    ).toHaveValue('52.5');
     expect(form.getByRole('button', { name: 'Save' })).toBeDisabled();
 
     await user.clear(form.getByLabelText('Effective to'));
     await user.type(form.getByLabelText('Effective to'), '2026-12-31');
-    await user.clear(form.getByLabelText('Hourly rate', { exact: false }));
-    await user.type(form.getByLabelText('Hourly rate', { exact: false }), '55');
+    await user.clear(
+      form.getByLabelText('Rate', { exact: false, selector: 'input' }),
+    );
+    await user.type(
+      form.getByLabelText('Rate', { exact: false, selector: 'input' }),
+      '55',
+    );
     await user.click(form.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
@@ -679,22 +693,111 @@ describe('LessonTypesPage pay rates', () => {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
     await user.click(
-      await screen.findByRole('button', { name: 'Private 2h 的时薪' }),
+      await screen.findByRole('button', { name: 'Private 2h 的费率' }),
     );
     const panel = within(
-      screen.getByRole('region', { name: 'Private 2h 的时薪' }),
+      screen.getByRole('region', { name: 'Private 2h 的费率' }),
     );
     await user.type(
-      panel.getByLabelText('时薪', { exact: false, selector: 'input' }),
+      panel.getByLabelText('费率', { exact: false, selector: 'input' }),
       '50',
     );
     await user.type(
       panel.getByLabelText('生效日期', { exact: false, selector: 'input' }),
       '2026-11-20',
     );
-    await user.click(panel.getByRole('button', { name: '添加时薪' }));
+    await user.click(panel.getByRole('button', { name: '添加费率' }));
     expect(await panel.findByRole('alert')).toHaveTextContent(
-      '该时薪与同一课程类型、同一教练的另一条时薪时间重叠。',
+      '该费率与同一课程类型、同一教练的另一条费率时间重叠。',
     );
+  });
+
+  it('adds a daily rate and shows it per day', async () => {
+    const calls = serve({ types: [privateType], rates: [] });
+    const user = userEvent.setup();
+    renderWithProviders(<LessonTypesPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Pay rates for Private 2h' }),
+    );
+    const panel = within(
+      screen.getByRole('region', { name: 'Pay rates for Private 2h' }),
+    );
+    const unit = panel.getByLabelText('Unit');
+    expect(unit).toHaveValue('hour');
+    expect(
+      within(unit)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Hourly', 'Daily']);
+
+    await user.type(
+      panel.getByLabelText('Rate', { exact: false, selector: 'input' }),
+      '400',
+    );
+    await user.selectOptions(unit, 'day');
+    await user.type(
+      panel.getByLabelText('Effective from', { exact: false }),
+      '2026-11-01',
+    );
+    await user.click(panel.getByRole('button', { name: 'Add pay rate' }));
+    await waitFor(() =>
+      expect(calls.ratePosts).toEqual([
+        expect.objectContaining({ hourlyRate: 400, rateUnit: 'day' }),
+      ]),
+    );
+    expect(await panel.findByText('$400.00/day')).toBeInTheDocument();
+    expect(panel.getByLabelText('Unit')).toHaveValue('hour');
+  });
+
+  it('changes only the unit of an existing rate', async () => {
+    const calls = serve({ rates: [...rates, dailyRate] });
+    const { user, panel } = await openRates();
+    await user.click(
+      panel.getByRole('button', { name: 'Edit rate for Eddie Lee' }),
+    );
+    const form = within(
+      panel
+        .getByRole('heading', { name: 'Edit pay rate: Eddie Lee' })
+        .closest('form') as HTMLElement,
+    );
+    expect(form.getByLabelText('Unit')).toHaveValue('hour');
+    await user.selectOptions(form.getByLabelText('Unit'), 'day');
+    await user.click(form.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(calls.ratePatches).toEqual([
+        { id: 'pr-eddie', body: { rateUnit: 'day' } },
+      ]),
+    );
+    expect(await panel.findByText('$52.50/day')).toBeInTheDocument();
+  });
+
+  it('shows the units in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serve({
+      types: [anyType],
+      rates: [
+        dailyRate,
+        fakePayRate({
+          lessonTypeId: 'lt3',
+          effectiveFrom: '2026-01-01',
+          effectiveTo: '2026-10-31',
+        }),
+      ],
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LessonTypesPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Group 4h 的费率' }),
+    );
+    const panel = within(
+      screen.getByRole('region', { name: 'Group 4h 的费率' }),
+    );
+    expect(panel.getByText('CA$400.00/天')).toBeInTheDocument();
+    expect(panel.getByText('CA$45.00/小时')).toBeInTheDocument();
+    expect(
+      within(panel.getByLabelText('计费方式'))
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['按小时', '按天']);
   });
 });

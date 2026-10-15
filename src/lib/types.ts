@@ -265,11 +265,14 @@ export interface LessonTypeInput {
   sortOrder?: number;
 }
 
+export type RateUnit = 'hour' | 'day';
+
 export interface PayRate {
   id: string;
   lessonTypeId: string;
   instructorId: string | null;
   hourlyRate: number;
+  rateUnit: RateUnit;
   currency: string;
   effectiveFrom: string;
   effectiveTo: string | null;
@@ -281,6 +284,7 @@ export interface PayRateCreate {
   lessonTypeId: string;
   instructorId: string | null;
   hourlyRate: number;
+  rateUnit?: RateUnit;
   currency?: string;
   effectiveFrom: string;
   effectiveTo: string | null;
@@ -288,6 +292,7 @@ export interface PayRateCreate {
 
 export interface PayRatePatch {
   hourlyRate?: number;
+  rateUnit?: RateUnit;
   currency?: string;
   effectiveFrom?: string;
   effectiveTo?: string | null;

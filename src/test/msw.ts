@@ -176,6 +176,7 @@ export function fakePayRate(overrides: Partial<PayRate> = {}): PayRate {
     lessonTypeId: 'lt1',
     instructorId: null,
     hourlyRate: 45,
+    rateUnit: 'hour',
     currency: 'CAD',
     effectiveFrom: '2026-11-01',
     effectiveTo: null,

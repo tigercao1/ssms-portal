@@ -121,6 +121,12 @@ export interface Messages {
     inactive: string;
     active: string;
   };
+  rateUnit: {
+    hour: string;
+    day: string;
+    perHour: string;
+    perDay: string;
+  };
   profile: {
     title: string;
     pendingBanner: string;
@@ -521,6 +527,7 @@ export interface Messages {
     current: string;
     instructorLabel: string;
     rateLabel: string;
+    unitLabel: string;
     currencyLabel: string;
     fromLabel: string;
     toLabel: string;
@@ -932,6 +939,7 @@ export interface Messages {
     adjustmentDescription: string;
     adjustmentAmount: string;
     adjustmentAmountHint: string;
+    adjustmentVisibleHint: string;
     adjustmentAmountInvalid: string;
     adjustmentAdd: string;
     adjustmentAdded: string;
