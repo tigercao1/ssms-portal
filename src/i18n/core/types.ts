@@ -153,6 +153,7 @@ export interface Messages {
     minStudentAgeRange: string;
     minStudentAgeValue: string;
     emailReadonly: string;
+    legalName: string;
     photo: string;
     addCert: string;
     addTrainer: string;

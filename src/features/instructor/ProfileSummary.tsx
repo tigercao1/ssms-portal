@@ -62,6 +62,10 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
   const t = useT();
   const { locale } = useLocale();
   const name = localizeField(profile.displayNameEn, profile.displayNameZh, locale);
+  const legalName =
+    profile.firstName && profile.lastName
+      ? `${profile.firstName} ${profile.lastName}`
+      : null;
   const bio = localizeField(profile.bioEn, profile.bioZh, locale);
   const showsZhBio = locale === 'zh-CN' && Boolean(profile.bioZh?.trim());
   const bioTranslatedBy = !bio
@@ -83,6 +87,11 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
         <div>
           <h2 className="text-2xl">{name || profile.email}</h2>
           <p className="font-mono text-sm text-slate">{profile.email}</p>
+          {legalName && (
+            <p className="text-sm text-slate">
+              {t.profile.legalName}: {legalName}
+            </p>
+          )}
         </div>
       </Card>
 

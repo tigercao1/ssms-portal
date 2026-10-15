@@ -20,6 +20,8 @@ const API = 'http://localhost:3000';
 export const fakeProfile: InstructorProfile = {
   id: 'inst-1',
   email: 'jane@example.com',
+  firstName: null,
+  lastName: null,
   displayNameEn: 'Jane Snow',
   displayNameZh: '简雪',
   bioEn: 'Veteran instructor.',

@@ -152,6 +152,7 @@ export const zhCN: Messages = {
     minStudentAgeRange: '请输入 0 到 18 之间的整数。',
     minStudentAgeValue: '{n} 岁及以上',
     emailReadonly: '邮箱由您的账户管理，无法在此更改。',
+    legalName: '法定姓名',
     photo: '头像',
     addCert: '添加认证',
     addTrainer: '添加培训师资格',

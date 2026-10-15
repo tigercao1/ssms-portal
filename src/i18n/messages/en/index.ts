@@ -163,6 +163,7 @@ export const en: Messages = {
     minStudentAgeRange: 'Enter a whole number from 0 to 18.',
     minStudentAgeValue: 'Ages {n}+',
     emailReadonly: 'Email is managed through your account and can’t be changed here.',
+    legalName: 'Legal name',
     photo: 'Profile photo',
     addCert: 'Add certification',
     addTrainer: 'Add trainer status',

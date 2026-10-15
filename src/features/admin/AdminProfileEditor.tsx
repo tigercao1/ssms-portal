@@ -18,6 +18,13 @@ import { MachineTranslationNote } from '@/features/translation/TranslatedByBadge
 import { MultiSelectChips } from '@/features/instructor/MultiSelectChips';
 import { CertEditor, TrainerEditor } from '@/features/instructor/CertEditor';
 import {
+  changedLegalName,
+  LegalNameFields,
+  toLegalNameDraft,
+  validateLegalName,
+  type LegalNameErrors,
+} from '@/features/instructor/LegalNameFields';
+import {
   EXTRA_PHOTO_SLOTS,
   MorePhotos,
   PhotoPicker,
@@ -136,6 +143,11 @@ export function AdminProfileEditor({
   const langs = useLanguages();
   const levels = useCourseLevels();
   const [draft, setDraft] = useState(() => toDraft(profile));
+  const [legalName, setLegalName] = useState(() => toLegalNameDraft(profile));
+  const [legalNameErrors, setLegalNameErrors] = useState<LegalNameErrors>({
+    firstName: null,
+    lastName: null,
+  });
   const [nameError, setNameError] = useState<string | null>(null);
   const [ageError, setAgeError] = useState<string | null>(null);
 
@@ -149,10 +161,23 @@ export function AdminProfileEditor({
       ? null
       : t.validation.required;
     const nextAgeError = minStudentAgeError(draft.minStudentAge, t);
+    const nextLegalNameErrors = validateLegalName(
+      legalName,
+      profile,
+      t.validation.required,
+    );
     setNameError(nextNameError);
     setAgeError(nextAgeError);
-    if (nextNameError || nextAgeError) return;
+    setLegalNameErrors(nextLegalNameErrors);
+    if (
+      nextNameError ||
+      nextAgeError ||
+      nextLegalNameErrors.firstName ||
+      nextLegalNameErrors.lastName
+    )
+      return;
     update.mutate({
+      ...changedLegalName(legalName, profile),
       ...draft,
       displayNameZh: draft.displayNameZh || null,
       bioEn: draft.bioEn || null,
@@ -187,6 +212,12 @@ export function AdminProfileEditor({
             />
           ))}
         </MorePhotos>
+        <LegalNameFields
+          value={legalName}
+          saved={profile}
+          errors={legalNameErrors}
+          onChange={setLegalName}
+        />
         <Field
           label={t.profile.displayNameEn}
           required

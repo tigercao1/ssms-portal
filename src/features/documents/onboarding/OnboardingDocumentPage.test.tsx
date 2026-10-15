@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { OnboardingDocumentPage } from './OnboardingDocumentPage';
 import { renderWithProviders } from '@/test/render';
-import { server } from '@/test/msw';
+import { fakeProfile, server } from '@/test/msw';
 import type { CompleteRequest } from '../api';
 import { fakeAssignment } from '../api/fixtures';
 import {
@@ -208,6 +208,38 @@ describe('OnboardingDocumentPage — sign', () => {
     await user.clear(await screen.findByLabelText(/Full legal name/));
     await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
     expect(screen.getByText('Enter your full legal name.')).toBeInTheDocument();
+  });
+
+  it('prefills the signer with the legal name', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          firstName: 'Janet',
+          lastName: 'Snowden',
+          legalName: 'Janet Snowden',
+        }),
+      ),
+    );
+    renderAt('asg-new');
+    expect(await screen.findByLabelText(/Full legal name/)).toHaveValue(
+      'Janet Snowden',
+    );
+    expect(
+      screen.getByRole('textbox', { name: 'Full name (required)' }),
+    ).toHaveTextContent('Janet Snowden');
+  });
+
+  it('falls back to the display name when the legal name is absent', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, displayNameEn: 'Jay Powder' }),
+      ),
+    );
+    renderAt('asg-new');
+    expect(await screen.findByLabelText(/Full legal name/)).toHaveValue(
+      'Jay Powder',
+    );
   });
 
   it('reuses an adopted signature on the next signature field with one tap', async () => {

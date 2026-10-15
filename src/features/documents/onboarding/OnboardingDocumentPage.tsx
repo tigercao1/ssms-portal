@@ -189,7 +189,10 @@ export function OnboardingDocumentPage() {
           template={template}
           sourceUrl={sourceUrl}
           defaultSignerName={
-            assignment.signerName ?? profile.data?.displayNameEn ?? ''
+            assignment.signerName ??
+            profile.data?.legalName ??
+            profile.data?.displayNameEn ??
+            ''
           }
           signerEmail={profile.data?.email ?? user?.email ?? null}
           signingDate={todayIso()}

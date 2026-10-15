@@ -19,6 +19,13 @@ import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
 import { BioSection } from './BioSection';
 import { MultiSelectChips } from './MultiSelectChips';
 import { CertEditor, TrainerEditor } from './CertEditor';
+import {
+  changedLegalName,
+  LegalNameFields,
+  toLegalNameDraft,
+  validateLegalName,
+  type LegalNameErrors,
+} from './LegalNameFields';
 import type {
   InstructorProfile,
   RefItem,
@@ -120,6 +127,11 @@ function Form({
 }) {
   const initial = useMemo(() => toDraft(profile), [profile]);
   const [draft, setDraft] = useState(initial);
+  const [legalName, setLegalName] = useState(() => toLegalNameDraft(profile));
+  const [legalNameErrors, setLegalNameErrors] = useState<LegalNameErrors>({
+    firstName: null,
+    lastName: null,
+  });
   const [nameError, setNameError] = useState<string | null>(null);
   const [ageError, setAgeError] = useState<string | null>(null);
 
@@ -131,10 +143,23 @@ function Form({
     e.preventDefault();
     const nextNameError = draft.displayNameEn.trim() ? null : t.validation.required;
     const nextAgeError = validateMinStudentAge(draft.minStudentAge, t);
+    const nextLegalNameErrors = validateLegalName(
+      legalName,
+      profile,
+      t.validation.required,
+    );
     setNameError(nextNameError);
     setAgeError(nextAgeError);
-    if (nextNameError || nextAgeError) return;
+    setLegalNameErrors(nextLegalNameErrors);
+    if (
+      nextNameError ||
+      nextAgeError ||
+      nextLegalNameErrors.firstName ||
+      nextLegalNameErrors.lastName
+    )
+      return;
     const body: UpdateProfileBody = {
+      ...changedLegalName(legalName, profile),
       ...draft,
       displayNameZh: draft.displayNameZh || null,
       dateOfBirth: draft.dateOfBirth || null,
@@ -153,6 +178,12 @@ function Form({
         <h2 className="text-lg">{t.profile.identitySection}</h2>
         <PhotoUploader profile={profile} />
         <MorePhotosUploader profile={profile} />
+        <LegalNameFields
+          value={legalName}
+          saved={profile}
+          errors={legalNameErrors}
+          onChange={setLegalName}
+        />
         <Field label={t.profile.displayNameEn} required error={nameError ?? undefined}>
           {(p) => (
             <Input
