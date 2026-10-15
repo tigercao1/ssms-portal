@@ -10,6 +10,8 @@ import {
 import { allowedPrefills, changeType, MIN_FIELD_PT } from './fieldModel';
 import { useFieldTypeLabel, usePrefillLabel } from './labels';
 
+const COMPACT = 'h-9 text-sm';
+
 /** Edits the selected field's type, labels, required flag, prefill and rect. */
 export function PropertiesPanel({
   field,
@@ -33,10 +35,19 @@ export function PropertiesPanel({
   return (
     <div className="flex flex-col gap-3" aria-label={t.documents.properties}>
       <h2 className="text-lg">{t.documents.properties}</h2>
+      <div className="flex gap-2">
+        <Button size="sm" variant="secondary" onClick={onDuplicate}>
+          {t.documents.duplicate}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onDelete}>
+          {t.documents.deleteField}
+        </Button>
+      </div>
       <FormField label={t.documents.fieldType}>
         {(p) => (
           <Select
             {...p}
+            className={COMPACT}
             value={field.type}
             onChange={(e) =>
               onChange(changeType(field, e.target.value as FieldType))
@@ -45,54 +56,6 @@ export function PropertiesPanel({
             {FIELD_TYPES.map((type) => (
               <option key={type} value={type}>
                 {typeLabel(type)}
-              </option>
-            ))}
-          </Select>
-        )}
-      </FormField>
-      <FormField
-        label={t.documents.labelEn}
-        required
-        error={field.labelEn.trim() ? undefined : t.validation.required}
-      >
-        {(p) => (
-          <Input
-            {...p}
-            value={field.labelEn}
-            onChange={(e) => set('labelEn', e.target.value)}
-          />
-        )}
-      </FormField>
-      <FormField label={t.documents.labelZh}>
-        {(p) => (
-          <Input
-            {...p}
-            value={field.labelZh ?? ''}
-            onChange={(e) => set('labelZh', e.target.value || null)}
-          />
-        )}
-      </FormField>
-      <label className="flex items-center gap-2 text-sm text-navy">
-        <input
-          type="checkbox"
-          checked={field.required}
-          onChange={(e) => set('required', e.target.checked)}
-        />
-        {t.documents.fieldRequired}
-      </label>
-      <FormField label={t.documents.prefill}>
-        {(p) => (
-          <Select
-            {...p}
-            value={field.prefill ?? ''}
-            disabled={allowedPrefills(field.type).length < 2}
-            onChange={(e) =>
-              set('prefill', (e.target.value || null) as FieldPrefill)
-            }
-          >
-            {allowedPrefills(field.type).map((v) => (
-              <option key={v ?? 'none'} value={v ?? ''}>
-                {prefillLabel(v)}
               </option>
             ))}
           </Select>
@@ -118,15 +81,58 @@ export function PropertiesPanel({
           />
         </div>
       </div>
+      <FormField
+        label={t.documents.labelEn}
+        required
+        error={field.labelEn.trim() ? undefined : t.validation.required}
+      >
+        {(p) => (
+          <Input
+            {...p}
+            className={COMPACT}
+            value={field.labelEn}
+            onChange={(e) => set('labelEn', e.target.value)}
+          />
+        )}
+      </FormField>
+      <FormField label={t.documents.labelZh}>
+        {(p) => (
+          <Input
+            {...p}
+            className={COMPACT}
+            value={field.labelZh ?? ''}
+            onChange={(e) => set('labelZh', e.target.value || null)}
+          />
+        )}
+      </FormField>
+      <label className="flex items-center gap-2 text-sm text-navy">
+        <input
+          type="checkbox"
+          checked={field.required}
+          onChange={(e) => set('required', e.target.checked)}
+        />
+        {t.documents.fieldRequired}
+      </label>
+      <FormField label={t.documents.prefill}>
+        {(p) => (
+          <Select
+            {...p}
+            className={COMPACT}
+            value={field.prefill ?? ''}
+            disabled={allowedPrefills(field.type).length < 2}
+            onChange={(e) =>
+              set('prefill', (e.target.value || null) as FieldPrefill)
+            }
+          >
+            {allowedPrefills(field.type).map((v) => (
+              <option key={v ?? 'none'} value={v ?? ''}>
+                {prefillLabel(v)}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
       <p className="text-xs text-slate">{t.documents.keyboardHint}</p>
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" onClick={onDuplicate}>
-          {t.documents.duplicate}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onDelete}>
-          {t.documents.deleteField}
-        </Button>
-      </div>
     </div>
   );
 }

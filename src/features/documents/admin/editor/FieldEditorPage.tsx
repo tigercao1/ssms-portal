@@ -398,7 +398,7 @@ function Editor({ template }: { template: Template }) {
           </div>
           <div className="order-first flex h-fit flex-col gap-4 md:sticky md:top-4 md:order-none md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
             {canPlace && (
-              <Card className="flex flex-col gap-2 p-3">
+              <Card className="flex flex-col gap-2 !p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <h2 className="text-sm font-medium uppercase tracking-wide text-slate">
                     {t.documents.palette}
@@ -410,7 +410,7 @@ function Editor({ template }: { template: Template }) {
                     )}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {FIELD_TYPES.map((type) => (
                     <button
                       key={type}
@@ -426,7 +426,7 @@ function Editor({ template }: { template: Template }) {
                         '{type}',
                         typeLabel(type),
                       )}
-                      className="flex cursor-grab items-center gap-1.5 whitespace-nowrap rounded-md border border-grey/80 bg-surface px-2.5 py-1.5 text-sm text-navy hover:border-navy hover:bg-navy-tint disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex cursor-grab items-center gap-1 whitespace-nowrap rounded-md border border-grey/80 bg-surface px-2 py-1 text-xs text-navy hover:border-navy hover:bg-navy-tint disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <span aria-hidden className="text-xs">
                         {FIELD_ICONS[type]}
@@ -439,7 +439,7 @@ function Editor({ template }: { template: Template }) {
               </Card>
             )}
 
-            <Card className="p-4">
+            <Card className="!p-4">
               {selected && canPlace ? (
                 <PropertiesPanel
                   key={selected.id}
