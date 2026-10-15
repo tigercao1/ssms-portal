@@ -123,7 +123,7 @@ describe('SignUpPage', () => {
     expect(screen.getByLabelText(/^姓/)).toBeRequired();
     expect(screen.getByLabelText(/^昵称/)).not.toBeRequired();
     expect(
-      screen.getByText('显示在你资料上的名字。留空则使用你的名和姓。'),
+      screen.getByText('显示在您资料上的名字。留空则使用您的名和姓。'),
     ).toBeInTheDocument();
   });
 });
