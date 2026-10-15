@@ -173,12 +173,28 @@ function AudienceCell({ row }: { row: TemplateSummary }) {
   const t = useT();
   if (row.status !== 'live' || !row.assignTo)
     return <span className="text-slate">—</span>;
+  const detail =
+    row.assignTo === 'all'
+      ? (row.kind === 'read'
+          ? t.documents.audienceAllDetailRead
+          : t.documents.audienceAllDetail
+        )
+          .replace('{assigned}', String(row.assignedCount))
+          .replace('{approved}', String(row.approvedCount))
+          .replace('{done}', String(row.completedCount))
+      : t.documents.audienceSelectedDetail.replace(
+          '{n}',
+          String(row.assignedCount),
+        );
   return (
-    <span>
-      {row.assignTo === 'all'
-        ? t.documents.audienceAll
-        : t.documents.audienceSelected}
-    </span>
+    <>
+      <div>
+        {row.assignTo === 'all'
+          ? t.documents.audienceAll
+          : t.documents.audienceSelected}
+      </div>
+      <div className="text-xs text-slate">{detail}</div>
+    </>
   );
 }
 

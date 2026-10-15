@@ -83,6 +83,9 @@ export interface TemplateSummary {
   season: string | null;
   publishedAt: string | null;
   hasCompletedAssignments: boolean;
+  assignedCount: number;
+  completedCount: number;
+  approvedCount: number;
   sortOrder: number;
   hasSource: boolean;
   pageCount: number | null;

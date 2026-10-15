@@ -61,6 +61,9 @@ describe('admin template requests', () => {
     expect(list.find((t) => t.id === 'tpl-conduct')).toMatchObject({
       hasSource: true,
       fieldCount: 4,
+      assignedCount: 1,
+      completedCount: 1,
+      approvedCount: 1,
     });
     expect(list.find((t) => t.id === 'tpl-draft')).toMatchObject({
       hasSource: false,

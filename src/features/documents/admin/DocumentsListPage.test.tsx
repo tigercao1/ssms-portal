@@ -132,6 +132,19 @@ describe('DocumentsListPage', () => {
       within(row('Liability waiver')).getByText('Selected'),
     ).toBeInTheDocument();
     expect(
+      within(row('Code of conduct')).getByText(
+        '1 of 2 approved assigned · 1 signed',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Instructor handbook')).getByText(
+        '1 of 2 approved assigned · 1 acknowledged',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Liability waiver')).getByText('1 instructors'),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole('switch', { name: /Active/ }),
     ).not.toBeInTheDocument();
     expect(
@@ -241,6 +254,11 @@ describe('DocumentsListPage', () => {
         within(row('Uniform policy')).getByText('Live'),
       ).toBeInTheDocument(),
     );
+    expect(
+      within(row('Uniform policy')).getByText(
+        '2 of 2 approved assigned · 0 signed',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('publishes for selected instructors and a different season', async () => {
@@ -380,6 +398,18 @@ describe('DocumentsListPage', () => {
     expect(
       within(editor).getByLabelText('Upload PDF for Code of conduct'),
     ).toBeDisabled();
+  });
+
+  it('shows status and audience counts in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<DocumentsListPage />);
+    await screen.findByText('行为准则');
+    const conduct = screen.getByText('行为准则').closest('tr') as HTMLElement;
+    expect(within(conduct).getByText('已发布')).toBeInTheDocument();
+    expect(
+      within(conduct).getByText('已分配 1/2 位已审核教练 · 1 人已签署'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 位教练')).toBeInTheDocument();
   });
 
   it('toggles required with PATCH', async () => {

@@ -137,13 +137,23 @@ export function documentsHandlers(
   const A = apiBase;
   const findTemplate = (id: unknown) =>
     state.templates.find((t) => t.id === id);
-  const present = (t: Template): Template =>
-    withDerived({
+  const present = (t: Template): Template => {
+    const open = state.assignments.filter(
+      (a) =>
+        a.templateId === t.id &&
+        a.status !== 'archived' &&
+        (t.season === null || a.season === t.season),
+    );
+    return withDerived({
       ...t,
       hasCompletedAssignments: state.assignments.some(
         (a) => a.templateId === t.id && a.status === 'completed',
       ),
+      assignedCount: open.length,
+      completedCount: open.filter((a) => a.status === 'completed').length,
+      approvedCount: state.instructorIds.length,
     });
+  };
   const assignToInstructors = (
     template: Template,
     season: string,
@@ -219,6 +229,9 @@ export function documentsHandlers(
         season: null,
         publishedAt: null,
         hasCompletedAssignments: false,
+        assignedCount: 0,
+        completedCount: 0,
+        approvedCount: state.instructorIds.length,
         sortOrder: body.sortOrder,
         hasSource: false,
         sourceSha256: null,
