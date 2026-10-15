@@ -137,6 +137,25 @@ describe('FieldEditorPage', () => {
     expect(screen.getByRole('button', { name: 'Save fields' })).toBeDisabled();
   });
 
+  it('puts the field actions and size inputs ahead of the label inputs', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTestId('page-overlay-1');
+    await user.click(fieldButton('Signature'));
+    const panel = screen.getByText('Properties').parentElement!;
+    const labelEn = within(panel).getByLabelText(/Label \(English\)/);
+    for (const control of [
+      within(panel).getByRole('button', { name: 'Duplicate' }),
+      within(panel).getByRole('button', { name: 'Delete' }),
+      within(panel).getByLabelText('w'),
+      within(panel).getByLabelText('h'),
+    ])
+      expect(
+        control.compareDocumentPosition(labelEn) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+  });
+
   it('edits properties of the selected field and saves via PUT', async () => {
     const user = userEvent.setup();
     renderEditor();

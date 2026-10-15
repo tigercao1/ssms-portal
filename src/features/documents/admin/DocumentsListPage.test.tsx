@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -21,6 +21,10 @@ let state: DocumentsMockState;
 let patches: { id: string; body: unknown }[];
 let assignBodies: unknown[];
 let publishBodies: { id: string; body: unknown }[];
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   state = createDocumentsState({
@@ -297,6 +301,34 @@ describe('DocumentsListPage', () => {
         within(row('Uniform policy')).getByText('Selected'),
       ).toBeInTheDocument(),
     );
+  });
+
+  it('publishes a customer document to selected people only', async () => {
+    makePublishable();
+    state.templates.find((x) => x.id === 'tpl-draft')!.audience = 'customer';
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2026/27'),
+    );
+    expect(within(dialog).queryByLabelText(/All instructors/)).toBeNull();
+    expect(within(dialog).getByRole('radio')).toBeChecked();
+    expect(within(dialog).queryByTestId('publish-summary')).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(publishBodies).toEqual([
+        { id: 'tpl-draft', body: { assignTo: 'selected', season: '2026/27' } },
+      ]),
+    );
+    expect(
+      await screen.findByText(
+        'Uniform policy is live. Assigned to 0 instructors.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('shows the API error when publishing fails', async () => {
@@ -663,9 +695,29 @@ describe('DocumentsListPage', () => {
 });
 
 describe('seasonFor', () => {
-  it('rolls over in August', () => {
-    expect(seasonFor(new Date(2026, 6, 31))).toBe('2025/26');
-    expect(seasonFor(new Date(2026, 7, 1))).toBe('2026/27');
-    expect(seasonFor(new Date(2099, 9, 1))).toBe('2099/00');
+  it('rolls over on August 1 in Toronto', () => {
+    expect(seasonFor(new Date('2026-07-31T23:59:00-04:00'))).toBe('2025/26');
+    expect(seasonFor(new Date('2026-08-01T00:00:00-04:00'))).toBe('2026/27');
+    expect(seasonFor(new Date('2099-10-01T12:00:00-04:00'))).toBe('2099/00');
+  });
+
+  it('uses the Toronto date, not UTC or the browser zone', () => {
+    expect(seasonFor(new Date('2026-08-01T03:30:00Z'))).toBe('2025/26');
+    expect(seasonFor(new Date('2026-08-01T00:30:00+08:00'))).toBe('2025/26');
+    expect(seasonFor(new Date('2027-08-01T04:00:00Z'))).toBe('2027/28');
+  });
+
+  it('defaults the assign dialog to the Toronto season', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-01T03:30:00Z'));
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Assign Code of conduct' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Assign “Code of conduct”',
+    });
+    expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2025/26');
   });
 });

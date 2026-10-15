@@ -11,15 +11,20 @@ import {
   StatusPill,
 } from '@/components';
 import { useAdminInstructors } from '@/features/admin/api';
-import type { AssignResult, TemplateSummary } from '../api';
+import { todayIso, type AssignResult, type TemplateSummary } from '../api';
 import { useCreateAssignments } from './hooks';
 import { errorText, templateTitle } from './format';
 
 export const SEASON_RE = /^\d{4}\/\d{2}$/;
 
-/** Ski season label for a date, e.g. `2026/27` from August 2026 through July 2027. */
+/**
+ * Ski season label for a date in America/Toronto, e.g. `2026/27` from
+ * August 2026 through July 2027.
+ */
 export function seasonFor(now: Date = new Date()): string {
-  const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  const today = todayIso(now);
+  const year = Number(today.slice(0, 4));
+  const start = Number(today.slice(5, 7)) >= 8 ? year : year - 1;
   return `${start}/${String((start + 1) % 100).padStart(2, '0')}`;
 }
 

@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api';
 import { useSession } from '@/auth/SessionProvider';
 import { useMyProfile } from '@/features/instructor/api';
 import {
+  downloadPresigned,
   getMySignedUrl,
   todayIso,
   type Assignment,
@@ -39,9 +40,10 @@ function DownloadSigned({ assignmentId }: { assignmentId: string }) {
     setBusy(true);
     setError(false);
     try {
-      const signed = await getMySignedUrl(assignmentId);
+      const signed = await downloadPresigned(() =>
+        getMySignedUrl(assignmentId),
+      );
       setSha256(signed.sha256);
-      window.open(signed.url, '_blank', 'noopener');
     } catch {
       setError(true);
     } finally {

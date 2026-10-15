@@ -182,7 +182,7 @@ describe('publish lifecycle requests', () => {
     expect(again.template.assignTo).toBe('selected');
   });
 
-  it('blocks source and field changes once a copy is completed and ignores isActive', async () => {
+  it('blocks source and field changes once a copy is completed', async () => {
     await expect(
       requestTemplateSourceUpload('tpl-conduct', 1000),
     ).rejects.toMatchObject({ status: 409 });
@@ -192,11 +192,24 @@ describe('publish lifecycle requests', () => {
     await expect(
       saveTemplateFields('tpl-conduct', [fakeField()]),
     ).rejects.toMatchObject({ status: 409 });
-    const patched = await updateTemplate('tpl-conduct', {
-      isActive: false,
-      required: false,
-    } as never);
+    const patched = await updateTemplate('tpl-conduct', { required: false });
     expect(patched).toMatchObject({ status: 'live', required: false });
+  });
+
+  it('rejects isActive in a template patch, like the API', async () => {
+    await expect(
+      updateTemplate('tpl-conduct', {
+        isActive: false,
+        required: false,
+      } as never),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: 'property isActive should not exist',
+    });
+    expect(state.templates.find((t) => t.id === 'tpl-conduct')).toMatchObject({
+      status: 'live',
+      required: true,
+    });
   });
 });
 
