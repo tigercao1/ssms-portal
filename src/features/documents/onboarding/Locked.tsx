@@ -39,9 +39,9 @@ export function LockedBanner() {
   return (
     <div
       role="status"
-      className="flex items-start gap-3 rounded-md bg-status-pending/15 px-4 py-3 text-sm"
+      className="flex items-start gap-3 rounded-md border-l-[3px] border-l-status-pending bg-surface px-4 py-3 text-sm shadow-card"
     >
-      <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-surface text-status-pending">
+      <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-sunken text-status-pending">
         <LockIcon />
       </span>
       <div>
@@ -97,7 +97,7 @@ export function LockedEmpty() {
     <div className="flex flex-col items-center gap-2 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
       <span
         aria-hidden
-        className="grid h-12 w-12 place-items-center rounded-full bg-status-pending/15 text-2xl"
+        className="grid h-12 w-12 place-items-center rounded-full bg-sunken text-2xl"
       >
         ⏳
       </span>

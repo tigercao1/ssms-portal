@@ -75,28 +75,28 @@ export function DocumentsListPage() {
       ) : (
         <Card className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[40rem] text-sm">
+            <table className="w-full min-w-[48rem] text-sm">
               <thead>
                 <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
-                  <th className="px-4 py-2 font-medium">
+                  <th className="px-3 py-2 font-medium">
                     {t.documents.colTitle}
                   </th>
-                  <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
+                  <th className="w-px whitespace-nowrap px-3 py-2 font-medium">
                     {t.documents.colKind}
                   </th>
-                  <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
+                  <th className="w-px whitespace-nowrap px-3 py-2 font-medium">
                     {t.documents.colPdf}
                   </th>
-                  <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
+                  <th className="w-px whitespace-nowrap px-3 py-2 font-medium">
                     {t.documents.colStatus}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 font-medium">
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">
                     {t.documents.colAudience}
                   </th>
-                  <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
+                  <th className="w-px whitespace-nowrap px-3 py-2 font-medium">
                     {t.documents.colRequired}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-2 text-right font-medium">
+                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium">
                     {t.admin.actions}
                   </th>
                 </tr>
@@ -365,7 +365,7 @@ function TemplateRow({
         row.status === 'retired' && 'text-slate',
       )}
     >
-      <td className="px-4 py-2">
+      <td className="min-w-[10rem] px-3 py-2">
         <div className={row.status !== 'retired' ? 'font-medium text-ink' : ''}>
           {title}
         </div>
@@ -373,23 +373,23 @@ function TemplateRow({
           <div className="text-xs text-slate">{row.titleZh}</div>
         )}
       </td>
-      <td className="whitespace-nowrap px-4 py-2">
+      <td className="whitespace-nowrap px-3 py-2">
         <KindBadge kind={row.kind} />
       </td>
-      <td className="whitespace-nowrap px-4 py-2">
+      <td className="whitespace-nowrap px-3 py-2">
         {row.hasSource ? (
           pagesText(row.pageCount, t)
         ) : (
           <span className="text-status-rejected">{t.documents.noPdf}</span>
         )}
       </td>
-      <td className="whitespace-nowrap px-4 py-2">
+      <td className="whitespace-nowrap px-3 py-2">
         <TemplateStatusChip status={row.status} />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-3 py-2">
         <AudienceCell row={row} />
       </td>
-      <td className="px-4 py-2">
+      <td className="px-3 py-2">
         <Toggle
           checked={row.required}
           disabled={update.isPending}
@@ -397,8 +397,8 @@ function TemplateRow({
           onChange={(required) => update.mutate({ id: row.id, required })}
         />
       </td>
-      <td className="px-4 py-2">
-        <div className="flex min-w-[11.5rem] flex-wrap items-center justify-end gap-2">
+      <td className="px-3 py-2">
+        <div className="flex min-w-[16rem] flex-wrap items-center justify-end gap-2">
           <Button
             size="sm"
             variant="ghost"
