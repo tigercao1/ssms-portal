@@ -6,7 +6,7 @@ import {
   type FormEvent,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useLocale, useT } from '@/i18n/core/I18nProvider';
+import { useT } from '@/i18n/core/I18nProvider';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
@@ -16,6 +16,7 @@ import {
   EmptyState,
   Field,
   Input,
+  Pager,
   Spinner,
 } from '@/components';
 import type { Messages } from '@/i18n/core/types';
@@ -39,7 +40,6 @@ function pageFrom(params: URLSearchParams): number {
 
 export function CustomersPage() {
   const t = useT();
-  const { locale } = useLocale();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const page = pageFrom(params);
@@ -49,7 +49,6 @@ export function CustomersPage() {
   const customers = results.data?.customers ?? [];
   const total = results.data?.total ?? 0;
   const shownPage = results.data?.page ?? page;
-  const number = new Intl.NumberFormat(locale);
 
   const update = useCallback(
     (next: { q?: string; page?: number }) => {
@@ -94,10 +93,6 @@ export function CustomersPage() {
     if (next !== committed.current) update({ q: next });
   }
 
-  const from = (shownPage - 1) * CUSTOMERS_PAGE_SIZE + 1;
-  const to = from + customers.length - 1;
-  const hasNext = shownPage * CUSTOMERS_PAGE_SIZE < total;
-  const lastPage = Math.max(1, Math.ceil(total / CUSTOMERS_PAGE_SIZE));
   const busy = results.isPlaceholderData;
 
   return (
@@ -196,39 +191,22 @@ export function CustomersPage() {
                   </p>
                 )}
               </div>
-              <nav
-                aria-label={t.customers.pagination}
-                className="flex flex-col gap-2 border-t border-grey/60 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
-              >
-                <p className="text-slate" aria-live="polite">
-                  {customers.length > 0
-                    ? t.customers.showing
-                        .replace('{from}', number.format(from))
-                        .replace('{to}', number.format(to))
-                        .replace('{total}', number.format(total))
-                    : null}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={page === 1 || busy}
-                    onClick={() =>
-                      update({ page: Math.min(page - 1, lastPage) })
-                    }
-                  >
-                    {t.customers.prevPage}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={!hasNext || busy}
-                    onClick={() => update({ page: page + 1 })}
-                  >
-                    {t.customers.nextPage}
-                  </Button>
-                </div>
-              </nav>
+              <Pager
+                page={page}
+                shownPage={shownPage}
+                pageSize={CUSTOMERS_PAGE_SIZE}
+                count={customers.length}
+                total={total}
+                busy={busy}
+                onPage={(next) => update({ page: next })}
+                className="border-t border-grey/60"
+                text={{
+                  label: t.customers.pagination,
+                  showing: t.customers.showing,
+                  previous: t.customers.prevPage,
+                  next: t.customers.nextPage,
+                }}
+              />
             </Card>
           )}
         </div>

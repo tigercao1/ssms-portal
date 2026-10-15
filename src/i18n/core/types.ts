@@ -228,6 +228,12 @@ export interface Messages {
     colActive: string;
     colApplied: string;
     noInstructors: string;
+    searchLabel: string;
+    search: string;
+    showing: string;
+    prevPage: string;
+    nextPage: string;
+    pagination: string;
     detailTitle: string;
     actions: string;
     approve: string;

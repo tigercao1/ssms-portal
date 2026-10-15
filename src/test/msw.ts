@@ -230,6 +230,36 @@ export function fakeClass(overrides: Partial<AdminClass> = {}): AdminClass {
   };
 }
 
+export function listAdminInstructors(
+  all: AdminInstructorRecord[],
+  params: URLSearchParams,
+): { rows: AdminInstructorRecord[]; total: number } {
+  const status = params.get('status');
+  const active = params.get('active');
+  const tokens = (params.get('q') ?? '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const matches = all.filter((r) => {
+    const haystack = [r.displayNameEn, r.displayNameZh, r.email]
+      .join(' ')
+      .toLowerCase();
+    return (
+      (!status || r.approvalStatus === status) &&
+      (active === null || String(r.isActive) === active) &&
+      tokens.every((token) => haystack.includes(token))
+    );
+  });
+  const page = params.get('page');
+  const limit = params.get('limit');
+  if (page === null && limit === null) {
+    return { rows: matches, total: matches.length };
+  }
+  const size = Number(limit ?? 50);
+  const offset = (Number(page ?? 1) - 1) * size;
+  return { rows: matches.slice(offset, offset + size), total: matches.length };
+}
+
 const refs: RefItem[] = [{ id: 'l1', key: 'loc.whistler', name: 'Whistler' }];
 
 export const handlers = [
@@ -241,7 +271,15 @@ export const handlers = [
   http.get(`${API}/me/instructor/bio/ai-usage`, () =>
     HttpResponse.json({ limit: 5, used: 0, remaining: 5, resetsAt: null }),
   ),
-  http.get(`${API}/admin/instructors`, () => HttpResponse.json(fakeAdminList)),
+  http.get(`${API}/admin/instructors`, ({ request }) => {
+    const { rows, total } = listAdminInstructors(
+      fakeAdminList,
+      new URL(request.url).searchParams,
+    );
+    return HttpResponse.json(rows, {
+      headers: { 'X-Total-Count': String(total) },
+    });
+  }),
   http.get(`${API}/admin/instructors/:id`, () =>
     HttpResponse.json(fakeAdminList[0]),
   ),
