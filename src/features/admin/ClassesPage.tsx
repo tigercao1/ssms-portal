@@ -1,19 +1,21 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Locale, Messages } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
+import { cn } from '@/lib/cn';
 import {
   Banner,
   Card,
   EmptyState,
   Field,
   Input,
+  Pager,
   Select,
   Spinner,
 } from '@/components';
 import type { AdminClass, Attendance, ClassStatus } from '@/lib/types';
 import { useAdminInstructors } from './api';
-import { useAdminClasses } from './lessonsApi';
+import { CLASSES_PAGE_SIZE, useAdminClasses } from './lessonsApi';
 import { localizeField } from '@/i18n/core/localize';
 import {
   addDays,
@@ -45,6 +47,11 @@ const ATTENDANCE_KEYS: Record<Attendance, LessonsKey> = {
   no_show: 'attendanceNoShow',
 };
 
+function pageFrom(params: URLSearchParams): number {
+  const page = Number(params.get('page'));
+  return Number.isInteger(page) && page > 1 ? page : 1;
+}
+
 function localeTag(locale: Locale) {
   return locale === 'zh-CN' ? 'zh-CN' : 'en-CA';
 }
@@ -69,15 +76,44 @@ export function ClassesPage() {
   const t = useT();
   const { locale } = useLocale();
   const today = new Date();
-  const [from, setFrom] = useState(dateInputValue(today));
-  const [to, setTo] = useState(dateInputValue(addDays(today, 28)));
-  const [instructorId, setInstructorId] = useState('');
+  const [params, setParams] = useSearchParams();
+  const from = params.get('from') ?? dateInputValue(today);
+  const to = params.get('to') ?? dateInputValue(addDays(today, 28));
+  const instructorId = params.get('instructor') ?? '';
+  const page = pageFrom(params);
   const instructors = useAdminInstructors({});
   const rangeValid = Boolean(from && to && from <= to);
   const iso = rangeValid ? rangeToIso(from, to) : null;
   const classes = useAdminClasses(
     iso && { ...iso, ...(instructorId && { instructorId }) },
+    page,
   );
+  const items = classes.data?.classes ?? [];
+  const total = classes.data?.total ?? 0;
+  const shownPage = classes.data?.page ?? page;
+  const busy = classes.isPlaceholderData;
+
+  function setFilter(key: 'instructor' | 'from' | 'to', value: string) {
+    setParams(
+      (prev) => {
+        const out = new URLSearchParams(prev);
+        if (key === 'instructor' && !value) out.delete(key);
+        else out.set(key, value);
+        out.delete('page');
+        return out;
+      },
+      { replace: true },
+    );
+  }
+
+  function setPage(next: number) {
+    setParams((prev) => {
+      const out = new URLSearchParams(prev);
+      if (next > 1) out.set('page', String(next));
+      else out.delete('page');
+      return out;
+    });
+  }
 
   const names = new Map(
     (instructors.data ?? []).map((i) => [
@@ -99,7 +135,7 @@ export function ClassesPage() {
             <Select
               {...p}
               value={instructorId}
-              onChange={(e) => setInstructorId(e.target.value)}
+              onChange={(e) => setFilter('instructor', e.target.value)}
             >
               <option value="">{t.lessons.allInstructors}</option>
               {options.map(([id, name]) => (
@@ -116,7 +152,7 @@ export function ClassesPage() {
               {...p}
               type="date"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => setFilter('from', e.target.value)}
             />
           )}
         </Field>
@@ -129,7 +165,7 @@ export function ClassesPage() {
               {...p}
               type="date"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => setFilter('to', e.target.value)}
             />
           )}
         </Field>
@@ -145,38 +181,68 @@ export function ClassesPage() {
             ? classes.error.message
             : t.errors.generic}
         </Banner>
-      ) : (classes.data ?? []).length === 0 ? (
+      ) : items.length === 0 && page === 1 ? (
         <EmptyState title={t.lessons.classesEmptyTitle}>
           {t.lessons.classesEmptyBody}
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-6">
-          {groupClassesByDay(classes.data ?? []).map((group) => (
-            <section
-              key={group.day}
-              aria-label={formatDay(group.day, locale)}
-              className="flex flex-col gap-2"
-            >
-              <h2 className="text-lg">{formatDay(group.day, locale)}</h2>
-              <Card className="divide-y divide-grey/40 p-0">
-                {group.classes.map((c) => (
-                  <ClassRow
-                    key={c.id}
-                    item={c}
-                    instructorName={
-                      localizeField(
-                        c.instructorName,
-                        c.instructorNameZh,
-                        locale,
-                      ) ||
-                      names.get(c.instructorId) ||
-                      '—'
-                    }
-                  />
-                ))}
-              </Card>
-            </section>
-          ))}
+          <div
+            className={cn(
+              'flex flex-col gap-6 transition-opacity',
+              busy && 'opacity-60',
+            )}
+            aria-busy={busy}
+          >
+            {items.length === 0 && (
+              <p className="py-6 text-center text-sm text-slate">
+                {t.lessons.classesEmptyTitle}
+              </p>
+            )}
+            {groupClassesByDay(items).map((group) => (
+              <section
+                key={group.day}
+                aria-label={formatDay(group.day, locale)}
+                className="flex flex-col gap-2"
+              >
+                <h2 className="text-lg">{formatDay(group.day, locale)}</h2>
+                <Card className="divide-y divide-grey/40 p-0">
+                  {group.classes.map((c) => (
+                    <ClassRow
+                      key={c.id}
+                      item={c}
+                      instructorName={
+                        localizeField(
+                          c.instructorName,
+                          c.instructorNameZh,
+                          locale,
+                        ) ||
+                        names.get(c.instructorId) ||
+                        '—'
+                      }
+                    />
+                  ))}
+                </Card>
+              </section>
+            ))}
+          </div>
+          <Card className="p-0">
+            <Pager
+              page={page}
+              shownPage={shownPage}
+              pageSize={CLASSES_PAGE_SIZE}
+              count={items.length}
+              total={total}
+              busy={busy}
+              onPage={setPage}
+              text={{
+                label: t.lessons.classesPagination,
+                showing: t.lessons.classesShowing,
+                previous: t.lessons.classesPrevPage,
+                next: t.lessons.classesNextPage,
+              }}
+            />
+          </Card>
         </div>
       )}
     </div>

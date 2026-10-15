@@ -1,5 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { api, apiWithHeaders } from '@/lib/api';
 import type {
   AdminClass,
   InstructorCalendarsOverview,
@@ -75,16 +80,40 @@ export function useUpdatePayRate() {
   });
 }
 
-export function useAdminClasses(filter: ClassFilter | null) {
+export const CLASSES_PAGE_SIZE = 50;
+
+export interface AdminClassPage {
+  classes: AdminClass[];
+  total: number;
+  page: number;
+}
+
+export function useAdminClasses(filter: ClassFilter | null, page: number) {
   return useQuery({
-    queryKey: ['admin', 'classes', filter] as const,
+    queryKey: ['admin', 'classes', 'page', filter, page] as const,
     enabled: filter !== null,
-    queryFn: () => {
-      if (!filter) return [];
-      const qs = new URLSearchParams({ from: filter.from, to: filter.to });
+    queryFn: async (): Promise<AdminClassPage> => {
+      if (!filter) return { classes: [], total: 0, page };
+      const qs = new URLSearchParams({
+        from: filter.from,
+        to: filter.to,
+        limit: String(CLASSES_PAGE_SIZE),
+        page: String(page),
+      });
       if (filter.instructorId) qs.set('instructorId', filter.instructorId);
-      return api<AdminClass[]>(`/admin/classes?${qs}`);
+      const { data, headers } = await apiWithHeaders<AdminClass[]>(
+        `/admin/classes?${qs}`,
+      );
+      const total = Number(headers.get('X-Total-Count') ?? Number.NaN);
+      return {
+        classes: data,
+        page,
+        total: Number.isFinite(total)
+          ? total
+          : (page - 1) * CLASSES_PAGE_SIZE + data.length,
+      };
     },
+    placeholderData: keepPreviousData,
   });
 }
 

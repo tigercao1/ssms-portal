@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
-import { fakeAdminList, fakeClass, server } from '@/test/msw';
+import { delay, http, HttpResponse } from 'msw';
+import { useLocation } from 'react-router-dom';
+import { fakeAdminList, fakeClass, listAdminClasses, server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import { ClassesPage } from './ClassesPage';
 import { hideSyncToast } from './booking/syncToast';
@@ -18,23 +19,58 @@ const eddie: AdminInstructorRecord = {
   displayNameEn: 'Eddie Lee',
 };
 
-function serve(classes: AdminClass[]) {
+function serve(classes: AdminClass[], { slowPages = [] as number[] } = {}) {
   const queries: URLSearchParams[] = [];
   server.use(
     http.get(`${API}/admin/instructors`, () =>
       HttpResponse.json([jane, eddie]),
     ),
-    http.get(`${API}/admin/classes`, ({ request }) => {
+    http.get(`${API}/admin/classes`, async ({ request }) => {
       const params = new URL(request.url).searchParams;
       queries.push(params);
-      const id = params.get('instructorId');
-      return HttpResponse.json(
-        id ? classes.filter((c) => c.instructorId === id) : classes,
-      );
+      if (slowPages.includes(Number(params.get('page')))) await delay(150);
+      const { rows, total } = listAdminClasses(classes, params);
+      return HttpResponse.json(rows, {
+        headers: { 'X-Total-Count': String(total) },
+      });
     }),
   );
   return queries;
 }
+
+function manyClasses(
+  count: number,
+  overrides: Partial<AdminClass> = {},
+): AdminClass[] {
+  return Array.from({ length: count }, (_, i) => {
+    const day = String(2 + Math.floor(i / 5)).padStart(2, '0');
+    const hour = String(8 + (i % 5)).padStart(2, '0');
+    return fakeClass({
+      id: `c${i + 1}`,
+      startsAt: `2026-12-${day}T${hour}:00:00`,
+      endsAt: `2026-12-${day}T${hour}:45:00`,
+      notes: `Lesson ${i + 1}`,
+      ...overrides,
+    });
+  });
+}
+
+function LocationProbe() {
+  const { search } = useLocation();
+  return <output data-testid="location">{search}</output>;
+}
+
+function renderPage(route = '/') {
+  return renderWithProviders(
+    <>
+      <ClassesPage />
+      <LocationProbe />
+    </>,
+    { route },
+  );
+}
+
+const location = () => screen.getByTestId('location').textContent;
 
 describe('ClassesPage', () => {
   beforeEach(() => {
@@ -142,6 +178,9 @@ describe('ClassesPage', () => {
       new Date('2026-12-30T00:00:00'),
     );
     expect(q.has('instructorId')).toBe(false);
+    expect(q.get('page')).toBe('1');
+    expect(q.get('limit')).toBe('50');
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });
 
   it('groups classes by day in time order with instructor, status and students', async () => {
@@ -284,6 +323,134 @@ describe('ClassesPage', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('No classes yet')).not.toBeInTheDocument();
     expect(queries.length).toBe(before);
+  });
+
+  it('pages 50 classes at a time, keeping the previous page while the next loads', async () => {
+    serve(manyClasses(120), { slowPages: [2] });
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText('Showing 1–50 of 120')).toBeInTheDocument();
+    expect(screen.getByText('Lesson 1')).toBeInTheDocument();
+    expect(screen.getByText('Lesson 50')).toBeInTheDocument();
+    expect(screen.queryByText('Lesson 51')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('region')).toHaveLength(10);
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Lesson 1')).toBeInTheDocument();
+    expect(screen.getByText('Lesson 1').closest('[aria-busy]')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+    expect(
+      await screen.findByText('Showing 51–100 of 120'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Lesson 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Lesson 51')).toBeInTheDocument();
+    expect(location()).toBe('?page=2');
+
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(await screen.findByText('Showing 1–50 of 120')).toBeInTheDocument();
+    expect(location()).toBe('');
+  });
+
+  it('disables Next on the last page', async () => {
+    serve(manyClasses(120));
+    renderPage('/?page=3');
+    expect(
+      await screen.findByText('Showing 101–120 of 120'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled();
+  });
+
+  it('restores the instructor, dates and page from the URL', async () => {
+    const queries = serve(
+      manyClasses(60, { instructorId: 'inst-2', instructorName: 'Eddie Lee' }),
+    );
+    renderPage('/?instructor=inst-2&from=2026-12-02&to=2026-12-20&page=2');
+
+    expect(await screen.findByText('Showing 51–60 of 60')).toBeInTheDocument();
+    expect(screen.getByLabelText('From')).toHaveValue('2026-12-02');
+    expect(screen.getByLabelText('To')).toHaveValue('2026-12-20');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Instructor')).toHaveValue('inst-2'),
+    );
+    const q = queries.at(-1) as URLSearchParams;
+    expect(q.get('instructorId')).toBe('inst-2');
+    expect(q.get('page')).toBe('2');
+    expect(q.get('limit')).toBe('50');
+    expect(new Date(q.get('from') as string)).toEqual(
+      new Date('2026-12-02T00:00:00'),
+    );
+  });
+
+  it('goes back to page 1 when the instructor or dates change', async () => {
+    const queries = serve([
+      ...manyClasses(80),
+      fakeClass({
+        id: 'e1',
+        instructorId: 'inst-2',
+        instructorName: 'Eddie Lee',
+        startsAt: '2026-12-03T15:00:00',
+        endsAt: '2026-12-03T16:00:00',
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderPage('/?page=2');
+    expect(await screen.findByText('Showing 51–81 of 81')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Instructor'), 'inst-2');
+    expect(await screen.findByText('Showing 1–1 of 1')).toBeInTheDocument();
+    expect(location()).toBe('?instructor=inst-2');
+    expect(queries.at(-1)?.get('page')).toBe('1');
+
+    await user.selectOptions(screen.getByLabelText('Instructor'), '');
+    expect(await screen.findByText('Showing 1–50 of 81')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Showing 51–81 of 81')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('From'), {
+      target: { value: '2026-12-02' },
+    });
+    await waitFor(() => expect(location()).toBe('?from=2026-12-02'));
+    expect(await screen.findByText('Showing 1–50 of 81')).toBeInTheDocument();
+    expect(queries.at(-1)?.get('page')).toBe('1');
+  });
+
+  it('offers Previous when a page past the end comes back empty', async () => {
+    serve(manyClasses(3));
+    const user = userEvent.setup();
+    renderPage('/?page=4');
+    expect(await screen.findByText('No classes yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(await screen.findByText('Showing 1–3 of 3')).toBeInTheDocument();
+    expect(location()).toBe('');
+  });
+
+  it('falls back to the rows it has when the total header is missing', async () => {
+    server.use(
+      http.get(`${API}/admin/classes`, () => HttpResponse.json(manyClasses(2))),
+    );
+    renderPage();
+    expect(await screen.findByText('Showing 1–2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
+  it('labels the pager in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serve(manyClasses(60));
+    renderPage();
+    expect(await screen.findByText('第 1–50 节，共 60 节')).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: '课程分页' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '下一页' })).toBeEnabled();
   });
 
   it('shows the API error', async () => {
