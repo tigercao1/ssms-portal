@@ -303,6 +303,34 @@ describe('DocumentsListPage', () => {
     );
   });
 
+  it('publishes a customer document to selected people only', async () => {
+    makePublishable();
+    state.templates.find((x) => x.id === 'tpl-draft')!.audience = 'customer';
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2026/27'),
+    );
+    expect(within(dialog).queryByLabelText(/All instructors/)).toBeNull();
+    expect(within(dialog).getByRole('radio')).toBeChecked();
+    expect(within(dialog).queryByTestId('publish-summary')).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(publishBodies).toEqual([
+        { id: 'tpl-draft', body: { assignTo: 'selected', season: '2026/27' } },
+      ]),
+    );
+    expect(
+      await screen.findByText(
+        'Uniform policy is live. Assigned to 0 instructors.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows the API error when publishing fails', async () => {
     makePublishable();
     server.use(

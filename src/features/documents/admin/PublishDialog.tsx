@@ -67,7 +67,10 @@ export function PublishDialog({
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const [assignTo, setAssignTo] = useState<TemplateAssignTo>('all');
+  const canAssignAll = template.audience === 'instructor';
+  const [assignTo, setAssignTo] = useState<TemplateAssignTo>(
+    canAssignAll ? 'all' : 'selected',
+  );
   const [seasonInput, setSeasonInput] = useState<string | null>(null);
   const seasonValid =
     seasonInput === null || SEASON_RE.test(seasonInput.trim());
@@ -131,12 +134,14 @@ export function PublishDialog({
           <legend className="mb-1 text-sm font-medium text-navy">
             {t.documents.publishWho}
           </legend>
-          <AudienceOption
-            checked={assignTo === 'all'}
-            label={t.documents.publishAllLabel}
-            hint={t.documents.publishAllHint}
-            onSelect={() => setAssignTo('all')}
-          />
+          {canAssignAll && (
+            <AudienceOption
+              checked={assignTo === 'all'}
+              label={t.documents.publishAllLabel}
+              hint={t.documents.publishAllHint}
+              onSelect={() => setAssignTo('all')}
+            />
+          )}
           <AudienceOption
             checked={assignTo === 'selected'}
             label={t.documents.publishSelectedLabel}
