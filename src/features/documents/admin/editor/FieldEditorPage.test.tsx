@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  cleanup,
   createEvent,
   fireEvent,
   screen,
@@ -20,6 +21,7 @@ import {
   type DocumentsMockState,
 } from '../../api/handlers';
 import type { Field } from '../../api';
+import { fakeAssignment } from '../../api/fixtures';
 import { FieldEditorPage } from './FieldEditorPage';
 
 vi.mock('../../pdf/pdfjs', () => ({ loadPdf: vi.fn() }));
@@ -88,6 +90,9 @@ let restoreWidth: () => void;
 beforeEach(() => {
   restoreWidth = stubClientWidth(612);
   state = createDocumentsState();
+  state.assignments = state.assignments.filter(
+    (a) => a.templateId !== 'tpl-conduct',
+  );
   puts = [];
   vi.mocked(loadPdf).mockImplementation(() => fakePdfLoad([{}, {}]));
   server.use(
@@ -372,6 +377,32 @@ describe('FieldEditorPage', () => {
         /Upload this document’s PDF from the documents list/,
       ),
     ).toBeInTheDocument();
+  });
+
+  it('locks field placement once a copy has been signed', async () => {
+    renderEditor('tpl-waiver');
+    await screen.findByText('Liability waiver');
+    expect(
+      screen.getByRole('button', { name: 'Save fields' }),
+    ).toBeInTheDocument();
+    state.assignments.push(
+      fakeAssignment({
+        id: 'asg-w-done',
+        templateId: 'tpl-waiver',
+        status: 'completed',
+      }),
+    );
+    cleanup();
+    renderEditor('tpl-waiver');
+    expect(
+      await screen.findByText(/Someone has signed this document/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Save fields' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add Signature field' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an error for an unknown template', async () => {

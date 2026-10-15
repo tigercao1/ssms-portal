@@ -1,6 +1,7 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
+import type { Messages } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
@@ -15,6 +16,7 @@ import type { ConfirmedTemplate, TemplateSummary } from '../api';
 import {
   MAX_TEMPLATE_BYTES,
   useCreateTemplate,
+  useRetireTemplate,
   useTemplates,
   useUpdateTemplate,
   useUploadTemplateSource,
@@ -27,7 +29,8 @@ import {
   valuesToPatch,
 } from './TemplateForm';
 import { AssignDialog } from './AssignDialog';
-import { KindBadge } from './badges';
+import { PublishDialog } from './PublishDialog';
+import { KindBadge, TemplateStatusChip } from './badges';
 import { errorText, templateTitle } from './format';
 
 type UploadNotice =
@@ -40,6 +43,8 @@ export function DocumentsListPage() {
   const templates = useTemplates();
   const [editing, setEditing] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<TemplateSummary | null>(null);
+  const [publishing, setPublishing] = useState<TemplateSummary | null>(null);
+  const { locale } = useLocale();
   const [notice, setNotice] = useState<UploadNotice | null>(null);
 
   const rows = [...(templates.data ?? [])].sort(
@@ -83,10 +88,13 @@ export function DocumentsListPage() {
                     {t.documents.colPdf}
                   </th>
                   <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
-                    {t.documents.colRequired}
+                    {t.documents.colStatus}
+                  </th>
+                  <th className="whitespace-nowrap px-4 py-2 font-medium">
+                    {t.documents.colAudience}
                   </th>
                   <th className="w-px whitespace-nowrap px-4 py-2 font-medium">
-                    {t.documents.colActive}
+                    {t.documents.colRequired}
                   </th>
                   <th className="whitespace-nowrap px-4 py-2 text-right font-medium">
                     {t.admin.actions}
@@ -104,15 +112,17 @@ export function DocumentsListPage() {
                         setEditing((cur) => (cur === row.id ? null : row.id))
                       }
                       onAssign={() => setAssigning(row)}
+                      onPublish={() => setPublishing(row)}
                       onNotice={setNotice}
                     />
                     {editing === row.id && (
                       <tr className="bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]">
-                        <td colSpan={6} className="px-4 pb-4 pt-1">
+                        <td colSpan={7} className="px-4 pb-4 pt-1">
                           <div className="rounded-md border border-grey/60 bg-surface p-4 shadow-card sm:p-5">
                             <EditTemplate
                               row={row}
                               onDone={() => setEditing(null)}
+                              onNotice={setNotice}
                             />
                           </div>
                         </td>
@@ -131,32 +141,62 @@ export function DocumentsListPage() {
       {assigning && (
         <AssignDialog template={assigning} onClose={() => setAssigning(null)} />
       )}
+
+      {publishing && (
+        <PublishDialog
+          template={publishing}
+          onClose={() => setPublishing(null)}
+          onPublished={(result) => {
+            setPublishing(null);
+            setNotice({
+              id: result.template.id,
+              tone: 'approved',
+              text: t.documents.published
+                .replace('{title}', templateTitle(result.template, locale))
+                .replace('{created}', String(result.created)),
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function TemplateRow({
+function publishBlocker(row: TemplateSummary, t: Messages): string | null {
+  if (!row.hasSource) return t.documents.publishNeedsPdf;
+  if (row.kind === 'sign' && row.fieldCount === 0)
+    return t.documents.publishNeedsField;
+  return null;
+}
+
+function AudienceCell({ row }: { row: TemplateSummary }) {
+  const t = useT();
+  if (row.status !== 'live' || !row.assignTo)
+    return <span className="text-slate">—</span>;
+  return (
+    <span className="whitespace-nowrap">
+      {row.assignTo === 'all'
+        ? t.documents.audienceAll
+        : t.documents.audienceSelected}
+    </span>
+  );
+}
+
+function SourceActions({
   row,
-  striped,
-  expanded,
-  onEdit,
-  onAssign,
   onNotice,
 }: {
   row: TemplateSummary;
-  striped: boolean;
-  expanded: boolean;
-  onEdit: () => void;
-  onAssign: () => void;
   onNotice: (n: UploadNotice | null) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const update = useUpdateTemplate();
   const upload = useUploadTemplateSource();
   const fileRef = useRef<HTMLInputElement>(null);
+  const reasonId = useId();
   const title = templateTitle(row, locale);
   const hasPdf = row.hasSource;
+  const locked = row.hasCompletedAssignments;
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -173,19 +213,13 @@ function TemplateRow({
               : t.documents.uploaded
             )
               .replace('{title}', title)
-              .replace('{pages}', pagesText(tpl.pageCount)),
+              .replace('{pages}', pagesText(tpl.pageCount, t)),
           }),
         onError: (err) =>
           onNotice({ id: row.id, tone: 'error', text: uploadError(err) }),
       },
     );
     if (fileRef.current) fileRef.current.value = '';
-  }
-
-  function pagesText(n: number | null) {
-    return n === 1
-      ? t.documents.onePage
-      : t.documents.pages.replace('{n}', String(n ?? 0));
   }
 
   function uploadError(err: unknown) {
@@ -202,6 +236,125 @@ function TemplateRow({
     );
   }
 
+  const describedBy = locked ? reasonId : undefined;
+
+  return (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={t.documents.uploadFor.replace('{title}', title)}
+        disabled={locked}
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
+      <span title={locked ? t.documents.lockedSigned : undefined}>
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={upload.isPending}
+          disabled={locked}
+          aria-describedby={describedBy}
+          onClick={() => fileRef.current?.click()}
+        >
+          {hasPdf ? t.documents.replacePdf : t.documents.uploadPdf}
+        </Button>
+      </span>
+      {hasPdf && row.kind === 'sign' && locked ? (
+        <span title={t.documents.lockedSigned}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled
+            aria-describedby={describedBy}
+          >
+            {t.documents.placeFields}
+          </Button>
+        </span>
+      ) : hasPdf ? (
+        <Link
+          to={`/admin/documents/${row.id}/edit`}
+          className="inline-flex h-9 items-center rounded-md border border-navy px-3 text-sm font-medium text-navy hover:bg-navy-tint"
+          aria-label={t.documents.placeFieldsFor.replace('{title}', title)}
+        >
+          {row.kind === 'sign' ? t.documents.placeFields : t.documents.preview}
+        </Link>
+      ) : null}
+      {locked && (
+        <p id={reasonId} className="basis-full text-right text-xs text-slate">
+          {t.documents.lockedSigned}
+        </p>
+      )}
+    </>
+  );
+}
+
+function pagesText(n: number | null, t: Messages) {
+  return n === 1
+    ? t.documents.onePage
+    : t.documents.pages.replace('{n}', String(n ?? 0));
+}
+
+function TemplateRow({
+  row,
+  striped,
+  expanded,
+  onEdit,
+  onAssign,
+  onPublish,
+  onNotice,
+}: {
+  row: TemplateSummary;
+  striped: boolean;
+  expanded: boolean;
+  onEdit: () => void;
+  onAssign: () => void;
+  onPublish: () => void;
+  onNotice: (n: UploadNotice | null) => void;
+}) {
+  const t = useT();
+  const { locale } = useLocale();
+  const update = useUpdateTemplate();
+  const retire = useRetireTemplate();
+  const reasonId = useId();
+  const title = templateTitle(row, locale);
+  const blocker = publishBlocker(row, t);
+  const error = update.error ?? retire.error;
+
+  function onRetire() {
+    onNotice(null);
+    retire.mutate(row.id, {
+      onSuccess: () =>
+        onNotice({
+          id: row.id,
+          tone: 'approved',
+          text: t.documents.retired.replace('{title}', title),
+        }),
+    });
+  }
+
+  const publishButton = (label: string, aria: string) => (
+    <span title={blocker ?? undefined}>
+      <Button
+        size="sm"
+        variant={row.status === 'draft' ? 'primary' : 'secondary'}
+        disabled={blocker !== null}
+        aria-label={aria.replace('{title}', title)}
+        aria-describedby={blocker ? reasonId : undefined}
+        onClick={onPublish}
+      >
+        {label}
+      </Button>
+      {blocker && (
+        <span id={reasonId} className="sr-only">
+          {blocker}
+        </span>
+      )}
+    </span>
+  );
+
   return (
     <tr
       aria-current={expanded ? true : undefined}
@@ -209,11 +362,11 @@ function TemplateRow({
         expanded
           ? 'bg-navy-tint shadow-[inset_3px_0_0_var(--navy)]'
           : striped && 'bg-sunken',
-        !row.isActive && 'text-slate',
+        row.status === 'retired' && 'text-slate',
       )}
     >
       <td className="px-4 py-2">
-        <div className={row.isActive ? 'font-medium text-ink' : ''}>
+        <div className={row.status !== 'retired' ? 'font-medium text-ink' : ''}>
           {title}
         </div>
         {locale === 'en' && row.titleZh && (
@@ -224,15 +377,17 @@ function TemplateRow({
         <KindBadge kind={row.kind} />
       </td>
       <td className="whitespace-nowrap px-4 py-2">
-        {hasPdf ? (
-          row.pageCount === 1 ? (
-            t.documents.onePage
-          ) : (
-            t.documents.pages.replace('{n}', String(row.pageCount ?? 0))
-          )
+        {row.hasSource ? (
+          pagesText(row.pageCount, t)
         ) : (
           <span className="text-status-rejected">{t.documents.noPdf}</span>
         )}
+      </td>
+      <td className="whitespace-nowrap px-4 py-2">
+        <TemplateStatusChip status={row.status} />
+      </td>
+      <td className="px-4 py-2">
+        <AudienceCell row={row} />
       </td>
       <td className="px-4 py-2">
         <Toggle
@@ -243,15 +398,7 @@ function TemplateRow({
         />
       </td>
       <td className="px-4 py-2">
-        <Toggle
-          checked={row.isActive}
-          disabled={update.isPending}
-          label={t.documents.activeFor.replace('{title}', title)}
-          onChange={(isActive) => update.mutate({ id: row.id, isActive })}
-        />
-      </td>
-      <td className="px-4 py-2">
-        <div className="flex min-w-[11.5rem] flex-wrap justify-end gap-2">
+        <div className="flex min-w-[11.5rem] flex-wrap items-center justify-end gap-2">
           <Button
             size="sm"
             variant="ghost"
@@ -261,50 +408,44 @@ function TemplateRow({
           >
             {t.common.edit}
           </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            className="sr-only"
-            tabIndex={-1}
-            aria-label={t.documents.uploadFor.replace('{title}', title)}
-            onChange={(e) => onFile(e.target.files?.[0])}
-          />
-          <Button
-            size="sm"
-            variant="ghost"
-            loading={upload.isPending}
-            onClick={() => fileRef.current?.click()}
-          >
-            {hasPdf ? t.documents.replacePdf : t.documents.uploadPdf}
-          </Button>
-          {hasPdf ? (
-            <Link
-              to={`/admin/documents/${row.id}/edit`}
-              className="inline-flex h-9 items-center rounded-md border border-navy px-3 text-sm font-medium text-navy hover:bg-navy-tint"
-              aria-label={t.documents.placeFieldsFor.replace('{title}', title)}
-            >
-              {row.kind === 'sign'
-                ? t.documents.placeFields
-                : t.documents.preview}
-            </Link>
-          ) : null}
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={!hasPdf || !row.isActive}
-            aria-label={t.documents.assignFor.replace('{title}', title)}
-            onClick={onAssign}
-          >
-            {t.documents.assign}
-          </Button>
+          {row.status === 'draft' && (
+            <>
+              <SourceActions row={row} onNotice={onNotice} />
+              {publishButton(t.documents.publish, t.documents.publishFor)}
+            </>
+          )}
+          {row.status === 'live' && (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                aria-label={t.documents.assignFor.replace('{title}', title)}
+                onClick={onAssign}
+              >
+                {row.assignTo === 'all'
+                  ? t.documents.assignMore
+                  : t.documents.assign}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={retire.isPending}
+                aria-label={t.documents.retireFor.replace('{title}', title)}
+                onClick={onRetire}
+              >
+                {t.documents.retire}
+              </Button>
+            </>
+          )}
+          {row.status === 'retired' &&
+            publishButton(t.documents.republish, t.documents.republishFor)}
         </div>
-        {update.isError && (
+        {error && (
           <p
             role="alert"
             className="mt-1 text-right text-xs text-status-rejected"
           >
-            {errorText(update.error, t.errors.generic)}
+            {errorText(error, t.errors.generic)}
           </p>
         )}
       </td>
@@ -315,15 +456,24 @@ function TemplateRow({
 function EditTemplate({
   row,
   onDone,
+  onNotice,
 }: {
   row: TemplateSummary;
   onDone: () => void;
+  onNotice: (n: UploadNotice | null) => void;
 }) {
   const t = useT();
   const update = useUpdateTemplate();
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-lg">{t.documents.editTitle}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg">{t.documents.editTitle}</h2>
+        {row.status !== 'draft' && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <SourceActions row={row} onNotice={onNotice} />
+          </div>
+        )}
+      </div>
       <TemplateForm
         initial={templateToValues(row)}
         kindEditable={false}

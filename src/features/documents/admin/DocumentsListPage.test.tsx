@@ -13,17 +13,23 @@ import {
   type DocumentsMockState,
 } from '../api/handlers';
 import { buildSamplePdf } from '../api/samplePdf';
+import { fakeField } from '../api/fixtures';
 
 const API = 'http://localhost:3000';
 
 let state: DocumentsMockState;
 let patches: { id: string; body: unknown }[];
 let assignBodies: unknown[];
+let publishBodies: { id: string; body: unknown }[];
 
 beforeEach(() => {
-  state = createDocumentsState({ instructorIds: ['inst-1', 'inst-2'] });
+  state = createDocumentsState({
+    instructorIds: ['inst-1', 'inst-2'],
+    pendingInstructorIds: ['inst-3', 'inst-4', 'inst-5'],
+  });
   patches = [];
   assignBodies = [];
+  publishBodies = [];
   const li: AdminInstructorRecord = {
     ...(fakeAdminList[0] as AdminInstructorRecord),
     id: 'inst-2',
@@ -36,6 +42,16 @@ beforeEach(() => {
       `${API}/admin/documents/templates/:id`,
       async ({ request, params }) => {
         patches.push({
+          id: String(params.id),
+          body: await request.clone().json(),
+        });
+        return undefined;
+      },
+    ),
+    http.post(
+      `${API}/admin/documents/templates/:id/publish`,
+      async ({ request, params }) => {
+        publishBodies.push({
           id: String(params.id),
           body: await request.clone().json(),
         });
@@ -55,6 +71,28 @@ beforeEach(() => {
 
 function row(name: string) {
   return screen.getByText(name).closest('tr') as HTMLElement;
+}
+
+async function openEdit(
+  user: ReturnType<typeof userEvent.setup>,
+  title: string,
+) {
+  await user.click(
+    await screen.findByRole('button', { name: `Edit ${title}` }),
+  );
+  return screen.getByText('Edit document').closest('div')!
+    .parentElement as HTMLElement;
+}
+
+function makePublishable(id = 'tpl-draft') {
+  const tpl = state.templates.find((x) => x.id === id)!;
+  Object.assign(tpl, {
+    sourceSha256: 'ab'.repeat(32),
+    sourceUrl: 'https://storage.mock/templates/tpl-draft/source.pdf',
+    pageCount: 1,
+    pages: [{ x: 0, y: 0, width: 612, height: 792, rotate: 0 }],
+    fields: [fakeField()],
+  });
 }
 
 describe('DocumentsListPage', () => {
@@ -81,44 +119,286 @@ describe('DocumentsListPage', () => {
       within(row('Uniform policy')).getByText('No PDF yet'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Assign Uniform policy' }),
-    ).toBeDisabled();
+      within(row('Uniform policy')).getByText('Draft'),
+    ).toBeInTheDocument();
+    expect(within(row('Uniform policy')).getByText('—')).toBeInTheDocument();
     expect(
-      within(row('Code of conduct')).getByRole('link', {
-        name: 'Open editor for Code of conduct',
+      within(row('Code of conduct')).getByText('Live'),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Code of conduct')).getByText('All instructors'),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Liability waiver')).getByText('Selected'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', { name: /Active/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Assign Uniform policy' }),
+    ).not.toBeInTheDocument();
+    const publish = screen.getByRole('button', {
+      name: 'Publish Uniform policy',
+    });
+    expect(publish).toBeDisabled();
+    expect(publish).toHaveAccessibleDescription(
+      'Upload a PDF before publishing.',
+    );
+    expect(publish.parentElement).toHaveAttribute(
+      'title',
+      'Upload a PDF before publishing.',
+    );
+    expect(
+      within(row('Uniform policy')).getByRole('button', { name: 'Upload PDF' }),
+    ).toBeEnabled();
+    expect(
+      within(row('Code of conduct')).getByRole('button', {
+        name: 'Assign Code of conduct',
       }),
-    ).toHaveAttribute('href', '/admin/documents/tpl-conduct/edit');
+    ).toHaveTextContent('Assign more');
+    expect(
+      within(row('Liability waiver')).getByRole('button', {
+        name: 'Assign Liability waiver',
+      }),
+    ).toHaveTextContent(/^Assign$/);
+    expect(
+      within(row('Code of conduct')).getByRole('button', {
+        name: 'Retire Code of conduct',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Code of conduct')).queryByRole('button', {
+        name: 'Replace PDF',
+      }),
+    ).not.toBeInTheDocument();
   });
 
-  it('toggles required and active with PATCH', async () => {
+  it('explains why a sign document without fields cannot be published', async () => {
+    const tpl = state.templates.find((x) => x.id === 'tpl-draft')!;
+    makePublishable();
+    tpl.fields = [];
+    renderWithProviders(<DocumentsListPage />);
+    const publish = await screen.findByRole('button', {
+      name: 'Publish Uniform policy',
+    });
+    expect(publish).toBeDisabled();
+    expect(publish).toHaveAccessibleDescription(
+      'Place at least one field before publishing.',
+    );
+    expect(
+      within(row('Uniform policy')).getByRole('link', {
+        name: 'Open editor for Uniform policy',
+      }),
+    ).toHaveAttribute('href', '/admin/documents/tpl-draft/edit');
+  });
+
+  it('publishes to all instructors with the counts from publish-preview', async () => {
+    makePublishable();
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Publish “Uniform policy”',
+    });
+    expect(
+      within(dialog).getByText(
+        "Instructors can see and sign it once it's published.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/All instructors/)).toBeChecked();
+    expect(await within(dialog).findByLabelText(/Season/)).toHaveValue(
+      '2026/27',
+    );
+    const summary = await within(dialog).findByTestId('publish-summary');
+    expect(summary).toHaveTextContent(
+      'Assigns now to 2 approved instructors and emails them.',
+    );
+    expect(summary).toHaveTextContent(
+      '3 pending instructors get it automatically when you approve them.',
+    );
+    await user.click(within(dialog).getByLabelText(/Selected instructors/));
+    expect(within(dialog).queryByTestId('publish-summary')).toBeNull();
+    expect(
+      within(dialog).getByRole('button', { name: 'Publish' }),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByLabelText(/All instructors/));
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Publish and email 2' }),
+    );
+    expect(
+      await screen.findByText(
+        'Uniform policy is live. Assigned to 2 instructors.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(publishBodies).toEqual([
+      { id: 'tpl-draft', body: { assignTo: 'all', season: '2026/27' } },
+    ]);
+    await waitFor(() =>
+      expect(
+        within(row('Uniform policy')).getByText('Live'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('publishes for selected instructors and a different season', async () => {
+    makePublishable();
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    const season = await within(dialog).findByLabelText(/Season/);
+    await waitFor(() => expect(season).toHaveValue('2026/27'));
+    await user.clear(season);
+    await user.type(season, '2027');
+    expect(
+      within(dialog).getByText('Use the form 2026/27.'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: /^Publish/ }),
+    ).toBeDisabled();
+    await user.type(season, '/28');
+    await user.click(within(dialog).getByLabelText(/Selected instructors/));
+    await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(publishBodies).toEqual([
+        { id: 'tpl-draft', body: { assignTo: 'selected', season: '2027/28' } },
+      ]),
+    );
+    expect(
+      await screen.findByText(
+        'Uniform policy is live. Assigned to 0 instructors.',
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(row('Uniform policy')).getByText('Selected'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('shows the API error when publishing fails', async () => {
+    makePublishable();
+    server.use(
+      http.post(`${API}/admin/documents/templates/:id/publish`, () =>
+        HttpResponse.json({ message: 'Already live' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      await within(dialog).findByRole('button', {
+        name: 'Publish and email 2',
+      }),
+    );
+    expect(await within(dialog).findByText('Already live')).toBeInTheDocument();
+  });
+
+  it('retires a live document and re-publishes it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Retire Liability waiver' }),
+    );
+    expect(
+      await screen.findByText(
+        'Liability waiver is retired. Existing assignments are kept.',
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(row('Liability waiver')).getByText('Retired'),
+      ).toBeInTheDocument(),
+    );
+    expect(within(row('Liability waiver')).getByText('—')).toBeInTheDocument();
+    expect(
+      within(row('Liability waiver')).queryByRole('button', {
+        name: 'Assign Liability waiver',
+      }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Re-publish Liability waiver' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Publish “Liability waiver”',
+    });
+    const summary = await within(dialog).findByTestId('publish-summary');
+    expect(summary).toHaveTextContent(
+      'Assigns now to 1 approved instructors and emails them.',
+    );
+    expect(summary).toHaveTextContent(
+      "1 already have it and won't be emailed again.",
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Publish and email 1' }),
+    );
+    expect(
+      await screen.findByText(
+        'Liability waiver is live. Assigned to 1 instructors.',
+      ),
+    ).toBeInTheDocument();
+    expect(publishBodies).toEqual([
+      { id: 'tpl-waiver', body: { assignTo: 'all', season: '2026/27' } },
+    ]);
+  });
+
+  it('shows the API error when retiring fails', async () => {
+    server.use(
+      http.post(`${API}/admin/documents/templates/:id/retire`, () =>
+        HttpResponse.json({ message: 'Not live' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Retire Liability waiver' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not live');
+  });
+
+  it('locks Replace PDF and Place fields once a copy has been signed', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const editor = await openEdit(user, 'Code of conduct');
+    const replace = within(editor).getByRole('button', { name: 'Replace PDF' });
+    expect(replace).toBeDisabled();
+    const reason =
+      "Someone has signed this document, so its PDF and fields can't change. Retire it and publish a new one.";
+    expect(replace).toHaveAccessibleDescription(reason);
+    expect(
+      within(editor).getByRole('button', { name: 'Place fields' }),
+    ).toBeDisabled();
+    expect(within(editor).getByText(reason)).toBeInTheDocument();
+    expect(
+      within(editor).getByLabelText('Upload PDF for Code of conduct'),
+    ).toBeDisabled();
+  });
+
+  it('toggles required with PATCH', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
       await screen.findByRole('switch', { name: 'Required: Code of conduct' }),
     );
-    await user.click(
-      screen.getByRole('switch', { name: 'Active: Uniform policy' }),
-    );
     await waitFor(() =>
       expect(patches).toEqual([
         { id: 'tpl-conduct', body: { required: false } },
-        { id: 'tpl-draft', body: { isActive: true } },
       ]),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole('switch', { name: 'Active: Uniform policy' }),
-      ).toHaveAttribute('aria-checked', 'true'),
     );
   });
 
   it('edits metadata and only sends changed keys', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit Liability waiver' }),
-    );
-    const editor = screen.getByText('Edit document').parentElement!;
+    const editor = await openEdit(user, 'Liability waiver');
     expect(within(editor).getByLabelText('Type')).toBeDisabled();
     const zh = within(editor).getByLabelText('Title (Chinese)');
     await user.clear(zh);
@@ -218,8 +498,9 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText(
-      'Upload PDF for Code of conduct',
+    const editor = await openEdit(user, 'Liability waiver');
+    const input = within(editor).getByLabelText(
+      'Upload PDF for Liability waiver',
     );
     await user.upload(
       input,
@@ -233,9 +514,7 @@ describe('DocumentsListPage', () => {
   it('rejects non-PDF and oversize files before uploading', async () => {
     const user = userEvent.setup({ applyAccept: false });
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText(
-      'Upload PDF for Code of conduct',
-    );
+    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
     await user.upload(input, new File(['x'], 'a.png', { type: 'image/png' }));
     expect(await screen.findByText('Choose a PDF file.')).toBeInTheDocument();
     const big = new File(['x'], 'big.pdf', { type: 'application/pdf' });
@@ -255,9 +534,7 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText(
-      'Upload PDF for Code of conduct',
-    );
+    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
     await user.upload(
       input,
       new File(['%PDF'], 'c.pdf', { type: 'application/pdf' }),

@@ -5,6 +5,7 @@ import type {
   CertState,
   ReviewStatus,
   TemplateKind,
+  TemplateStatus,
 } from '../api';
 
 type Tone = 'neutral' | 'pending' | 'approved' | 'rejected' | 'navy';
@@ -42,6 +43,17 @@ export function KindBadge({ kind }: { kind: TemplateKind }) {
       {kind === 'sign' ? t.documents.kindSign : t.documents.kindRead}
     </span>
   );
+}
+
+export function TemplateStatusChip({ status }: { status: TemplateStatus }) {
+  const t = useT();
+  const map: Record<TemplateStatus, [Tone, string]> = {
+    draft: ['navy', t.documents.templateStatusDraft],
+    live: ['approved', t.documents.templateStatusLive],
+    retired: ['neutral', t.documents.templateStatusRetired],
+  };
+  const [tone, label] = map[status];
+  return <Chip tone={tone} label={label} />;
 }
 
 export function AssignmentStatusChip({ status }: { status: AssignmentStatus }) {
