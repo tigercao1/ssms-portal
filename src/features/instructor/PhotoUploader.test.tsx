@@ -6,7 +6,7 @@ import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
 import { mockImagePipeline, sizedFile } from '@/test/imageMocks';
-import { bodyBytes, patternBytes } from '@/test/bytes';
+import { bodyBytes, patternBytes, sha256 } from '@/test/bytes';
 
 const API = 'http://localhost:3000';
 
@@ -153,7 +153,8 @@ describe('PhotoUploader', () => {
         contentLength: 800_000,
       }),
     );
-    await vi.waitFor(() => expect(uploaded).toEqual(patternBytes(800_000)));
+    const expected = sha256(patternBytes(800_000));
+    await vi.waitFor(() => expect(uploaded && sha256(uploaded)).toBe(expected));
     expect(screen.queryByText(/5 MB or smaller/)).not.toBeInTheDocument();
   });
 
@@ -255,7 +256,7 @@ describe('MorePhotosUploader', () => {
         { route: 'confirm', body: { contentType: 'image/jpeg', slot: 2 } },
       ]),
     );
-    expect(uploads).toEqual([patternBytes(700_000)]);
+    expect(uploads.map(sha256)).toEqual([sha256(patternBytes(700_000))]);
     expect(mock.drawn).toEqual([{ width: 2000, height: 1500 }]);
   });
 

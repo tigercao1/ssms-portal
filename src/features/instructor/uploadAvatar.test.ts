@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { uploadAvatar } from './api';
 import { fakeProfile, server } from '@/test/msw';
 import { mockImagePipeline, sizedFile } from '@/test/imageMocks';
-import { bodyBytes, patternBytes } from '@/test/bytes';
+import { bodyBytes, patternBytes, sha256 } from '@/test/bytes';
 
 const API = 'http://localhost:3000';
 const MB = 1024 * 1024;
@@ -68,7 +68,7 @@ describe('uploadAvatar resizing', () => {
       contentLength: 900_000,
     });
     expect(captured.putType).toBe('image/jpeg');
-    expect(captured.putBody).toEqual(patternBytes(900_000));
+    expect(sha256(captured.putBody!)).toBe(sha256(patternBytes(900_000)));
     expect(captured.confirm).toEqual({ contentType: 'image/jpeg' });
   });
 
