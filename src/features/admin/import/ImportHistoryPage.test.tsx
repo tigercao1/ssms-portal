@@ -916,11 +916,13 @@ describe('ImportHistoryPage', () => {
     expect(
       await within(pager()).findByText('Showing 1–50 of 120'),
     ).toBeInTheDocument();
-    expect(calls.pages.at(-1)).toEqual({
-      id: 'imp-1',
-      page: '1',
-      limit: '50',
-    });
+    await waitFor(() =>
+      expect(calls.pages.at(-1)).toEqual({
+        id: 'imp-1',
+        page: '1',
+        limit: '50',
+      }),
+    );
   });
 
   it('stays on the current page after editing a row', async () => {
@@ -976,12 +978,16 @@ describe('ImportHistoryPage', () => {
     expect(
       await screen.findByLabelText('Instructor for row 1'),
     ).toBeInTheDocument();
-    expect(within(pager()).getByText('Showing 1–50 of 50')).toBeInTheDocument();
-    expect(calls.pages.at(-1)).toEqual({
-      id: 'imp-1',
-      page: '1',
-      limit: '50',
-    });
+    expect(
+      await within(pager()).findByText('Showing 1–50 of 50'),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(calls.pages.at(-1)).toEqual({
+        id: 'imp-1',
+        page: '1',
+        limit: '50',
+      }),
+    );
     expect(screen.queryByText('No rows match this filter.')).toBeNull();
   });
 });
