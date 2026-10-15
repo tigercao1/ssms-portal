@@ -14,10 +14,11 @@ import {
 import type { CertOrg, CertTrack } from '@/lib/types';
 import { isCertContentType, prepareCertFile } from './certFile';
 
-export function useMyChecklist() {
+export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: documentsKeys.myChecklist,
     queryFn: getMyChecklist,
+    enabled,
   });
 }
 

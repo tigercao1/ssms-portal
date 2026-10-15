@@ -5,11 +5,14 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { Brandmark, Contour } from '@/components';
 import { LangSwitch } from '@/components/LangSwitch';
 import { cn } from '@/lib/cn';
+import { useMyChecklist } from '@/features/documents/onboarding/queries';
+import { LockIcon } from '@/features/documents/onboarding/Locked';
 
 interface NavItem {
   to: string;
   label: string;
   end?: boolean;
+  locked?: boolean;
 }
 
 /** App shell (W1.7): navy contour sidebar + topbar; role-aware nav; responsive. */
@@ -21,6 +24,7 @@ export function AppShell() {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
   const { pathname } = useLocation();
+  const checklist = useMyChecklist({ enabled: !isAdmin });
 
   useEffect(() => {
     setOpen(false);
@@ -64,7 +68,11 @@ export function AppShell() {
       ]
     : [
         { to: '/profile', label: t.nav.profile },
-        { to: '/onboarding', label: t.nav.onboarding },
+        {
+          to: '/onboarding',
+          label: t.nav.onboarding,
+          locked: checklist.data?.locked ?? false,
+        },
         { to: '/settings', label: t.nav.settings },
       ];
 
@@ -127,7 +135,18 @@ export function AppShell() {
                 )
               }
             >
-              {it.label}
+              {it.locked ? (
+                <span
+                  className="inline-flex items-center gap-2"
+                  title={t.nav.onboardingLocked}
+                >
+                  <LockIcon />
+                  {it.label}
+                  <span className="sr-only">{t.nav.onboardingLocked}</span>
+                </span>
+              ) : (
+                it.label
+              )}
             </NavLink>
           ))}
         </nav>
