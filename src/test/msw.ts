@@ -260,6 +260,24 @@ export function listAdminInstructors(
   return { rows: matches.slice(offset, offset + size), total: matches.length };
 }
 
+export function listAdminClasses(
+  all: AdminClass[],
+  params: URLSearchParams,
+): { rows: AdminClass[]; total: number } {
+  const instructorId = params.get('instructorId');
+  const matches = instructorId
+    ? all.filter((c) => c.instructorId === instructorId)
+    : all;
+  const page = params.get('page');
+  const limit = params.get('limit');
+  if (page === null && limit === null) {
+    return { rows: matches, total: matches.length };
+  }
+  const size = Number(limit ?? 50);
+  const offset = (Number(page ?? 1) - 1) * size;
+  return { rows: matches.slice(offset, offset + size), total: matches.length };
+}
+
 const refs: RefItem[] = [{ id: 'l1', key: 'loc.whistler', name: 'Whistler' }];
 
 export const handlers = [
@@ -284,7 +302,15 @@ export const handlers = [
     HttpResponse.json(fakeAdminList[0]),
   ),
   http.get(`${API}/reference/:slug`, () => HttpResponse.json(refs)),
-  http.get(`${API}/admin/classes`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/classes`, ({ request }) => {
+    const { rows, total } = listAdminClasses(
+      [],
+      new URL(request.url).searchParams,
+    );
+    return HttpResponse.json(rows, {
+      headers: { 'X-Total-Count': String(total) },
+    });
+  }),
   http.get(`${API}/admin/booking/sync-issues`, () =>
     HttpResponse.json({ classes: [], deletions: [] }),
   ),

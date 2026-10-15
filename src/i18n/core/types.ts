@@ -454,6 +454,10 @@ export interface Messages {
     rangeInvalid: string;
     classesEmptyTitle: string;
     classesEmptyBody: string;
+    classesShowing: string;
+    classesPrevPage: string;
+    classesNextPage: string;
+    classesPagination: string;
     classScheduled: string;
     classCompleted: string;
     classNoShow: string;
