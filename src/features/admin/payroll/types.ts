@@ -1,3 +1,5 @@
+import type { RateUnit } from '@/lib/types';
+
 export type PayrollPeriodStatus = 'open' | 'finalized';
 export type PayrollClassStatus =
   | 'scheduled'
@@ -36,6 +38,7 @@ export interface PayrollLessonLine {
   customerNames: string[];
   minutes: number;
   hourlyRate: number | null;
+  rateUnit: RateUnit;
   currency: string;
   amount: number;
   flags: string[];

@@ -74,6 +74,7 @@ function detailFor(p: PayrollPeriod): PayrollPeriodDetail {
         customerNames: ['Kai Wong'],
         minutes: 90,
         hourlyRate: 37.33,
+        rateUnit: 'hour',
         currency: 'CAD',
         amount: 56,
         flags: [],
@@ -93,6 +94,7 @@ function detailFor(p: PayrollPeriod): PayrollPeriodDetail {
         customerNames: [],
         minutes: 60,
         hourlyRate: null,
+        rateUnit: 'hour',
         currency: 'CAD',
         amount: 0,
         flags: ['needs_rate'],
@@ -111,7 +113,8 @@ function detailFor(p: PayrollPeriod): PayrollPeriodDetail {
         time: '10:00',
         customerNames: ['Ava Sun'],
         minutes: 90,
-        hourlyRate: 37.33,
+        hourlyRate: 400,
+        rateUnit: 'day',
         currency: 'CAD',
         amount: 0,
         flags: ['already_paid'],
@@ -287,7 +290,9 @@ describe('PayrollPage', () => {
     expect(rows[1]).toHaveTextContent('Private 90');
     expect(rows[1]).toHaveTextContent('Kai Wong');
     expect(rows[1]).toHaveTextContent('No-show');
+    expect(rows[1]).toHaveTextContent('$37.33/h');
     expect(rows[1]).toHaveTextContent('$56.00');
+    expect(rows[3]).toHaveTextContent('$400.00/day');
     expect(rows[2]).toHaveTextContent('No lesson type');
     expect(rows[2]).toHaveTextContent('Scheduled');
     expect(
@@ -402,6 +407,9 @@ describe('PayrollPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<PayrollPage />);
     await screen.findByText('Advance');
+    expect(screen.getByLabelText('Description')).toHaveAccessibleDescription(
+      'The instructor sees this description and amount on their Lessons & pay page.',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Add adjustment' }));
     expect(screen.getAllByText('This field is required.')).toHaveLength(2);
@@ -537,6 +545,11 @@ describe('PayrollPage', () => {
     );
     expect(screen.getAllByText('私教90分钟')).toHaveLength(2);
     expect(screen.getAllByText('缺少课时费').length).toBeGreaterThan(0);
+    expect(screen.getByText('CA$37.33/小时')).toBeInTheDocument();
+    expect(screen.getByText('CA$400.00/天')).toBeInTheDocument();
+    expect(screen.getByLabelText('说明')).toHaveAccessibleDescription(
+      '教练会在“课程与工资”页面看到这条说明和金额。',
+    );
   });
 
   it('shows an error when periods cannot load', async () => {

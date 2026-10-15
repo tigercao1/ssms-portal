@@ -3,7 +3,13 @@ import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
 import { Banner, Button, Field, Input, Select } from '@/components';
-import type { AdminInstructorRecord, LessonType, PayRate } from '@/lib/types';
+import type {
+  AdminInstructorRecord,
+  LessonType,
+  PayRate,
+  RateUnit,
+} from '@/lib/types';
+import { RATE_UNITS, rateUnitLabel, withRateUnit } from '@/lib/rateUnit';
 import { useCreatePayRate, useUpdatePayRate } from './lessonsApi';
 import {
   dateInputValue,
@@ -14,6 +20,7 @@ import {
 
 interface RateValues {
   hourlyRate: string;
+  rateUnit: RateUnit;
   currency: string;
   effectiveFrom: string;
   effectiveTo: string;
@@ -129,7 +136,11 @@ export function PayRatesPanel({
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono">
-                      {formatRate(rate.hourlyRate, rate.currency, locale)}
+                      {withRateUnit(
+                        formatRate(rate.hourlyRate, rate.currency, locale),
+                        rate.rateUnit,
+                        t,
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
                       {rate.effectiveFrom}
@@ -186,7 +197,7 @@ function RateFields({
   onChange: (next: RateValues) => void;
 }) {
   const t = useT();
-  const set = (key: keyof RateValues, value: string) =>
+  const set = <K extends keyof RateValues>(key: K, value: RateValues[K]) =>
     onChange({ ...values, [key]: value });
   return (
     <>
@@ -198,6 +209,21 @@ function RateFields({
             value={values.hourlyRate}
             onChange={(e) => set('hourlyRate', e.target.value)}
           />
+        )}
+      </Field>
+      <Field label={t.lessonTypes.unitLabel}>
+        {(p) => (
+          <Select
+            {...p}
+            value={values.rateUnit}
+            onChange={(e) => set('rateUnit', e.target.value as RateUnit)}
+          >
+            {RATE_UNITS.map((unit) => (
+              <option key={unit} value={unit}>
+                {rateUnitLabel(unit, t)}
+              </option>
+            ))}
+          </Select>
         )}
       </Field>
       <Field label={t.lessonTypes.currencyLabel} error={errors.currency}>
@@ -255,6 +281,7 @@ function EditRate({
   const update = useUpdatePayRate();
   const [values, setValues] = useState<RateValues>({
     hourlyRate: String(rate.hourlyRate),
+    rateUnit: rate.rateUnit,
     currency: rate.currency,
     effectiveFrom: rate.effectiveFrom,
     effectiveTo: rate.effectiveTo ?? '',
@@ -266,6 +293,7 @@ function EditRate({
   const changes = {
     ...(hourlyRate !== 'invalid' &&
       hourlyRate !== rate.hourlyRate && { hourlyRate }),
+    ...(values.rateUnit !== rate.rateUnit && { rateUnit: values.rateUnit }),
     ...(currency !== rate.currency && { currency }),
     ...(values.effectiveFrom !== rate.effectiveFrom && {
       effectiveFrom: values.effectiveFrom,
@@ -292,7 +320,7 @@ function EditRate({
         </h3>
         <p className="text-xs text-slate">{t.lessonTypes.instructorFixed}</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <RateFields
           values={values}
           errors={errors}
@@ -330,6 +358,7 @@ function EditRate({
 
 const EMPTY_RATE: RateValues = {
   hourlyRate: '',
+  rateUnit: 'hour',
   currency: 'CAD',
   effectiveFrom: '',
   effectiveTo: '',
@@ -369,6 +398,7 @@ function AddRate({
         lessonTypeId,
         instructorId: instructorId || null,
         hourlyRate,
+        rateUnit: values.rateUnit,
         currency: values.currency.trim().toUpperCase(),
         effectiveFrom: values.effectiveFrom,
         effectiveTo: values.effectiveTo || null,
@@ -390,7 +420,7 @@ function AddRate({
       className="flex flex-col gap-3 border-t border-grey/40 pt-4"
     >
       <h3 className="font-medium text-navy">{t.lessonTypes.addRate}</h3>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Field label={t.lessonTypes.instructorLabel}>
           {(p) => (
             <Select
