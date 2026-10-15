@@ -141,7 +141,7 @@ export function AppShell() {
                   title={t.nav.onboardingLocked}
                 >
                   <LockIcon />
-                  {it.label}
+                  {it.label}{' '}
                   <span className="sr-only">{t.nav.onboardingLocked}</span>
                 </span>
               ) : (
