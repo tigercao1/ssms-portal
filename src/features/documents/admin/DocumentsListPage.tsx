@@ -381,7 +381,7 @@ function TemplateRow({
         row.status === 'retired' && 'text-slate',
       )}
     >
-      <td className="min-w-[8rem] px-2 py-2 xl:px-3 xl:min-w-[10rem]">
+      <td className="min-w-[8rem] px-2 py-2 xl:px-3">
         <div className={row.status !== 'retired' ? 'font-medium text-ink' : ''}>
           {title}
         </div>
@@ -402,7 +402,7 @@ function TemplateRow({
       <td className="whitespace-nowrap px-2 py-2 xl:px-3">
         <TemplateStatusChip status={row.status} />
       </td>
-      <td className="px-2 py-2 xl:px-3">
+      <td className="px-2 py-2 xl:min-w-[10rem] xl:px-3">
         <AudienceCell row={row} />
       </td>
       <td className="px-2 py-2 xl:px-3">
@@ -414,7 +414,7 @@ function TemplateRow({
         />
       </td>
       <td className="px-2 py-2 xl:px-3">
-        <div className="flex min-w-[7rem] flex-wrap items-center justify-end gap-2 xl:min-w-[16rem]">
+        <div className="flex min-w-[7rem] flex-wrap items-center justify-end gap-2 xl:min-w-[15rem]">
           <Button
             size="sm"
             variant="ghost"
