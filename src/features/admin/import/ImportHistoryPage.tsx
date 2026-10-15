@@ -348,6 +348,7 @@ function ImportWorkspace({ id, side }: { id: string; side: ReactNode }) {
   const t = useT();
   const [filter, setFilter] = useState<RowFilter | ''>('any');
   const [paging, setPaging] = useState({ id, page: 1 });
+  if (paging.id !== id) setPaging({ id, page: 1 });
   const page = paging.id === id ? paging.page : 1;
   const detail = useClassImport(id, filter, page);
   const lessonTypes = useLessonTypes();

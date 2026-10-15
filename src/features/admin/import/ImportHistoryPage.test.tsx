@@ -878,6 +878,40 @@ describe('ImportHistoryPage', () => {
     );
   });
 
+  it('starts on page 1 when reopening an import that was left on a later page', async () => {
+    const calls = serve({
+      imports: [
+        record(),
+        record({ id: 'imp-0', filename: 'older.csv', status: 'committed' }),
+      ],
+      current: detail({ rows: manyRows(120) }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ImportHistoryPage />);
+
+    await screen.findByLabelText('Instructor for row 1');
+    await user.click(within(pager()).getByRole('button', { name: 'Next' }));
+    await screen.findByLabelText('Instructor for row 51');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open import older.csv' }),
+    );
+    await waitFor(() => expect(calls.pages.at(-1)?.id).toBe('imp-0'));
+    await user.click(
+      screen.getByRole('button', { name: 'Open import bookings.csv' }),
+    );
+
+    await waitFor(() => expect(calls.pages.at(-1)?.id).toBe('imp-1'));
+    expect(
+      await within(pager()).findByText('Showing 1–50 of 120'),
+    ).toBeInTheDocument();
+    expect(calls.pages.at(-1)).toEqual({
+      id: 'imp-1',
+      page: '1',
+      limit: '50',
+    });
+  });
+
   it('stays on the current page after editing a row', async () => {
     const calls = serve({ current: detail({ rows: manyRows(120) }) });
     const user = userEvent.setup();
