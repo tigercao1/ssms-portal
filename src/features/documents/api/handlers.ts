@@ -8,6 +8,7 @@ import type {
   CompleteRequest,
   ConsentText,
   Field,
+  PublishRequest,
   Template,
   TemplateCreate,
   TemplatePatch,
@@ -18,6 +19,7 @@ import {
   MOCK_SEASON,
   MOCK_STORAGE_ORIGIN,
   buildChecklist,
+  buildPreviewChecklist,
   fakeAssignment,
   fakeCertUpload,
   presentCertUploads,
@@ -36,7 +38,9 @@ export interface DocumentsMockState {
   assignments: Assignment[];
   certUploads: CertUpload[];
   instructorIds: string[];
+  pendingInstructorIds: string[];
   meInstructorId: string;
+  meApprovalStatus: 'approved' | 'pending' | 'rejected';
   meCerts: { org: CertOrg; track: CertTrack; level: number }[];
   uploadedSources: Map<string, ArrayBuffer>;
   reminded: string[];
@@ -53,7 +57,9 @@ export function createDocumentsState(
     assignments: structuredClone(sampleAssignments),
     certUploads: structuredClone(sampleCertUploads),
     instructorIds: ['inst-1'],
+    pendingInstructorIds: [],
     meInstructorId: 'inst-1',
+    meApprovalStatus: 'approved',
     meCerts: [
       { org: 'csia', track: 'regular', level: 3 },
       { org: 'casi', track: 'park', level: 2 },
@@ -74,6 +80,24 @@ const notFound = () =>
   HttpResponse.json({ message: 'Not found' }, { status: 404 });
 const badRequest = (message: string) =>
   HttpResponse.json({ message }, { status: 400 });
+const conflict = (message: string) =>
+  HttpResponse.json({ message }, { status: 409 });
+const notApproved = (status: 'pending' | 'rejected') =>
+  HttpResponse.json(
+    status === 'rejected'
+      ? {
+          message:
+            'Your profile was not approved, so onboarding documents are not available',
+          reason: 'rejected',
+        }
+      : {
+          message: 'Your profile is pending approval',
+          reason: 'pending_approval',
+        },
+    { status: 403 },
+  );
+const TEMPLATE_LOCKED =
+  'Someone has completed this document, so its PDF and fields can no longer change. Retire it and publish a new one instead.';
 
 function nowIso() {
   return new Date().toISOString();
@@ -119,6 +143,60 @@ export function documentsHandlers(
   const A = apiBase;
   const findTemplate = (id: unknown) =>
     state.templates.find((t) => t.id === id);
+  const present = (t: Template): Template => {
+    const open = state.assignments.filter(
+      (a) =>
+        a.templateId === t.id &&
+        a.status !== 'archived' &&
+        t.season !== null &&
+        a.season === t.season,
+    );
+    return withDerived({
+      ...t,
+      hasCompletedAssignments: state.assignments.some(
+        (a) => a.templateId === t.id && a.status === 'completed',
+      ),
+      assignedCount: open.length,
+      completedCount: open.filter((a) => a.status === 'completed').length,
+      approvedCount:
+        t.status === 'draft' || t.season === null
+          ? 0
+          : state.instructorIds.length,
+    });
+  };
+  const assignToInstructors = (
+    template: Template,
+    season: string,
+    ids: string[],
+  ) => {
+    let created = 0;
+    let skipped = 0;
+    for (const subjectId of ids) {
+      const exists = state.assignments.some(
+        (a) =>
+          a.templateId === template.id &&
+          a.subjectId === subjectId &&
+          a.season === season &&
+          a.status !== 'archived',
+      );
+      if (exists) {
+        skipped += 1;
+        continue;
+      }
+      created += 1;
+      state.assignments.push(
+        fakeAssignment({
+          id: nextId('asg'),
+          templateId: template.id,
+          template: toAssignmentTemplate(template),
+          subjectId,
+          season,
+          assignedAt: nowIso(),
+        }),
+      );
+    }
+    return { created, skipped };
+  };
   const findAssignment = (id: unknown) =>
     state.assignments.find((a) => a.id === id);
   const pdfFor = (t: Template) =>
@@ -142,7 +220,7 @@ export function documentsHandlers(
 
   return [
     http.get(`${A}/admin/documents/templates`, () =>
-      HttpResponse.json(state.templates.map(toSummary)),
+      HttpResponse.json(state.templates.map((t) => toSummary(present(t)))),
     ),
     http.post(`${A}/admin/documents/templates`, async ({ request }) => {
       const body = (await request.json()) as TemplateCreate;
@@ -156,7 +234,14 @@ export function documentsHandlers(
         descriptionEn: body.descriptionEn ?? null,
         descriptionZh: body.descriptionZh ?? null,
         required: body.required,
-        isActive: true,
+        status: 'draft',
+        assignTo: null,
+        season: null,
+        publishedAt: null,
+        hasCompletedAssignments: false,
+        assignedCount: 0,
+        completedCount: 0,
+        approvedCount: 0,
         sortOrder: body.sortOrder,
         hasSource: false,
         sourceSha256: null,
@@ -174,24 +259,97 @@ export function documentsHandlers(
     }),
     http.get(`${A}/admin/documents/templates/:id`, ({ params }) => {
       const t = findTemplate(params.id);
-      return t ? HttpResponse.json(withDerived(t)) : notFound();
+      return t ? HttpResponse.json(present(t)) : notFound();
     }),
     http.patch(
       `${A}/admin/documents/templates/:id`,
       async ({ params, request }) => {
         const t = findTemplate(params.id);
         if (!t) return notFound();
-        Object.assign(t, (await request.json()) as TemplatePatch, {
-          updatedAt: nowIso(),
-        });
-        return HttpResponse.json(withDerived(t));
+        const body = (await request.json()) as TemplatePatch & {
+          isActive?: unknown;
+        };
+        delete body.isActive;
+        Object.assign(t, body, { updatedAt: nowIso() });
+        return HttpResponse.json(present(t));
       },
     ),
+    http.get(
+      `${A}/admin/documents/templates/:id/publish-preview`,
+      ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const season =
+          new URL(request.url).searchParams.get('season') ??
+          state.season ??
+          MOCK_SEASON;
+        const alreadyAssignedCount = state.instructorIds.filter((id) =>
+          state.assignments.some(
+            (a) =>
+              a.templateId === t.id &&
+              a.subjectId === id &&
+              a.season === season &&
+              a.status !== 'archived',
+          ),
+        ).length;
+        return HttpResponse.json({
+          season,
+          approvedCount: state.instructorIds.length,
+          pendingCount: state.pendingInstructorIds.length,
+          alreadyAssignedCount,
+        });
+      },
+    ),
+    http.post(
+      `${A}/admin/documents/templates/:id/publish`,
+      async ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const body = (await request.json()) as PublishRequest;
+        if (body.assignTo !== 'all' && body.assignTo !== 'selected')
+          return badRequest('assignTo must be all or selected');
+        if (t.status === 'live')
+          return conflict('This document is already published');
+        if (!t.sourceSha256)
+          return badRequest('Upload the PDF before publishing');
+        if (t.kind === 'sign' && t.fields.length === 0)
+          return badRequest(
+            'Place at least one field before publishing a document to sign',
+          );
+        if (body.assignTo === 'all' && t.audience !== 'instructor')
+          return badRequest(
+            'Only instructor documents can be published to all instructors',
+          );
+        const season = body.season ?? state.season ?? MOCK_SEASON;
+        Object.assign(t, {
+          status: 'live',
+          assignTo: body.assignTo,
+          season,
+          publishedAt: nowIso(),
+          updatedAt: nowIso(),
+        });
+        const { created, skipped } =
+          body.assignTo === 'all'
+            ? assignToInstructors(t, season, state.instructorIds)
+            : { created: 0, skipped: 0 };
+        return HttpResponse.json({ template: present(t), created, skipped });
+      },
+    ),
+    http.post(`${A}/admin/documents/templates/:id/retire`, ({ params }) => {
+      const t = findTemplate(params.id);
+      if (!t) return notFound();
+      if (t.status !== 'live')
+        return conflict('Only a published document can be retired');
+      Object.assign(t, { status: 'retired', updatedAt: nowIso() });
+      return HttpResponse.json(present(t));
+    }),
     http.post(
       `${A}/admin/documents/templates/:id/source/upload-url`,
       async ({ params, request }) => {
         const t = findTemplate(params.id);
         if (!t) return notFound();
+        if (present(t).hasCompletedAssignments)
+          return conflict(TEMPLATE_LOCKED);
         const { contentLength } = (await request.json()) as {
           contentLength: number;
         };
@@ -208,6 +366,8 @@ export function documentsHandlers(
       ({ params }) => {
         const t = findTemplate(params.id);
         if (!t) return notFound();
+        if (present(t).hasCompletedAssignments)
+          return conflict(TEMPLATE_LOCKED);
         if (!state.uploadedSources.has(t.id))
           return badRequest('No uploaded source found');
         const pages = t.pages.length ? t.pages : DEFAULT_PAGES;
@@ -218,7 +378,7 @@ export function documentsHandlers(
           sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`,
           updatedAt: nowIso(),
         });
-        return HttpResponse.json({ ...withDerived(t), fieldsCleared: false });
+        return HttpResponse.json({ ...present(t), fieldsCleared: false });
       },
     ),
     http.put(
@@ -226,48 +386,33 @@ export function documentsHandlers(
       async ({ params, request }) => {
         const t = findTemplate(params.id);
         if (!t) return notFound();
+        if (present(t).hasCompletedAssignments)
+          return conflict(TEMPLATE_LOCKED);
         const { fields } = (await request.json()) as { fields: Field[] };
         const error = validateFields(t, fields);
         if (error) return badRequest(error);
         t.fields = fields;
         t.updatedAt = nowIso();
-        return HttpResponse.json(withDerived(t));
+        return HttpResponse.json(present(t));
       },
     ),
     http.post(`${A}/admin/documents/assignments`, async ({ request }) => {
       const body = (await request.json()) as AssignRequest;
       const template = findTemplate(body.templateId);
       if (!template) return notFound();
+      if (template.status !== 'live')
+        return badRequest(
+          'Only live instructor templates with an uploaded PDF can be assigned',
+        );
       if (!body.season?.trim()) return badRequest('season is required');
       const ids = body.allActiveInstructors
         ? state.instructorIds
         : (body.instructorIds ?? []);
-      let created = 0;
-      let skipped = 0;
-      for (const subjectId of ids) {
-        const exists = state.assignments.some(
-          (a) =>
-            a.templateId === body.templateId &&
-            a.subjectId === subjectId &&
-            a.season === body.season &&
-            a.status !== 'archived',
-        );
-        if (exists) {
-          skipped += 1;
-          continue;
-        }
-        created += 1;
-        state.assignments.push(
-          fakeAssignment({
-            id: nextId('asg'),
-            templateId: body.templateId,
-            template: toAssignmentTemplate(template),
-            subjectId,
-            season: body.season,
-            assignedAt: nowIso(),
-          }),
-        );
-      }
+      const { created, skipped } = assignToInstructors(
+        template,
+        body.season,
+        ids,
+      );
       return HttpResponse.json({ created, skipped }, { status: 201 });
     }),
     http.get(`${A}/admin/instructors/:id/documents`, ({ params }) =>
@@ -343,18 +488,38 @@ export function documentsHandlers(
 
     http.get(`${A}/me/documents`, () =>
       HttpResponse.json(
-        buildChecklist(
-          state.templates,
-          state.assignments.filter((a) => a.subjectId === state.meInstructorId),
-          state.meCerts,
-          state.certUploads.filter(
-            (u) => u.instructorId === state.meInstructorId,
-          ),
-          state.season,
-        ),
+        state.meApprovalStatus === 'rejected'
+          ? {
+              season: state.season,
+              locked: true,
+              lockReason: 'rejected',
+              items: [],
+            }
+          : state.meApprovalStatus === 'approved'
+            ? buildChecklist(
+                state.templates,
+                state.assignments.filter(
+                  (a) => a.subjectId === state.meInstructorId,
+                ),
+                state.meCerts,
+                state.certUploads.filter(
+                  (u) => u.instructorId === state.meInstructorId,
+                ),
+                state.season,
+              )
+            : buildPreviewChecklist(
+                state.templates,
+                state.meCerts,
+                state.certUploads.filter(
+                  (u) => u.instructorId === state.meInstructorId,
+                ),
+                state.season,
+              ),
       ),
     ),
     http.get(`${A}/me/documents/:assignmentId`, ({ params }) => {
+      if (state.meApprovalStatus !== 'approved')
+        return notApproved(state.meApprovalStatus);
       const a = findAssignment(params.assignmentId);
       const t = a && findTemplate(a.templateId);
       if (!a || !t || a.subjectId !== state.meInstructorId) return notFound();
@@ -385,6 +550,8 @@ export function documentsHandlers(
     http.post(
       `${A}/me/documents/:assignmentId/complete`,
       async ({ params, request }) => {
+        if (state.meApprovalStatus !== 'approved')
+          return notApproved(state.meApprovalStatus);
         const a = findAssignment(params.assignmentId);
         const t = a && findTemplate(a.templateId);
         if (!a || !t || a.subjectId !== state.meInstructorId) return notFound();
@@ -442,6 +609,8 @@ export function documentsHandlers(
     http.post(
       `${A}/me/certification-uploads/upload-url`,
       async ({ request }) => {
+        if (state.meApprovalStatus !== 'approved')
+          return notApproved(state.meApprovalStatus);
         const body = (await request.json()) as CertUploadUrlRequest;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(body.validUntil ?? ''))
           return badRequest('validUntil must be YYYY-MM-DD');
@@ -469,6 +638,8 @@ export function documentsHandlers(
     http.post(
       `${A}/me/certification-uploads/:uploadId/confirm`,
       ({ params }) => {
+        if (state.meApprovalStatus !== 'approved')
+          return notApproved(state.meApprovalStatus);
         const u = state.certUploads.find((x) => x.id === params.uploadId);
         if (!u) return notFound();
         u.sha256 = 'f00dbabe'.repeat(8);

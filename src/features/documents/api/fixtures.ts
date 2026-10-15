@@ -5,6 +5,7 @@ import type {
   CertificationChecklistItem,
   ConsentText,
   DocumentChecklistItem,
+  DocumentPreviewItem,
   Field,
   MyChecklist,
   Template,
@@ -93,7 +94,14 @@ export function fakeTemplate(overrides: Partial<Template> = {}): Template {
     descriptionEn: 'Sign before your first lesson.',
     descriptionZh: '首次上课前签署。',
     required: true,
-    isActive: true,
+    status: 'live',
+    assignTo: 'all',
+    season: MOCK_SEASON,
+    publishedAt: '2026-10-02T15:00:00Z',
+    hasCompletedAssignments: false,
+    assignedCount: 0,
+    completedCount: 0,
+    approvedCount: 0,
     sortOrder: 10,
     hasSource: true,
     sourceSha256: HASH,
@@ -122,7 +130,14 @@ export function toSummary(t: Template): TemplateSummary {
     descriptionEn: t.descriptionEn,
     descriptionZh: t.descriptionZh,
     required: t.required,
-    isActive: t.isActive,
+    status: t.status,
+    assignTo: t.assignTo,
+    season: t.season,
+    publishedAt: t.publishedAt,
+    hasCompletedAssignments: t.hasCompletedAssignments,
+    assignedCount: t.assignedCount,
+    completedCount: t.completedCount,
+    approvedCount: t.approvedCount,
     sortOrder: t.sortOrder,
     hasSource: t.sourceSha256 !== null,
     pageCount: t.pageCount,
@@ -133,9 +148,10 @@ export function toSummary(t: Template): TemplateSummary {
 }
 
 export const sampleTemplates: Template[] = [
-  fakeTemplate(),
+  fakeTemplate({ hasCompletedAssignments: true }),
   fakeTemplate({
     id: 'tpl-handbook',
+    hasCompletedAssignments: true,
     kind: 'read',
     titleEn: 'Instructor handbook',
     titleZh: '教练手册',
@@ -156,6 +172,7 @@ export const sampleTemplates: Template[] = [
     titleZh: '免责声明',
     descriptionEn: null,
     descriptionZh: null,
+    assignTo: 'selected',
     sortOrder: 20,
     pageCount: 1,
     pages: [{ x: 0, y: 0, width: 612, height: 792, rotate: 90 }],
@@ -167,7 +184,10 @@ export const sampleTemplates: Template[] = [
     titleZh: null,
     descriptionEn: null,
     descriptionZh: null,
-    isActive: false,
+    status: 'draft',
+    assignTo: null,
+    season: null,
+    publishedAt: null,
     required: false,
     sortOrder: 30,
     sourceSha256: null,
@@ -373,5 +393,64 @@ export function buildChecklist(
       state: certState(upload, today),
     };
   });
-  return { season, items: [...docs, ...certItems] };
+  return {
+    season,
+    locked: false,
+    lockReason: null,
+    items: [...docs, ...certItems],
+  };
+}
+
+/** The locked `/me/documents` preview a pending instructor gets. */
+export function buildPreviewChecklist(
+  templates: Template[],
+  certs: {
+    org: CertUpload['org'];
+    track: CertUpload['track'];
+    level: number;
+  }[],
+  uploads: CertUpload[],
+  season: string | null = MOCK_SEASON,
+  today: string = todayIso(),
+): MyChecklist {
+  const docs: DocumentPreviewItem[] = templates
+    .filter(
+      (t) =>
+        t.status === 'live' &&
+        t.assignTo === 'all' &&
+        t.audience === 'instructor' &&
+        t.season === season,
+    )
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((t) => ({
+      type: 'document',
+      assignmentId: null,
+      templateId: t.id,
+      kind: t.kind,
+      titleEn: t.titleEn,
+      titleZh: t.titleZh,
+      descriptionEn: t.descriptionEn,
+      descriptionZh: t.descriptionZh,
+      required: t.required,
+      status: null,
+      season,
+      assignedAt: null,
+      viewedAt: null,
+      completedAt: null,
+      dueAt: null,
+    }));
+  const certItems = buildChecklist(
+    [],
+    [],
+    certs,
+    uploads,
+    season,
+    today,
+  ).items.map((c) => ({ ...c, uploadId: null }));
+  return {
+    season,
+    locked: true,
+    lockReason: 'pending_approval',
+    items: [...docs, ...certItems],
+  };
 }

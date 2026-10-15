@@ -7,17 +7,21 @@ import {
   createTemplate,
   documentsKeys,
   getInstructorDocuments,
+  getPublishPreview,
   getTemplate,
   listTemplates,
+  publishTemplate,
   putToPresignedUrl,
   remindAssignment,
   requestTemplateSourceUpload,
+  retireTemplate,
   reviewCertUpload,
   saveTemplateFields,
   updateTemplate,
   type AssignRequest,
   type CertUploadReview,
   type Field,
+  type PublishRequest,
   type Template,
   type TemplateCreate,
   type TemplatePatch,
@@ -64,6 +68,36 @@ export function useUpdateTemplate() {
   return useMutation({
     mutationFn: ({ id, ...body }: TemplatePatch & { id: string }) =>
       updateTemplate(id, body),
+    onSuccess: sync,
+  });
+}
+
+/** Who a publish would reach; `season` null lets the API pick the current one. */
+export function usePublishPreview(id: string, season: string | null) {
+  return useQuery({
+    queryKey: documentsKeys.publishPreview(id, season),
+    queryFn: () => getPublishPreview(id, season ?? undefined),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function usePublishTemplate() {
+  const sync = useTemplateSync();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: PublishRequest & { id: string }) =>
+      publishTemplate(id, body),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
+      return sync(result.template);
+    },
+  });
+}
+
+export function useRetireTemplate() {
+  const sync = useTemplateSync();
+  return useMutation({
+    mutationFn: (id: string) => retireTemplate(id),
     onSuccess: sync,
   });
 }

@@ -15,6 +15,7 @@ import {
 import { ReadDocument } from '../signer/ReadDocument';
 import { SignerDocument } from '../signer/SignerDocument';
 import { useCompleteMyDocument, useMyDocument } from './queries';
+import { LockedBanner, lockReasonOf } from './Locked';
 
 function BackLink() {
   const t = useT();
@@ -115,6 +116,14 @@ export function OnboardingDocumentPage() {
     return (
       <div className="flex justify-center py-20">
         <Spinner className="h-7 w-7" />
+      </div>
+    );
+  const lockReason = lockReasonOf(doc.error);
+  if (lockReason)
+    return (
+      <div className="flex flex-col gap-4">
+        <BackLink />
+        <LockedBanner reason={lockReason} />
       </div>
     );
   if (doc.isError || !doc.data)

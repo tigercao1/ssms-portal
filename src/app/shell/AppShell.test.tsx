@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Route,
@@ -9,14 +9,25 @@ import {
 } from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { renderWithProviders } from '@/test/render';
+import { server } from '@/test/msw';
+import {
+  createDocumentsState,
+  documentsHandlers,
+} from '@/features/documents/api/handlers';
+
+const session = vi.hoisted(() => ({ isAdmin: true }));
 
 vi.mock('@/auth/SessionProvider', () => ({
   useSession: () => ({
-    isAdmin: true,
+    isAdmin: session.isAdmin,
     user: { email: 'admin@example.com' },
     signOut: vi.fn(),
   }),
 }));
+
+beforeEach(() => {
+  session.isAdmin = true;
+});
 
 let navigate: NavigateFunction;
 
@@ -164,6 +175,52 @@ describe('AppShell admin nav', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'Calendar matching' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('AppShell instructor nav', () => {
+  function renderInstructorShell(
+    meApprovalStatus: 'approved' | 'pending' | 'rejected',
+  ) {
+    session.isAdmin = false;
+    server.use(
+      ...documentsHandlers(createDocumentsState({ meApprovalStatus })),
+    );
+    renderWithProviders(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/profile" element={<p>Profile page</p>} />
+        </Route>
+      </Routes>,
+      { route: '/profile' },
+    );
+  }
+
+  it('shows a lock on Onboarding while the profile is pending approval', async () => {
+    renderInstructorShell('pending');
+    expect(
+      await screen.findByRole('link', {
+        name: 'Onboarding Locked until your profile is approved',
+      }),
+    ).toHaveAttribute('href', '/onboarding');
+  });
+
+  it('keeps the lock on Onboarding for a rejected instructor', async () => {
+    renderInstructorShell('rejected');
+    expect(
+      await screen.findByRole('link', {
+        name: 'Onboarding Locked until your profile is approved',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a plain Onboarding link once approved', async () => {
+    renderInstructorShell('approved');
+    const link = screen.getByRole('link', { name: 'Onboarding' });
+    await waitFor(() => expect(link.querySelector('svg')).toBeNull());
+    expect(
+      screen.queryByText('Locked until your profile is approved'),
     ).not.toBeInTheDocument();
   });
 });

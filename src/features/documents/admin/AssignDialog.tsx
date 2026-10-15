@@ -15,7 +15,7 @@ import type { AssignResult, TemplateSummary } from '../api';
 import { useCreateAssignments } from './hooks';
 import { errorText, templateTitle } from './format';
 
-const SEASON_RE = /^\d{4}\/\d{2}$/;
+export const SEASON_RE = /^\d{4}\/\d{2}$/;
 
 /** Ski season label for a date, e.g. `2026/27` from August 2026 through July 2027. */
 export function seasonFor(now: Date = new Date()): string {

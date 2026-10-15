@@ -17,6 +17,7 @@ import { CertUploadSheet } from './CertUploadSheet';
 import { ProgressBar } from './ProgressBar';
 import { StatePill, type PillTone } from './StatePill';
 import { checklistProgress, isItemDone, useMyChecklist } from './queries';
+import { LockedBanner, LockedEmpty, LockedPreviewList } from './Locked';
 
 const CERT_TONE: Record<CertState, PillTone> = {
   missing: 'muted',
@@ -242,9 +243,27 @@ export function OnboardingPage() {
       </Card>
     );
 
+  if (data.locked)
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-3xl">{t.onboarding.title}</h1>
+        {data.lockReason === 'rejected' ? (
+          <LockedBanner reason="rejected" />
+        ) : data.items.length === 0 ? (
+          <LockedEmpty />
+        ) : (
+          <>
+            <LockedBanner reason="pending_approval" />
+            <LockedPreviewList items={data.items} />
+          </>
+        )}
+      </div>
+    );
+
   const items: ChecklistItem[] = data.items;
   const docs = items.filter(
-    (i): i is DocumentChecklistItem => i.type === 'document',
+    (i): i is DocumentChecklistItem =>
+      i.type === 'document' && i.assignmentId !== null,
   );
   const reads = docs.filter((d) => d.kind === 'read');
   const signs = docs.filter((d) => d.kind === 'sign');

@@ -2,6 +2,9 @@ import type { CertOrg, CertTrack } from '@/lib/types';
 
 export type TemplateKind = 'sign' | 'read';
 export type TemplateAudience = 'instructor' | 'customer';
+export type TemplateStatus = 'draft' | 'live' | 'retired';
+export type TemplateAssignTo = 'all' | 'selected';
+export type ChecklistLockReason = 'pending_approval' | 'rejected';
 export type FieldType =
   | 'signature'
   | 'initials'
@@ -75,7 +78,14 @@ export interface TemplateSummary {
   descriptionEn: string | null;
   descriptionZh: string | null;
   required: boolean;
-  isActive: boolean;
+  status: TemplateStatus;
+  assignTo: TemplateAssignTo | null;
+  season: string | null;
+  publishedAt: string | null;
+  hasCompletedAssignments: boolean;
+  assignedCount: number;
+  completedCount: number;
+  approvedCount: number;
   sortOrder: number;
   hasSource: boolean;
   pageCount: number | null;
@@ -113,9 +123,26 @@ export interface TemplatePatch {
   titleZh?: string | null;
   descriptionEn?: string | null;
   descriptionZh?: string | null;
-  isActive?: boolean;
   required?: boolean;
   sortOrder?: number;
+}
+
+export interface PublishPreview {
+  season: string;
+  approvedCount: number;
+  pendingCount: number;
+  alreadyAssignedCount: number;
+}
+
+export interface PublishRequest {
+  assignTo: TemplateAssignTo;
+  season?: string;
+}
+
+export interface PublishResult {
+  template: Template;
+  created: number;
+  skipped: number;
 }
 
 export interface UploadUrl {
@@ -257,10 +284,25 @@ export interface CertificationChecklistItem {
   state: CertState;
 }
 
-export type ChecklistItem = DocumentChecklistItem | CertificationChecklistItem;
+/** A document an instructor will get once approved; nothing is assigned yet. */
+export interface DocumentPreviewItem extends Omit<
+  DocumentChecklistItem,
+  'assignmentId' | 'status' | 'assignedAt'
+> {
+  assignmentId: null;
+  status: null;
+  assignedAt: null;
+}
+
+export type ChecklistItem =
+  | DocumentChecklistItem
+  | DocumentPreviewItem
+  | CertificationChecklistItem;
 
 export interface MyChecklist {
   season: string | null;
+  locked: boolean;
+  lockReason: ChecklistLockReason | null;
   items: ChecklistItem[];
 }
 

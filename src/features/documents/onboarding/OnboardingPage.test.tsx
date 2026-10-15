@@ -287,7 +287,12 @@ describe('OnboardingPage', () => {
   it('shows an empty state', async () => {
     server.use(
       http.get(`${API}/me/documents`, () =>
-        HttpResponse.json({ season: '2026/27', items: [] }),
+        HttpResponse.json({
+          season: '2026/27',
+          locked: false,
+          lockReason: null,
+          items: [],
+        }),
       ),
     );
     renderWithProviders(<OnboardingPage />);
@@ -318,10 +323,149 @@ describe('OnboardingCard', () => {
   it('renders nothing without items', async () => {
     server.use(
       http.get(`${API}/me/documents`, () =>
-        HttpResponse.json({ season: '2026/27', items: [] }),
+        HttpResponse.json({
+          season: '2026/27',
+          locked: false,
+          lockReason: null,
+          items: [],
+        }),
       ),
     );
     const { container } = renderWithProviders(<OnboardingCard />);
     await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+});
+
+describe('locked onboarding while pending approval', () => {
+  beforeEach(() => {
+    state.meApprovalStatus = 'pending';
+    state.meCerts = [
+      { org: 'csia', track: 'regular', level: 2 },
+      { org: 'casi', track: 'park', level: 1 },
+    ];
+  });
+
+  it('shows the review banner and greyed, non-clickable preview rows', async () => {
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByText('Your profile is being reviewed'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "These open once an admin approves you. We'll email you.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Onboarding' }),
+    ).toBeInTheDocument();
+    const rows = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(rows.map((r) => r.textContent)).toEqual([
+      'Instructor handbookRead',
+      'Code of conductSign',
+      'CSIA Level 2Upload',
+      'CASI Park Level 1Upload',
+    ]);
+    for (const r of rows) expect(r).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('shows "Nothing to complete yet" when nothing is published', async () => {
+    state.templates = [];
+    state.meCerts = [];
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByRole('heading', { name: 'Nothing to complete yet' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Your profile is being reviewed.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('renders the locked preview in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<OnboardingPage />);
+    expect(await screen.findByText('你的资料正在审核中')).toBeInTheDocument();
+    expect(screen.getByText('行为准则')).toBeInTheDocument();
+    expect(screen.getAllByText('上传')).toHaveLength(2);
+  });
+
+  it('shows a locked profile card with document and certification counts', async () => {
+    renderWithProviders(<OnboardingCard />);
+    expect(
+      await screen.findByRole('heading', { name: 'Onboarding · 4 items' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Unlocks when your profile is approved'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "2 documents to sign and 2 certifications to upload. We'll email you when you can start.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('shows the locked card in Chinese and without counts when empty', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const { unmount } = renderWithProviders(<OnboardingCard />);
+    expect(
+      await screen.findByText('审核通过后即可填写 2 份文件并上传 2 份证书。'),
+    ).toBeInTheDocument();
+    unmount();
+    state.templates = [];
+    state.meCerts = [];
+    renderWithProviders(<OnboardingCard />);
+    expect(
+      await screen.findByRole('heading', { name: '入职资料' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('资料审核通过后解锁')).toBeInTheDocument();
+    expect(screen.queryByText(/份文件/)).not.toBeInTheDocument();
+  });
+});
+
+describe('locked onboarding for a rejected instructor', () => {
+  beforeEach(() => {
+    state.meApprovalStatus = 'rejected';
+  });
+
+  it('shows the not-approved banner with no preview rows', async () => {
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByText("Your profile wasn't approved"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Contact SSnow if you think this is a mistake.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Nothing to complete yet'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Your profile is being reviewed'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a rejected profile card in en and zh', async () => {
+    const { unmount } = renderWithProviders(<OnboardingCard />);
+    expect(
+      await screen.findByRole('heading', { name: 'Onboarding' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Your profile wasn't approved"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Contact SSnow if you think this is a mistake.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Unlocks when your profile is approved'),
+    ).not.toBeInTheDocument();
+    unmount();
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<OnboardingCard />);
+    expect(await screen.findByText('您的资料未通过审核')).toBeInTheDocument();
+    expect(screen.getByText('如有疑问，请联系 SSnow。')).toBeInTheDocument();
   });
 });

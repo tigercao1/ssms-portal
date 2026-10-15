@@ -297,6 +297,36 @@ describe('OnboardingDocumentPage — sign', () => {
       await screen.findByText('The document could not be loaded.'),
     ).toBeInTheDocument();
   });
+
+  it('shows the not-approved banner for a rejected instructor', async () => {
+    state.meApprovalStatus = 'rejected';
+    renderAt('asg-new');
+    expect(
+      await screen.findByText("Your profile wasn't approved"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('The document could not be loaded.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the review banner instead of the document while pending approval', async () => {
+    state.meApprovalStatus = 'pending';
+    renderAt('asg-new');
+    expect(
+      await screen.findByText('Your profile is being reviewed'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "These open once an admin approves you. We'll email you.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('The document could not be loaded.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Back to checklist/ }),
+    ).toHaveAttribute('href', '/onboarding');
+  });
 });
 
 describe('OnboardingDocumentPage — mobile stepper', () => {

@@ -77,7 +77,8 @@ function Editor({ template }: { template: Template }) {
   const [activePage, setActivePage] = useState(1);
   const [numPages, setNumPages] = useState(template.pageCount ?? 0);
   const fieldEls = useRef(new Map<string, HTMLElement>());
-  const canPlace = template.kind === 'sign' && !preview;
+  const locked = template.hasCompletedAssignments;
+  const canPlace = template.kind === 'sign' && !preview && !locked;
   const dirty = !sameFields(fields, saved);
   const selected = fields.find((f) => f.id === selectedId) ?? null;
   const title = templateTitle(template, locale);
@@ -334,12 +335,12 @@ function Editor({ template }: { template: Template }) {
           <Button
             variant="secondary"
             size="sm"
-            disabled={!template.isActive || !template.sourceUrl}
+            disabled={template.status !== 'live' || !template.sourceUrl}
             onClick={() => setAssigning(true)}
           >
             {t.documents.assignEllipsis}
           </Button>
-          {template.kind === 'sign' && (
+          {template.kind === 'sign' && !locked && (
             <Button
               size="sm"
               loading={save.isPending}
@@ -374,6 +375,9 @@ function Editor({ template }: { template: Template }) {
         <Banner tone="approved">
           {t.documents.fieldsSaved.replace('{n}', String(saved.length))}
         </Banner>
+      )}
+      {template.kind === 'sign' && locked && (
+        <Banner tone="pending">{t.documents.lockedSigned}</Banner>
       )}
       {template.kind === 'read' && (
         <Banner tone="info">{t.documents.readNoFields}</Banner>
