@@ -39,6 +39,12 @@ export const en: Messages = {
     signUpTitle: 'Apply as an instructor',
     signUpSubtitle:
       'Create an account to start your profile. An admin reviews every application.',
+    firstName: 'First name',
+    lastName: 'Last name',
+    nickname: 'Nickname',
+    nicknameHint:
+      'The name shown on your profile. Leave blank to use your first and last name.',
+    nameRequired: 'Enter your first and last name.',
     signUpButton: 'Create account',
     signingUp: 'Creating account…',
     passwordHint: 'At least 6 characters.',
