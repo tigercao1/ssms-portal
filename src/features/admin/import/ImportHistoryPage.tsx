@@ -11,6 +11,7 @@ import {
   EmptyState,
   Field,
   Input,
+  Pager,
   Select,
   Spinner,
 } from '@/components';
@@ -21,6 +22,7 @@ import { useLessonTypes } from '../lessonsApi';
 import { customerName } from '../lessonRules';
 import { errorText } from '../LessonTypesPage';
 import {
+  IMPORT_ROWS_PAGE_SIZE,
   useClassImport,
   useClassImports,
   useCommitClassImport,
@@ -345,9 +347,22 @@ function RecentImports({
 function ImportWorkspace({ id, side }: { id: string; side: ReactNode }) {
   const t = useT();
   const [filter, setFilter] = useState<RowFilter | ''>('any');
-  const detail = useClassImport(id, filter);
+  const [paging, setPaging] = useState({ id, page: 1 });
+  const page = paging.id === id ? paging.page : 1;
+  const detail = useClassImport(id, filter, page);
   const lessonTypes = useLessonTypes();
   const instructors = useAdminInstructors({});
+  const result = detail.data;
+  const fresh = result && !detail.isPlaceholderData ? result : undefined;
+  const lastPage = fresh
+    ? Math.max(1, Math.ceil(fresh.total / IMPORT_ROWS_PAGE_SIZE))
+    : page;
+
+  useEffect(() => {
+    if (fresh && fresh.detail.rows.length === 0 && lastPage < page) {
+      setPaging({ id, page: lastPage });
+    }
+  }, [fresh, lastPage, page, id]);
 
   if (detail.isLoading) {
     return (
@@ -358,7 +373,7 @@ function ImportWorkspace({ id, side }: { id: string; side: ReactNode }) {
       </TwoColumns>
     );
   }
-  if (detail.isError || !detail.data) {
+  if (detail.isError || !result) {
     return (
       <TwoColumns side={side}>
         <Banner tone="error">
@@ -367,7 +382,7 @@ function ImportWorkspace({ id, side }: { id: string; side: ReactNode }) {
       </TwoColumns>
     );
   }
-  const data = detail.data;
+  const data = result.detail;
   const editable = data.import.status === 'draft';
   return (
     <>
@@ -384,7 +399,15 @@ function ImportWorkspace({ id, side }: { id: string; side: ReactNode }) {
         id={id}
         detail={data}
         filter={filter}
-        onFilter={setFilter}
+        onFilter={(next) => {
+          setFilter(next);
+          setPaging({ id, page: 1 });
+        }}
+        page={page}
+        shownPage={result.page}
+        total={result.total}
+        busy={detail.isPlaceholderData}
+        onPage={(next) => setPaging({ id, page: next })}
         lessonTypes={lessonTypes.data ?? []}
         instructors={instructors.data ?? []}
         editable={editable}
@@ -629,6 +652,11 @@ function RowsCard({
   detail,
   filter,
   onFilter,
+  page,
+  shownPage,
+  total,
+  busy,
+  onPage,
   lessonTypes,
   instructors,
   editable,
@@ -637,6 +665,11 @@ function RowsCard({
   detail: ClassImportDetail;
   filter: RowFilter | '';
   onFilter: (f: RowFilter | '') => void;
+  page: number;
+  shownPage: number;
+  total: number;
+  busy: boolean;
+  onPage: (page: number) => void;
   lessonTypes: LessonType[];
   instructors: AdminInstructorRecord[];
   editable: boolean;
@@ -689,7 +722,13 @@ function RowsCard({
       {detail.rows.length === 0 ? (
         <p className="text-sm text-slate">{t.classImport.rowsEmpty}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div
+          className={cn(
+            'overflow-x-auto transition-opacity',
+            busy && 'opacity-60',
+          )}
+          aria-busy={busy}
+        >
           <table className="w-full min-w-[50rem] text-sm">
             <thead>
               <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
@@ -729,6 +768,24 @@ function RowsCard({
             </tbody>
           </table>
         </div>
+      )}
+      {detail.rows.length > 0 && (
+        <Pager
+          page={page}
+          shownPage={shownPage}
+          pageSize={IMPORT_ROWS_PAGE_SIZE}
+          count={detail.rows.length}
+          total={total}
+          busy={busy}
+          onPage={onPage}
+          className="border-t border-grey/60 px-0 pb-0"
+          text={{
+            label: t.classImport.rowsPagination,
+            showing: t.classImport.rowsShowing,
+            previous: t.classImport.prevPage,
+            next: t.classImport.nextPage,
+          }}
+        />
       )}
     </Card>
   );
