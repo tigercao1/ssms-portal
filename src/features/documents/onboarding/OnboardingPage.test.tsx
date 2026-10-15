@@ -7,6 +7,7 @@ import { OnboardingCard } from './OnboardingCard';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/msw';
 import { sizedFile } from '@/test/imageMocks';
+import { bodyBytes, patternBytes } from '@/test/bytes';
 import type { CertUploadUrlRequest } from '../api';
 import { MOCK_STORAGE_ORIGIN, fakeCertUpload } from '../api/fixtures';
 import {
@@ -144,6 +145,7 @@ describe('OnboardingPage', () => {
     const user = userEvent.setup();
     let ticket: CertUploadUrlRequest | undefined;
     let putType: string | null = null;
+    let putBody: Uint8Array | undefined;
     let confirmed = false;
     server.use(
       http.post(
@@ -159,8 +161,9 @@ describe('OnboardingPage', () => {
       ),
       http.put(
         `${MOCK_STORAGE_ORIGIN}/upload/certifications/cu-new`,
-        ({ request }) => {
+        async ({ request }) => {
           putType = request.headers.get('content-type');
+          putBody = await bodyBytes(request);
           return new HttpResponse(null, { status: 200 });
         },
       ),
@@ -190,7 +193,9 @@ describe('OnboardingPage', () => {
       within(dialog).getByText('This field is required.'),
     ).toBeInTheDocument();
 
-    const pdf = sizedFile('cert.pdf', 'application/pdf', 4321);
+    const pdf = new File([patternBytes(4321)], 'cert.pdf', {
+      type: 'application/pdf',
+    });
     await user.upload(within(dialog).getByLabelText(/Certificate file/), pdf);
     await user.type(date, '2026-10-11');
     await user.click(within(dialog).getByRole('button', { name: 'Upload' }));
@@ -213,6 +218,7 @@ describe('OnboardingPage', () => {
       contentLength: 4321,
     });
     expect(putType).toBe('application/pdf');
+    expect(putBody).toEqual(patternBytes(4321));
     expect(confirmed).toBe(true);
     expect(screen.queryByRole('dialog')).toBeNull();
   });

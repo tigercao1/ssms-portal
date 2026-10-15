@@ -529,18 +529,17 @@ describe('DocumentsListPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     const input = await screen.findByLabelText('Upload PDF for Uniform policy');
-    const file = new File(
-      [buildSamplePdf([{ width: 612, height: 792 }])],
-      'policy.pdf',
-      {
-        type: 'application/pdf',
-      },
-    );
+    const pdfBytes = buildSamplePdf([{ width: 612, height: 792 }]);
+    const file = new File([pdfBytes], 'policy.pdf', {
+      type: 'application/pdf',
+    });
     await user.upload(input, file);
     expect(
       await screen.findByText('Uploaded the PDF for Uniform policy (1 page).'),
     ).toBeInTheDocument();
-    expect(state.uploadedSources.has('tpl-draft')).toBe(true);
+    expect(new Uint8Array(state.uploadedSources.get('tpl-draft')!)).toEqual(
+      Uint8Array.from(pdfBytes),
+    );
     await waitFor(() =>
       expect(
         within(row('Uniform policy')).getByText('1 page'),
@@ -571,6 +570,9 @@ describe('DocumentsListPage', () => {
     expect(
       await screen.findByText(/its placed fields were cleared/),
     ).toBeInTheDocument();
+    expect(
+      new TextDecoder().decode(state.uploadedSources.get('tpl-waiver')),
+    ).toBe('%PDF');
   });
 
   it('rejects non-PDF and oversize files before uploading', async () => {

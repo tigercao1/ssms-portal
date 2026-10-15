@@ -43,6 +43,7 @@ export interface DocumentsMockState {
   meApprovalStatus: 'approved' | 'pending' | 'rejected';
   meCerts: { org: CertOrg; track: CertTrack; level: number }[];
   uploadedSources: Map<string, ArrayBuffer>;
+  uploadedCerts: Map<string, ArrayBuffer>;
   reminded: string[];
   season: string | null;
   consentText: ConsentText;
@@ -65,6 +66,7 @@ export function createDocumentsState(
       { org: 'casi', track: 'park', level: 2 },
     ],
     uploadedSources: new Map(),
+    uploadedCerts: new Map(),
     reminded: [],
     season: MOCK_SEASON,
     consentText: structuredClone(MOCK_CONSENT_TEXT),
@@ -670,7 +672,10 @@ export function documentsHandlers(
     ),
     http.put(
       `${MOCK_STORAGE_ORIGIN}/upload/certifications/:id`,
-      () => new HttpResponse(null, { status: 200 }),
+      async ({ params, request }) => {
+        state.uploadedCerts.set(String(params.id), await request.arrayBuffer());
+        return new HttpResponse(null, { status: 200 });
+      },
     ),
     http.get(
       `${MOCK_STORAGE_ORIGIN}/templates/:id/source.pdf`,
