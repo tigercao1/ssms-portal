@@ -68,6 +68,9 @@ describe('admin template requests', () => {
     expect(list.find((t) => t.id === 'tpl-draft')).toMatchObject({
       hasSource: false,
       fieldCount: 0,
+      assignedCount: 0,
+      completedCount: 0,
+      approvedCount: 0,
     });
   });
 

@@ -158,7 +158,10 @@ export function documentsHandlers(
       ),
       assignedCount: open.length,
       completedCount: open.filter((a) => a.status === 'completed').length,
-      approvedCount: state.instructorIds.length,
+      approvedCount:
+        t.status === 'draft' || t.season === null
+          ? 0
+          : state.instructorIds.length,
     });
   };
   const assignToInstructors = (
@@ -238,7 +241,7 @@ export function documentsHandlers(
         hasCompletedAssignments: false,
         assignedCount: 0,
         completedCount: 0,
-        approvedCount: state.instructorIds.length,
+        approvedCount: 0,
         sortOrder: body.sortOrder,
         hasSource: false,
         sourceSha256: null,
