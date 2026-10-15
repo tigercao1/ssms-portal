@@ -461,24 +461,23 @@ function PeriodCard({ period }: { period: MyPayPeriod }) {
           label={awaiting ? t.myLessons.awaiting : t.myLessons.paid}
         />
         <span className="text-xs text-slate">{summary}</span>
-        {notCounted && (
-          <span
-            data-testid="period-not-counted"
-            className="ml-auto text-xs text-slate"
-          >
-            {notCounted}
-          </span>
-        )}
-        <span
-          data-testid="period-total"
-          className={cn(
-            'font-semibold tabular-nums text-navy',
-            !notCounted && 'ml-auto',
+        <span className="ml-auto flex flex-wrap items-baseline justify-end gap-x-2">
+          {notCounted && (
+            <span
+              data-testid="period-not-counted"
+              className="text-xs text-slate"
+            >
+              {notCounted}
+            </span>
           )}
-        >
-          {awaiting && total
-            ? t.myLessons.approx.replace('{amount}', total)
-            : total}
+          <span
+            data-testid="period-total"
+            className="font-semibold tabular-nums text-navy"
+          >
+            {awaiting && total
+              ? t.myLessons.approx.replace('{amount}', total)
+              : total}
+          </span>
         </span>
       </button>
       {open && (
