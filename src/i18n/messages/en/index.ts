@@ -746,7 +746,7 @@ export const en: Messages = {
     retireFor: 'Retire {title}',
     publishNeedsPdf: 'Upload a PDF before publishing.',
     publishNeedsField: 'Place at least one field before publishing.',
-    lockedSigned: "Someone has signed this document, so its PDF and fields can't change. Retire it and publish a new one.",
+    lockedSigned: "Someone has completed this document, so its PDF and fields can't change. Retire it and publish a new one.",
     publishTitle: 'Publish “{title}”',
     publishIntro: "Instructors can see and sign it once it's published.",
     publishWho: 'Who gets it',

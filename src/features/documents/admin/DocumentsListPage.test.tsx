@@ -364,14 +364,14 @@ describe('DocumentsListPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Not live');
   });
 
-  it('locks Replace PDF and Place fields once a copy has been signed', async () => {
+  it('locks Replace PDF and Place fields once a copy has been completed', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     const editor = await openEdit(user, 'Code of conduct');
     const replace = within(editor).getByRole('button', { name: 'Replace PDF' });
     expect(replace).toBeDisabled();
     const reason =
-      "Someone has signed this document, so its PDF and fields can't change. Retire it and publish a new one.";
+      "Someone has completed this document, so its PDF and fields can't change. Retire it and publish a new one.";
     expect(replace).toHaveAccessibleDescription(reason);
     expect(
       within(editor).getByRole('button', { name: 'Place fields' }),

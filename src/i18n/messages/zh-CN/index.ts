@@ -724,7 +724,7 @@ export const zhCN: Messages = {
     retireFor: '停用 {title}',
     publishNeedsPdf: '发布前请先上传 PDF。',
     publishNeedsField: '发布前请至少放置一个字段。',
-    lockedSigned: '已有教练签署此资料，PDF 和字段不能再修改。如需修改，请停用后发布新的资料。',
+    lockedSigned: '已有教练完成此资料，PDF 和字段不能再修改。如需修改，请停用后发布新的资料。',
     publishTitle: '发布“{title}”',
     publishIntro: '发布后教练即可查看并签署。',
     publishWho: '发给谁',

@@ -90,8 +90,8 @@ const pendingApproval = () =>
     },
     { status: 403 },
   );
-const SIGNED_TEMPLATE_LOCKED =
-  'This document has been signed; retire it and publish a new one to change the PDF or fields';
+const TEMPLATE_LOCKED =
+  'Someone has completed this document, so its PDF and fields can no longer change. Retire it and publish a new one instead.';
 
 function nowIso() {
   return new Date().toISOString();
@@ -283,10 +283,18 @@ export function documentsHandlers(
         const body = (await request.json()) as PublishRequest;
         if (body.assignTo !== 'all' && body.assignTo !== 'selected')
           return badRequest('assignTo must be all or selected');
-        if (t.status === 'live') return conflict('Already live');
-        if (!t.sourceSha256) return badRequest('Upload a PDF first');
+        if (t.status === 'live')
+          return conflict('This document is already published');
+        if (!t.sourceSha256)
+          return badRequest('Upload the PDF before publishing');
         if (t.kind === 'sign' && t.fields.length === 0)
-          return badRequest('Place at least one field first');
+          return badRequest(
+            'Place at least one field before publishing a document to sign',
+          );
+        if (body.assignTo === 'all' && t.audience !== 'instructor')
+          return badRequest(
+            'Only instructor documents can be published to all instructors',
+          );
         const season = body.season ?? state.season ?? MOCK_SEASON;
         Object.assign(t, {
           status: 'live',
@@ -306,7 +314,7 @@ export function documentsHandlers(
       const t = findTemplate(params.id);
       if (!t) return notFound();
       if (t.status !== 'live')
-        return conflict('Only live documents can be retired');
+        return conflict('Only a published document can be retired');
       Object.assign(t, { status: 'retired', updatedAt: nowIso() });
       return HttpResponse.json(present(t));
     }),
@@ -316,7 +324,7 @@ export function documentsHandlers(
         const t = findTemplate(params.id);
         if (!t) return notFound();
         if (present(t).hasCompletedAssignments)
-          return conflict(SIGNED_TEMPLATE_LOCKED);
+          return conflict(TEMPLATE_LOCKED);
         const { contentLength } = (await request.json()) as {
           contentLength: number;
         };
@@ -334,7 +342,7 @@ export function documentsHandlers(
         const t = findTemplate(params.id);
         if (!t) return notFound();
         if (present(t).hasCompletedAssignments)
-          return conflict(SIGNED_TEMPLATE_LOCKED);
+          return conflict(TEMPLATE_LOCKED);
         if (!state.uploadedSources.has(t.id))
           return badRequest('No uploaded source found');
         const pages = t.pages.length ? t.pages : DEFAULT_PAGES;
@@ -354,7 +362,7 @@ export function documentsHandlers(
         const t = findTemplate(params.id);
         if (!t) return notFound();
         if (present(t).hasCompletedAssignments)
-          return conflict(SIGNED_TEMPLATE_LOCKED);
+          return conflict(TEMPLATE_LOCKED);
         const { fields } = (await request.json()) as { fields: Field[] };
         const error = validateFields(t, fields);
         if (error) return badRequest(error);
@@ -368,7 +376,9 @@ export function documentsHandlers(
       const template = findTemplate(body.templateId);
       if (!template) return notFound();
       if (template.status !== 'live')
-        return badRequest('Only live documents can be assigned');
+        return badRequest(
+          'Only live instructor templates with an uploaded PDF can be assigned',
+        );
       if (!body.season?.trim()) return badRequest('season is required');
       const ids = body.allActiveInstructors
         ? state.instructorIds

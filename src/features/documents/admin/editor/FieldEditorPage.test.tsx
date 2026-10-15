@@ -395,7 +395,7 @@ describe('FieldEditorPage', () => {
     cleanup();
     renderEditor('tpl-waiver');
     expect(
-      await screen.findByText(/Someone has signed this document/),
+      await screen.findByText(/Someone has completed this document/),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Save fields' }),
