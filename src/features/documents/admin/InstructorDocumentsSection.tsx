@@ -15,6 +15,7 @@ import {
 } from '@/components';
 import { formatBytes } from '@/features/admin/PageParts';
 import {
+  downloadPresigned,
   getAssignmentSignedUrl,
   getCertUploadUrl,
   type Assignment,
@@ -64,15 +65,6 @@ export async function openPresigned(get: () => Promise<{ url: string }>) {
     tab?.close();
     throw err;
   }
-}
-
-/**
- * Downloads a presigned file served as an attachment. Navigating this tab to
- * it starts the download without leaving the page or opening another tab.
- */
-export async function downloadPresigned(get: () => Promise<{ url: string }>) {
-  const { url } = await get();
-  window.location.assign(url);
 }
 
 /** Documents and certification uploads for one instructor, on the admin detail page. */

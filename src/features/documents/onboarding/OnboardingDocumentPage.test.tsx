@@ -65,6 +65,15 @@ function setMobile(matches: boolean) {
   );
 }
 
+function stubLocationAssign() {
+  const assign = vi.fn();
+  vi.spyOn(window, 'location', 'get').mockReturnValue({
+    ...window.location,
+    assign,
+  });
+  return assign;
+}
+
 function renderAt(id: string) {
   return renderWithProviders(
     <Routes>
@@ -103,6 +112,7 @@ describe('OnboardingDocumentPage — sign', () => {
   it('fills fields, signs, requires consent and posts the exact contract body', async () => {
     const user = userEvent.setup();
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const assign = stubLocationAssign();
     renderAt('asg-new');
     expect(
       await screen.findByRole('heading', { name: 'Code of conduct' }),
@@ -178,12 +188,11 @@ describe('OnboardingDocumentPage — sign', () => {
     await user.click(
       screen.getByRole('button', { name: 'Download signed copy' }),
     );
-    expect(open).toHaveBeenCalledWith(
-      'https://storage.mock/signed/asg-new.pdf?sig=mock',
-      '_blank',
-      'noopener',
-    );
     expect(await screen.findAllByText(/SHA-256: e5f6a7b8/)).not.toHaveLength(0);
+    expect(assign).toHaveBeenCalledWith(
+      'https://storage.mock/signed/asg-new.pdf?sig=mock',
+    );
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('shows the consent text from the API and the Toronto signing date', async () => {
@@ -278,19 +287,29 @@ describe('OnboardingDocumentPage — sign', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the signed copy for a completed document', async () => {
+  it('downloads the signed copy of a completed document in place', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const assign = stubLocationAssign();
     renderAt('asg-conduct');
     expect(
       await screen.findByRole('heading', { name: 'Signed' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/SHA-256: b7e4d2a1/)).toBeInTheDocument();
-    expect(
+    await user.click(
       screen.getByRole('button', { name: 'Download signed copy' }),
-    ).toBeInTheDocument();
+    );
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        'https://storage.mock/signed/asg-conduct.pdf?sig=mock',
+      ),
+    );
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('reports a failed download link', async () => {
     const user = userEvent.setup();
+    const assign = stubLocationAssign();
     server.use(
       http.get(`${API}/me/documents/:id/signed-url`, () =>
         HttpResponse.json({}, { status: 500 }),
@@ -305,6 +324,7 @@ describe('OnboardingDocumentPage — sign', () => {
         'The download link could not be created. Try again.',
       ),
     ).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('shows an error when the document has no PDF to open', async () => {
