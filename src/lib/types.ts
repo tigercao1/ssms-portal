@@ -40,6 +40,9 @@ export interface TrainerStatus {
 export interface InstructorProfile {
   id: string;
   email: string;
+  firstName: string | null;
+  lastName: string | null;
+  legalName?: string;
   displayNameEn: string;
   displayNameZh: string | null;
   bioEn: string | null;
@@ -68,6 +71,8 @@ export interface InstructorProfile {
 
 /** PATCH /me/instructor body (all optional; omit = leave, [] = clear). */
 export interface UpdateProfileBody {
+  firstName?: string;
+  lastName?: string;
   displayNameEn?: string;
   displayNameZh?: string | null;
   bioEn?: string | null;

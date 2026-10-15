@@ -387,6 +387,72 @@ describe('AdminDetailPage profile editor', () => {
   );
 });
 
+describe('AdminDetailPage legal name', () => {
+  it('prefills the names and sends only the changed one', async () => {
+    const { profileBodies } = serveRecord({}, 'instructor', {
+      firstName: 'Jane',
+      lastName: 'Snow',
+    });
+    renderDetail();
+
+    const first = await screen.findByRole('textbox', { name: /First name/ });
+    expect(first).toHaveValue('Jane');
+    expect(screen.getByRole('textbox', { name: /Last name/ })).toHaveValue(
+      'Snow',
+    );
+    await userEvent.clear(first);
+    await userEvent.type(first, 'Janet');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(profileBodies).toHaveLength(1));
+    expect(profileBodies[0]).toMatchObject({ firstName: 'Janet' });
+    expect(profileBodies[0]).not.toHaveProperty('lastName');
+  });
+
+  it('blocks clearing a name that was set', async () => {
+    const { profileBodies } = serveRecord({}, 'instructor', {
+      firstName: 'Jane',
+      lastName: 'Snow',
+    });
+    renderDetail();
+
+    const last = await screen.findByRole('textbox', { name: /Last name/ });
+    await userEvent.clear(last);
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('This field is required.'),
+    ).toBeInTheDocument();
+    expect(last).toHaveAttribute('aria-invalid', 'true');
+    expect(profileBodies).toHaveLength(0);
+  });
+
+  it('leaves empty names optional until one is entered', async () => {
+    const { profileBodies } = serveRecord({});
+    renderDetail();
+
+    const first = await screen.findByRole('textbox', { name: /First name/ });
+    expect(first).toHaveValue('');
+    await userEvent.type(first, 'Jane');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText('This field is required.'),
+    ).toBeInTheDocument();
+    expect(profileBodies).toHaveLength(0);
+
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Last name/ }),
+      'Snow',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(profileBodies).toHaveLength(1));
+    expect(profileBodies[0]).toMatchObject({
+      firstName: 'Jane',
+      lastName: 'Snow',
+    });
+  });
+});
+
 describe('AdminDetailPage photo', () => {
   it('uploads through the admin photo routes', async () => {
     const { calls } = serveRecord({});

@@ -224,3 +224,109 @@ describe('EditProfilePage more photos', () => {
     );
   });
 });
+
+describe('EditProfilePage legal name', () => {
+  function serveNames(firstName: string | null, lastName: string | null) {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, firstName, lastName }),
+      ),
+    );
+  }
+
+  async function nameInputs() {
+    return {
+      first: await screen.findByRole('textbox', { name: /First name/ }),
+      last: screen.getByRole('textbox', { name: /Last name/ }),
+    };
+  }
+
+  it('prefills the names and sends only the changed one', async () => {
+    serveNames('Jane', 'Snow');
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    const { first, last } = await nameInputs();
+    expect(first).toHaveValue('Jane');
+    expect(last).toHaveValue('Snow');
+
+    await userEvent.clear(last);
+    await userEvent.type(last, ' Frost ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ lastName: 'Frost' });
+    expect(bodies[0]).not.toHaveProperty('firstName');
+  });
+
+  it('sends no names when they are unchanged', async () => {
+    serveNames('Jane', 'Snow');
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    await nameInputs();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('firstName');
+    expect(bodies[0]).not.toHaveProperty('lastName');
+  });
+
+  it('blocks clearing a name that was set', async () => {
+    serveNames('Jane', 'Snow');
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    const { first } = await nameInputs();
+    await userEvent.clear(first);
+    await userEvent.type(first, '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('This field is required.'),
+    ).toBeInTheDocument();
+    expect(first).toHaveAttribute('aria-invalid', 'true');
+    expect(bodies).toHaveLength(0);
+  });
+
+  it('lets an account without names save with both left empty', async () => {
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    const { first, last } = await nameInputs();
+    expect(first).toHaveValue('');
+    expect(last).toHaveValue('');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).not.toHaveProperty('firstName');
+    expect(bodies[0]).not.toHaveProperty('lastName');
+  });
+
+  it('requires both names once one is entered', async () => {
+    const bodies = capturePatches();
+    renderWithProviders(<EditProfilePage />);
+    const { first, last } = await nameInputs();
+    await userEvent.type(first, 'Jane');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText('This field is required.'),
+    ).toBeInTheDocument();
+    expect(last).toHaveAttribute('aria-invalid', 'true');
+    expect(first).toHaveAttribute('aria-invalid', 'false');
+    expect(bodies).toHaveLength(0);
+
+    await userEvent.type(last, 'Snow');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ firstName: 'Jane', lastName: 'Snow' });
+  });
+
+  it('labels the name fields in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveNames('简', '雪');
+    renderWithProviders(<EditProfilePage />);
+    expect(
+      await screen.findByRole('textbox', { name: /^名\s*\*?$/ }),
+    ).toHaveValue('简');
+    expect(screen.getByRole('textbox', { name: /^姓\s*\*?$/ })).toHaveValue(
+      '雪',
+    );
+  });
+});

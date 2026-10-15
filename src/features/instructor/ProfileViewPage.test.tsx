@@ -50,6 +50,41 @@ describe('ProfileViewPage (W2.1)', () => {
   });
 });
 
+describe('ProfileViewPage legal name', () => {
+  it('shows the legal name when both names are set', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          firstName: 'Janet',
+          lastName: 'Snowden',
+        }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('Legal name: Janet Snowden'),
+    ).toBeInTheDocument();
+  });
+
+  it('labels the legal name in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, firstName: '简', lastName: '雪' }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('法定姓名: 简 雪')).toBeInTheDocument();
+  });
+
+  it('hides the legal name when it is not set', async () => {
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
+    expect(screen.queryByText(/Legal name/)).not.toBeInTheDocument();
+  });
+});
+
 describe('ProfileViewPage machine-translation badge', () => {
   const translated: InstructorProfile = {
     ...fakeProfile,
