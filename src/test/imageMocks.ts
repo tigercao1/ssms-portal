@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { patternBytes } from './bytes';
 
 export interface ImageMock {
   drawn: { width: number; height: number }[];
@@ -47,7 +48,7 @@ export function mockImagePipeline({
     quality,
   ) {
     mock.encoded.push({ type, quality });
-    cb(new Blob([new Uint8Array(outputBytes)], { type: outputType }));
+    cb(new Blob([patternBytes(outputBytes)], { type: outputType }));
   });
   return mock;
 }
