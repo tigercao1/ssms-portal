@@ -714,8 +714,6 @@ export interface Messages {
     templateStatusRetired: string;
     audienceAll: string;
     audienceSelected: string;
-    audienceAllDetail: string;
-    audienceSelectedDetail: string;
     assignMore: string;
     publish: string;
     republish: string;

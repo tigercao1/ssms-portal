@@ -713,8 +713,6 @@ export const zhCN: Messages = {
     templateStatusRetired: '已停用',
     audienceAll: '所有教练',
     audienceSelected: '指定教练',
-    audienceAllDetail: '已分配 {assigned}/{approved} 位已审核教练 · {signed} 人已签',
-    audienceSelectedDetail: '{n} 位教练',
     assignMore: '继续分配',
     publish: '发布',
     republish: '重新发布',

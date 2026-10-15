@@ -735,8 +735,6 @@ export const en: Messages = {
     templateStatusRetired: 'Retired',
     audienceAll: 'All instructors',
     audienceSelected: 'Selected',
-    audienceAllDetail: '{assigned} of {approved} approved assigned · {signed} signed',
-    audienceSelectedDetail: '{n} instructors',
     assignMore: 'Assign more',
     publish: 'Publish',
     republish: 'Re-publish',
