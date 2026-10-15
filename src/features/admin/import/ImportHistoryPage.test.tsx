@@ -125,7 +125,7 @@ function detail(overrides: Partial<ClassImportDetail> = {}): ClassImportDetail {
 interface Calls {
   details: (string | null)[];
   pages: { id: string; page: string | null; limit: string | null }[];
-  uploads: (string | null)[];
+  uploads: { contentType: string | null; body: string }[];
   patches: { rowNo: string; body: unknown }[];
   maps: unknown[];
   commits: number;
@@ -189,8 +189,11 @@ function serve({
         { headers: { 'X-Total-Count': String(rows.length) } },
       );
     }),
-    http.post(`${API}/admin/class-imports`, ({ request }) => {
-      calls.uploads.push(request.headers.get('content-type'));
+    http.post(`${API}/admin/class-imports`, async ({ request }) => {
+      calls.uploads.push({
+        contentType: request.headers.get('content-type'),
+        body: await request.text(),
+      });
       list = [record(), ...list];
       return HttpResponse.json(shown, { status: 201 });
     }),
@@ -279,7 +282,6 @@ describe('ImportHistoryPage', () => {
     const file = new File(['id,event.name\n'], 'bookings.csv', {
       type: 'text/csv',
     });
-    const append = vi.spyOn(FormData.prototype, 'append');
     await user.upload(screen.getByLabelText('CSV file'), file);
     await user.click(upload);
 
@@ -287,8 +289,17 @@ describe('ImportHistoryPage', () => {
       await screen.findByRole('heading', { name: 'Summary' }),
     ).toBeInTheDocument();
     expect(calls.uploads).toHaveLength(1);
-    expect(calls.uploads[0]).toMatch(/^multipart\/form-data; boundary=/);
-    expect(append).toHaveBeenCalledWith('file', file);
+    const [{ contentType, body }] = calls.uploads as [Calls['uploads'][0]];
+    const boundary = contentType?.match(
+      /^multipart\/form-data; boundary=(.+)$/,
+    )?.[1];
+    expect(body).toBe(
+      `--${boundary}\r\n` +
+        'Content-Disposition: form-data; name="file"; filename="bookings.csv"\r\n' +
+        'Content-Type: text/csv\r\n\r\n' +
+        'id,event.name\n\r\n' +
+        `--${boundary}--\r\n`,
+    );
     const tiles = screen.getByText('Needs instructor').closest('div');
     expect(within(tiles as HTMLElement).getByText('1')).toBeInTheDocument();
     for (const label of [
