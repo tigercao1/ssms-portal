@@ -74,7 +74,7 @@ export function DocumentsListPage() {
         </EmptyState>
       ) : (
         <Card className="p-0">
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[48rem] text-sm">
               <thead>
                 <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
