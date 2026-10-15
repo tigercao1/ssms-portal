@@ -78,6 +78,15 @@ const DEFAULT_PAGES: TemplatePage[] = [
 
 const notFound = () =>
   HttpResponse.json({ message: 'Not found' }, { status: 404 });
+const TEMPLATE_PATCH_KEYS = new Set<string>([
+  'titleEn',
+  'titleZh',
+  'descriptionEn',
+  'descriptionZh',
+  'required',
+  'sortOrder',
+] satisfies (keyof TemplatePatch)[]);
+
 const badRequest = (message: string) =>
   HttpResponse.json({ message }, { status: 400 });
 const conflict = (message: string) =>
@@ -266,10 +275,12 @@ export function documentsHandlers(
       async ({ params, request }) => {
         const t = findTemplate(params.id);
         if (!t) return notFound();
-        const body = (await request.json()) as TemplatePatch & {
-          isActive?: unknown;
-        };
-        delete body.isActive;
+        const body = (await request.json()) as TemplatePatch;
+        const unknownKey = Object.keys(body).find(
+          (key) => !TEMPLATE_PATCH_KEYS.has(key),
+        );
+        if (unknownKey)
+          return badRequest(`property ${unknownKey} should not exist`);
         Object.assign(t, body, { updatedAt: nowIso() });
         return HttpResponse.json(present(t));
       },
