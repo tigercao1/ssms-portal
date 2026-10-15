@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { uploadAvatar } from './api';
 import { fakeProfile, server } from '@/test/msw';
 import { mockImagePipeline, sizedFile } from '@/test/imageMocks';
+import { bodyBytes, patternBytes, sha256 } from '@/test/bytes';
 
 const API = 'http://localhost:3000';
 const MB = 1024 * 1024;
@@ -10,21 +11,12 @@ const MB = 1024 * 1024;
 interface Captured {
   ticket?: { contentType: string; contentLength: number };
   putType?: string | null;
-  putBytes?: number;
-  putBody?: Blob;
+  putBody?: Uint8Array;
   confirm?: { contentType: string };
 }
 
 function captureUpload(): Captured {
   const captured: Captured = {};
-  const realFetch = globalThis.fetch;
-  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
-    if (init?.method === 'PUT') {
-      captured.putBody = init.body as Blob;
-      captured.putBytes = captured.putBody.size;
-    }
-    return realFetch(input, init);
-  });
   server.use(
     http.post(
       `${API}/me/instructor/photo/signed-upload-url`,
@@ -40,6 +32,7 @@ function captureUpload(): Captured {
     ),
     http.put('http://storage.test/upload', async ({ request }) => {
       captured.putType = request.headers.get('content-type');
+      captured.putBody = await bodyBytes(request);
       return new HttpResponse(null, { status: 200 });
     }),
     http.post(`${API}/me/instructor/photo/confirm`, async ({ request }) => {
@@ -75,7 +68,7 @@ describe('uploadAvatar resizing', () => {
       contentLength: 900_000,
     });
     expect(captured.putType).toBe('image/jpeg');
-    expect(captured.putBytes).toBe(900_000);
+    expect(sha256(captured.putBody!)).toBe(sha256(patternBytes(900_000)));
     expect(captured.confirm).toEqual({ contentType: 'image/jpeg' });
   });
 
@@ -93,7 +86,7 @@ describe('uploadAvatar resizing', () => {
       contentLength: 500,
     });
     expect(captured.putType).toBe('image/jpeg');
-    expect(captured.putBytes).toBe(500);
+    expect(captured.putBody).toEqual(patternBytes(500));
   });
 
   it('uploads the original when resizing does not make it smaller', async () => {
@@ -101,7 +94,7 @@ describe('uploadAvatar resizing', () => {
     const captured = captureUpload();
 
     await uploadAvatar(
-      new File([new Uint8Array(3000)], 'a.webp', { type: 'image/webp' }),
+      new File([patternBytes(3000)], 'a.webp', { type: 'image/webp' }),
       '/me/instructor/photo',
     );
 
@@ -110,7 +103,7 @@ describe('uploadAvatar resizing', () => {
       contentLength: 3000,
     });
     expect(captured.putType).toBe('image/webp');
-    expect(captured.putBytes).toBe(3000);
+    expect(captured.putBody).toEqual(patternBytes(3000));
     expect(captured.confirm).toEqual({ contentType: 'image/webp' });
   });
 
@@ -124,12 +117,12 @@ describe('uploadAvatar resizing', () => {
     const captured = captureUpload();
 
     await uploadAvatar(
-      new File([new Uint8Array(100)], 'a.png', { type: 'image/png' }),
+      new File([patternBytes(100)], 'a.png', { type: 'image/png' }),
       '/me/instructor/photo',
     );
 
     expect(captured.putType).toBe('image/png');
-    expect(captured.putBytes).toBe(100);
+    expect(captured.putBody).toEqual(patternBytes(100));
   });
 
   it('rejects a photo that is still over 5 MB after resizing', async () => {

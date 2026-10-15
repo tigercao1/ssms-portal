@@ -31,6 +31,7 @@ function serveRecord(
 ) {
   let profile: InstructorProfile = { ...fakeProfile, ...profileOverrides };
   const calls: string[] = [];
+  const uploads: string[] = [];
   const profileBodies: unknown[] = [];
   let record: AdminInstructorRecord = {
     ...(fakeAdminList[0] as AdminInstructorRecord),
@@ -69,8 +70,9 @@ function serveRecord(
         });
       },
     ),
-    http.put('http://storage.test/upload', () => {
+    http.put('http://storage.test/upload', async ({ request }) => {
       calls.push('PUT storage');
+      uploads.push(await request.text());
       return new HttpResponse(null, { status: 200 });
     }),
     http.post(`${API}/admin/instructors/:id/photo/confirm`, ({ params }) => {
@@ -112,7 +114,7 @@ function serveRecord(
       });
     }),
   );
-  return { activationBodies, roleBodies, profileBodies, calls };
+  return { activationBodies, roleBodies, profileBodies, calls, uploads };
 }
 
 function renderDetail() {
@@ -455,7 +457,7 @@ describe('AdminDetailPage legal name', () => {
 
 describe('AdminDetailPage photo', () => {
   it('uploads through the admin photo routes', async () => {
-    const { calls } = serveRecord({});
+    const { calls, uploads } = serveRecord({});
     const { container } = renderDetail();
 
     await screen.findByDisplayValue('Jane Snow');
@@ -478,6 +480,7 @@ describe('AdminDetailPage photo', () => {
       'PUT storage',
       'POST /admin/instructors/inst-1/photo/confirm',
     ]);
+    expect(uploads).toEqual(['abcd']);
   });
 
   it('removes the photo with a null profilePhotoUrl', async () => {
@@ -596,7 +599,7 @@ describe('AdminDetailPage more photos', () => {
   }
 
   it('uploads slot 2 through the admin photo routes with its slot', async () => {
-    serveRecord({});
+    const { uploads } = serveRecord({});
     const calls = serveSlots();
     renderDetail();
 
@@ -620,6 +623,7 @@ describe('AdminDetailPage more photos', () => {
         body: { contentType: 'image/png', slot: 2 },
       },
     ]);
+    expect(uploads).toEqual(['abcd']);
   });
 
   it('removes slot 3 through the admin delete route', async () => {

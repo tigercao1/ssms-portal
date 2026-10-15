@@ -147,6 +147,7 @@ describe('EditProfilePage machine-translation badge', () => {
 describe('EditProfilePage more photos', () => {
   it('shows photo slots 2 and 3 and updates a slot after upload', async () => {
     const confirms: unknown[] = [];
+    const uploads: string[] = [];
     server.use(
       http.get(`${API}/me/instructor`, () =>
         HttpResponse.json({
@@ -163,10 +164,10 @@ describe('EditProfilePage more photos', () => {
           path: 'inst-1/photo-3.png',
         }),
       ),
-      http.put(
-        'http://storage.test/upload',
-        () => new HttpResponse(null, { status: 200 }),
-      ),
+      http.put('http://storage.test/upload', async ({ request }) => {
+        uploads.push(await request.text());
+        return new HttpResponse(null, { status: 200 });
+      }),
       http.post(`${API}/me/instructor/photo/confirm`, async ({ request }) => {
         confirms.push(await request.json());
         return HttpResponse.json({
@@ -198,6 +199,7 @@ describe('EditProfilePage more photos', () => {
       'src',
       'http://storage.test/p3.png',
     );
+    expect(uploads).toEqual(['abcd']);
     expect(confirms).toEqual([{ contentType: 'image/png', slot: 3 }]);
     expect(screen.getByDisplayValue('Jane Snow')).toBeInTheDocument();
   });

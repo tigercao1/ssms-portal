@@ -44,6 +44,7 @@ import {
   presentCertUploads,
 } from './fixtures';
 import { buildSamplePdf } from './samplePdf';
+import { patternBytes } from '@/test/bytes';
 
 vi.mock('@/lib/supabase', () => import('@/test/supabaseAuth'));
 
@@ -86,12 +87,16 @@ describe('admin template requests', () => {
     await expect(confirmTemplateSource(created.id)).rejects.toBeInstanceOf(
       ApiError,
     );
-    const pdf = new Blob([buildSamplePdf([{ width: 612, height: 792 }])]);
+    const pdfBytes = buildSamplePdf([{ width: 612, height: 792 }]);
+    const pdf = new Blob([pdfBytes]);
     const { uploadUrl } = await requestTemplateSourceUpload(
       created.id,
       pdf.size,
     );
     await putToPresignedUrl(uploadUrl, pdf, 'application/pdf');
+    expect(new Uint8Array(state.uploadedSources.get(created.id)!)).toEqual(
+      Uint8Array.from(pdfBytes),
+    );
     const confirmed = await confirmTemplateSource(created.id);
     expect(confirmed.pageCount).toBe(1);
     expect(confirmed.fieldsCleared).toBe(false);
@@ -350,7 +355,14 @@ describe('/me requests', () => {
       contentType: 'image/png',
       contentLength: 1000,
     });
-    await putToPresignedUrl(uploadUrl, new Blob(['x']), 'image/png');
+    await putToPresignedUrl(
+      uploadUrl,
+      new Blob([patternBytes(1000)]),
+      'image/png',
+    );
+    expect(new Uint8Array(state.uploadedCerts.get(uploadId)!)).toEqual(
+      patternBytes(1000),
+    );
     const confirmed = await confirmMyCertUpload(uploadId);
     expect(confirmed.sha256).toMatch(/^[0-9a-f]{64}$/);
   });

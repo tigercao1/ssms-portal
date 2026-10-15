@@ -6,6 +6,7 @@ import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
 import { mockImagePipeline, sizedFile } from '@/test/imageMocks';
+import { bodyBytes, patternBytes, sha256 } from '@/test/bytes';
 
 const API = 'http://localhost:3000';
 
@@ -17,6 +18,7 @@ afterEach(() => {
 describe('PhotoUploader', () => {
   it('uploads through the instructor photo routes without a remove action', async () => {
     const calls: string[] = [];
+    let uploaded: { type: string | null; body: string } | undefined;
     server.use(
       http.post(`${API}/me/instructor/photo/signed-upload-url`, () => {
         calls.push('signed-upload-url');
@@ -27,8 +29,12 @@ describe('PhotoUploader', () => {
           path: 'inst-1/photo.png',
         });
       }),
-      http.put('http://storage.test/upload', () => {
+      http.put('http://storage.test/upload', async ({ request }) => {
         calls.push('put');
+        uploaded = {
+          type: request.headers.get('content-type'),
+          body: await request.text(),
+        };
         return new HttpResponse(null, { status: 200 });
       }),
       http.post(`${API}/me/instructor/photo/confirm`, () => {
@@ -60,6 +66,7 @@ describe('PhotoUploader', () => {
     await vi.waitFor(() =>
       expect(calls).toEqual(['signed-upload-url', 'put', 'confirm']),
     );
+    expect(uploaded).toEqual({ type: 'image/png', body: 'abcd' });
   });
 
   it('shows the storage error when the upload is rejected', async () => {
@@ -109,6 +116,7 @@ describe('PhotoUploader', () => {
   it('accepts a large phone photo and uploads it resized', async () => {
     mockImagePipeline({ width: 4032, height: 3024, outputBytes: 800_000 });
     let ticket: unknown;
+    let uploaded: Uint8Array | undefined;
     server.use(
       http.post(
         `${API}/me/instructor/photo/signed-upload-url`,
@@ -122,10 +130,10 @@ describe('PhotoUploader', () => {
           });
         },
       ),
-      http.put(
-        'http://storage.test/upload',
-        () => new HttpResponse(null, { status: 200 }),
-      ),
+      http.put('http://storage.test/upload', async ({ request }) => {
+        uploaded = await bodyBytes(request);
+        return new HttpResponse(null, { status: 200 });
+      }),
       http.post(`${API}/me/instructor/photo/confirm`, () =>
         HttpResponse.json(fakeProfile),
       ),
@@ -145,6 +153,8 @@ describe('PhotoUploader', () => {
         contentLength: 800_000,
       }),
     );
+    const expected = sha256(patternBytes(800_000));
+    await vi.waitFor(() => expect(uploaded && sha256(uploaded)).toBe(expected));
     expect(screen.queryByText(/5 MB or smaller/)).not.toBeInTheDocument();
   });
 
@@ -172,6 +182,7 @@ describe('PhotoUploader', () => {
 describe('MorePhotosUploader', () => {
   function serveSlotRoutes() {
     const bodies: { route: string; body: unknown }[] = [];
+    const uploads: Uint8Array[] = [];
     const deletes: string[] = [];
     server.use(
       http.post(
@@ -186,10 +197,10 @@ describe('MorePhotosUploader', () => {
           });
         },
       ),
-      http.put(
-        'http://storage.test/upload',
-        () => new HttpResponse(null, { status: 200 }),
-      ),
+      http.put('http://storage.test/upload', async ({ request }) => {
+        uploads.push(await bodyBytes(request));
+        return new HttpResponse(null, { status: 200 });
+      }),
       http.post(`${API}/me/instructor/photo/confirm`, async ({ request }) => {
         bodies.push({ route: 'confirm', body: await request.json() });
         return HttpResponse.json({
@@ -202,7 +213,7 @@ describe('MorePhotosUploader', () => {
         return HttpResponse.json({ ...fakeProfile, photo3Url: null });
       }),
     );
-    return { bodies, deletes };
+    return { bodies, uploads, deletes };
   }
 
   it('shows two labelled photo slots under a More photos heading', () => {
@@ -227,7 +238,7 @@ describe('MorePhotosUploader', () => {
       height: 3024,
       outputBytes: 700_000,
     });
-    const { bodies } = serveSlotRoutes();
+    const { bodies, uploads } = serveSlotRoutes();
     renderWithProviders(<MorePhotosUploader profile={fakeProfile} />);
 
     const group = screen.getByRole('group', { name: 'Photo 2' });
@@ -245,6 +256,7 @@ describe('MorePhotosUploader', () => {
         { route: 'confirm', body: { contentType: 'image/jpeg', slot: 2 } },
       ]),
     );
+    expect(uploads.map(sha256)).toEqual([sha256(patternBytes(700_000))]);
     expect(mock.drawn).toEqual([{ width: 2000, height: 1500 }]);
   });
 
