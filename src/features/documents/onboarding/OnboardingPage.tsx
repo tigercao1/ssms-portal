@@ -247,11 +247,13 @@ export function OnboardingPage() {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-3xl">{t.onboarding.title}</h1>
-        {data.items.length === 0 ? (
+        {data.lockReason === 'rejected' ? (
+          <LockedBanner reason="rejected" />
+        ) : data.items.length === 0 ? (
           <LockedEmpty />
         ) : (
           <>
-            <LockedBanner />
+            <LockedBanner reason="pending_approval" />
             <LockedPreviewList items={data.items} />
           </>
         )}

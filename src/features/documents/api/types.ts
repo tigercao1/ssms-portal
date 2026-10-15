@@ -4,7 +4,7 @@ export type TemplateKind = 'sign' | 'read';
 export type TemplateAudience = 'instructor' | 'customer';
 export type TemplateStatus = 'draft' | 'live' | 'retired';
 export type TemplateAssignTo = 'all' | 'selected';
-export type ChecklistLockReason = 'pending_approval';
+export type ChecklistLockReason = 'pending_approval' | 'rejected';
 export type FieldType =
   | 'signature'
   | 'initials'

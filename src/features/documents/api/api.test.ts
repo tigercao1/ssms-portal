@@ -340,7 +340,7 @@ describe('/me requests', () => {
   });
 
   it('returns a locked preview and 403s while pending approval', async () => {
-    state.meApproved = false;
+    state.meApprovalStatus = 'pending';
     const list = await getMyChecklist();
     expect(list).toMatchObject({
       season: '2026/27',
@@ -385,6 +385,21 @@ describe('/me requests', () => {
         contentLength: 1000,
       }),
     ).rejects.toMatchObject(forbidden);
+    await expect(confirmMyCertUpload('cu-1')).rejects.toMatchObject(forbidden);
+  });
+});
+
+describe('/me requests for a rejected instructor', () => {
+  it('returns an empty rejected lock and 403s with reason rejected', async () => {
+    state.meApprovalStatus = 'rejected';
+    expect(await getMyChecklist()).toEqual({
+      season: '2026/27',
+      locked: true,
+      lockReason: 'rejected',
+      items: [],
+    });
+    const forbidden = { status: 403, body: { reason: 'rejected' } };
+    await expect(getMyDocument('asg-waiver')).rejects.toMatchObject(forbidden);
     await expect(confirmMyCertUpload('cu-1')).rejects.toMatchObject(forbidden);
   });
 });

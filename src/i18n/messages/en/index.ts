@@ -1176,6 +1176,8 @@ export const en: Messages = {
     cardLockedTitle: 'Onboarding · {n} items',
     cardLockedUnlocks: 'Unlocks when your profile is approved',
     cardLockedBody: "{docs} documents to sign and {certs} certifications to upload. We'll email you when you can start.",
+    rejectedTitle: "Your profile wasn't approved",
+    rejectedBody: 'Contact SSnow if you think this is a mistake.',
   },
   signer: {
     signatureTitle: 'Your signature',

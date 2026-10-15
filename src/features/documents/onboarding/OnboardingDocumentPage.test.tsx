@@ -298,8 +298,19 @@ describe('OnboardingDocumentPage — sign', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the not-approved banner for a rejected instructor', async () => {
+    state.meApprovalStatus = 'rejected';
+    renderAt('asg-new');
+    expect(
+      await screen.findByText("Your profile wasn't approved"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('The document could not be loaded.'),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows the review banner instead of the document while pending approval', async () => {
-    state.meApproved = false;
+    state.meApprovalStatus = 'pending';
     renderAt('asg-new');
     expect(
       await screen.findByText('Your profile is being reviewed'),

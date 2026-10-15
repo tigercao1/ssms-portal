@@ -1154,6 +1154,8 @@ export interface Messages {
     cardLockedTitle: string;
     cardLockedUnlocks: string;
     cardLockedBody: string;
+    rejectedTitle: string;
+    rejectedBody: string;
   };
   signer: {
     signatureTitle: string;

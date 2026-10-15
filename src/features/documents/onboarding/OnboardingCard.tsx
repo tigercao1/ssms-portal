@@ -8,7 +8,8 @@ import { LockIcon } from './Locked';
 
 function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
   const t = useT();
-  const total = checklist.items.length;
+  const rejected = checklist.lockReason === 'rejected';
+  const total = rejected ? 0 : checklist.items.length;
   const docs = checklist.items.filter((i) => i.type === 'document').length;
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-dashed border-grey bg-sunken p-5">
@@ -22,9 +23,16 @@ function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
               ? t.onboarding.cardLockedTitle.replace('{n}', String(total))
               : t.onboarding.cardTitle}
           </h2>
-          <p className="text-sm text-slate">{t.onboarding.cardLockedUnlocks}</p>
+          <p className="text-sm text-slate">
+            {rejected
+              ? t.onboarding.rejectedTitle
+              : t.onboarding.cardLockedUnlocks}
+          </p>
         </div>
       </div>
+      {rejected && (
+        <p className="text-sm text-slate">{t.onboarding.rejectedBody}</p>
+      )}
       {total > 0 && (
         <p className="text-sm text-slate">
           {t.onboarding.cardLockedBody

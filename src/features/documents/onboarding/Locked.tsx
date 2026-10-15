@@ -3,7 +3,7 @@ import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { certificationLabel } from '@/features/instructor/certLabels';
-import type { ChecklistItem } from '../api';
+import type { ChecklistItem, ChecklistLockReason } from '../api';
 
 /** Padlock glyph used wherever onboarding is locked. */
 export function LockIcon({ className }: { className?: string }) {
@@ -23,30 +23,40 @@ export function LockIcon({ className }: { className?: string }) {
   );
 }
 
-/** True when the API refused because the instructor is not approved yet. */
-export function isPendingApprovalError(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    error.status === 403 &&
-    (error.body as { reason?: unknown } | undefined)?.reason ===
-      'pending_approval'
-  );
+/** The lock reason when the API refused because the instructor is not approved. */
+export function lockReasonOf(error: unknown): ChecklistLockReason | null {
+  if (!(error instanceof ApiError) || error.status !== 403) return null;
+  const reason = (error.body as { reason?: unknown } | undefined)?.reason;
+  return reason === 'pending_approval' || reason === 'rejected' ? reason : null;
 }
 
-/** "Your profile is being reviewed" banner for locked onboarding pages. */
-export function LockedBanner() {
+/** Banner for locked onboarding pages: under review, or not approved. */
+export function LockedBanner({ reason }: { reason: ChecklistLockReason }) {
   const t = useT();
+  const rejected = reason === 'rejected';
   return (
     <div
       role="status"
-      className="flex items-start gap-3 rounded-md border-l-[3px] border-l-status-pending bg-surface px-4 py-3 text-sm shadow-card"
+      className={cn(
+        'flex items-start gap-3 rounded-md border-l-[3px] bg-surface px-4 py-3 text-sm shadow-card',
+        rejected ? 'border-l-status-rejected' : 'border-l-status-pending',
+      )}
     >
-      <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-sunken text-status-pending">
+      <span
+        className={cn(
+          'grid h-7 w-7 flex-none place-items-center rounded-full bg-sunken',
+          rejected ? 'text-status-rejected' : 'text-status-pending',
+        )}
+      >
         <LockIcon />
       </span>
       <div>
-        <p className="font-semibold text-navy">{t.onboarding.lockedTitle}</p>
-        <p className="text-ink">{t.onboarding.lockedBody}</p>
+        <p className="font-semibold text-navy">
+          {rejected ? t.onboarding.rejectedTitle : t.onboarding.lockedTitle}
+        </p>
+        <p className="text-ink">
+          {rejected ? t.onboarding.rejectedBody : t.onboarding.lockedBody}
+        </p>
       </div>
     </div>
   );

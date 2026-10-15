@@ -1153,6 +1153,8 @@ export const zhCN: Messages = {
     cardLockedTitle: '入职资料 · {n} 项',
     cardLockedUnlocks: '资料审核通过后解锁',
     cardLockedBody: '审核通过后即可填写 {docs} 份文件并上传 {certs} 份证书。',
+    rejectedTitle: '您的资料未通过审核',
+    rejectedBody: '如有疑问，请联系 SSnow。',
   },
   signer: {
     signatureTitle: '您的签名',

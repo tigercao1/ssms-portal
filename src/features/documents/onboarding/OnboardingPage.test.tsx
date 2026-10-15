@@ -338,7 +338,7 @@ describe('OnboardingCard', () => {
 
 describe('locked onboarding while pending approval', () => {
   beforeEach(() => {
-    state.meApproved = false;
+    state.meApprovalStatus = 'pending';
     state.meCerts = [
       { org: 'csia', track: 'regular', level: 2 },
       { org: 'casi', track: 'park', level: 1 },
@@ -423,5 +423,49 @@ describe('locked onboarding while pending approval', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('资料审核通过后解锁')).toBeInTheDocument();
     expect(screen.queryByText(/份文件/)).not.toBeInTheDocument();
+  });
+});
+
+describe('locked onboarding for a rejected instructor', () => {
+  beforeEach(() => {
+    state.meApprovalStatus = 'rejected';
+  });
+
+  it('shows the not-approved banner with no preview rows', async () => {
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByText("Your profile wasn't approved"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Contact SSnow if you think this is a mistake.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Nothing to complete yet'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Your profile is being reviewed'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a rejected profile card in en and zh', async () => {
+    const { unmount } = renderWithProviders(<OnboardingCard />);
+    expect(
+      await screen.findByRole('heading', { name: 'Onboarding' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Your profile wasn't approved"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Contact SSnow if you think this is a mistake.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Unlocks when your profile is approved'),
+    ).not.toBeInTheDocument();
+    unmount();
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<OnboardingCard />);
+    expect(await screen.findByText('您的资料未通过审核')).toBeInTheDocument();
+    expect(screen.getByText('如有疑问，请联系 SSnow。')).toBeInTheDocument();
   });
 });

@@ -180,9 +180,13 @@ describe('AppShell admin nav', () => {
 });
 
 describe('AppShell instructor nav', () => {
-  function renderInstructorShell(meApproved: boolean) {
+  function renderInstructorShell(
+    meApprovalStatus: 'approved' | 'pending' | 'rejected',
+  ) {
     session.isAdmin = false;
-    server.use(...documentsHandlers(createDocumentsState({ meApproved })));
+    server.use(
+      ...documentsHandlers(createDocumentsState({ meApprovalStatus })),
+    );
     renderWithProviders(
       <Routes>
         <Route element={<AppShell />}>
@@ -194,7 +198,7 @@ describe('AppShell instructor nav', () => {
   }
 
   it('shows a lock on Onboarding while the profile is pending approval', async () => {
-    renderInstructorShell(false);
+    renderInstructorShell('pending');
     expect(
       await screen.findByRole('link', {
         name: 'Onboarding Locked until your profile is approved',
@@ -202,8 +206,17 @@ describe('AppShell instructor nav', () => {
     ).toHaveAttribute('href', '/onboarding');
   });
 
+  it('keeps the lock on Onboarding for a rejected instructor', async () => {
+    renderInstructorShell('rejected');
+    expect(
+      await screen.findByRole('link', {
+        name: 'Onboarding Locked until your profile is approved',
+      }),
+    ).toBeInTheDocument();
+  });
+
   it('shows a plain Onboarding link once approved', async () => {
-    renderInstructorShell(true);
+    renderInstructorShell('approved');
     const link = screen.getByRole('link', { name: 'Onboarding' });
     await waitFor(() => expect(link.querySelector('svg')).toBeNull());
     expect(

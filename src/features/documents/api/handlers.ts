@@ -40,7 +40,7 @@ export interface DocumentsMockState {
   instructorIds: string[];
   pendingInstructorIds: string[];
   meInstructorId: string;
-  meApproved: boolean;
+  meApprovalStatus: 'approved' | 'pending' | 'rejected';
   meCerts: { org: CertOrg; track: CertTrack; level: number }[];
   uploadedSources: Map<string, ArrayBuffer>;
   reminded: string[];
@@ -59,7 +59,7 @@ export function createDocumentsState(
     instructorIds: ['inst-1'],
     pendingInstructorIds: [],
     meInstructorId: 'inst-1',
-    meApproved: true,
+    meApprovalStatus: 'approved',
     meCerts: [
       { org: 'csia', track: 'regular', level: 3 },
       { org: 'casi', track: 'park', level: 2 },
@@ -82,12 +82,18 @@ const badRequest = (message: string) =>
   HttpResponse.json({ message }, { status: 400 });
 const conflict = (message: string) =>
   HttpResponse.json({ message }, { status: 409 });
-const pendingApproval = () =>
+const notApproved = (status: 'pending' | 'rejected') =>
   HttpResponse.json(
-    {
-      message: 'Your profile is pending approval',
-      reason: 'pending_approval',
-    },
+    status === 'rejected'
+      ? {
+          message:
+            'Your profile was not approved, so onboarding documents are not available',
+          reason: 'rejected',
+        }
+      : {
+          message: 'Your profile is pending approval',
+          reason: 'pending_approval',
+        },
     { status: 403 },
   );
 const TEMPLATE_LOCKED =
@@ -142,7 +148,8 @@ export function documentsHandlers(
       (a) =>
         a.templateId === t.id &&
         a.status !== 'archived' &&
-        (t.season === null || a.season === t.season),
+        t.season !== null &&
+        a.season === t.season,
     );
     return withDerived({
       ...t,
@@ -478,30 +485,38 @@ export function documentsHandlers(
 
     http.get(`${A}/me/documents`, () =>
       HttpResponse.json(
-        state.meApproved
-          ? buildChecklist(
-              state.templates,
-              state.assignments.filter(
-                (a) => a.subjectId === state.meInstructorId,
+        state.meApprovalStatus === 'rejected'
+          ? {
+              season: state.season,
+              locked: true,
+              lockReason: 'rejected',
+              items: [],
+            }
+          : state.meApprovalStatus === 'approved'
+            ? buildChecklist(
+                state.templates,
+                state.assignments.filter(
+                  (a) => a.subjectId === state.meInstructorId,
+                ),
+                state.meCerts,
+                state.certUploads.filter(
+                  (u) => u.instructorId === state.meInstructorId,
+                ),
+                state.season,
+              )
+            : buildPreviewChecklist(
+                state.templates,
+                state.meCerts,
+                state.certUploads.filter(
+                  (u) => u.instructorId === state.meInstructorId,
+                ),
+                state.season,
               ),
-              state.meCerts,
-              state.certUploads.filter(
-                (u) => u.instructorId === state.meInstructorId,
-              ),
-              state.season,
-            )
-          : buildPreviewChecklist(
-              state.templates,
-              state.meCerts,
-              state.certUploads.filter(
-                (u) => u.instructorId === state.meInstructorId,
-              ),
-              state.season,
-            ),
       ),
     ),
     http.get(`${A}/me/documents/:assignmentId`, ({ params }) => {
-      if (!state.meApproved) return pendingApproval();
+      if (state.meApprovalStatus !== 'approved')
+        return notApproved(state.meApprovalStatus);
       const a = findAssignment(params.assignmentId);
       const t = a && findTemplate(a.templateId);
       if (!a || !t || a.subjectId !== state.meInstructorId) return notFound();
@@ -532,7 +547,8 @@ export function documentsHandlers(
     http.post(
       `${A}/me/documents/:assignmentId/complete`,
       async ({ params, request }) => {
-        if (!state.meApproved) return pendingApproval();
+        if (state.meApprovalStatus !== 'approved')
+          return notApproved(state.meApprovalStatus);
         const a = findAssignment(params.assignmentId);
         const t = a && findTemplate(a.templateId);
         if (!a || !t || a.subjectId !== state.meInstructorId) return notFound();
@@ -590,7 +606,8 @@ export function documentsHandlers(
     http.post(
       `${A}/me/certification-uploads/upload-url`,
       async ({ request }) => {
-        if (!state.meApproved) return pendingApproval();
+        if (state.meApprovalStatus !== 'approved')
+          return notApproved(state.meApprovalStatus);
         const body = (await request.json()) as CertUploadUrlRequest;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(body.validUntil ?? ''))
           return badRequest('validUntil must be YYYY-MM-DD');
@@ -618,7 +635,8 @@ export function documentsHandlers(
     http.post(
       `${A}/me/certification-uploads/:uploadId/confirm`,
       ({ params }) => {
-        if (!state.meApproved) return pendingApproval();
+        if (state.meApprovalStatus !== 'approved')
+          return notApproved(state.meApprovalStatus);
         const u = state.certUploads.find((x) => x.id === params.uploadId);
         if (!u) return notFound();
         u.sha256 = 'f00dbabe'.repeat(8);
