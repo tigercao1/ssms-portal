@@ -243,8 +243,10 @@ export function documentsHandlers(
       async ({ params, request }) => {
         const t = findTemplate(params.id);
         if (!t) return notFound();
-        const body = (await request.json()) as TemplatePatch;
-        if ('isActive' in body) return badRequest('isActive is not allowed');
+        const body = (await request.json()) as TemplatePatch & {
+          isActive?: unknown;
+        };
+        delete body.isActive;
         Object.assign(t, body, { updatedAt: nowIso() });
         return HttpResponse.json(present(t));
       },

@@ -176,7 +176,7 @@ describe('publish lifecycle requests', () => {
     expect(again.template.assignTo).toBe('selected');
   });
 
-  it('blocks source and field changes once a copy is signed and rejects isActive', async () => {
+  it('blocks source and field changes once a copy is completed and ignores isActive', async () => {
     await expect(
       requestTemplateSourceUpload('tpl-conduct', 1000),
     ).rejects.toMatchObject({ status: 409 });
@@ -186,9 +186,11 @@ describe('publish lifecycle requests', () => {
     await expect(
       saveTemplateFields('tpl-conduct', [fakeField()]),
     ).rejects.toMatchObject({ status: 409 });
-    await expect(
-      updateTemplate('tpl-conduct', { isActive: false } as never),
-    ).rejects.toMatchObject({ status: 400 });
+    const patched = await updateTemplate('tpl-conduct', {
+      isActive: false,
+      required: false,
+    } as never);
+    expect(patched).toMatchObject({ status: 'live', required: false });
   });
 });
 
