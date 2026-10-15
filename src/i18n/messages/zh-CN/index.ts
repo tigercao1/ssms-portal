@@ -41,7 +41,7 @@ export const zhCN: Messages = {
     firstName: '名',
     lastName: '姓',
     nickname: '昵称',
-    nicknameHint: '显示在你资料上的名字。留空则使用你的名和姓。',
+    nicknameHint: '显示在您资料上的名字。留空则使用您的名和姓。',
     nameRequired: '请填写名和姓。',
     signUpButton: '创建账户',
     signingUp: '正在创建账户…',
