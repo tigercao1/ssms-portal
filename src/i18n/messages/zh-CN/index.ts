@@ -1118,6 +1118,7 @@ export const zhCN: Messages = {
     rateTimesDay: '{rate}/天 × 1 天',
     rateNotSet: '费率待定',
     noRate: '无费率',
+    noRateAmount: '无费率 · {amount}',
     noLessonType: '课程',
     studentsCount: '{n} 名学员',
     projected: '预计工资 · {lessons}',
@@ -1138,8 +1139,8 @@ export const zhCN: Messages = {
     pendingTitle: '你的资料正在审核中',
     pendingBody: '审核通过后即可查看课程和工资。',
     pendingEmpty: '暂时没有内容。只有通过审核的教练才能被安排课程。',
-    rejectedTitle: '无法再安排新的课程',
-    rejectedBody: '你的资料未通过审核。以下是你以往的课程和工资。',
+    rejectedTitle: '你的资料未通过审核',
+    rejectedBody: '你无法被安排新的课程。你过去的课程和工资见下方。',
   },
   onboarding: {
     title: '入职资料',

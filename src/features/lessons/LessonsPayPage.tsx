@@ -214,10 +214,16 @@ function lessonName(lesson: MyLesson, locale: Locale, fallback: string) {
 function LessonPay({ lesson }: { lesson: MyLesson }) {
   const t = useT();
   const { locale } = useLocale();
+  if (lesson.amount === null)
+    return lesson.needsRate ? (
+      <StatePill tone="warn" label={t.myLessons.rateNotSet} />
+    ) : (
+      <>—</>
+    );
+  const amount = formatMoney(lesson.amount, lesson.currency, locale);
   if (lesson.needsRate)
-    return <StatePill tone="warn" label={t.myLessons.rateNotSet} />;
-  if (lesson.amount === null) return <>—</>;
-  return <>{formatMoney(lesson.amount, lesson.currency, locale)}</>;
+    return <>{t.myLessons.noRateAmount.replace('{amount}', amount)}</>;
+  return <>{amount}</>;
 }
 
 function RateTimes({ lesson }: { lesson: MyLesson }) {
@@ -427,6 +433,11 @@ function PeriodCard({ period }: { period: MyPayPeriod }) {
     period.totals.map((x) => ({ currency: x.currency, amount: x.total })),
     locale,
   );
+  const unrated = period.totals.reduce((sum, x) => sum + x.needsRateCount, 0);
+  const notCounted =
+    awaiting && unrated > 0
+      ? t.myLessons.notCounted.replace('{n}', String(unrated))
+      : null;
 
   return (
     <div className={cn(SURFACE, 'overflow-hidden')}>
@@ -450,9 +461,20 @@ function PeriodCard({ period }: { period: MyPayPeriod }) {
           label={awaiting ? t.myLessons.awaiting : t.myLessons.paid}
         />
         <span className="text-xs text-slate">{summary}</span>
+        {notCounted && (
+          <span
+            data-testid="period-not-counted"
+            className="ml-auto text-xs text-slate"
+          >
+            {notCounted}
+          </span>
+        )}
         <span
           data-testid="period-total"
-          className="ml-auto font-semibold tabular-nums text-navy"
+          className={cn(
+            'font-semibold tabular-nums text-navy',
+            !notCounted && 'ml-auto',
+          )}
         >
           {awaiting && total
             ? t.myLessons.approx.replace('{amount}', total)

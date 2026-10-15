@@ -1119,6 +1119,7 @@ export interface Messages {
     rateTimesDay: string;
     rateNotSet: string;
     noRate: string;
+    noRateAmount: string;
     noLessonType: string;
     studentsCount: string;
     projected: string;

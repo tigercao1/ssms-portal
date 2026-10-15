@@ -1141,6 +1141,7 @@ export const en: Messages = {
     rateTimesDay: '{rate} × 1 day',
     rateNotSet: 'Rate not set',
     noRate: 'No rate',
+    noRateAmount: 'No rate · {amount}',
     noLessonType: 'Lesson',
     studentsCount: '{n} students',
     projected: 'Projected · {lessons}',
@@ -1161,8 +1162,8 @@ export const en: Messages = {
     pendingTitle: 'Your profile is being reviewed',
     pendingBody: 'Lessons and pay open once an admin approves you.',
     pendingEmpty: 'Nothing to show yet. Only approved instructors can be booked.',
-    rejectedTitle: 'Lessons & pay isn\'t available for new lessons',
-    rejectedBody: 'Your profile was not approved. Your past lessons and pay are below.',
+    rejectedTitle: 'Your profile was not approved',
+    rejectedBody: "You can't be booked for new lessons. Your past lessons and pay are below.",
   },
   onboarding: {
     title: 'Onboarding',

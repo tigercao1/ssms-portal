@@ -183,7 +183,45 @@ describe('LessonsPayPage past lessons', () => {
     expect(rows[1]).toHaveTextContent('Adjustment · Uniform-$65.00');
   });
 
-  it('shows a stored zero-rate line as No rate · $0.00', async () => {
+  it('shows a stored zero payment in a paid period as No rate · $0.00', async () => {
+    const paid = fullLessons.periods[1]!;
+    const period = {
+      ...paid,
+      adjustments: [],
+      lessons: [
+        { ...paid.lessons[0]!, rate: null, amount: 0, needsRate: true },
+      ],
+    };
+    const user = userEvent.setup();
+    serve({ ...emptyLessons, periods: [period] });
+    const { unmount } = renderPage();
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Show lessons for Jan 11 – Jan 24, 2027',
+      }),
+    );
+    const row = within(
+      screen.getByRole('list', { name: 'Jan 11 – Jan 24, 2027' }),
+    ).getAllByRole('listitem')[0] as HTMLElement;
+    expect(within(row).getByText('No rate · $0.00')).toBeInTheDocument();
+    expect(within(row).queryByText('Rate not set')).toBeNull();
+    unmount();
+
+    serve({ ...emptyLessons, periods: [period] });
+    renderPage('zh-CN');
+    await user.click(
+      await screen.findByRole('button', {
+        name: '显示 2027年1月11日 – 1月24日 的课程',
+      }),
+    );
+    const zhRow = within(
+      screen.getByRole('list', { name: '2027年1月11日 – 1月24日' }),
+    ).getAllByRole('listitem')[0] as HTMLElement;
+    expect(within(zhRow).getByText('无费率 · CA$0.00')).toBeInTheDocument();
+    expect(within(zhRow).queryByText('费率待定')).toBeNull();
+  });
+
+  it('shows a stored zero-rate line without needsRate as No rate and $0.00', async () => {
     const [first] = fullLessons.periods;
     serve({
       ...emptyLessons,
@@ -202,6 +240,59 @@ describe('LessonsPayPage past lessons', () => {
     expect(within(row).getByText('No rate')).toBeInTheDocument();
     expect(row).toHaveTextContent('1 to 1 private lesson · No rate');
     expect(row).toHaveTextContent('$0.00');
+  });
+
+  it('shows the pill and the exclusion note for an awaiting lesson without a rate', async () => {
+    const [first] = fullLessons.periods;
+    serve({
+      ...emptyLessons,
+      periods: [
+        {
+          ...first!,
+          adjustments: [],
+          lessons: [
+            {
+              ...first!.lessons[0]!,
+              rate: null,
+              amount: null,
+              needsRate: true,
+            },
+          ],
+          totals: [
+            {
+              ...first!.totals[0]!,
+              lessons: 1,
+              lessonAmount: 0,
+              adjustmentAmount: 0,
+              total: 0,
+              needsRateCount: 1,
+            },
+          ],
+        },
+      ],
+    });
+    renderPage();
+    const header = await screen.findByRole('button', {
+      name: 'Hide lessons for Jan 25 – Feb 7, 2027',
+    });
+    expect(within(header).getByTestId('period-total')).toHaveTextContent(
+      '≈ $0.00',
+    );
+    expect(within(header).getByTestId('period-not-counted')).toHaveTextContent(
+      '(1 without a rate is not counted)',
+    );
+    const row = within(
+      screen.getByRole('list', { name: 'Jan 25 – Feb 7, 2027' }),
+    ).getAllByRole('listitem')[0] as HTMLElement;
+    expect(within(row).getByText('Rate not set')).toBeInTheDocument();
+    expect(row).not.toHaveTextContent('$0.00');
+  });
+
+  it('shows no exclusion note on paid or fully rated periods', async () => {
+    serve(fullLessons);
+    renderPage();
+    await screen.findByRole('heading', { name: 'Past lessons' });
+    expect(screen.queryByTestId('period-not-counted')).toBeNull();
   });
 });
 
@@ -242,10 +333,10 @@ describe('LessonsPayPage states', () => {
     serve(rejectedLessons);
     renderPage();
     const banner = (
-      await screen.findByText("Lessons & pay isn't available for new lessons")
+      await screen.findByText('Your profile was not approved')
     ).closest('[role="status"]');
     expect(banner).toHaveTextContent(
-      'Your profile was not approved. Your past lessons and pay are below.',
+      "You can't be booked for new lessons. Your past lessons and pay are below.",
     );
     expect(
       screen.getByRole('heading', { name: 'Past lessons' }),
@@ -349,7 +440,7 @@ describe('LessonsPayPage in Chinese', () => {
     renderPage('zh-CN');
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(
-        '无法再安排新的课程你的资料未通过审核。以下是你以往的课程和工资。',
+        '你的资料未通过审核你无法被安排新的课程。你过去的课程和工资见下方。',
       ),
     );
   });
