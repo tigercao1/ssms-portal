@@ -7,6 +7,7 @@ import type {
   CertUploadReview,
   CertUploadUrl,
   CertUploadUrlRequest,
+  ChangeAudienceRequest,
   CompleteRequest,
   CompleteResult,
   ConfirmedTemplate,
@@ -69,6 +70,16 @@ export function getPublishPreview(id: string, season?: string) {
 
 export function publishTemplate(id: string, body: PublishRequest) {
   return api<PublishResult>(`/admin/documents/templates/${enc(id)}/publish`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export function changeTemplateAudience(
+  id: string,
+  body: ChangeAudienceRequest,
+) {
+  return api<PublishResult>(`/admin/documents/templates/${enc(id)}/audience`, {
     method: 'POST',
     body,
   });

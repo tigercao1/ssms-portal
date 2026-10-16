@@ -145,6 +145,10 @@ export interface PublishRequest {
   instructorIds?: string[];
 }
 
+export interface ChangeAudienceRequest {
+  assignTo: TemplateAssignTo;
+}
+
 export interface PublishResult {
   template: Template;
   created: number;

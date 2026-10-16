@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import {
   archiveAssignment,
+  changeTemplateAudience,
   confirmTemplateSource,
   createAssignments,
   createTemplate,
@@ -19,6 +20,7 @@ import {
   saveTemplateFields,
   updateTemplate,
   type AssignRequest,
+  type ChangeAudienceRequest,
   type CertUploadReview,
   type Field,
   type PublishRequest,
@@ -87,6 +89,19 @@ export function usePublishTemplate() {
   return useMutation({
     mutationFn: ({ id, ...body }: PublishRequest & { id: string }) =>
       publishTemplate(id, body),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
+      return sync(result.template);
+    },
+  });
+}
+
+export function useChangeAudience() {
+  const sync = useTemplateSync();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: ChangeAudienceRequest & { id: string }) =>
+      changeTemplateAudience(id, body),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
       return sync(result.template);

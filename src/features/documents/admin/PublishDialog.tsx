@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input, Modal, Spinner } from '@/components';
 import { cn } from '@/lib/cn';
@@ -7,17 +7,7 @@ import { SEASON_RE } from './AssignDialog';
 import { usePublishPreview, usePublishTemplate } from './hooks';
 import { errorText, templateTitle } from './format';
 import { InstructorPicker, useToggleSet } from './InstructorPicker';
-
-function withBold(template: string, value: string): ReactNode {
-  const [before, after] = template.split('{count}');
-  return (
-    <>
-      {before}
-      <b className="text-navy">{value}</b>
-      {after}
-    </>
-  );
-}
+import { withBold } from './withBold';
 
 function AudienceOption({
   checked,
