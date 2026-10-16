@@ -63,6 +63,7 @@ export function AppShell() {
         { to: '/admin/booking', label: t.nav.booking },
         { to: '/admin/classes', label: t.nav.classes },
         { to: '/admin/payroll', label: t.nav.payroll },
+        { to: '/admin/insurance', label: t.nav.adminInsurance },
         { to: '/admin/import-history', label: t.nav.importHistory },
         { to: '/admin/settings/google', label: t.nav.google },
       ]
@@ -71,6 +72,11 @@ export function AppShell() {
         {
           to: '/onboarding',
           label: t.nav.onboarding,
+          locked: checklist.data?.locked ?? false,
+        },
+        {
+          to: '/insurance',
+          label: t.nav.insurance,
           locked: checklist.data?.locked ?? false,
         },
         {

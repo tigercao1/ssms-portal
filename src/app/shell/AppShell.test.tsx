@@ -161,6 +161,28 @@ describe('AppShell admin nav', () => {
     );
   });
 
+  it('links to Lesson insurance right after Payroll', () => {
+    renderShell();
+    const links = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(
+      screen.getByRole('link', { name: 'Lesson insurance' }),
+    ).toHaveAttribute('href', '/admin/insurance');
+    expect(links.indexOf('/admin/insurance')).toBe(
+      links.indexOf('/admin/payroll') + 1,
+    );
+  });
+
+  it('labels Lesson insurance in Chinese', () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderShell();
+    expect(screen.getByRole('link', { name: '私课保险' })).toHaveAttribute(
+      'href',
+      '/admin/insurance',
+    );
+  });
+
   it('links to Lesson types, Customers and Classes, not Calendar matching', () => {
     renderShell();
     for (const [name, href] of [
@@ -223,6 +245,7 @@ describe('AppShell instructor nav', () => {
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
       '/profile',
       '/onboarding',
+      '/insurance',
       '/lessons',
       '/settings',
     ]);
@@ -256,6 +279,32 @@ describe('AppShell instructor nav', () => {
       'href',
       '/lessons',
     );
+  });
+
+  it('locks Private lesson insurance while pending or rejected', async () => {
+    renderInstructorShell('pending');
+    expect(
+      await screen.findByRole('link', {
+        name: 'Private lesson insurance Locked until your profile is approved',
+      }),
+    ).toHaveAttribute('href', '/insurance');
+  });
+
+  it('keeps the insurance lock for a rejected instructor', async () => {
+    renderInstructorShell('rejected');
+    expect(
+      await screen.findByRole('link', {
+        name: 'Private lesson insurance Locked until your profile is approved',
+      }),
+    ).toHaveAttribute('href', '/insurance');
+  });
+
+  it('shows a plain insurance link once approved, in Chinese too', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderInstructorShell('approved');
+    const link = screen.getByRole('link', { name: '私课保险登记' });
+    expect(link).toHaveAttribute('href', '/insurance');
+    await waitFor(() => expect(link.querySelector('svg')).toBeNull());
   });
 
   it('shows a plain Onboarding link once approved', async () => {
