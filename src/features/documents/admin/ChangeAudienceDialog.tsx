@@ -23,7 +23,10 @@ export function ChangeAudienceDialog({
     fresh: true,
   });
   const change = useChangeAudience();
-  const counts = preview.isFetching ? undefined : preview.data;
+  const counts =
+    preview.isFetchedAfterMount && !preview.isFetching && !preview.isError
+      ? preview.data
+      : undefined;
   const newCount = counts
     ? Math.max(0, counts.approvedCount - counts.alreadyAssignedCount)
     : 0;

@@ -589,6 +589,38 @@ describe('DocumentsListPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps confirm disabled when the fresh preview fails, even with an older count cached', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />, { staleTime: 30_000 });
+    const openDialog = async () => {
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Change audience of Liability waiver',
+        }),
+      );
+      return screen.getByRole('dialog', {
+        name: 'Change audience of “Liability waiver”',
+      });
+    };
+    let dialog = await openDialog();
+    await within(dialog).findByRole('button', { name: 'Change and email 1' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    server.use(
+      http.get(`${API}/admin/documents/templates/:id/publish-preview`, () =>
+        HttpResponse.json({ message: 'Preview failed' }, { status: 500 }),
+      ),
+    );
+    dialog = await openDialog();
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: /Change and email/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Change audience' }),
+    ).toBeDisabled();
+    expect(audienceBodies).toEqual([]);
+  });
+
   it('offers Change audience only on live instructor documents', async () => {
     const customer = state.templates.find((x) => x.id === 'tpl-handbook')!;
     customer.audience = 'customer';
