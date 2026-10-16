@@ -173,14 +173,6 @@ function EmptyLessons() {
       </span>
       <h2 className="text-xl">{t.myLessons.emptyTitle}</h2>
       <p className="max-w-md text-sm text-slate">{t.myLessons.emptyBody}</p>
-      <div
-        aria-hidden
-        className="mt-2 flex w-full max-w-xs flex-col gap-2 opacity-60"
-      >
-        <span className="mx-auto h-3 w-[85%] rounded-full bg-sunken" />
-        <span className="mx-auto h-3 w-[70%] rounded-full bg-sunken" />
-        <span className="mx-auto h-3 w-[78%] rounded-full bg-sunken" />
-      </div>
     </div>
   );
 }

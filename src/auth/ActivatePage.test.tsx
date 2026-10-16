@@ -36,12 +36,14 @@ function captureRedeem(response: () => Response) {
   return bodies;
 }
 
-function captureResend() {
+function captureResend(
+  response: () => Response = () => new HttpResponse(null, { status: 202 }),
+) {
   const bodies: unknown[] = [];
   server.use(
     http.post(`${API}/activation/resend`, async ({ request }) => {
       bodies.push(await request.json());
-      return new HttpResponse(null, { status: 202 });
+      return response();
     }),
   );
   return bodies;
@@ -95,6 +97,65 @@ describe('ActivatePage', () => {
       await screen.findByText(/a new activation link is on its way/),
     ).toBeInTheDocument();
     expect(resent).toEqual([{ email: 'jane@example.com' }]);
+  });
+
+  it('asks the user to wait when too many new links were requested', async () => {
+    captureRedeem(() =>
+      HttpResponse.json({ email: 'jane@example.com' }, { status: 410 }),
+    );
+    captureResend(() =>
+      HttpResponse.json({ message: 'Too Many Requests' }, { status: 429 }),
+    );
+
+    renderActivate('/activate?t=old');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Send me a new link' }),
+    );
+
+    expect(
+      await screen.findByText(
+        'You’ve requested too many links. Please wait a while and try again later.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Something went wrong/)).toBeNull();
+  });
+
+  it('shows the rate-limit message in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    captureRedeem(() =>
+      HttpResponse.json({ email: 'jane@example.com' }, { status: 410 }),
+    );
+    captureResend(() =>
+      HttpResponse.json({ message: 'Too Many Requests' }, { status: 429 }),
+    );
+
+    renderActivate('/activate?t=old');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: '发送新链接' }),
+    );
+
+    expect(
+      await screen.findByText('请求新链接的次数过多，请稍后再试。'),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the generic error for other resend failures', async () => {
+    captureRedeem(() =>
+      HttpResponse.json({ email: 'jane@example.com' }, { status: 410 }),
+    );
+    captureResend(() =>
+      HttpResponse.json({ message: 'Boom' }, { status: 500 }),
+    );
+
+    renderActivate('/activate?t=old');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Send me a new link' }),
+    );
+
+    expect(await screen.findByText(/Something went wrong/)).toBeInTheDocument();
   });
 
   it('treats an unknown token as expired and lets the user type their email', async () => {

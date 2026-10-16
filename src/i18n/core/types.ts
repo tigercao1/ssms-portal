@@ -80,6 +80,7 @@ export interface Messages {
     expiredBody: string;
     resendButton: string;
     resendSent: string;
+    resendRateLimited: string;
     networkTitle: string;
     networkBody: string;
     passwordTitle: string;

@@ -86,6 +86,8 @@ export const en: Messages = {
     resendButton: 'Send me a new link',
     resendSent:
       'If there is an invitation for that email, a new activation link is on its way.',
+    resendRateLimited:
+      'You’ve requested too many links. Please wait a while and try again later.',
     networkTitle: 'We couldn’t reach the server',
     networkBody: 'Check your connection and try again.',
     passwordTitle: 'Welcome to Serendipity Snow Club',
