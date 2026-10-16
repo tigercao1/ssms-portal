@@ -171,7 +171,8 @@ export const en: Messages = {
     minStudentAge: 'Minimum student age',
     minStudentAgeRange: 'Enter a whole number from 0 to 18.',
     minStudentAgeValue: 'Ages {n}+',
-    emailReadonly: 'Email is managed through your account and can’t be changed here.',
+    emailReadonly:
+      'Email is managed through your account and can’t be changed here.',
     legalName: 'Legal name',
     photo: 'Profile photo',
     addCert: 'Add certification',
@@ -212,9 +213,11 @@ export const en: Messages = {
     notTranslated: 'Your bio is saved, but the other language couldn’t be translated right now. Use “Update translation” to add it later.',
     notCleared: 'This bio wasn’t cleared because the other language couldn’t be translated right now. Try again later, or Cancel to keep it.',
     remaining: '{n} of {limit} left today',
-    limitReached: 'You’ve used all {limit} AI requests for today. Try again after {time}',
+    limitReached:
+      'You’ve used all {limit} AI requests for today. Try again after {time}',
     limitReachedNoTime: 'You’ve used all {limit} AI requests for today.',
-    unavailable: 'AI is unavailable right now. Your text is kept — try again later.',
+    unavailable:
+      'AI is unavailable right now. Your text is kept — try again later.',
     modalTitle: 'Review your bio',
     refining: 'Polishing and translating…',
     translating: 'Translating…',
@@ -372,15 +375,18 @@ export const en: Messages = {
   },
   google: {
     title: 'Google Calendar',
-    intro: 'Connect the SSNOW Google account so SSMS can read instructor availability and add lessons to their calendars.',
+    intro:
+      'Connect the SSNOW Google account so SSMS can read instructor availability and add lessons to their calendars.',
     connectionTitle: 'Connection',
     connected: 'Connected',
     notConnected: 'Not connected',
-    notConnectedBody: 'Google features stay off until an admin connects. Sign in with admin@ssnow.club and approve every requested permission.',
+    notConnectedBody:
+      'Google features stay off until an admin connects. Sign in with admin@ssnow.club and approve every requested permission.',
     connect: 'Connect Google',
     disconnect: 'Disconnect',
     disconnectTitle: 'Disconnect Google Calendar?',
-    disconnectBody: 'SSMS loses access to the Google account and stops reading availability and writing events until an admin connects again.',
+    disconnectBody:
+      'SSMS loses access to the Google account and stops reading availability and writing events until an admin connects again.',
     disconnectConfirm: 'Disconnect',
     disconnected: 'Google Calendar disconnected.',
     account: 'Account',
@@ -392,16 +398,20 @@ export const en: Messages = {
     returnConnectedTitle: 'Google Calendar connected',
     returnConnectedBody: 'SSMS can now use the Google account.',
     returnErrorTitle: 'Google Calendar was not connected',
-    returnErrorUnknown: 'Google returned an error ({code}). Try connecting again.',
+    returnErrorUnknown:
+      'Google returned an error ({code}). Try connecting again.',
     calendarsTitle: 'Calendars',
-    calendarsIntro: 'Calendars shared with the connected account. SSMS can only add events where it has Writer or Owner access.',
+    calendarsIntro:
+      'Calendars shared with the connected account. SSMS can only add events where it has Writer or Owner access.',
     calendarsEmpty: 'No calendars are shared with this account yet.',
-    readOnlySummary: '{count} calendars are shared without write access. Ask the instructor to share with “Make changes to events”.',
+    readOnlySummary:
+      '{count} calendars are shared without write access. Ask the instructor to share with “Make changes to events”.',
     colName: 'Name',
     colId: 'Calendar ID',
     colAccess: 'Access',
     cannotWrite: 'Can’t add events',
-    cannotWriteHint: 'Access is below Writer, so SSMS can’t add events to this calendar.',
+    cannotWriteHint:
+      'Access is below Writer, so SSMS can’t add events to this calendar.',
     roles: {
       owner: 'Owner',
       writer: 'Writer',
@@ -412,18 +422,24 @@ export const en: Messages = {
       access_denied: 'Access was declined on the Google consent screen.',
       wrong_account: 'Sign in with admin@ssnow.club.',
       missing_scopes: 'Accept all calendar permissions and try again.',
-      invalid_state: 'The connect link expired or was invalid. Try connecting again.',
-      token_exchange_failed: 'Google didn’t complete the sign-in. Try connecting again.',
-      no_refresh_token: 'Google didn’t return offline access. Disconnect the app in your Google account settings and connect again.',
+      invalid_state:
+        'The connect link expired or was invalid. Try connecting again.',
+      token_exchange_failed:
+        'Google didn’t complete the sign-in. Try connecting again.',
+      no_refresh_token:
+        'Google didn’t return offline access. Disconnect the app in your Google account settings and connect again.',
       not_configured: 'Google isn’t configured on the server.',
-      oauth_error: 'Google reported an error during sign-in. Try connecting again.',
-      missing_code: 'Google didn’t send an authorization code. Try connecting again.',
+      oauth_error:
+        'Google reported an error during sign-in. Try connecting again.',
+      missing_code:
+        'Google didn’t send an authorization code. Try connecting again.',
       server_error: 'Something went wrong on the server. Try connecting again.',
     },
   },
   pages: {
     title: 'Pages',
-    intro: 'Upload a self-contained HTML file, preview it, and publish it at a public link.',
+    intro:
+      'Upload a self-contained HTML file, preview it, and publish it at a public link.',
     colTitle: 'Title',
     colSlug: 'Slug',
     colStatus: 'Status',
@@ -437,8 +453,10 @@ export const en: Messages = {
     titleLabel: 'Title',
     titleInvalid: 'Enter a title of up to 200 characters.',
     slugLabel: 'Slug',
-    slugHint: 'Lowercase letters, digits and hyphens. Used in the public link and can’t be changed later.',
-    slugInvalid: 'Use lowercase letters and digits, with single hyphens between words (up to 80 characters).',
+    slugHint:
+      'Lowercase letters, digits and hyphens. Used in the public link and can’t be changed later.',
+    slugInvalid:
+      'Use lowercase letters and digits, with single hyphens between words (up to 80 characters).',
     slugTaken: 'That slug is already taken.',
     create: 'Create page',
     backToList: 'All pages',
@@ -467,9 +485,11 @@ export const en: Messages = {
     publishTitle: 'Publish “{title}”?',
     publishBody: 'The current draft becomes the public page.',
     unpublishTitle: 'Unpublish “{title}”?',
-    unpublishBody: 'The public link stops working until you publish again. The draft is kept.',
+    unpublishBody:
+      'The public link stops working until you publish again. The draft is kept.',
     deleteTitle: 'Delete “{title}”?',
-    deleteBody: 'This deletes the page, its draft and the published copy. This can’t be undone.',
+    deleteBody:
+      'This deletes the page, its draft and the published copy. This can’t be undone.',
     deleteConfirm: 'Delete permanently',
     publishedDone: 'Published.',
     unpublishedDone: 'Unpublished.',
@@ -515,7 +535,8 @@ export const en: Messages = {
   },
   lessonTypes: {
     title: 'Lesson types',
-    intro: 'The lessons admins book. Each type has its own pay rates, hourly or daily; promo lessons are their own type.',
+    intro:
+      'The lessons admins book. Each type has its own pay rates, hourly or daily; promo lessons are their own type.',
     colNameEn: 'English name',
     colNameZh: 'Chinese name',
     colGroupSize: 'Group size',
@@ -545,7 +566,8 @@ export const en: Messages = {
     sortOrderLabel: 'Sort order',
     nameTaken: 'A lesson type with this English name already exists.',
     ratesTitle: 'Pay rates',
-    ratesIntro: 'The default rate applies to every instructor without an override. Dates are inclusive.',
+    ratesIntro:
+      'The default rate applies to every instructor without an override. Dates are inclusive.',
     ratesEmpty: 'No pay rates yet.',
     colInstructor: 'Instructor',
     colRate: 'Rate',
@@ -569,12 +591,14 @@ export const en: Messages = {
     currencyInvalid: 'Use a 3-letter code such as CAD.',
     dateRequired: 'Choose a start date.',
     rangeInvalid: 'The end date must be on or after the start date.',
-    rateOverlap: 'This rate overlaps another rate for the same lesson type and instructor. Change the dates, or end the other rate first.',
+    rateOverlap:
+      'This rate overlaps another rate for the same lesson type and instructor. Change the dates, or end the other rate first.',
     instructorFixed: 'To change the instructor, add a new rate instead.',
   },
   customers: {
     title: 'Customers',
-    intro: 'Customers come from Shopify. Search the copy stored here, sync it from Shopify, or create a new customer in Shopify.',
+    intro:
+      'Customers come from Shopify. Search the copy stored here, sync it from Shopify, or create a new customer in Shopify.',
     searchLabel: 'Search by name, email or phone',
     search: 'Search',
     colName: 'Name',
@@ -584,7 +608,8 @@ export const en: Messages = {
     empty: 'No customers found.',
     emptyHint: 'Sync from Shopify to load customers.',
     syncTitle: 'Shopify customers',
-    syncBody: 'Fetch new and updated customers from Shopify. Shopify is only read.',
+    syncBody:
+      'Fetch new and updated customers from Shopify. Shopify is only read.',
     sync: 'Sync from Shopify',
     syncModeBackfill: 'Full import',
     syncModeIncremental: 'Incremental sync',
@@ -623,7 +648,8 @@ export const en: Messages = {
   },
   documents: {
     title: 'Documents',
-    intro: 'Onboarding documents instructors read or sign. Upload the original PDF, place the fields signers fill in, then publish it.',
+    intro:
+      'Onboarding documents instructors read or sign. Upload the original PDF, place the fields signers fill in, then publish it.',
     empty: 'No documents yet',
     emptyBody: 'Create one below, then upload its PDF.',
     colTitle: 'Title',
@@ -635,7 +661,8 @@ export const en: Messages = {
     kindSign: 'Sign',
     kindRead: 'Read',
     kindLabel: 'Type',
-    kindHint: 'Sign: fields placed on the PDF. Read: the instructor confirms they have read it.',
+    kindHint:
+      'Sign: fields placed on the PDF. Read: the instructor confirms they have read it.',
     kindLocked: 'The type cannot be changed after creation.',
     onePage: '1 page',
     pages: '{n} pages',
@@ -652,7 +679,8 @@ export const en: Messages = {
     assignFor: 'Assign {title}',
     assignEllipsis: 'Assign…',
     uploaded: 'Uploaded the PDF for {title} ({pages}).',
-    uploadedFieldsCleared: 'Uploaded the PDF for {title} ({pages}). The page sizes changed, so its placed fields were cleared — place them again.',
+    uploadedFieldsCleared:
+      'Uploaded the PDF for {title} ({pages}). The page sizes changed, so its placed fields were cleared — place them again.',
     uploadNotPdf: 'Choose a PDF file.',
     uploadTooLarge: 'The PDF must be {mb} MB or smaller.',
     uploadFailed: 'Upload failed: {reason}',
@@ -677,16 +705,20 @@ export const en: Messages = {
     searchInstructors: 'Search instructors',
     pickedCount: '{n} selected',
     pickAtLeastOne: 'Pick at least one instructor.',
-    assignResult: 'Assigned to {created}. Skipped {skipped} who already had it for this season.',
+    assignResult:
+      'Assigned to {created}. Skipped {skipped} who already had it for this season.',
     unsaved: 'Unsaved changes',
     previewAsSigner: 'Preview as signer',
     backToEditing: 'Back to editing',
     saveFields: 'Save fields',
     saveFailed: 'Couldn’t save fields: {reason}',
     fieldsSaved: 'Saved {n} fields.',
-    readNoFields: 'Read documents have no fields: instructors open the PDF and tick “I have read and understood”.',
-    previewNotice: 'This is roughly what the signer sees. Prefilled values are samples.',
-    noSourceYet: 'Upload this document’s PDF from the documents list before placing fields.',
+    readNoFields:
+      'Read documents have no fields: instructors open the PDF and tick “I have read and understood”.',
+    previewNotice:
+      'This is roughly what the signer sees. Prefilled values are samples.',
+    noSourceYet:
+      'Upload this document’s PDF from the documents list before placing fields.',
     palette: 'Fields',
     paletteHint: 'Drag onto a page, or click to add to the current page.',
     addFieldOf: 'Add {type} field',
@@ -694,7 +726,8 @@ export const en: Messages = {
     properties: 'Properties',
     selectAField: 'Select a field to edit it.',
     propertiesIdle: 'Field editing is off in this view.',
-    coordinateNote: 'Positions are stored in PDF points of the unrotated page, origin bottom-left.',
+    coordinateNote:
+      'Positions are stored in PDF points of the unrotated page, origin bottom-left.',
     pageOf: 'Page {n} of {total}',
     fieldAria: '{type} field “{label}” on page {page}',
     fieldType: 'Type',
@@ -707,7 +740,8 @@ export const en: Messages = {
     prefillEmail: 'Signer’s email',
     prefillDateSigned: 'Date signed',
     position: 'Position (PDF pt, origin bottom-left)',
-    keyboardHint: 'Arrow keys nudge (Shift ×10) · Delete removes · Ctrl/⌘+D duplicates',
+    keyboardHint:
+      'Arrow keys nudge (Shift ×10) · Delete removes · Ctrl/⌘+D duplicates',
     duplicate: 'Duplicate',
     deleteField: 'Delete',
     typeSignature: 'Signature',
@@ -754,8 +788,10 @@ export const en: Messages = {
     templateStatusRetired: 'Retired',
     audienceAll: 'All instructors',
     audienceSelected: 'Selected',
-    audienceAllDetail: '{assigned} of {approved} approved assigned · {done} signed',
-    audienceAllDetailRead: '{assigned} of {approved} approved assigned · {done} acknowledged',
+    audienceAllDetail:
+      '{assigned} of {approved} approved assigned · {done} signed',
+    audienceAllDetailRead:
+      '{assigned} of {approved} approved assigned · {done} acknowledged',
     audienceSelectedDetail: '{n} instructors',
     publish: 'Publish',
     republish: 'Re-publish',
@@ -765,14 +801,17 @@ export const en: Messages = {
     retireFor: 'Retire {title}',
     publishNeedsPdf: 'Upload a PDF before publishing.',
     publishNeedsField: 'Place at least one field before publishing.',
-    lockedSigned: "Someone has completed this document, so its PDF and fields can't change. Retire it and publish a new one.",
+    lockedSigned:
+      "Someone has completed this document, so its PDF and fields can't change. Retire it and publish a new one.",
     publishTitle: 'Publish “{title}”',
     publishIntro: "Instructors can see and sign it once it's published.",
     publishWho: 'Who gets it',
     publishAllLabel: 'All instructors',
-    publishAllHint: 'Every approved instructor now, and every instructor you approve later in this season.',
+    publishAllHint:
+      'Every approved instructor now, and every instructor you approve later in this season.',
     publishSelectedLabel: 'Selected instructors',
-    publishSelectedHint: 'Only the instructors you pick. Nobody is added automatically.',
+    publishSelectedHint:
+      'Only the instructors you pick. Nobody is added automatically.',
     publishAssignsNow: 'Assigns now to {count} and emails them.',
     publishApprovedCount: '{n} approved instructors',
     publishPendingLater: '{count} get it automatically when you approve them.',
@@ -810,23 +849,28 @@ export const en: Messages = {
     suggestion: 'Suggested match: {name}',
     confirm: 'Confirm',
     readOnlyTag: 'read-only',
-    readOnlyWarning: 'Read-only, SSMS can\'t add lessons',
+    readOnlyWarning: "Read-only, SSMS can't add lessons",
     clear: 'Clear',
-    notConnected: 'Google Calendar is not connected, so calendars can\'t be listed. Connect it, or enter the calendar ID by hand.',
-    googleError: 'Couldn\'t load calendars from Google. Check the connection, or enter the calendar ID by hand.',
+    notConnected:
+      "Google Calendar is not connected, so calendars can't be listed. Connect it, or enter the calendar ID by hand.",
+    googleError:
+      "Couldn't load calendars from Google. Check the connection, or enter the calendar ID by hand.",
     settingsLink: 'Open Settings → Google Calendar',
     manualLabel: 'Google Calendar ID',
-    manualHint: 'The calendar this instructor\'s bookings go into.',
+    manualHint: "The calendar this instructor's bookings go into.",
     taken: 'This calendar is already linked to another instructor.',
     suggest: 'Suggest calendar matches',
-    suggested: '{count} calendar suggestions saved. Review them on each instructor.',
+    suggested:
+      '{count} calendar suggestions saved. Review them on each instructor.',
     suggestFailed: 'Could not suggest calendar matches',
   },
   classImport: {
     title: 'Import history',
-    intro: 'Bring past bookings in from the Digital Appointments CSV export. Nothing becomes a class until you commit, and no Google Calendar events are created.',
+    intro:
+      'Bring past bookings in from the Digital Appointments CSV export. Nothing becomes a class until you commit, and no Google Calendar events are created.',
     uploadTitle: 'Upload a CSV',
-    uploadBody: 'Export the bookings from Digital Appointments and upload the CSV file (up to 5 MB).',
+    uploadBody:
+      'Export the bookings from Digital Appointments and upload the CSV file (up to 5 MB).',
     fileLabel: 'CSV file',
     upload: 'Upload',
     uploadFailed: 'Upload failed',
@@ -849,7 +893,8 @@ export const en: Messages = {
     countDuplicate: 'Duplicate rows',
     countAlreadyImported: 'Already imported',
     mappingTitle: 'Event names → lesson types',
-    mappingBody: 'Each event name in the CSV maps to one lesson type. Mappings are saved and reused for later imports.',
+    mappingBody:
+      'Each event name in the CSV maps to one lesson type. Mappings are saved and reused for later imports.',
     colEventName: 'Event name',
     colRows: 'Rows',
     colLessonType: 'Lesson type',
@@ -899,11 +944,13 @@ export const en: Messages = {
     rowFailed: 'Could not update row {row}',
     manual: 'set by hand',
     commitTitle: 'Commit',
-    commitBody: 'Rows with problems are skipped. Rows whose customer is not found import without a participant.',
+    commitBody:
+      'Rows with problems are skipped. Rows whose customer is not found import without a participant.',
     commit: 'Import {count} classes',
     commitConfirm: 'Import {count} classes now?',
     confirm: 'Confirm',
-    commitDone: 'Imported {created} classes, {participants} with a customer. {already} were already imported and {skipped} rows were skipped.',
+    commitDone:
+      'Imported {created} classes, {participants} with a customer. {already} were already imported and {skipped} rows were skipped.',
     commitFailed: 'Commit failed',
     discard: 'Discard draft',
     discardConfirm: 'Discard this draft? It can no longer be committed.',
@@ -915,7 +962,8 @@ export const en: Messages = {
   },
   payroll: {
     title: 'Payroll',
-    intro: 'Bi-weekly pay for every lesson that is not cancelled, at the pay rate in effect on the lesson date.',
+    intro:
+      'Bi-weekly pay for every lesson that is not cancelled, at the pay rate in effect on the lesson date.',
     previous: 'Previous period',
     next: 'Next period',
     current: 'Current period',
@@ -924,13 +972,16 @@ export const en: Messages = {
     statusOpen: 'Open',
     statusFinalized: 'Finalized',
     finalizedOn: 'Finalized {date}',
-    liveNote: 'Open periods are recalculated live, so class edits show up straight away.',
-    frozenNote: 'This period is finalized. Its amounts are frozen until it is reopened.',
+    liveNote:
+      'Open periods are recalculated live, so class edits show up straight away.',
+    frozenNote:
+      'This period is finalized. Its amounts are frozen until it is reopened.',
     totalPay: 'Total pay',
     lessonsCount: 'Lessons: {n}',
     hoursCount: 'Hours: {n}',
     needsRateTitle: 'Lessons without a pay rate: {n}',
-    needsRateBody: 'They count as 0 until the class has a lesson type with a pay rate for that date.',
+    needsRateBody:
+      'They count as 0 until the class has a lesson type with a pay rate for that date.',
     fixInClasses: 'Open Classes',
     openPayRates: 'Open pay rates',
     colInstructor: 'Instructor',
@@ -965,7 +1016,8 @@ export const en: Messages = {
     adjustmentDescription: 'Description',
     adjustmentAmount: 'Amount',
     adjustmentAmountHint: 'Use a negative amount for a deduction.',
-    adjustmentVisibleHint: 'The instructor sees this description and amount on their Lessons & pay page.',
+    adjustmentVisibleHint:
+      'The instructor sees this description and amount on their Lessons & pay page.',
     adjustmentAmountInvalid: 'Enter a non-zero amount with at most 2 decimals.',
     adjustmentAdd: 'Add adjustment',
     adjustmentAdded: 'Adjustment added.',
@@ -973,14 +1025,16 @@ export const en: Messages = {
     adjustmentsLocked: 'Reopen the period to change adjustments.',
     finalize: 'Finalize period',
     finalizeTitle: 'Finalize this period?',
-    finalizeBody: 'Rates and amounts are frozen. Later class or rate changes will not change this period until it is reopened.',
+    finalizeBody:
+      'Rates and amounts are frozen. Later class or rate changes will not change this period until it is reopened.',
     finalizeNeedsRate: 'Lessons without a pay rate: {n}. They will be paid 0.',
     acceptZeroRate: 'Finalize with these lessons at 0',
     finalizeConfirm: 'Finalize',
     finalized: 'Period finalized.',
     reopen: 'Reopen period',
     reopenTitle: 'Reopen this period?',
-    reopenBody: 'The frozen amounts are discarded and the period is recalculated live. Adjustments are kept.',
+    reopenBody:
+      'The frozen amounts are discarded and the period is recalculated live. Adjustments are kept.',
     reopenConfirm: 'Reopen',
     reopened: 'Period reopened.',
     downloadSheet: 'Payroll sheet',
@@ -990,13 +1044,15 @@ export const en: Messages = {
     settingsTitle: 'Pay period settings',
     anchorLabel: 'First day of a pay period',
     anchorHint: 'Periods are 14 days long, counted from this date.',
-    settingsLocked: 'The anchor date cannot change once a period has been finalized.',
+    settingsLocked:
+      'The anchor date cannot change once a period has been finalized.',
     settingsSaved: 'Settings saved.',
     close: 'Close',
   },
   booking: {
     title: 'Book a lesson',
-    intro: 'Pick a customer and a lesson type, then a free slot. Times are in Toronto time. Bookings go on the instructor\'s Google calendar without inviting the customer.',
+    intro:
+      "Pick a customer and a lesson type, then a free slot. Times are in Toronto time. Bookings go on the instructor's Google calendar without inviting the customer.",
     customerStep: 'Customer',
     customerSearch: 'Find a customer',
     customerSearchHint: 'Name, email or phone. Type at least 2 characters.',
@@ -1028,9 +1084,11 @@ export const en: Messages = {
     legendNoFit: 'Not available for this lesson',
     legendLabel: 'Legend',
     legendSelected: 'Selected',
-    dayClosed: 'Bookings are closed on this day. Change the hours under Booking settings.',
+    dayClosed:
+      'Bookings are closed on this day. Change the hours under Booking settings.',
     noInstructorsTitle: 'No instructors can be booked',
-    noInstructorsBody: 'Link and confirm instructor calendars on the Calendar matching page.',
+    noInstructorsBody:
+      'Link and confirm instructor calendars on the Calendar matching page.',
     unavailableTitle: 'Not bookable',
     reasonInactive: 'not active or not approved',
     reasonNoCalendar: 'no Google calendar linked',
@@ -1059,21 +1117,25 @@ export const en: Messages = {
     bookedBody: '{count} lesson(s) saved, starting {when}.',
     viewClasses: 'View classes',
     conflictTitle: 'That time is no longer free',
-    conflictRace: 'Another booking took this slot a moment ago. Pick another time.',
+    conflictRace:
+      'Another booking took this slot a moment ago. Pick another time.',
     conflictLine: '{when}: busy {from}–{to} ({source})',
     sourceGoogle: 'Google Calendar',
     sourceSsms: 'another lesson',
     googleFailedTitle: 'Google Calendar could not be checked',
     googleFailed: 'Nothing was saved. Google said: {code}.',
-    pastBody: 'Record a lesson that already happened, for tracking and payroll. It is only added to Google Calendar if you ask.',
+    pastBody:
+      'Record a lesson that already happened, for tracking and payroll. It is only added to Google Calendar if you ask.',
     startTime: 'Start time',
-    pastMustBePast: 'This time is in the future. Use Book from availability instead.',
+    pastMustBePast:
+      'This time is in the future. Use Book from availability instead.',
     instructor: 'Instructor',
     chooseInstructor: 'Choose an instructor',
     status: 'Status',
-    addToCalendar: 'Also add it to the instructor\'s Google calendar',
+    addToCalendar: "Also add it to the instructor's Google calendar",
     settingsTitle: 'Booking hours and slots',
-    settingsBody: 'The hours and slot size used for availability. Times are Toronto time.',
+    settingsBody:
+      'The hours and slot size used for availability. Times are Toronto time.',
     dayStart: 'Day starts',
     dayEnd: 'Day ends',
     slotMinutes: 'Slot size',
@@ -1103,7 +1165,8 @@ export const en: Messages = {
     actionCancel: 'Cancel lesson…',
     actionRestore: 'Restore lesson',
     cancelTitle: 'Cancel this lesson?',
-    cancelBody: 'The lesson on {when} will be marked cancelled and no longer paid.',
+    cancelBody:
+      'The lesson on {when} will be marked cancelled and no longer paid.',
     cancelGoogle: 'Its Google Calendar event will be deleted.',
     cancelConfirm: 'Cancel lesson',
     keep: 'Keep lesson',
@@ -1161,12 +1224,15 @@ export const en: Messages = {
     showPeriod: 'Show lessons for {dates}',
     hidePeriod: 'Hide lessons for {dates}',
     emptyTitle: 'No lessons booked yet',
-    emptyBody: 'When the school books you on a lesson, it appears here with the date, location and your pay. Pay periods are two weeks long; paid periods are listed under Past lessons.',
+    emptyBody:
+      'When the school books you on a lesson, it appears here with the date, location and your pay. Pay periods are two weeks long; paid periods are listed under Past lessons.',
     pendingTitle: 'Your profile is being reviewed',
     pendingBody: 'Lessons and pay open once an admin approves you.',
-    pendingEmpty: 'Nothing to show yet. Only approved instructors can be booked.',
+    pendingEmpty:
+      'Nothing to show yet. Only approved instructors can be booked.',
     rejectedTitle: 'Your profile was not approved',
-    rejectedBody: "You can't be booked for new lessons. Your past lessons and pay are below.",
+    rejectedBody:
+      "You can't be booked for new lessons. Your past lessons and pay are below.",
   },
   onboarding: {
     title: 'Onboarding',
@@ -1211,7 +1277,8 @@ export const en: Messages = {
     readDoneTitle: 'Marked as read',
     readDoneBody: 'Thanks — this document is complete.',
     signedTitle: 'Signed',
-    signedBody: 'Your signed copy has been emailed to you. You can also download it here.',
+    signedBody:
+      'Your signed copy has been emailed to you. You can also download it here.',
     downloadSigned: 'Download signed copy',
     downloadFailed: 'The download link could not be created. Try again.',
     sha256: 'SHA-256',
@@ -1222,7 +1289,8 @@ export const en: Messages = {
     fileType: 'Use a PDF, JPG, PNG or WebP file.',
     fileTooLarge: 'The file must be 10 MB or smaller.',
     validUntil: 'Valid until',
-    validUntilHint: 'The date your membership or registration is valid through.',
+    validUntilHint:
+      'The date your membership or registration is valid through.',
     validUntilPast: 'Must be today or later.',
     uploadButton: 'Upload',
     uploading: 'Uploading…',
@@ -1238,7 +1306,8 @@ export const en: Messages = {
     tagUpload: 'Upload',
     cardLockedTitle: 'Onboarding · {n} items',
     cardLockedUnlocks: 'Unlocks when your profile is approved',
-    cardLockedBody: "{docs} documents to sign and {certs} certifications to upload. We'll email you when you can start.",
+    cardLockedBody:
+      "{docs} documents to sign and {certs} certifications to upload. We'll email you when you can start.",
     rejectedTitle: "Your profile wasn't approved",
     rejectedBody: 'Contact SSnow if you think this is a mistake.',
     deactivatedTitle: 'Your profile is deactivated',
@@ -1286,6 +1355,8 @@ export const en: Messages = {
     submitFailed: 'Could not submit. Try again.',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
+    reviewAndSubmit: 'Review & submit',
+    draftRestored: 'We restored the progress you saved on this device.',
   },
   validation: {
     required: 'This field is required.',

@@ -1260,6 +1260,8 @@ export interface Messages {
     submitFailed: string;
     zoomIn: string;
     zoomOut: string;
+    reviewAndSubmit: string;
+    draftRestored: string;
   };
   validation: {
     required: string;

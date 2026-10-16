@@ -4,6 +4,7 @@ import { Banner, Button, Card, Spinner } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
+import { cn } from '@/lib/cn';
 import { useSession } from '@/auth/SessionProvider';
 import { useMyProfile } from '@/features/instructor/api';
 import {
@@ -15,15 +16,19 @@ import {
 } from '../api';
 import { ReadDocument } from '../signer/ReadDocument';
 import { SignerDocument } from '../signer/SignerDocument';
+import { clearSigningDraft, signingDraftKey } from '../signer/signingDraft';
 import { useCompleteMyDocument, useMyDocument } from './queries';
 import { LockedBanner, lockReasonOf } from './Locked';
 
-function BackLink() {
+function BackLink({ compact = false }: { compact?: boolean }) {
   const t = useT();
   return (
     <Link
       to="/onboarding"
-      className="text-sm font-medium text-navy hover:text-red"
+      className={cn(
+        'font-medium text-navy hover:text-red',
+        compact ? 'text-xs' : 'text-sm',
+      )}
     >
       ← {t.onboarding.backToChecklist}
     </Link>
@@ -145,8 +150,11 @@ export function OnboardingDocumentPage() {
       ? t.onboarding.alreadyCompleted
       : t.signer.submitFailed
     : null;
-  const onDone = (result: { assignment: Assignment }) =>
+  const draftKey = user?.id ? signingDraftKey(user.id, assignment.id) : null;
+  const onDone = (result: { assignment: Assignment }) => {
+    if (draftKey) clearSigningDraft(draftKey);
     setCompleted(result.assignment);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -204,6 +212,8 @@ export function OnboardingDocumentPage() {
           submitting={complete.isPending}
           submitError={submitError}
           onSubmit={(body) => complete.mutate(body, { onSuccess: onDone })}
+          backAction={<BackLink compact />}
+          draftKey={draftKey}
         />
       )}
     </div>

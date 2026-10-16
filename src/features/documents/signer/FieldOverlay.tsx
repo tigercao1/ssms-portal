@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, FocusEvent } from 'react';
 import { cn } from '@/lib/cn';
 import type { Field, SignatureValue } from '../api';
 import { pdfRectToScreen, type PageGeometry } from '../pdf/transforms';
@@ -14,9 +14,26 @@ interface FieldOverlayProps {
   signature: SignatureValue | undefined;
   active: boolean;
   text: SignerText;
+  touch?: boolean;
   onFocus: () => void;
+  onInputFocus?: () => void;
   onChange: (value: string | boolean) => void;
   onSign: () => void;
+}
+
+const TOUCH_INPUT_FONT_PX = 16;
+
+function keepInViewWhileKeyboardOpens(input: HTMLInputElement) {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  const centre = () =>
+    input.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+  viewport.addEventListener('resize', centre);
+  input.addEventListener(
+    'blur',
+    () => viewport.removeEventListener('resize', centre),
+    { once: true },
+  );
 }
 
 /** One input drawn over its field rect on the rendered page. */
@@ -28,7 +45,9 @@ export function FieldOverlay({
   signature,
   active,
   text,
+  touch = false,
   onFocus,
+  onInputFocus,
   onChange,
   onSign,
 }: FieldOverlayProps) {
@@ -139,17 +158,42 @@ export function FieldOverlay({
     );
   }
 
+  const inputScale = touch ? fontSize / TOUCH_INPUT_FONT_PX : 1;
+  const inputStyle: CSSProperties =
+    inputScale < 1
+      ? {
+          fontSize: TOUCH_INPUT_FONT_PX,
+          width: `${100 / inputScale}%`,
+          height: `${100 / inputScale}%`,
+          transform: `scale(${inputScale})`,
+          transformOrigin: 'top left',
+        }
+      : { fontSize };
+  const focusInput = (e: FocusEvent<HTMLInputElement>) => {
+    onFocus();
+    if (!touch) return;
+    onInputFocus?.();
+    keepInViewWhileKeyboardOpens(e.currentTarget);
+  };
+
   return (
-    <div className={frame} style={style} data-field-id={field.id}>
+    <div
+      className={cn(
+        frame,
+        'items-start focus-within:border-solid focus-within:bg-white',
+      )}
+      style={style}
+      data-field-id={field.id}
+    >
       <input
         type={field.type === 'date' ? 'date' : 'text'}
         aria-label={accessibleLabel}
         placeholder={label}
         value={typeof value === 'string' ? value : ''}
-        onFocus={onFocus}
+        onFocus={focusInput}
         onChange={(e) => onChange(e.target.value)}
-        className="h-full w-full bg-transparent px-1 text-ink placeholder:text-slate focus:outline-none"
-        style={{ fontSize }}
+        className="h-full w-full shrink-0 bg-transparent px-1 text-ink caret-red placeholder:text-slate focus:outline-none"
+        style={inputStyle}
       />
     </div>
   );

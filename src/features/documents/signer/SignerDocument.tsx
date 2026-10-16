@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Banner, Button, Input } from '@/components';
 import type { Locale } from '@/i18n/core/types';
 import type {
@@ -23,6 +30,12 @@ import {
   type FieldValues,
 } from './fieldLogic';
 import { SignatureModal } from './SignatureModal';
+import {
+  loadSigningDraft,
+  saveSigningDraft,
+  type AdoptedSignatures,
+  type SigningDraft,
+} from './signingDraft';
 import type { SignerText } from './types';
 
 export interface SignerDocumentProps {
@@ -37,6 +50,8 @@ export interface SignerDocumentProps {
   submitting?: boolean;
   submitError?: string | null;
   onSubmit: (body: SignCompletion) => void;
+  backAction?: ReactNode;
+  draftKey?: string | null;
 }
 
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -44,6 +59,7 @@ const MOBILE_MIN_FIELD_PX = 220;
 const MOBILE_MIN_TOUCH_PX = 36;
 const MAX_ZOOM = 3;
 const MAX_AUTO_ZOOM = 2.5;
+const DRAFT_SAVE_DELAY_MS = 500;
 
 export function zoomForField(
   field: Field,
@@ -123,6 +139,8 @@ export function SignerDocument({
   submitting = false,
   submitError,
   onSubmit,
+  backAction,
+  draftKey,
 }: SignerDocumentProps) {
   const pdfRef = useRef<PdfPagesHandle>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -132,22 +150,30 @@ export function SignerDocument({
     [template.fields],
   );
   const required = useMemo(() => ordered.filter((f) => f.required), [ordered]);
-  const [signerName, setSignerName] = useState(defaultSignerName);
+  const [draft] = useState(() =>
+    draftKey ? loadSigningDraft(draftKey, template.id, template.fields) : null,
+  );
+  const [signerName, setSignerName] = useState(() =>
+    draft?.signerName.trim() ? draft.signerName : defaultSignerName,
+  );
   const identity = useMemo(
     () => ({ signerName, email: signerEmail, today: signingDate }),
     [signerName, signerEmail, signingDate],
   );
-  const [values, setValues] = useState<FieldValues>(() =>
-    initialValues(template.fields, {
+  const [values, setValues] = useState<FieldValues>(() => ({
+    ...initialValues(template.fields, {
       signerName: defaultSignerName,
       email: signerEmail,
       today: signingDate,
     }),
+    ...draft?.values,
+  }));
+  const [signatures, setSignatures] = useState<FieldSignatures>(
+    () => draft?.signatures ?? {},
   );
-  const [signatures, setSignatures] = useState<FieldSignatures>({});
-  const [adopted, setAdopted] = useState<
-    Partial<Record<'signature' | 'initials', SignatureValue>>
-  >({});
+  const [adopted, setAdopted] = useState<AdoptedSignatures>(
+    () => draft?.adopted ?? {},
+  );
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [signingId, setSigningId] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
@@ -157,6 +183,37 @@ export function SignerDocument({
     id: string;
     n: number;
   } | null>(null);
+
+  const touched = useRef(false);
+  const pendingSave = useRef<number | null>(null);
+  const latestDraft = useRef<SigningDraft | null>(null);
+
+  const flushDraft = useCallback(() => {
+    if (pendingSave.current === null) return;
+    window.clearTimeout(pendingSave.current);
+    pendingSave.current = null;
+    if (draftKey && latestDraft.current)
+      saveSigningDraft(draftKey, template.id, latestDraft.current);
+  }, [draftKey, template.id]);
+
+  useEffect(() => {
+    if (!draftKey || !touched.current) return;
+    latestDraft.current = { signerName, values, signatures, adopted };
+    if (pendingSave.current !== null) window.clearTimeout(pendingSave.current);
+    pendingSave.current = window.setTimeout(() => {
+      pendingSave.current = null;
+      if (latestDraft.current)
+        saveSigningDraft(draftKey, template.id, latestDraft.current);
+    }, DRAFT_SAVE_DELAY_MS);
+  }, [draftKey, template.id, signerName, values, signatures, adopted]);
+
+  useEffect(() => {
+    window.addEventListener('pagehide', flushDraft);
+    return () => {
+      window.removeEventListener('pagehide', flushDraft);
+      flushDraft();
+    };
+  }, [flushDraft]);
 
   useEffect(() => {
     setValues((v) => syncLockedValues(template.fields, v, identity));
@@ -192,6 +249,18 @@ export function SignerDocument({
     [isMobile, zoom],
   );
 
+  const focusField = (field: Field) => {
+    setCurrentId(field.id);
+    if (!isMobile) return;
+    const g = pdfRef.current?.getGeometry(field.page);
+    if (g) {
+      const rect = pdfRectToScreen(g, field);
+      const wanted = zoomForField(field, rect.width / zoom, rect.height / zoom);
+      if (wanted > zoom) setZoom(wanted);
+    }
+    setScrollTarget((prev) => ({ id: field.id, n: (prev?.n ?? 0) + 1 }));
+  };
+
   const scrollToPanel = () => {
     setScrollTarget(null);
     setZoom(1);
@@ -219,6 +288,7 @@ export function SignerDocument({
     const kind = field.type === 'initials' ? 'initials' : 'signature';
     const reuse = adopted[kind];
     if (reuse && !signatures[field.id]) {
+      touched.current = true;
       setSignatures((s) => ({ ...s, [field.id]: reuse }));
       return;
     }
@@ -228,6 +298,7 @@ export function SignerDocument({
   const adopt = (value: SignatureValue) => {
     if (!signingField) return;
     const kind = signingField.type === 'initials' ? 'initials' : 'signature';
+    touched.current = true;
     setAdopted((a) => ({ ...a, [kind]: value }));
     setSignatures((s) => ({ ...s, [signingField.id]: value }));
     setSigningId(null);
@@ -250,6 +321,7 @@ export function SignerDocument({
       return;
     }
     setProblem(null);
+    flushDraft();
     onSubmit(buildSignBody(template.fields, signerName, values, signatures));
   };
 
@@ -266,8 +338,13 @@ export function SignerDocument({
         : text.fieldsRemaining.replace('{count}', String(remaining.length));
 
   return (
-    <div className="grid items-start gap-4 pb-24 md:grid-cols-[minmax(0,1fr)_280px] md:pb-0">
+    <div className="grid items-start gap-4 pb-32 md:grid-cols-[minmax(0,1fr)_280px] md:pb-0">
       <div className="min-w-0">
+        {draft && (
+          <div className="mb-2">
+            <Banner tone="info">{text.draftRestored}</Banner>
+          </div>
+        )}
         <div className="mb-2 flex items-center justify-end gap-1">
           <Button
             variant="ghost"
@@ -318,8 +395,11 @@ export function SignerDocument({
                     signature={signatures[field.id]}
                     active={field.id === currentId}
                     text={text}
+                    touch={isMobile}
                     onFocus={() => setCurrentId(field.id)}
+                    onInputFocus={() => focusField(field)}
                     onChange={(v) => {
+                      touched.current = true;
                       setValues((s) => ({ ...s, [field.id]: v }));
                       setProblem(null);
                     }}
@@ -365,7 +445,10 @@ export function SignerDocument({
               value={signerName}
               autoComplete="name"
               maxLength={120}
-              onChange={(e) => setSignerName(e.target.value)}
+              onChange={(e) => {
+                touched.current = true;
+                setSignerName(e.target.value);
+              }}
               aria-describedby="signer-legal-name-hint"
             />
             <p id="signer-legal-name-hint" className="text-xs text-slate">
@@ -388,27 +471,45 @@ export function SignerDocument({
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-2 border-t border-grey/60 bg-surface px-3 py-2 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-grey/60 bg-surface px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 md:hidden"
         data-testid="mobile-stepper"
       >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={prev}
-          aria-label={text.prevField}
-          disabled={required.length === 0}
-        >
-          ←
-        </Button>
-        <span
-          className="min-w-0 flex-1 truncate text-center text-sm text-ink"
-          aria-live="polite"
-        >
-          {stepLabel}
-        </span>
-        <Button size="sm" onClick={next}>
-          {text.nextField} →
-        </Button>
+        <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
+          {backAction && <div className="shrink-0">{backAction}</div>}
+          <span
+            className="min-w-0 flex-1 truncate text-right text-ink"
+            aria-live="polite"
+          >
+            {stepLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={prev}
+            aria-label={text.prevField}
+            disabled={required.length === 0}
+          >
+            ←
+          </Button>
+          <Button
+            size="sm"
+            variant={remaining.length === 0 ? 'secondary' : 'primary'}
+            className="flex-1"
+            onClick={next}
+          >
+            {text.nextField} →
+          </Button>
+          <Button
+            size="sm"
+            variant={remaining.length === 0 ? 'primary' : 'secondary'}
+            className="flex-1"
+            onClick={scrollToPanel}
+          >
+            {text.reviewAndSubmit}
+          </Button>
+        </div>
       </div>
 
       <SignatureModal
