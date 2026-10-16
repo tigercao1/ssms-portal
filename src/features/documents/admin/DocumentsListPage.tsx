@@ -179,9 +179,9 @@ function AudienceCell({ row }: { row: TemplateSummary }) {
           ? t.documents.audienceAllDetailRead
           : t.documents.audienceAllDetail
         )
-          .replace('{assigned}', String(row.assignedCount))
+          .replace('{assigned}', String(row.approvedAssignedCount))
           .replace('{approved}', String(row.approvedCount))
-          .replace('{done}', String(row.completedCount))
+          .replace('{done}', String(row.approvedCompletedCount))
       : t.documents.audienceSelectedDetail.replace(
           '{n}',
           String(row.assignedCount),
@@ -432,16 +432,16 @@ function TemplateRow({
           )}
           {row.status === 'live' && (
             <>
-              <Button
-                size="sm"
-                variant="secondary"
-                aria-label={t.documents.assignFor.replace('{title}', title)}
-                onClick={onAssign}
-              >
-                {row.assignTo === 'all'
-                  ? t.documents.assignMore
-                  : t.documents.assign}
-              </Button>
+              {row.assignTo !== 'all' && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label={t.documents.assignFor.replace('{title}', title)}
+                  onClick={onAssign}
+                >
+                  {t.documents.assign}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

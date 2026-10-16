@@ -369,7 +369,16 @@ describe('FieldEditorPage', () => {
     expect(screen.getAllByTestId('rnd')).toHaveLength(4);
   });
 
-  it('opens the assign dialog', async () => {
+  it('hides Assign for a document published to all instructors', async () => {
+    renderEditor();
+    await screen.findByTestId('page-overlay-1');
+    expect(
+      screen.queryByRole('button', { name: 'Assign…' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the assign dialog for selected instructors', async () => {
+    state.templates.find((x) => x.id === 'tpl-conduct')!.assignTo = 'selected';
     const user = userEvent.setup();
     renderEditor();
     await screen.findByTestId('page-overlay-1');
@@ -377,6 +386,7 @@ describe('FieldEditorPage', () => {
     expect(
       screen.getByRole('dialog', { name: 'Assign “Code of conduct”' }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

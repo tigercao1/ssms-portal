@@ -13,7 +13,7 @@ import {
   type DocumentsMockState,
 } from '../api/handlers';
 import { buildSamplePdf } from '../api/samplePdf';
-import { fakeField } from '../api/fixtures';
+import { MOCK_SEASON, fakeAssignment, fakeField } from '../api/fixtures';
 
 const API = 'http://localhost:3000';
 
@@ -169,10 +169,10 @@ describe('DocumentsListPage', () => {
       within(row('Uniform policy')).getByRole('button', { name: 'Upload PDF' }),
     ).toBeEnabled();
     expect(
-      within(row('Code of conduct')).getByRole('button', {
+      within(row('Code of conduct')).queryByRole('button', {
         name: 'Assign Code of conduct',
       }),
-    ).toHaveTextContent('Assign more');
+    ).not.toBeInTheDocument();
     expect(
       within(row('Liability waiver')).getByRole('button', {
         name: 'Assign Liability waiver',
@@ -286,14 +286,31 @@ describe('DocumentsListPage', () => {
     await user.type(season, '/28');
     await user.click(within(dialog).getByLabelText(/Selected instructors/));
     await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
+    expect(
+      within(dialog).getByText('Pick at least one instructor.'),
+    ).toBeInTheDocument();
+    expect(publishBodies).toEqual([]);
+    await user.type(within(dialog).getByLabelText('Search instructors'), 'li');
+    await user.click(await within(dialog).findByRole('checkbox'));
+    expect(within(dialog).getByText('1 selected')).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Publish and email 1' }),
+    );
     await waitFor(() =>
       expect(publishBodies).toEqual([
-        { id: 'tpl-draft', body: { assignTo: 'selected', season: '2027/28' } },
+        {
+          id: 'tpl-draft',
+          body: {
+            assignTo: 'selected',
+            season: '2027/28',
+            instructorIds: ['inst-2'],
+          },
+        },
       ]),
     );
     expect(
       await screen.findByText(
-        'Uniform policy is live. Assigned to 0 instructors.',
+        'Uniform policy is live. Assigned to 1 instructors.',
       ),
     ).toBeInTheDocument();
     await waitFor(() =>
@@ -301,6 +318,9 @@ describe('DocumentsListPage', () => {
         within(row('Uniform policy')).getByText('Selected'),
       ).toBeInTheDocument(),
     );
+    expect(
+      within(row('Uniform policy')).getByText('1 instructors'),
+    ).toBeInTheDocument();
   });
 
   it('publishes a customer document to selected people only', async () => {
@@ -318,6 +338,7 @@ describe('DocumentsListPage', () => {
     expect(within(dialog).queryByLabelText(/All instructors/)).toBeNull();
     expect(within(dialog).getByRole('radio')).toBeChecked();
     expect(within(dialog).queryByTestId('publish-summary')).toBeNull();
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
     await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
     await waitFor(() =>
       expect(publishBodies).toEqual([
@@ -608,15 +629,38 @@ describe('DocumentsListPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('assigns to all active instructors for a season', async () => {
+  it('counts only currently approved instructors for an all-instructors document', async () => {
+    state.assignments.push(
+      fakeAssignment({
+        id: 'asg-conduct-gone',
+        templateId: 'tpl-conduct',
+        subjectId: 'inst-gone',
+      }),
+      fakeAssignment({
+        id: 'asg-conduct-li',
+        templateId: 'tpl-conduct',
+        subjectId: 'inst-2',
+      }),
+    );
+    renderWithProviders(<DocumentsListPage />);
+    await screen.findByText('Code of conduct');
+    expect(
+      within(row('Code of conduct')).getByText(
+        '2 of 2 approved assigned · 1 signed',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('assigns a selected document for a season and refreshes its count', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
-      await screen.findByRole('button', { name: 'Assign Code of conduct' }),
+      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
     );
     const dialog = screen.getByRole('dialog', {
-      name: 'Assign “Code of conduct”',
+      name: 'Assign “Liability waiver”',
     });
+    expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument();
     const season = within(dialog).getByLabelText(/Season/);
     expect(season).toHaveValue(seasonFor());
     await user.clear(season);
@@ -626,22 +670,27 @@ describe('DocumentsListPage', () => {
       within(dialog).getByText('Use the form 2026/27.'),
     ).toBeInTheDocument();
     await user.clear(season);
-    await user.type(season, '2027/28');
+    await user.type(season, MOCK_SEASON);
+    await user.type(within(dialog).getByLabelText('Search instructors'), 'li');
+    await user.click(await within(dialog).findByRole('checkbox'));
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
     expect(
       await within(dialog).findByText(
-        'Assigned to 2. Skipped 0 who already had it for this season.',
+        'Assigned to 1. Skipped 0 who already had it for this season.',
       ),
     ).toBeInTheDocument();
     expect(assignBodies).toEqual([
       {
-        templateId: 'tpl-conduct',
-        season: '2027/28',
-        allActiveInstructors: true,
+        templateId: 'tpl-waiver',
+        season: MOCK_SEASON,
+        instructorIds: ['inst-2'],
       },
     ]);
     await user.click(within(dialog).getByRole('button', { name: 'Done' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      await within(row('Liability waiver')).findByText('2 instructors'),
+    ).toBeInTheDocument();
   });
 
   it('assigns to picked instructors and requires a pick', async () => {
@@ -651,7 +700,6 @@ describe('DocumentsListPage', () => {
       await screen.findByRole('button', { name: 'Assign Liability waiver' }),
     );
     const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByLabelText('Pick instructors'));
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
     expect(
       within(dialog).getByText('Pick at least one instructor.'),
@@ -675,7 +723,7 @@ describe('DocumentsListPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
-      await screen.findByRole('button', { name: 'Assign Code of conduct' }),
+      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
     );
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -715,10 +763,10 @@ describe('seasonFor', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
-      await screen.findByRole('button', { name: 'Assign Code of conduct' }),
+      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
     );
     const dialog = screen.getByRole('dialog', {
-      name: 'Assign “Code of conduct”',
+      name: 'Assign “Liability waiver”',
     });
     expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2025/26');
   });

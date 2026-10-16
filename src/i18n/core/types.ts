@@ -644,9 +644,6 @@ export interface Messages {
     done: string;
     assignTitle: string;
     assignSubmit: string;
-    assignWho: string;
-    assignAll: string;
-    assignPick: string;
     seasonLabel: string;
     seasonHint: string;
     seasonInvalid: string;
@@ -733,7 +730,6 @@ export interface Messages {
     audienceAllDetail: string;
     audienceAllDetailRead: string;
     audienceSelectedDetail: string;
-    assignMore: string;
     publish: string;
     republish: string;
     retire: string;
