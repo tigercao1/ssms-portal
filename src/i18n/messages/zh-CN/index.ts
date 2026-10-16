@@ -723,6 +723,7 @@ export const zhCN: Messages = {
     reviewNote: '给教练的备注',
     reviewNoteHint: '驳回时必填',
     viewFile: '查看文件',
+    fileDeletedAfterReject: '文件已在驳回后删除',
     templateStatusDraft: '草稿',
     templateStatusLive: '已发布',
     templateStatusRetired: '已停用',

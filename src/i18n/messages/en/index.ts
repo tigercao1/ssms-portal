@@ -746,6 +746,7 @@ export const en: Messages = {
     reviewNote: 'Note to instructor',
     reviewNoteHint: 'Required when rejecting',
     viewFile: 'View file',
+    fileDeletedAfterReject: 'File deleted after rejection',
     templateStatusDraft: 'Draft',
     templateStatusLive: 'Live',
     templateStatusRetired: 'Retired',
