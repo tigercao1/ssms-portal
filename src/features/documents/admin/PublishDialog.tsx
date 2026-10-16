@@ -6,6 +6,7 @@ import type { PublishResult, TemplateAssignTo, TemplateSummary } from '../api';
 import { SEASON_RE } from './AssignDialog';
 import { usePublishPreview, usePublishTemplate } from './hooks';
 import { errorText, templateTitle } from './format';
+import { InstructorPicker, useToggleSet } from './InstructorPicker';
 
 function withBold(template: string, value: string): ReactNode {
   const [before, after] = template.split('{count}');
@@ -71,6 +72,10 @@ export function PublishDialog({
   const [assignTo, setAssignTo] = useState<TemplateAssignTo>(
     canAssignAll ? 'all' : 'selected',
   );
+  const [picked, toggle] = useToggleSet();
+  const [touched, setTouched] = useState(false);
+  const picksInstructors = canAssignAll && assignTo === 'selected';
+  const nothingPicked = picksInstructors && picked.size === 0;
   const [seasonInput, setSeasonInput] = useState<string | null>(null);
   const seasonValid =
     seasonInput === null || SEASON_RE.test(seasonInput.trim());
@@ -84,7 +89,8 @@ export function PublishDialog({
   const newCount = counts
     ? Math.max(0, counts.approvedCount - counts.alreadyAssignedCount)
     : 0;
-  const emails = assignTo === 'all' ? newCount : 0;
+  const emails =
+    assignTo === 'all' ? newCount : picksInstructors ? picked.size : 0;
 
   function changeSeason(value: string) {
     setSeasonInput(value);
@@ -93,9 +99,15 @@ export function PublishDialog({
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (!ready || publish.isPending) return;
+    setTouched(true);
+    if (!ready || nothingPicked || publish.isPending) return;
     publish.mutate(
-      { id: template.id, assignTo, season: season.trim() },
+      {
+        id: template.id,
+        assignTo,
+        season: season.trim(),
+        ...(picksInstructors && { instructorIds: [...picked] }),
+      },
       { onSuccess: onPublished },
     );
   }
@@ -118,7 +130,7 @@ export function PublishDialog({
           </Button>
           <Button
             loading={publish.isPending}
-            disabled={!ready}
+            disabled={!ready || (touched && nothingPicked)}
             onClick={() => submit()}
           >
             {emails > 0
@@ -149,6 +161,13 @@ export function PublishDialog({
             onSelect={() => setAssignTo('selected')}
           />
         </fieldset>
+        {picksInstructors && (
+          <InstructorPicker
+            picked={picked}
+            onToggle={toggle}
+            showError={touched && nothingPicked}
+          />
+        )}
         <Field
           label={t.documents.seasonLabel}
           required

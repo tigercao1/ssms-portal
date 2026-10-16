@@ -284,7 +284,7 @@ describe('InstructorDocumentsSection — documents', () => {
     await user.selectOptions(picker, 'tpl-conduct');
     await user.click(assign);
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByLabelText('Pick instructors')).toBeChecked();
+    expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument();
     expect(within(dialog).getByText('1 selected')).toBeInTheDocument();
   });
 
