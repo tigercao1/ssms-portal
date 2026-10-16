@@ -12,6 +12,7 @@ import { SettingsPage } from '@/features/instructor/SettingsPage';
 import { OnboardingPage } from '@/features/documents/onboarding/OnboardingPage';
 import { OnboardingDocumentPage } from '@/features/documents/onboarding/OnboardingDocumentPage';
 import { LessonsPayPage } from '@/features/lessons/LessonsPayPage';
+import { InsurancePage } from '@/features/insurance/InsurancePage';
 import { AdminDashboard } from '@/features/admin/AdminDashboard';
 import { AdminListPage } from '@/features/admin/AdminListPage';
 import { AdminDetailPage } from '@/features/admin/AdminDetailPage';
@@ -25,6 +26,7 @@ import { ClassesPage } from '@/features/admin/ClassesPage';
 import { BookLessonPage } from '@/features/admin/booking/BookLessonPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
 import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
+import { AdminInsurancePage } from '@/features/admin/insurance/AdminInsurancePage';
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
 import { DocumentsListPage } from '@/features/documents/admin/DocumentsListPage';
 import { FieldEditorPage } from '@/features/documents/admin/editor/FieldEditorPage';
@@ -78,6 +80,7 @@ export const router = createBrowserRouter([
         path: '/onboarding/:assignmentId',
         element: <OnboardingDocumentPage />,
       },
+      { path: '/insurance', element: <InsurancePage /> },
       { path: '/lessons', element: <LessonsPayPage /> },
       { path: '/settings', element: <SettingsPage /> },
 
@@ -151,6 +154,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <PayrollPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/insurance',
+        element: (
+          <RequireAdmin>
+            <AdminInsurancePage />
           </RequireAdmin>
         ),
       },
