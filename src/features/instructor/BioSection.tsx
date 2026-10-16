@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Modal, Spinner, Textarea } from '@/components';
 import {
@@ -22,6 +22,7 @@ import {
 
 export const MAX_BIO = 1000;
 export const MAX_BIO_SOURCE = 2000;
+const LOCKED_TEXTAREA = 'disabled:cursor-not-allowed disabled:opacity-60';
 
 type Lang = 'en' | 'zh';
 const LANGS: Lang[] = ['en', 'zh'];
@@ -42,6 +43,83 @@ export function writtenLangs(request: DraftRequest, draft?: BioDraft): Lang[] {
 
 function bioOf(p: InstructorProfile, lang: Lang): string {
   return (lang === 'en' ? p.bioEn : p.bioZh) ?? '';
+}
+
+function machineOf(p: InstructorProfile, lang: Lang): boolean {
+  return Boolean(
+    lang === 'en' ? p.bioEnMachineTranslated : p.bioZhMachineTranslated,
+  );
+}
+
+function otherLang(lang: Lang): Lang {
+  return lang === 'en' ? 'zh' : 'en';
+}
+
+function bioField(
+  lang: Lang,
+  text: string,
+  machine: boolean,
+): UpdateProfileBody {
+  const value = text.trim() ? text : null;
+  return lang === 'en'
+    ? { bioEn: value, bioEnMachineTranslated: machine }
+    : { bioZh: value, bioZhMachineTranslated: machine };
+}
+
+function useSaveLock() {
+  const [holders, setHolders] = useState(0);
+  const hold = useCallback(async <T,>(work: () => Promise<T>) => {
+    setHolders((n) => n + 1);
+    try {
+      return await work();
+    } finally {
+      setHolders((n) => n - 1);
+    }
+  }, []);
+  return { locked: holders > 0, hold };
+}
+
+type SaveLock = ReturnType<typeof useSaveLock>;
+
+function useSaveBio() {
+  const save = useUpdateProfile();
+  const translate = useBioDraft();
+
+  async function translateFrom(source: Lang, text: string): Promise<string> {
+    const missing = otherLang(source);
+    return translate.mutateAsync({ text, mode: 'translate' }).then(
+      (d) => d[missing],
+      () => '',
+    );
+  }
+
+  async function saveBio(
+    values: Record<Lang, string>,
+    machine: Record<Lang, boolean> = { en: false, zh: false },
+  ): Promise<Lang | null> {
+    const [source, ...rest] = LANGS.filter((lang) => values[lang].trim());
+    if (!source || rest.length > 0) {
+      await save.mutateAsync({
+        ...bioField('en', values.en, machine.en),
+        ...bioField('zh', values.zh, machine.zh),
+      });
+      return null;
+    }
+    const missing = otherLang(source);
+    const translation = await translateFrom(source, values[source]);
+    await save.mutateAsync({
+      ...bioField(source, values[source], machine[source]),
+      ...(translation.trim() ? bioField(missing, translation, true) : {}),
+    });
+    return translation.trim() ? null : missing;
+  }
+
+  return {
+    saveBio,
+    translateFrom,
+    save,
+    pending: save.isPending || translate.isPending,
+  };
 }
 
 function time(iso: string | null | undefined): number | null {
@@ -113,11 +191,13 @@ function BioCard({
   title,
   text,
   editLabel,
+  disabled = false,
   onEdit,
 }: {
   title: string;
   text: string;
   editLabel: string;
+  disabled?: boolean;
   onEdit: () => void;
 }) {
   const t = useT();
@@ -125,7 +205,7 @@ function BioCard({
     <div className="flex flex-col gap-1.5">
       <span className="text-sm font-medium text-navy">{title}</span>
       <div
-        onClick={onEdit}
+        onClick={disabled ? undefined : onEdit}
         className="relative min-h-24 cursor-pointer rounded-md border border-grey bg-sunken px-3 py-2 pr-11"
       >
         <p className="whitespace-pre-wrap break-words text-ink">
@@ -138,11 +218,12 @@ function BioCard({
         <button
           type="button"
           aria-label={editLabel}
+          disabled={disabled}
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
           }}
-          className="absolute right-1.5 top-1.5 rounded-md p-1.5 text-slate hover:bg-navy-tint hover:text-navy"
+          className="absolute right-1.5 top-1.5 rounded-md p-1.5 text-slate hover:bg-navy-tint hover:text-navy disabled:cursor-not-allowed disabled:opacity-50"
         >
           <PenIcon />
         </button>
@@ -154,10 +235,12 @@ function BioCard({
 function BioTextarea({
   label,
   value,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: string;
+  disabled?: boolean;
   onChange: (v: string) => void;
 }) {
   return (
@@ -167,6 +250,8 @@ function BioTextarea({
           {...p}
           rows={5}
           autoFocus
+          disabled={disabled}
+          className={LOCKED_TEXTAREA}
           maxLength={MAX_BIO}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -189,18 +274,20 @@ function BioDraftModal({
   request,
   draft,
   usage,
+  lock,
   onBack,
   onSaved,
 }: {
   request: DraftRequest;
   draft: ReturnType<typeof useBioDraft>;
   usage: BioAiUsage | undefined;
+  lock: SaveLock;
   onBack: () => void;
-  onSaved: () => void;
+  onSaved: (untranslated: Lang | null) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const save = useUpdateProfile();
+  const { saveBio, save, pending } = useSaveBio();
   const [edits, setEdits] = useState<Partial<Record<Lang, string>>>({});
   const [editing, setEditing] = useState<Record<Lang, boolean>>({
     en: false,
@@ -216,32 +303,41 @@ function BioDraftModal({
     Boolean(valueOf(lang).trim());
 
   async function onSave() {
-    const body: UpdateProfileBody = {
-      bioEn: valueOf('en').trim() ? valueOf('en') : null,
-      bioZh: valueOf('zh').trim() ? valueOf('zh') : null,
-      bioEnMachineTranslated: machine('en'),
-      bioZhMachineTranslated: machine('zh'),
-    };
-    await save.mutateAsync(body);
-    onSaved();
+    await lock.hold(async () =>
+      onSaved(
+        await saveBio(
+          { en: valueOf('en'), zh: valueOf('zh') },
+          { en: machine('en'), zh: machine('zh') },
+        ),
+      ),
+    );
   }
 
   const error = draft.isError ? bioDraftError(draft.error) : null;
+  const close = () => {
+    if (!lock.locked) onBack();
+  };
 
   return (
     <Modal
       title={t.bio.modalTitle}
-      onClose={onBack}
+      onClose={close}
       size="lg"
       footer={
         <>
-          <Button type="button" variant="ghost" onClick={onBack}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={lock.locked}
+            onClick={close}
+          >
             {t.common.back}
           </Button>
           {result && (
             <Button
               type="button"
-              loading={save.isPending}
+              disabled={lock.locked}
+              loading={pending}
               onClick={() => void onSave().catch(() => undefined)}
             >
               {t.common.save}
@@ -280,6 +376,7 @@ function BioDraftModal({
                   <BioTextarea
                     label={titleOf(t, lang)}
                     value={valueOf(lang)}
+                    disabled={lock.locked}
                     onChange={(v) => setEdits((e) => ({ ...e, [lang]: v }))}
                   />
                 ) : (
@@ -287,6 +384,7 @@ function BioDraftModal({
                     title={titleOf(t, lang)}
                     text={valueOf(lang)}
                     editLabel={editLabelOf(t, lang)}
+                    disabled={lock.locked}
                     onEdit={() => setEditing((e) => ({ ...e, [lang]: true }))}
                   />
                 )}
@@ -300,24 +398,29 @@ function BioDraftModal({
   );
 }
 
-/** Saved bio in one language, edited in place; saving sends only this side. */
+/** Saved bio in one language, edited in place; an empty other side is machine-translated. */
 function SavedBioCard({
   lang,
   profile,
   stale,
   usage,
+  lock,
   onUpdateTranslation,
+  onSaved,
 }: {
   lang: Lang;
   profile: InstructorProfile;
   stale: boolean;
   usage: BioAiUsage | undefined;
+  lock: SaveLock;
   onUpdateTranslation: () => void;
+  onSaved: (untranslated: Lang | null) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const save = useUpdateProfile();
+  const { saveBio, translateFrom, save, pending } = useSaveBio();
   const [value, setValue] = useState<string | null>(null);
+  const [notCleared, setNotCleared] = useState(false);
   const saved = bioOf(profile, lang);
   const machineModel =
     lang === 'en'
@@ -329,16 +432,33 @@ function SavedBioCard({
         : null;
   const exhausted = usage?.remaining === 0;
 
-  async function onSave() {
+  async function saveEdit() {
     if (value === null) return;
-    const text = value.trim() ? value : null;
-    const body: UpdateProfileBody =
-      lang === 'en'
-        ? { bioEn: text, bioEnMachineTranslated: false }
-        : { bioZh: text, bioZhMachineTranslated: false };
-    await save.mutateAsync(body);
+    const other = otherLang(lang);
+    const otherSaved = bioOf(profile, other);
+    setNotCleared(false);
+    if (!value.trim() && otherSaved.trim()) {
+      const translation = await translateFrom(other, otherSaved);
+      if (!translation.trim()) {
+        setNotCleared(true);
+        return;
+      }
+      await save.mutateAsync({
+        ...bioField(other, otherSaved, machineOf(profile, other)),
+        ...bioField(lang, translation, true),
+      });
+      onSaved(null);
+    } else if (value.trim() && !otherSaved.trim()) {
+      const values = { [lang]: value, [other]: '' } as Record<Lang, string>;
+      onSaved(await saveBio(values));
+    } else {
+      await save.mutateAsync(bioField(lang, value, false));
+      onSaved(null);
+    }
     setValue(null);
   }
+
+  const onSave = () => lock.hold(saveEdit);
 
   return (
     <div className="flex flex-col gap-2">
@@ -347,6 +467,7 @@ function SavedBioCard({
           title={titleOf(t, lang)}
           text={saved}
           editLabel={editLabelOf(t, lang)}
+          disabled={lock.locked}
           onEdit={() => setValue(saved)}
         />
       ) : (
@@ -354,16 +475,23 @@ function SavedBioCard({
           <BioTextarea
             label={titleOf(t, lang)}
             value={value}
-            onChange={setValue}
+            disabled={lock.locked}
+            onChange={(v) => {
+              setValue(v);
+              setNotCleared(false);
+            }}
           />
+          {notCleared && <Banner tone="pending">{t.bio.notCleared}</Banner>}
           {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              disabled={lock.locked}
               onClick={() => {
                 setValue(null);
+                setNotCleared(false);
                 save.reset();
               }}
             >
@@ -373,7 +501,8 @@ function SavedBioCard({
               type="button"
               variant="secondary"
               size="sm"
-              loading={save.isPending}
+              disabled={lock.locked}
+              loading={pending}
               onClick={() => void onSave().catch(() => undefined)}
             >
               {t.common.save}
@@ -393,7 +522,7 @@ function SavedBioCard({
               type="button"
               variant="secondary"
               size="sm"
-              disabled={exhausted}
+              disabled={exhausted || lock.locked}
               onClick={onUpdateTranslation}
             >
               {t.bio.updateTranslation}
@@ -409,16 +538,19 @@ function SavedBioCard({
   );
 }
 
-/** Instructor bio: write once, refine or translate with AI, review, save. */
+/** Instructor bio in both languages; an empty one is machine-translated on save. */
 export function BioSection({ profile }: { profile: InstructorProfile }) {
   const t = useT();
   const { locale } = useLocale();
   const usage = useBioAiUsage();
   const draft = useBioDraft();
+  const { saveBio, save, pending } = useSaveBio();
+  const lock = useSaveLock();
   const hasBio = Boolean(profile.bioEn?.trim() || profile.bioZh?.trim());
   const [composing, setComposing] = useState(false);
-  const [text, setText] = useState('');
+  const [texts, setTexts] = useState<Record<Lang, string>>({ en: '', zh: '' });
   const [request, setRequest] = useState<DraftRequest | null>(null);
+  const [untranslated, setUntranslated] = useState<Lang | null>(null);
   const exhausted = usage.data?.remaining === 0;
   const stale = hasBio ? staleSide(profile) : null;
 
@@ -432,18 +564,35 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
     draft.reset();
   }
 
+  function finish(missing: Lang | null) {
+    setUntranslated(missing);
+    setComposing(false);
+    setTexts({ en: '', zh: '' });
+  }
+
   function startRewrite() {
     const preferred: Lang = profile.preferredLanguage === 'zh-CN' ? 'zh' : 'en';
-    const other: Lang = preferred === 'en' ? 'zh' : 'en';
-    setText(bioOf(profile, preferred) || bioOf(profile, other));
+    const lang = bioOf(profile, preferred) ? preferred : otherLang(preferred);
+    setTexts({ en: '', zh: '', [lang]: bioOf(profile, lang) });
+    save.reset();
     setComposing(true);
   }
 
+  async function onSave() {
+    await lock.hold(async () => finish(await saveBio(texts)));
+  }
+
   const showComposer = !hasBio || composing;
-  const canAsk = Boolean(text.trim()) && !exhausted;
+  const refineText = LANGS.map((lang) => texts[lang].trim())
+    .filter(Boolean)
+    .join('\n\n');
+  const canAsk =
+    Boolean(refineText) && refineText.length <= MAX_BIO_SOURCE && !exhausted;
 
   return (
     <div className="flex flex-col gap-4">
+      {untranslated && <Banner tone="pending">{t.bio.notTranslated}</Banner>}
+
       {hasBio && (
         <div className="grid gap-4 md:grid-cols-2">
           {LANGS.map((lang) => (
@@ -453,8 +602,10 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               profile={profile}
               stale={stale === lang}
               usage={usage.data}
+              lock={lock}
+              onSaved={setUntranslated}
               onUpdateTranslation={() => {
-                const source: Lang = lang === 'en' ? 'zh' : 'en';
+                const source = otherLang(lang);
                 start({
                   text: bioOf(profile, source),
                   mode: 'translate',
@@ -472,6 +623,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
             type="button"
             variant="secondary"
             size="sm"
+            disabled={lock.locked}
             onClick={startRewrite}
           >
             {t.bio.rewrite}
@@ -481,49 +633,60 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
 
       {showComposer && (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-slate">{t.bio.composeHint}</p>
-          <div className="relative">
-            <Field
-              label={t.bio.composeLabel}
-              hint={`${text.length}/${MAX_BIO_SOURCE}`}
-            >
-              {(p) => (
-                <Textarea
-                  {...p}
-                  rows={6}
-                  maxLength={MAX_BIO_SOURCE}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                />
-              )}
-            </Field>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-slate">{t.bio.composeHint}</p>
             {hasBio && (
               <button
                 type="button"
-                onClick={() => setText('')}
-                className="absolute right-0 top-0 text-sm font-medium text-navy underline-offset-2 hover:underline"
+                disabled={lock.locked}
+                onClick={() => setTexts({ en: '', zh: '' })}
+                className="text-sm font-medium text-navy underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t.bio.clear}
               </button>
             )}
           </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {LANGS.map((lang) => (
+              <Field
+                key={lang}
+                label={titleOf(t, lang)}
+                hint={`${texts[lang].length}/${MAX_BIO}`}
+              >
+                {(p) => (
+                  <Textarea
+                    {...p}
+                    rows={6}
+                    disabled={lock.locked}
+                    className={LOCKED_TEXTAREA}
+                    maxLength={MAX_BIO}
+                    value={texts[lang]}
+                    onChange={(e) =>
+                      setTexts((v) => ({ ...v, [lang]: e.target.value }))
+                    }
+                  />
+                )}
+              </Field>
+            ))}
+          </div>
+          {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
           <p className="text-xs text-slate">{t.bio.actionsHint}</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Button
               type="button"
-              variant="secondary"
-              disabled={!canAsk}
-              onClick={() => start({ text, mode: 'refine' })}
+              disabled={!refineText || lock.locked}
+              loading={pending}
+              onClick={() => void onSave().catch(() => undefined)}
             >
-              {t.bio.refine}
+              {t.common.save}
             </Button>
             <Button
               type="button"
               variant="secondary"
-              disabled={!canAsk}
-              onClick={() => start({ text, mode: 'translate' })}
+              disabled={!canAsk || lock.locked}
+              onClick={() => start({ text: refineText, mode: 'refine' })}
             >
-              {t.bio.useAsWritten}
+              {t.bio.refine}
             </Button>
             <UsageCount usage={usage.data} />
             {hasBio && (
@@ -531,6 +694,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
                 type="button"
                 variant="ghost"
                 className="ml-auto"
+                disabled={lock.locked}
                 onClick={() => setComposing(false)}
               >
                 {t.common.cancel}
@@ -550,11 +714,11 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
           request={request}
           draft={draft}
           usage={usage.data}
+          lock={lock}
           onBack={closeModal}
-          onSaved={() => {
+          onSaved={(missing) => {
             closeModal();
-            setComposing(false);
-            setText('');
+            finish(missing);
           }}
         />
       )}

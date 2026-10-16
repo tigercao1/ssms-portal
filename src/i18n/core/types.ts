@@ -195,11 +195,11 @@ export interface Messages {
     slotRemovePhoto: string;
   };
   bio: {
-    composeLabel: string;
     composeHint: string;
     actionsHint: string;
     refine: string;
-    useAsWritten: string;
+    notTranslated: string;
+    notCleared: string;
     remaining: string;
     limitReached: string;
     limitReachedNoTime: string;
