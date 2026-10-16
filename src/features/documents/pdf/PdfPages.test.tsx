@@ -112,10 +112,14 @@ describe('PdfPages', () => {
         },
       ],
     });
+    await waitFor(() =>
+      expect(overlays.filter((o) => o.pageNumber === 2).at(-1)?.isVisible).toBe(
+        true,
+      ),
+    );
     const second = overlays.filter((o) => o.pageNumber === 2).at(-1)!;
     expect(second.rotate).toBe(90);
     expect(second.geometry.height).toBeCloseTo((612 / 792) * 612);
-    expect(second.isVisible).toBe(true);
     await waitFor(() => expect(renders.length).toBeGreaterThanOrEqual(2));
   });
 
