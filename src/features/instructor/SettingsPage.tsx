@@ -1,28 +1,27 @@
 import { useState } from 'react';
-import { useT, useLocale } from '@/i18n/core/I18nProvider';
+import { useT } from '@/i18n/core/I18nProvider';
 import { useSession } from '@/auth/SessionProvider';
-import { Banner, Card, Field, Select } from '@/components';
-import { persistPreferredLanguage } from './api';
-import type { Locale } from '@/i18n/core/types';
+import { Banner, Card, Field, Select, Spinner } from '@/components';
+import { useMyProfile, useUpdateProfile } from './api';
+import type { PreferredLanguage } from '@/lib/types';
 
-/** W2.4 — language preference (persisted to profile) + account info. */
+/** W2.4 — email language preference (persisted to profile) + account info. */
 export function SettingsPage() {
   const t = useT();
-  const { locale, setLocale } = useLocale();
   const { user } = useSession();
+  const { data: profile, isLoading, isError } = useMyProfile();
+  const update = useUpdateProfile();
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState(false);
+  const selected =
+    (update.isPending && update.variables.preferredLanguage) ||
+    profile?.preferredLanguage;
 
-  async function changeLanguage(next: Locale) {
-    setLocale(next);
+  function changeLanguage(next: PreferredLanguage) {
     setSaved(false);
-    setError(false);
-    try {
-      await persistPreferredLanguage(next);
-      setSaved(true);
-    } catch {
-      setError(true);
-    }
+    update.mutate(
+      { preferredLanguage: next },
+      { onSuccess: () => setSaved(true) },
+    );
   }
 
   return (
@@ -30,20 +29,36 @@ export function SettingsPage() {
       <h1 className="text-3xl">{t.settings.title}</h1>
 
       <Card className="flex flex-col gap-4">
-        <Field label={t.settings.languageLabel} hint={t.settings.languageHint}>
-          {(p) => (
-            <Select
-              {...p}
-              value={locale}
-              onChange={(e) => changeLanguage(e.target.value as Locale)}
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <Spinner className="h-6 w-6" />
+          </div>
+        ) : isError || !profile ? (
+          <Banner tone="error">{t.errors.generic}</Banner>
+        ) : (
+          <>
+            <Field
+              label={t.settings.emailLanguageLabel}
+              hint={t.settings.emailLanguageHint}
             >
-              <option value="en">{t.common.english}</option>
-              <option value="zh-CN">{t.common.chinese}</option>
-            </Select>
-          )}
-        </Field>
-        {saved && <Banner tone="approved">{t.common.saved}</Banner>}
-        {error && <Banner tone="error">{t.errors.generic}</Banner>}
+              {(p) => (
+                <Select
+                  {...p}
+                  value={selected}
+                  disabled={update.isPending}
+                  onChange={(e) =>
+                    changeLanguage(e.target.value as PreferredLanguage)
+                  }
+                >
+                  <option value="en">{t.common.english}</option>
+                  <option value="zh-CN">{t.common.chinese}</option>
+                </Select>
+              )}
+            </Field>
+            {saved && <Banner tone="approved">{t.common.saved}</Banner>}
+            {update.isError && <Banner tone="error">{t.errors.generic}</Banner>}
+          </>
+        )}
       </Card>
 
       <Card className="flex flex-col gap-1">

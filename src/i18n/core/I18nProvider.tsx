@@ -30,8 +30,8 @@ function initialLocale(): Locale {
 
 /**
  * i18n provider (W1.5). Holds the active locale, persists it, and sets the
- * document `lang` so the CJK font (tokens.css `:lang`) applies for zh-CN. The
- * instructor's `preferred_language` is synced into this on profile load (W2.4).
+ * document `lang` so the CJK font (tokens.css `:lang`) applies for zh-CN. This
+ * is a local display choice, separate from the instructor's `preferred_language`.
  */
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);

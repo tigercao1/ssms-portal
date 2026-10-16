@@ -231,7 +231,8 @@ export const en: Messages = {
   settings: {
     title: 'Settings',
     languageLabel: 'Preferred language',
-    languageHint: 'Used across the portal and saved to your profile.',
+    emailLanguageLabel: 'Email language',
+    emailLanguageHint: 'Language for emails from SSMS. To change the website language, use the language switch in the header.',
     account: 'Account',
     signedInAs: 'Signed in as',
   },

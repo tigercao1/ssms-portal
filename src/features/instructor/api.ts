@@ -176,13 +176,3 @@ export function useRemovePhoto(slot: ExtraPhotoSlot) {
     },
   });
 }
-
-/** Helper used by Settings (W2.4) to persist preferred language. */
-export async function persistPreferredLanguage(
-  preferredLanguage: 'en' | 'zh-CN',
-): Promise<InstructorProfile> {
-  return api<InstructorProfile>('/me/instructor', {
-    method: 'PATCH',
-    body: { preferredLanguage },
-  });
-}
