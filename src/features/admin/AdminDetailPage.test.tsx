@@ -39,8 +39,17 @@ function serveRecord(
   };
   let role = initialRole;
   const activationBodies: unknown[] = [];
+  const approvalBodies: unknown[] = [];
   const roleBodies: unknown[] = [];
   server.use(
+    http.patch(`${API}/admin/instructors/:id/approval`, async ({ request }) => {
+      const body = (await request.json()) as {
+        approvalStatus: AdminInstructorRecord['approvalStatus'];
+      };
+      approvalBodies.push(body);
+      record = { ...record, approvalStatus: body.approvalStatus };
+      return HttpResponse.json(record);
+    }),
     http.get(`${API}/admin/instructors/:id`, () => HttpResponse.json(record)),
     http.get(`${API}/admin/instructors/:id/profile`, () =>
       HttpResponse.json(profile),
@@ -114,7 +123,14 @@ function serveRecord(
       });
     }),
   );
-  return { activationBodies, roleBodies, profileBodies, calls, uploads };
+  return {
+    activationBodies,
+    approvalBodies,
+    roleBodies,
+    profileBodies,
+    calls,
+    uploads,
+  };
 }
 
 function renderDetail() {
@@ -200,6 +216,101 @@ describe('AdminDetailPage actions', () => {
     expect(
       screen.queryByRole('button', { name: 'Take offline' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows the rejected status right after rejecting', async () => {
+    const { approvalBodies } = serveRecord({ approvalStatus: 'pending' });
+    renderDetail();
+
+    await userEvent.type(
+      await screen.findByLabelText('Reason (optional)'),
+      'Missing certs',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(await screen.findByText('Rejected')).toBeInTheDocument();
+    expect(screen.queryByText('Pending')).not.toBeInTheDocument();
+    expect(approvalBodies).toEqual([
+      { approvalStatus: 'rejected', reason: 'Missing certs' },
+    ]);
+    expect(
+      screen.queryByRole('button', { name: 'Reject' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('refetches the status when the approval request fails after saving', async () => {
+    serveRecord({ approvalStatus: 'pending' });
+    let record: AdminInstructorRecord = {
+      ...(fakeAdminList[0] as AdminInstructorRecord),
+      approvalStatus: 'pending',
+    };
+    server.use(
+      http.get(`${API}/admin/instructors/:id`, () => HttpResponse.json(record)),
+      http.patch(`${API}/admin/instructors/:id/approval`, () => {
+        record = { ...record, approvalStatus: 'rejected' };
+        return HttpResponse.json({}, { status: 500 });
+      }),
+    );
+    renderDetail();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Reject' }),
+    );
+
+    expect(await screen.findByText('Rejected')).toBeInTheDocument();
+  });
+
+  it('re-approves a rejected instructor only after confirming', async () => {
+    const { approvalBodies } = serveRecord({ approvalStatus: 'rejected' });
+    renderDetail();
+
+    expect(await screen.findByText('Rejected')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Approve' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reject' }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Re-approve' }));
+    expect(screen.getByText(/notified by email/)).toBeInTheDocument();
+    expect(approvalBodies).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(approvalBodies).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Re-approve' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() =>
+      expect(approvalBodies).toEqual([{ approvalStatus: 'approved' }]),
+    );
+    expect(
+      await screen.findByText('Active', { selector: '.text-status-approved' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Re-approve' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows an error when re-approval fails', async () => {
+    serveRecord({ approvalStatus: 'rejected' });
+    server.use(
+      http.patch(`${API}/admin/instructors/:id/approval`, () =>
+        HttpResponse.json({}, { status: 400 }),
+      ),
+    );
+    renderDetail();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Re-approve' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    expect(
+      await screen.findByText('Something went wrong.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Rejected')).toBeInTheDocument();
   });
 
   it('shows an error when the approval request fails', async () => {

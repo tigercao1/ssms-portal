@@ -254,6 +254,8 @@ export interface Messages {
     approve: string;
     reject: string;
     rejectReason: string;
+    reapprove: string;
+    reapproveConfirm: string;
     takeOffline: string;
     putOnline: string;
     takeOfflineConfirm: string;
@@ -1213,6 +1215,8 @@ export interface Messages {
     cardLockedBody: string;
     rejectedTitle: string;
     rejectedBody: string;
+    deactivatedTitle: string;
+    deactivatedBody: string;
   };
   signer: {
     signatureTitle: string;

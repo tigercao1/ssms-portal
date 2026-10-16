@@ -120,7 +120,7 @@ export function OnboardingDocumentPage() {
         <Spinner className="h-7 w-7" />
       </div>
     );
-  const lockReason = lockReasonOf(doc.error);
+  const lockReason = lockReasonOf(doc.error) ?? lockReasonOf(complete.error);
   if (lockReason)
     return (
       <div className="flex flex-col gap-4">

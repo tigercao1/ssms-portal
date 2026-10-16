@@ -264,6 +264,9 @@ export const en: Messages = {
     approve: 'Approve',
     reject: 'Reject',
     rejectReason: 'Reason (optional)',
+    reapprove: 'Re-approve',
+    reapproveConfirm:
+      'Re-approve this instructor? They are notified by email and their onboarding opens.',
     takeOffline: 'Take offline',
     putOnline: 'Put online',
     takeOfflineConfirm:
@@ -1236,6 +1239,9 @@ export const en: Messages = {
     cardLockedBody: "{docs} documents to sign and {certs} certifications to upload. We'll email you when you can start.",
     rejectedTitle: "Your profile wasn't approved",
     rejectedBody: 'Contact SSnow if you think this is a mistake.',
+    deactivatedTitle: 'Your profile is deactivated',
+    deactivatedBody:
+      "You can't sign documents or upload certificates while deactivated. Your past lessons and pay are still under Lessons & pay.",
   },
   signer: {
     signatureTitle: 'Your signature',

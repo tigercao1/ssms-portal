@@ -475,3 +475,74 @@ describe('locked onboarding for a rejected instructor', () => {
     expect(screen.getByText('如有疑问，请联系 SSnow。')).toBeInTheDocument();
   });
 });
+
+describe('locked onboarding for a deactivated instructor', () => {
+  it('shows the deactivated banner with no rows or upload actions', async () => {
+    state.meIsActive = false;
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByText('Your profile is deactivated'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/can't sign documents or upload certificates/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Your profile is being reviewed'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the deactivated lock even for an approved profile', async () => {
+    state.meIsActive = false;
+    state.meApprovalStatus = 'approved';
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByText('Your profile is deactivated'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Upload:/)).not.toBeInTheDocument();
+  });
+
+  it('shows a deactivated profile card in en and zh', async () => {
+    state.meIsActive = false;
+    const { unmount } = renderWithProviders(<OnboardingCard />);
+    expect(
+      await screen.findByRole('heading', { name: 'Onboarding' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Your profile is deactivated')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Unlocks when your profile is approved'),
+    ).not.toBeInTheDocument();
+    unmount();
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<OnboardingCard />);
+    expect(await screen.findByText('您的资料已下线')).toBeInTheDocument();
+    expect(
+      screen.getByText(/下线期间无法签署文件或上传证书/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the deactivated lock when an upload is refused', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<OnboardingPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Upload: CASI Carving Level 1',
+      }),
+    );
+    state.meIsActive = false;
+    const dialog = screen.getByRole('dialog');
+    await user.upload(
+      within(dialog).getByLabelText(/Certificate file/),
+      sizedFile('c.pdf', 'application/pdf', 10),
+    );
+    await user.type(within(dialog).getByLabelText(/Valid until/), '2027-01-01');
+    await user.click(within(dialog).getByRole('button', { name: 'Upload' }));
+    expect(
+      await within(dialog).findByText('Your profile is deactivated'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByText('Upload failed. Try again.'),
+    ).not.toBeInTheDocument();
+  });
+});

@@ -4,13 +4,17 @@ import { useT } from '@/i18n/core/I18nProvider';
 import type { MyChecklist } from '../api';
 import { ProgressBar } from './ProgressBar';
 import { checklistProgress, useMyChecklist } from './queries';
-import { LockIcon } from './Locked';
+import { LockIcon, lockText } from './Locked';
 
 function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
   const t = useT();
-  const rejected = checklist.lockReason === 'rejected';
-  const total = rejected ? 0 : checklist.items.length;
+  const closed =
+    checklist.lockReason === 'rejected' ||
+    checklist.lockReason === 'deactivated';
+  const total = closed ? 0 : checklist.items.length;
   const docs = checklist.items.filter((i) => i.type === 'document').length;
+  const [closedTitle, closedBody] =
+    closed && checklist.lockReason ? lockText(checklist.lockReason, t) : [];
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-dashed border-grey bg-sunken p-5">
       <div className="flex items-center gap-3">
@@ -24,15 +28,11 @@ function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
               : t.onboarding.cardTitle}
           </h2>
           <p className="text-sm text-slate">
-            {rejected
-              ? t.onboarding.rejectedTitle
-              : t.onboarding.cardLockedUnlocks}
+            {closedTitle ?? t.onboarding.cardLockedUnlocks}
           </p>
         </div>
       </div>
-      {rejected && (
-        <p className="text-sm text-slate">{t.onboarding.rejectedBody}</p>
-      )}
+      {closedBody && <p className="text-sm text-slate">{closedBody}</p>}
       {total > 0 && (
         <p className="text-sm text-slate">
           {t.onboarding.cardLockedBody

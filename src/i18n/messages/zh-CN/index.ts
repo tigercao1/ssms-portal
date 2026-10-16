@@ -253,6 +253,8 @@ export const zhCN: Messages = {
     approve: '通过',
     reject: '拒绝',
     rejectReason: '原因（可选）',
+    reapprove: '重新通过',
+    reapproveConfirm: '确定重新通过该教练？系统会发邮件通知教练，并开放入职资料。',
     takeOffline: '下线',
     putOnline: '重新上线',
     takeOfflineConfirm: '确定下线该教练？其资料将不在公开目录中显示，并会通过邮件通知教练。',
@@ -1212,6 +1214,8 @@ export const zhCN: Messages = {
     cardLockedBody: '审核通过后即可填写 {docs} 份文件并上传 {certs} 份证书。',
     rejectedTitle: '您的资料未通过审核',
     rejectedBody: '如有疑问，请联系 SSnow。',
+    deactivatedTitle: '您的资料已下线',
+    deactivatedBody: '下线期间无法签署文件或上传证书。过往课程和工资仍可在“课程与工资”中查看。',
   },
   signer: {
     signatureTitle: '您的签名',
