@@ -497,6 +497,7 @@ function CertUploadReviewRow({
   const noteEdited = trimmedNote !== (u.reviewNote ?? '');
   const unchangedApproval =
     u.reviewStatus === 'approved' && !dateChanged && !noteEdited;
+  const rejected = u.reviewStatus === 'rejected';
 
   function submit(reviewStatus: CertUpload['reviewStatus']) {
     if (!dateValid) return;
@@ -577,22 +578,31 @@ function CertUploadReviewRow({
         </label>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" onClick={view}>
-          {t.documents.viewFile}
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          loading={
-            review.isPending && review.variables?.reviewStatus === 'approved'
-          }
-          disabled={!dateValid || review.isPending || unchangedApproval}
-          onClick={() => submit('approved')}
-        >
-          {u.reviewStatus === 'approved' && dateChanged
-            ? t.documents.saveDate
-            : t.documents.approve}
-        </Button>
+        {rejected ? (
+          <p className="self-center text-xs text-slate">
+            {t.documents.fileDeletedAfterReject}
+          </p>
+        ) : (
+          <>
+            <Button size="sm" variant="ghost" onClick={view}>
+              {t.documents.viewFile}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={
+                review.isPending &&
+                review.variables?.reviewStatus === 'approved'
+              }
+              disabled={!dateValid || review.isPending || unchangedApproval}
+              onClick={() => submit('approved')}
+            >
+              {u.reviewStatus === 'approved' && dateChanged
+                ? t.documents.saveDate
+                : t.documents.approve}
+            </Button>
+          </>
+        )}
         <Button
           size="sm"
           variant="ghost"

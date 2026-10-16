@@ -375,10 +375,9 @@ describe('InstructorDocumentsSection — certification uploads', () => {
     );
   });
 
-  it('clears an old rejection note when the note box is emptied', async () => {
+  it('clears an old review note when the note box is emptied', async () => {
     state.certUploads[0] = fakeCertUpload({
       id: 'cu-pending',
-      reviewStatus: 'rejected',
       reviewNote: 'Photo is blurry',
       validUntil: daysFromToday(10),
     });
@@ -395,6 +394,55 @@ describe('InstructorDocumentsSection — certification uploads', () => {
       ]),
     );
     await waitFor(() => expect(state.certUploads[0]?.reviewNote).toBeNull());
+  });
+
+  it('shows a rejected upload as deleted and only lets its note be re-saved', async () => {
+    state.certUploads[0] = fakeCertUpload({
+      id: 'cu-pending',
+      reviewStatus: 'rejected',
+      reviewNote: 'Photo is blurry',
+      validUntil: daysFromToday(10),
+    });
+    const user = userEvent.setup();
+    renderSection();
+    const csia = await screen.findByRole('listitem', { name: 'CSIA' });
+    expect(
+      within(csia).getByText('File deleted after rejection'),
+    ).toBeInTheDocument();
+    expect(
+      within(csia).queryByRole('button', { name: 'View file' }),
+    ).toBeNull();
+    expect(within(csia).queryByRole('button', { name: 'Approve' })).toBeNull();
+    const note = within(csia).getByLabelText('Note to instructor');
+    await user.clear(note);
+    expect(within(csia).getByRole('button', { name: 'Reject' })).toBeDisabled();
+    await user.type(note, 'Upload the back side too');
+    await user.click(within(csia).getByRole('button', { name: 'Reject' }));
+    await waitFor(() =>
+      expect(reviews).toEqual([
+        {
+          id: 'cu-pending',
+          reviewStatus: 'rejected',
+          reviewNote: 'Upload the back side too',
+        },
+      ]),
+    );
+  });
+
+  it('labels a deleted rejected file in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    state.certUploads[0] = fakeCertUpload({
+      id: 'cu-pending',
+      reviewStatus: 'rejected',
+      reviewNote: 'Photo is blurry',
+      validUntil: daysFromToday(10),
+    });
+    renderSection();
+    const row = (await screen.findByText('文件已在驳回后删除')).closest('li');
+    expect(row).not.toBeNull();
+    expect(
+      within(row as HTMLElement).queryByRole('button', { name: '查看文件' }),
+    ).toBeNull();
   });
 
   it('lets an approved upload save only a changed date', async () => {

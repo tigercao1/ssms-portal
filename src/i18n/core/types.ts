@@ -724,6 +724,7 @@ export interface Messages {
     reviewNote: string;
     reviewNoteHint: string;
     viewFile: string;
+    fileDeletedAfterReject: string;
     templateStatusDraft: string;
     templateStatusLive: string;
     templateStatusRetired: string;
