@@ -59,7 +59,6 @@ function bioField(
     : { bioZh: value, bioZhMachineTranslated: machine };
 }
 
-/** Saves both bios; when only one is filled, machine-translates the other first. */
 function useSaveBio() {
   const save = useUpdateProfile();
   const translate = useBioDraft();
