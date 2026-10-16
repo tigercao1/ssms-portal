@@ -9,6 +9,8 @@ import {
   useAdminReferences,
   useDeleteReference,
   useReferenceUsage,
+  useSetActivation,
+  useSetApproval,
   useUpdateReference,
 } from './api';
 
@@ -134,6 +136,44 @@ describe('admin reference hooks', () => {
           ['admin', 'reference', 'languages'],
           ['reference', 'languages'],
         ]),
+      ),
+    );
+  });
+});
+
+describe('instructor status hooks', () => {
+  it('approving refreshes the document templates', async () => {
+    server.use(
+      http.patch(`${API}/admin/instructors/i1/approval`, () =>
+        HttpResponse.json({ id: 'i1' }),
+      ),
+    );
+    const { invalidate, wrapper } = setup();
+    const { result } = renderHook(() => useSetApproval('i1'), { wrapper });
+
+    await act(() => result.current.mutateAsync({ approvalStatus: 'approved' }));
+
+    await waitFor(() =>
+      expect(invalidatedKeys(invalidate)).toEqual(
+        expect.arrayContaining([['admin', 'documents', 'templates']]),
+      ),
+    );
+  });
+
+  it('activating refreshes the document templates', async () => {
+    server.use(
+      http.patch(`${API}/admin/instructors/i1/activation`, () =>
+        HttpResponse.json({ id: 'i1' }),
+      ),
+    );
+    const { invalidate, wrapper } = setup();
+    const { result } = renderHook(() => useSetActivation('i1'), { wrapper });
+
+    await act(() => result.current.mutateAsync(true));
+
+    await waitFor(() =>
+      expect(invalidatedKeys(invalidate)).toEqual(
+        expect.arrayContaining([['admin', 'documents', 'templates']]),
       ),
     );
   });

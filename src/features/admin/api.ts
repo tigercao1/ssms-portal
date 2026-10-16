@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { api, apiWithHeaders } from '@/lib/api';
 import { removePhoto, uploadAvatar } from '@/features/instructor/api';
+import { documentsKeys } from '@/features/documents/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
@@ -119,9 +120,18 @@ function useInvalidate(id: string) {
   };
 }
 
+function useInvalidateWithDocuments(id: string) {
+  const qc = useQueryClient();
+  const sync = useInvalidate(id);
+  return (record: AdminInstructorRecord) => {
+    sync(record);
+    void qc.invalidateQueries({ queryKey: documentsKeys.templates });
+  };
+}
+
 /** W2.9 — approve / reject. */
 export function useSetApproval(id: string) {
-  const sync = useInvalidate(id);
+  const sync = useInvalidateWithDocuments(id);
   return useMutation({
     mutationFn: (vars: {
       approvalStatus: 'approved' | 'rejected';
@@ -137,7 +147,7 @@ export function useSetApproval(id: string) {
 
 /** W2.10 — activate / deactivate. */
 export function useSetActivation(id: string) {
-  const sync = useInvalidate(id);
+  const sync = useInvalidateWithDocuments(id);
   return useMutation({
     mutationFn: (isActive: boolean) =>
       api<AdminInstructorRecord>(`/admin/instructors/${id}/activation`, {
