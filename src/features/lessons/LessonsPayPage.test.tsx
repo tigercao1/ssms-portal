@@ -300,9 +300,10 @@ describe('LessonsPayPage states', () => {
   it('shows one empty card for an approved instructor with no lessons', async () => {
     serve(emptyLessons);
     renderPage();
-    expect(
-      await screen.findByRole('heading', { name: 'No lessons booked yet' }),
-    ).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', {
+      name: 'No lessons booked yet',
+    });
+    expect(heading.parentElement?.querySelector('.bg-sunken')).toBeNull();
     expect(
       screen.getByText(/When the school books you on a lesson/),
     ).toBeInTheDocument();

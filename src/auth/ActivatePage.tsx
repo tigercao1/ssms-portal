@@ -133,8 +133,12 @@ function ExpiredLink({ initialEmail }: { initialEmail: string }) {
     try {
       await resendActivation(trimmed);
       setSent(true);
-    } catch {
-      setError(t.auth.genericError);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 429
+          ? t.activation.resendRateLimited
+          : t.auth.genericError,
+      );
     } finally {
       setBusy(false);
     }
