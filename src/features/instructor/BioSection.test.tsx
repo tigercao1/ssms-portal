@@ -729,6 +729,158 @@ describe('BioSection stale warning', () => {
   });
 });
 
+describe('BioSection while a save is translating', () => {
+  function heldDraft(after = 0) {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    const draft = async () => {
+      if (calls++ >= after) await gate;
+      return HttpResponse.json({
+        en: 'EN draft',
+        zh: '中文稿',
+        sourceLangs: ['en'],
+        model: 'gemini-test',
+        usage: usage(4),
+      });
+    };
+    return { draft, release };
+  }
+
+  it('locks the composer until the translated save lands', async () => {
+    const held = heldDraft();
+    const { patches, drafts } = setup(noBio, { draft: held.draft });
+    const { en, zh } = await compose({ en: 'I teach skiing' });
+    await userEvent.click(saveButton());
+    await waitFor(() => expect(drafts).toHaveLength(1));
+    expect(en).toBeDisabled();
+    expect(zh).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Refine' })).toBeDisabled();
+    await userEvent.type(zh, '我自己写的');
+    await userEvent.type(en, ' more');
+    expect(zh).toHaveValue('');
+    expect(en).toHaveValue('I teach skiing');
+    held.release();
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          bioEn: 'I teach skiing',
+          bioEnMachineTranslated: false,
+          bioZh: '中文稿',
+          bioZhMachineTranslated: true,
+        },
+      ]),
+    );
+  });
+
+  it('locks Rewrite, Clear, Cancel and the saved cards while the rewrite saves', async () => {
+    const held = heldDraft();
+    const { patches } = setup(bothBios, { draft: held.draft });
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Rewrite with AI' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('textbox', { name: 'English' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: '中文' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeDisabled();
+    expect(
+      within(bioCard()).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit English bio' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit Chinese bio' }),
+    ).toBeDisabled();
+    await userEvent.click(screen.getByText('资深教练。'));
+    expect(within(bioCard()).getAllByRole('textbox')).toHaveLength(2);
+    held.release();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await waitFor(() =>
+      expect(within(bioCard()).queryByRole('textbox')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('locks an in-place edit and the other card while its translation is pending', async () => {
+    const held = heldDraft();
+    const { patches } = setup(
+      { ...bothBios, bioZh: null, bioZhMachineTranslated: false },
+      { draft: held.draft },
+    );
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit English bio' }),
+    );
+    const en = screen.getByRole('textbox', { name: 'English' });
+    await userEvent.type(en, ' Today.');
+    await userEvent.click(saveButton());
+    expect(en).toBeDisabled();
+    expect(
+      within(bioCard()).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit Chinese bio' }),
+    ).toBeDisabled();
+    await userEvent.type(en, ' Lost?');
+    expect(en).toHaveValue('Veteran instructor. Today.');
+    held.release();
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          bioEn: 'Veteran instructor. Today.',
+          bioEnMachineTranslated: false,
+          bioZh: '中文稿',
+          bioZhMachineTranslated: true,
+        },
+      ]),
+    );
+  });
+
+  it('locks the review cards and Back while a cleared card is translated', async () => {
+    const held = heldDraft(1);
+    const { patches, drafts } = setup(noBio, { draft: held.draft });
+    await compose({ en: 'Hello' });
+    await userEvent.click(screen.getByRole('button', { name: 'Refine' }));
+    await userEvent.click(
+      await within(dialog()).findByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    const zh = within(dialog()).getByRole('textbox', { name: '中文' });
+    await userEvent.clear(zh);
+    await userEvent.click(
+      within(dialog()).getByRole('button', { name: 'Save' }),
+    );
+    await waitFor(() => expect(drafts).toHaveLength(2));
+    expect(zh).toBeDisabled();
+    expect(
+      within(dialog()).getByRole('button', { name: 'Edit English bio' }),
+    ).toBeDisabled();
+    expect(
+      within(dialog()).getByRole('button', { name: 'Back' }),
+    ).toBeDisabled();
+    await userEvent.type(zh, '手写');
+    expect(zh).toHaveValue('');
+    await userEvent.keyboard('{Escape}');
+    expect(dialog()).toBeInTheDocument();
+    held.release();
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          bioEn: 'EN draft',
+          bioEnMachineTranslated: false,
+          bioZh: '中文稿',
+          bioZhMachineTranslated: true,
+        },
+      ]),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+  });
+});
+
 describe('bio helpers', () => {
   it('takes the written languages from the request, else from the draft', () => {
     const draft = {

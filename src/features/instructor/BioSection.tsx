@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Modal, Spinner, Textarea } from '@/components';
 import {
@@ -22,6 +22,7 @@ import {
 
 export const MAX_BIO = 1000;
 export const MAX_BIO_SOURCE = 2000;
+const LOCKED_TEXTAREA = 'disabled:cursor-not-allowed disabled:opacity-60';
 
 type Lang = 'en' | 'zh';
 const LANGS: Lang[] = ['en', 'zh'];
@@ -58,6 +59,21 @@ function bioField(
     ? { bioEn: value, bioEnMachineTranslated: machine }
     : { bioZh: value, bioZhMachineTranslated: machine };
 }
+
+function useSaveLock() {
+  const [holders, setHolders] = useState(0);
+  const hold = useCallback(async <T,>(work: () => Promise<T>) => {
+    setHolders((n) => n + 1);
+    try {
+      return await work();
+    } finally {
+      setHolders((n) => n - 1);
+    }
+  }, []);
+  return { locked: holders > 0, hold };
+}
+
+type SaveLock = ReturnType<typeof useSaveLock>;
 
 function useSaveBio() {
   const save = useUpdateProfile();
@@ -169,11 +185,13 @@ function BioCard({
   title,
   text,
   editLabel,
+  disabled = false,
   onEdit,
 }: {
   title: string;
   text: string;
   editLabel: string;
+  disabled?: boolean;
   onEdit: () => void;
 }) {
   const t = useT();
@@ -181,7 +199,7 @@ function BioCard({
     <div className="flex flex-col gap-1.5">
       <span className="text-sm font-medium text-navy">{title}</span>
       <div
-        onClick={onEdit}
+        onClick={disabled ? undefined : onEdit}
         className="relative min-h-24 cursor-pointer rounded-md border border-grey bg-sunken px-3 py-2 pr-11"
       >
         <p className="whitespace-pre-wrap break-words text-ink">
@@ -194,11 +212,12 @@ function BioCard({
         <button
           type="button"
           aria-label={editLabel}
+          disabled={disabled}
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
           }}
-          className="absolute right-1.5 top-1.5 rounded-md p-1.5 text-slate hover:bg-navy-tint hover:text-navy"
+          className="absolute right-1.5 top-1.5 rounded-md p-1.5 text-slate hover:bg-navy-tint hover:text-navy disabled:cursor-not-allowed disabled:opacity-50"
         >
           <PenIcon />
         </button>
@@ -210,10 +229,12 @@ function BioCard({
 function BioTextarea({
   label,
   value,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: string;
+  disabled?: boolean;
   onChange: (v: string) => void;
 }) {
   return (
@@ -223,6 +244,8 @@ function BioTextarea({
           {...p}
           rows={5}
           autoFocus
+          disabled={disabled}
+          className={LOCKED_TEXTAREA}
           maxLength={MAX_BIO}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -245,12 +268,14 @@ function BioDraftModal({
   request,
   draft,
   usage,
+  lock,
   onBack,
   onSaved,
 }: {
   request: DraftRequest;
   draft: ReturnType<typeof useBioDraft>;
   usage: BioAiUsage | undefined;
+  lock: SaveLock;
   onBack: () => void;
   onSaved: (untranslated: Lang | null) => void;
 }) {
@@ -272,29 +297,40 @@ function BioDraftModal({
     Boolean(valueOf(lang).trim());
 
   async function onSave() {
-    onSaved(
-      await saveBio(
-        { en: valueOf('en'), zh: valueOf('zh') },
-        { en: machine('en'), zh: machine('zh') },
+    await lock.hold(async () =>
+      onSaved(
+        await saveBio(
+          { en: valueOf('en'), zh: valueOf('zh') },
+          { en: machine('en'), zh: machine('zh') },
+        ),
       ),
     );
   }
 
   const error = draft.isError ? bioDraftError(draft.error) : null;
+  const close = () => {
+    if (!lock.locked) onBack();
+  };
 
   return (
     <Modal
       title={t.bio.modalTitle}
-      onClose={onBack}
+      onClose={close}
       size="lg"
       footer={
         <>
-          <Button type="button" variant="ghost" onClick={onBack}>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={lock.locked}
+            onClick={close}
+          >
             {t.common.back}
           </Button>
           {result && (
             <Button
               type="button"
+              disabled={lock.locked}
               loading={pending}
               onClick={() => void onSave().catch(() => undefined)}
             >
@@ -334,6 +370,7 @@ function BioDraftModal({
                   <BioTextarea
                     label={titleOf(t, lang)}
                     value={valueOf(lang)}
+                    disabled={lock.locked}
                     onChange={(v) => setEdits((e) => ({ ...e, [lang]: v }))}
                   />
                 ) : (
@@ -341,6 +378,7 @@ function BioDraftModal({
                     title={titleOf(t, lang)}
                     text={valueOf(lang)}
                     editLabel={editLabelOf(t, lang)}
+                    disabled={lock.locked}
                     onEdit={() => setEditing((e) => ({ ...e, [lang]: true }))}
                   />
                 )}
@@ -360,6 +398,7 @@ function SavedBioCard({
   profile,
   stale,
   usage,
+  lock,
   onUpdateTranslation,
   onSaved,
 }: {
@@ -367,6 +406,7 @@ function SavedBioCard({
   profile: InstructorProfile;
   stale: boolean;
   usage: BioAiUsage | undefined;
+  lock: SaveLock;
   onUpdateTranslation: () => void;
   onSaved: (untranslated: Lang | null) => void;
 }) {
@@ -386,7 +426,7 @@ function SavedBioCard({
         : null;
   const exhausted = usage?.remaining === 0;
 
-  async function onSave() {
+  async function saveEdit() {
     if (value === null) return;
     const other = otherLang(lang);
     const otherSaved = bioOf(profile, other);
@@ -409,6 +449,8 @@ function SavedBioCard({
     setValue(null);
   }
 
+  const onSave = () => lock.hold(saveEdit);
+
   return (
     <div className="flex flex-col gap-2">
       {value === null ? (
@@ -416,6 +458,7 @@ function SavedBioCard({
           title={titleOf(t, lang)}
           text={saved}
           editLabel={editLabelOf(t, lang)}
+          disabled={lock.locked}
           onEdit={() => setValue(saved)}
         />
       ) : (
@@ -423,6 +466,7 @@ function SavedBioCard({
           <BioTextarea
             label={titleOf(t, lang)}
             value={value}
+            disabled={lock.locked}
             onChange={(v) => {
               setValue(v);
               setNotCleared(false);
@@ -435,6 +479,7 @@ function SavedBioCard({
               type="button"
               variant="ghost"
               size="sm"
+              disabled={lock.locked}
               onClick={() => {
                 setValue(null);
                 setNotCleared(false);
@@ -447,6 +492,7 @@ function SavedBioCard({
               type="button"
               variant="secondary"
               size="sm"
+              disabled={lock.locked}
               loading={pending}
               onClick={() => void onSave().catch(() => undefined)}
             >
@@ -467,7 +513,7 @@ function SavedBioCard({
               type="button"
               variant="secondary"
               size="sm"
-              disabled={exhausted}
+              disabled={exhausted || lock.locked}
               onClick={onUpdateTranslation}
             >
               {t.bio.updateTranslation}
@@ -490,6 +536,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
   const usage = useBioAiUsage();
   const draft = useBioDraft();
   const { saveBio, save, pending } = useSaveBio();
+  const lock = useSaveLock();
   const hasBio = Boolean(profile.bioEn?.trim() || profile.bioZh?.trim());
   const [composing, setComposing] = useState(false);
   const [texts, setTexts] = useState<Record<Lang, string>>({ en: '', zh: '' });
@@ -523,7 +570,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
   }
 
   async function onSave() {
-    finish(await saveBio(texts));
+    await lock.hold(async () => finish(await saveBio(texts)));
   }
 
   const showComposer = !hasBio || composing;
@@ -546,6 +593,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               profile={profile}
               stale={stale === lang}
               usage={usage.data}
+              lock={lock}
               onSaved={setUntranslated}
               onUpdateTranslation={() => {
                 const source = otherLang(lang);
@@ -566,6 +614,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
             type="button"
             variant="secondary"
             size="sm"
+            disabled={lock.locked}
             onClick={startRewrite}
           >
             {t.bio.rewrite}
@@ -580,8 +629,9 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
             {hasBio && (
               <button
                 type="button"
+                disabled={lock.locked}
                 onClick={() => setTexts({ en: '', zh: '' })}
-                className="text-sm font-medium text-navy underline-offset-2 hover:underline"
+                className="text-sm font-medium text-navy underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t.bio.clear}
               </button>
@@ -598,6 +648,8 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
                   <Textarea
                     {...p}
                     rows={6}
+                    disabled={lock.locked}
+                    className={LOCKED_TEXTAREA}
                     maxLength={MAX_BIO}
                     value={texts[lang]}
                     onChange={(e) =>
@@ -613,7 +665,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Button
               type="button"
-              disabled={!refineText || pending}
+              disabled={!refineText || lock.locked}
               loading={pending}
               onClick={() => void onSave().catch(() => undefined)}
             >
@@ -622,7 +674,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
             <Button
               type="button"
               variant="secondary"
-              disabled={!canAsk || pending}
+              disabled={!canAsk || lock.locked}
               onClick={() => start({ text: refineText, mode: 'refine' })}
             >
               {t.bio.refine}
@@ -633,6 +685,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
                 type="button"
                 variant="ghost"
                 className="ml-auto"
+                disabled={lock.locked}
                 onClick={() => setComposing(false)}
               >
                 {t.common.cancel}
@@ -652,6 +705,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
           request={request}
           draft={draft}
           usage={usage.data}
+          lock={lock}
           onBack={closeModal}
           onSaved={(missing) => {
             closeModal();
