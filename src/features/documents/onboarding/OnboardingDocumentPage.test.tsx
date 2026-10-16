@@ -361,6 +361,36 @@ describe('OnboardingDocumentPage — sign', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows the deactivated banner instead of the document', async () => {
+    state.meIsActive = false;
+    renderAt('asg-new');
+    expect(
+      await screen.findByText('Your profile is deactivated'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Sign and submit' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the deactivated banner when signing is refused', async () => {
+    const user = userEvent.setup();
+    state.templates.find((t) => t.id === 'tpl-conduct')!.fields = [];
+    renderAt('asg-new');
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: 'I agree to sign this document electronically',
+      }),
+    );
+    state.meIsActive = false;
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    expect(
+      await screen.findByText('Your profile is deactivated'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Sign and submit' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows the review banner instead of the document while pending approval', async () => {
     state.meApprovalStatus = 'pending';
     renderAt('asg-new');

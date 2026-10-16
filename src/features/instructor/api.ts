@@ -21,6 +21,7 @@ export function useMyProfile() {
   return useQuery({
     queryKey: PROFILE_KEY,
     queryFn: () => api<InstructorProfile>('/me/instructor'),
+    refetchOnWindowFocus: 'always',
   });
 }
 

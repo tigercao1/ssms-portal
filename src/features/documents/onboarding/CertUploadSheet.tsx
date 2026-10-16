@@ -11,6 +11,7 @@ import {
   type CertFileError,
 } from './certFile';
 import { useUploadCertification } from './queries';
+import { LockedBanner, lockReasonOf } from './Locked';
 
 interface CertUploadSheetProps {
   open: boolean;
@@ -63,8 +64,10 @@ export function CertUploadSheet({
     );
   };
 
-  const uploadError =
-    upload.error instanceof Error && upload.error.message in t.onboarding
+  const uploadLock = lockReasonOf(upload.error);
+  const uploadError = uploadLock
+    ? null
+    : upload.error instanceof Error && upload.error.message in t.onboarding
       ? t.onboarding[upload.error.message as CertFileError]
       : upload.error
         ? t.onboarding.uploadFailed
@@ -132,6 +135,7 @@ export function CertUploadSheet({
             />
           )}
         </Field>
+        {uploadLock && <LockedBanner reason={uploadLock} />}
         {uploadError && (
           <p role="alert" className="text-sm text-status-rejected">
             {uploadError}

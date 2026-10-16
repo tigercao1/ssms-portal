@@ -19,6 +19,7 @@ export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
     queryKey: documentsKeys.myChecklist,
     queryFn: getMyChecklist,
     enabled,
+    refetchOnWindowFocus: 'always',
   });
 }
 

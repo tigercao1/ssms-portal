@@ -41,6 +41,7 @@ export interface DocumentsMockState {
   pendingInstructorIds: string[];
   meInstructorId: string;
   meApprovalStatus: 'approved' | 'pending' | 'rejected';
+  meIsActive: boolean;
   meCerts: { org: CertOrg; track: CertTrack; level: number }[];
   uploadedSources: Map<string, ArrayBuffer>;
   uploadedCerts: Map<string, ArrayBuffer>;
@@ -61,6 +62,7 @@ export function createDocumentsState(
     pendingInstructorIds: [],
     meInstructorId: 'inst-1',
     meApprovalStatus: 'approved',
+    meIsActive: true,
     meCerts: [
       { org: 'csia', track: 'regular', level: 3 },
       { org: 'casi', track: 'park', level: 2 },
@@ -105,6 +107,15 @@ const notApproved = (status: 'pending' | 'rejected') =>
           message: 'Your profile is pending approval',
           reason: 'pending_approval',
         },
+    { status: 403 },
+  );
+const deactivated = () =>
+  HttpResponse.json(
+    {
+      statusCode: 403,
+      message: 'Your profile is deactivated',
+      reason: 'deactivated',
+    },
     { status: 403 },
   );
 const TEMPLATE_LOCKED =
@@ -516,11 +527,11 @@ export function documentsHandlers(
 
     http.get(`${A}/me/documents`, () =>
       HttpResponse.json(
-        state.meApprovalStatus === 'rejected'
+        !state.meIsActive || state.meApprovalStatus === 'rejected'
           ? {
               season: state.season,
               locked: true,
-              lockReason: 'rejected',
+              lockReason: state.meIsActive ? 'rejected' : 'deactivated',
               items: [],
             }
           : state.meApprovalStatus === 'approved'
@@ -546,6 +557,7 @@ export function documentsHandlers(
       ),
     ),
     http.get(`${A}/me/documents/:assignmentId`, ({ params }) => {
+      if (!state.meIsActive) return deactivated();
       if (state.meApprovalStatus !== 'approved')
         return notApproved(state.meApprovalStatus);
       const a = findAssignment(params.assignmentId);
@@ -578,6 +590,7 @@ export function documentsHandlers(
     http.post(
       `${A}/me/documents/:assignmentId/complete`,
       async ({ params, request }) => {
+        if (!state.meIsActive) return deactivated();
         if (state.meApprovalStatus !== 'approved')
           return notApproved(state.meApprovalStatus);
         const a = findAssignment(params.assignmentId);
@@ -637,6 +650,7 @@ export function documentsHandlers(
     http.post(
       `${A}/me/certification-uploads/upload-url`,
       async ({ request }) => {
+        if (!state.meIsActive) return deactivated();
         if (state.meApprovalStatus !== 'approved')
           return notApproved(state.meApprovalStatus);
         const body = (await request.json()) as CertUploadUrlRequest;
@@ -666,6 +680,7 @@ export function documentsHandlers(
     http.post(
       `${A}/me/certification-uploads/:uploadId/confirm`,
       ({ params }) => {
+        if (!state.meIsActive) return deactivated();
         if (state.meApprovalStatus !== 'approved')
           return notApproved(state.meApprovalStatus);
         const u = state.certUploads.find((x) => x.id === params.uploadId);

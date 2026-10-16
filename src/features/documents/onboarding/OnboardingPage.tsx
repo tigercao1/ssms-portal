@@ -247,8 +247,8 @@ export function OnboardingPage() {
     return (
       <div className="flex flex-col gap-6">
         <h1 className="text-3xl">{t.onboarding.title}</h1>
-        {data.lockReason === 'rejected' ? (
-          <LockedBanner reason="rejected" />
+        {data.lockReason === 'rejected' || data.lockReason === 'deactivated' ? (
+          <LockedBanner reason={data.lockReason} />
         ) : data.items.length === 0 ? (
           <LockedEmpty />
         ) : (

@@ -432,6 +432,33 @@ describe('/me requests for a rejected instructor', () => {
   });
 });
 
+describe('/me requests for a deactivated instructor', () => {
+  it('returns an empty deactivated lock and 403s with reason deactivated', async () => {
+    state.meIsActive = false;
+    expect(await getMyChecklist()).toEqual({
+      season: '2026/27',
+      locked: true,
+      lockReason: 'deactivated',
+      items: [],
+    });
+    const forbidden = { status: 403, body: { reason: 'deactivated' } };
+    await expect(getMyDocument('asg-waiver')).rejects.toMatchObject(forbidden);
+    await expect(
+      completeMyDocument('asg-waiver', { acknowledged: true }),
+    ).rejects.toMatchObject(forbidden);
+    await expect(
+      requestMyCertUpload({
+        org: 'csia',
+        track: 'regular',
+        validUntil: '2027-12-31',
+        contentType: 'image/png',
+        contentLength: 1000,
+      }),
+    ).rejects.toMatchObject(forbidden);
+    await expect(confirmMyCertUpload('cu-1')).rejects.toMatchObject(forbidden);
+  });
+});
+
 describe('validity rules', () => {
   const today = '2026-10-12';
   it.each([

@@ -23,43 +23,74 @@ export function LockIcon({ className }: { className?: string }) {
   );
 }
 
-/** The lock reason when the API refused because the instructor is not approved. */
+const LOCK_STYLES: Record<
+  ChecklistLockReason,
+  { border: string; icon: string }
+> = {
+  pending_approval: {
+    border: 'border-l-status-pending',
+    icon: 'text-status-pending',
+  },
+  rejected: {
+    border: 'border-l-status-rejected',
+    icon: 'text-status-rejected',
+  },
+  deactivated: {
+    border: 'border-l-status-inactive',
+    icon: 'text-status-inactive',
+  },
+};
+
+/** The lock reason when the API refused because the instructor is not approved or is deactivated. */
 export function lockReasonOf(error: unknown): ChecklistLockReason | null {
   if (!(error instanceof ApiError) || error.status !== 403) return null;
   const reason = (error.body as { reason?: unknown } | undefined)?.reason;
-  return reason === 'pending_approval' || reason === 'rejected' ? reason : null;
+  return typeof reason === 'string' && Object.hasOwn(LOCK_STYLES, reason)
+    ? (reason as ChecklistLockReason)
+    : null;
 }
 
-/** Banner for locked onboarding pages: under review, or not approved. */
+/** Banner for locked onboarding pages: under review, not approved, or deactivated. */
 export function LockedBanner({ reason }: { reason: ChecklistLockReason }) {
   const t = useT();
-  const rejected = reason === 'rejected';
+  const style = LOCK_STYLES[reason];
+  const [title, body] = lockText(reason, t);
   return (
     <div
       role="status"
       className={cn(
         'flex items-start gap-3 rounded-md border-l-[3px] bg-surface px-4 py-3 text-sm shadow-card',
-        rejected ? 'border-l-status-rejected' : 'border-l-status-pending',
+        style.border,
       )}
     >
       <span
         className={cn(
           'grid h-7 w-7 flex-none place-items-center rounded-full bg-sunken',
-          rejected ? 'text-status-rejected' : 'text-status-pending',
+          style.icon,
         )}
       >
         <LockIcon />
       </span>
       <div>
-        <p className="font-semibold text-navy">
-          {rejected ? t.onboarding.rejectedTitle : t.onboarding.lockedTitle}
-        </p>
-        <p className="text-ink">
-          {rejected ? t.onboarding.rejectedBody : t.onboarding.lockedBody}
-        </p>
+        <p className="font-semibold text-navy">{title}</p>
+        <p className="text-ink">{body}</p>
       </div>
     </div>
   );
+}
+
+export function lockText(
+  reason: ChecklistLockReason,
+  t: ReturnType<typeof useT>,
+): [title: string, body: string] {
+  switch (reason) {
+    case 'rejected':
+      return [t.onboarding.rejectedTitle, t.onboarding.rejectedBody];
+    case 'deactivated':
+      return [t.onboarding.deactivatedTitle, t.onboarding.deactivatedBody];
+    default:
+      return [t.onboarding.lockedTitle, t.onboarding.lockedBody];
+  }
 }
 
 /** Greyed, non-interactive rows previewing what unlocks on approval. */

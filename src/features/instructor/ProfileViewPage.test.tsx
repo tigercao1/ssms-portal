@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { I18nProvider } from '@/i18n/core/I18nProvider';
 import { ProfileViewPage } from './ProfileViewPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
@@ -138,7 +145,12 @@ describe('ProfileViewPage reference names', () => {
         HttpResponse.json({
           ...fakeProfile,
           teachingLocations: [
-            { id: 'l1', key: 'loc.whistler', name: 'Whistler', nameZh: '惠斯勒' },
+            {
+              id: 'l1',
+              key: 'loc.whistler',
+              name: 'Whistler',
+              nameZh: '惠斯勒',
+            },
           ],
         }),
       ),
@@ -237,5 +249,61 @@ describe('ProfileViewPage more photos', () => {
     renderWithProviders(<ProfileViewPage />);
     expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
     expect(screen.queryByText('More photos')).not.toBeInTheDocument();
+  });
+});
+
+describe('ProfileViewPage approval status', () => {
+  afterEach(() => {
+    focusManager.setFocused(undefined);
+  });
+
+  it('shows the rejected banner and status', async () => {
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, approvalStatus: 'rejected' }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('Rejected')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your profile was not approved/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/pending review/)).not.toBeInTheDocument();
+  });
+
+  it('picks up a rejection when the tab regains focus', async () => {
+    let profile: InstructorProfile = fakeProfile;
+    server.use(
+      http.get(`${API}/me/instructor`, () => HttpResponse.json(profile)),
+    );
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: 30_000,
+          refetchOnWindowFocus: false,
+        },
+      },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <I18nProvider>
+          <MemoryRouter>
+            <ProfileViewPage />
+          </MemoryRouter>
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(/pending review/)).toBeInTheDocument();
+
+    profile = { ...fakeProfile, approvalStatus: 'rejected' };
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    expect(
+      await screen.findByText(/Your profile was not approved/),
+    ).toBeInTheDocument();
   });
 });

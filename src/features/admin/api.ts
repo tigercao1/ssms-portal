@@ -43,6 +43,7 @@ export function useAdminInstructors(filter: AdminListFilter) {
       const suffix = qs.toString() ? `?${qs}` : '';
       return api<AdminInstructorRecord[]>(`/admin/instructors${suffix}`);
     },
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -93,6 +94,7 @@ export function useAdminInstructorPage({
       };
     },
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -101,6 +103,7 @@ export function useAdminInstructor(id: string) {
   return useQuery({
     queryKey: detailKey(id),
     queryFn: () => api<AdminInstructorRecord>(`/admin/instructors/${id}`),
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -141,7 +144,7 @@ export function useSetApproval(id: string) {
         method: 'PATCH',
         body: vars,
       }),
-    onSuccess: sync,
+    onSettled: (record) => sync(record),
   });
 }
 

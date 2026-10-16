@@ -131,6 +131,8 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
           </>
         )}
 
+        {rec.approvalStatus === 'rejected' && <ReapproveAction rec={rec} />}
+
         <VisibilityAction rec={rec} />
       </Card>
 
@@ -138,6 +140,38 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
       <InstructorCalendarCard instructorId={rec.id} />
       <RoleCard authUserId={rec.authUserId} />
       <ShopifyInstructorPanel instructorId={rec.id} />
+    </div>
+  );
+}
+
+function ReapproveAction({ rec }: { rec: AdminInstructorRecord }) {
+  const t = useT();
+  const approval = useSetApproval(rec.id);
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {confirming ? (
+        <>
+          <p className="text-sm text-navy">{t.admin.reapproveConfirm}</p>
+          <div className="flex gap-2">
+            <Button
+              loading={approval.isPending}
+              onClick={() => approval.mutate({ approvalStatus: 'approved' })}
+            >
+              {t.admin.confirm}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              {t.common.cancel}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <Button onClick={() => setConfirming(true)}>
+          {t.admin.reapprove}
+        </Button>
+      )}
+      {approval.isError && <Banner tone="error">{t.errors.generic}</Banner>}
     </div>
   );
 }
