@@ -10,6 +10,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
           'h-11 w-full rounded-md border border-grey bg-surface px-3 text-ink',
           'placeholder:text-grey focus:border-navy focus:outline-none',
           'aria-[invalid=true]:border-status-rejected',
+          '[&[type=date]]:appearance-none [&::-webkit-date-and-time-value]:text-left',
           className,
         )}
         {...rest}
