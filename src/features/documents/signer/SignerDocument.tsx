@@ -23,6 +23,7 @@ import {
   buildSignBody,
   initialValues,
   isFieldFilled,
+  isNameField,
   missingRequired,
   orderFields,
   syncLockedValues,
@@ -391,7 +392,7 @@ export function SignerDocument({
                     field={field}
                     label={fieldLabel(field, locale, text)}
                     geometry={geometry}
-                    value={values[field.id]}
+                    value={isNameField(field) ? signerName : values[field.id]}
                     signature={signatures[field.id]}
                     active={field.id === currentId}
                     text={text}
@@ -400,7 +401,9 @@ export function SignerDocument({
                     onInputFocus={() => focusField(field)}
                     onChange={(v) => {
                       touched.current = true;
-                      setValues((s) => ({ ...s, [field.id]: v }));
+                      if (isNameField(field) && typeof v === 'string')
+                        setSignerName(v);
+                      else setValues((s) => ({ ...s, [field.id]: v }));
                       setProblem(null);
                     }}
                     onSign={() => startSigning(field)}

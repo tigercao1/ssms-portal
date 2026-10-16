@@ -2,7 +2,7 @@ import type { CSSProperties, FocusEvent } from 'react';
 import { cn } from '@/lib/cn';
 import type { Field, SignatureValue } from '../api';
 import { pdfRectToScreen, type PageGeometry } from '../pdf/transforms';
-import { isLockedField, isSignatureField } from './fieldLogic';
+import { isReadOnlyField, isSignatureField } from './fieldLogic';
 import { TYPED_SIGNATURE_FONT } from './SignatureModal';
 import type { SignerText } from './types';
 
@@ -139,7 +139,7 @@ export function FieldOverlay({
     );
   }
 
-  if (isLockedField(field)) {
+  if (isReadOnlyField(field)) {
     return (
       <div
         className={cn(frame, 'px-1 text-ink')}

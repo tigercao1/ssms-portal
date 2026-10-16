@@ -126,7 +126,7 @@ describe('OnboardingDocumentPage — sign', () => {
     );
     expect(
       screen.getByRole('textbox', { name: 'Full name (required)' }),
-    ).toHaveTextContent('Jane Snow');
+    ).toHaveValue('Jane Snow');
     expect(
       screen.getByRole('textbox', { name: 'Date (required)' }),
     ).toHaveTextContent('2026-10-12');
@@ -164,7 +164,7 @@ describe('OnboardingDocumentPage — sign', () => {
     await user.type(legal, 'Jane A. Snow');
     expect(
       screen.getByRole('textbox', { name: 'Full name (required)' }),
-    ).toHaveTextContent('Jane A. Snow');
+    ).toHaveValue('Jane A. Snow');
 
     await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
     expect(
@@ -239,7 +239,7 @@ describe('OnboardingDocumentPage — sign', () => {
     );
     expect(
       screen.getByRole('textbox', { name: 'Full name (required)' }),
-    ).toHaveTextContent('Janet Snowden');
+    ).toHaveValue('Janet Snowden');
   });
 
   it('falls back to the display name when the legal name is absent', async () => {
@@ -520,6 +520,82 @@ describe('OnboardingDocumentPage — mobile stepper', () => {
     expect(phone).toHaveValue('555');
   });
 
+  it('edits the legal name from the Full name field on the document', async () => {
+    const user = userEvent.setup();
+    setMobile(true);
+    state.templates
+      .find((t) => t.id === 'tpl-conduct')!
+      .fields.push(
+        fakeField({
+          id: 'f_print',
+          type: 'text',
+          prefill: 'full_name',
+          y: 300,
+          required: false,
+          labelEn: 'Printed name',
+        }),
+        fakeField({
+          id: 'f_mail',
+          type: 'text',
+          prefill: 'email',
+          y: 320,
+          required: false,
+          labelEn: 'Email',
+        }),
+      );
+    renderAt('asg-new');
+    const name = await screen.findByRole('textbox', {
+      name: 'Full name (required)',
+    });
+    expect(name).toHaveStyle({ fontSize: '16px' });
+    await user.click(name);
+    expect(name).toHaveFocus();
+    await waitFor(() =>
+      expect(fakePdf.scrollToRect).toHaveBeenLastCalledWith(
+        1,
+        expect.objectContaining({ id: 'f_name' }),
+      ),
+    );
+    await user.type(name, ' Updated');
+    expect(name).toHaveValue('Jane Snow Updated');
+    expect(screen.getByLabelText(/Full legal name/)).toHaveValue(
+      'Jane Snow Updated',
+    );
+    expect(screen.getByRole('textbox', { name: 'Printed name' })).toHaveValue(
+      'Jane Snow Updated',
+    );
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAttribute(
+      'aria-readonly',
+      'true',
+    );
+
+    await user.click(
+      screen.getByRole('checkbox', { name: 'I agree (required)' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Signature (required)' }),
+    );
+    await user.click(screen.getByRole('tab', { name: 'Type' }));
+    await user.click(screen.getByRole('button', { name: 'Use signature' }));
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'I agree to sign this document electronically',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Signed' }),
+    ).toBeInTheDocument();
+    expect(completeBody).toMatchObject({
+      signerName: 'Jane Snow Updated',
+      values: {
+        f_name: 'Jane Snow Updated',
+        f_print: 'Jane Snow Updated',
+        f_mail: 'jane@example.com',
+      },
+    });
+  });
+
   it('keeps the desktop text field size and zoom on focus', async () => {
     const user = userEvent.setup();
     state.templates
@@ -592,7 +668,7 @@ describe('OnboardingDocumentPage — draft', () => {
     );
     expect(
       screen.getByRole('textbox', { name: 'Full name (required)' }),
-    ).toHaveTextContent('Jane A. Snow');
+    ).toHaveValue('Jane A. Snow');
     expect(
       screen.getByRole('checkbox', {
         name: 'I agree to sign this document electronically',

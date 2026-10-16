@@ -47,8 +47,7 @@ export const zhCN: Messages = {
     signingUp: '正在创建账户…',
     passwordHint: '至少 6 个字符。',
     signUpDone: '请查收邮箱',
-    signUpDoneBody:
-      '我们已发送验证链接以确认您的邮箱。点击后即可登录并完善资料。',
+    signUpDoneBody: '我们已发送验证链接以确认您的邮箱。点击后即可登录并完善资料。',
     emailInUse: '该邮箱已注册账户，请尝试登录。',
     verifyTitle: '验证您的邮箱',
     verifyBody: '我们已向您的邮箱发送验证链接。确认后即可登录。',
@@ -259,8 +258,7 @@ export const zhCN: Messages = {
     reapproveConfirm: '确定重新通过该教练？系统会发邮件通知教练，并开放入职资料。',
     takeOffline: '下线',
     putOnline: '重新上线',
-    takeOfflineConfirm:
-      '确定下线该教练？其资料将不在公开目录中显示，并会通过邮件通知教练。',
+    takeOfflineConfirm: '确定下线该教练？其资料将不在公开目录中显示，并会通过邮件通知教练。',
     putOnlineConfirm: '确定重新上线该教练？其资料将重新在公开目录中显示。',
     confirm: '确认',
     roleSection: '角色',
@@ -299,8 +297,7 @@ export const zhCN: Messages = {
     editReplacesHint: '此内容为机器翻译。编辑后将替换机器翻译。',
     nameZhLabel: '中文名称',
     addNameHint: '任填一种名称，另一种将自动翻译。',
-    englishNameRequired:
-      '需要填写英文名称（翻译暂不可用）。请填写英文名称后重试。',
+    englishNameRequired: '需要填写英文名称（翻译暂不可用）。请填写英文名称后重试。',
   },
   shopifySync: {
     title: 'Shopify 同步',
@@ -310,16 +307,13 @@ export const zhCN: Messages = {
     enableTitle: '开启 Shopify 同步？',
     enableBody: '已审核且在线的教练将发布到 Shopify 预览列表。',
     disableTitle: '关闭 Shopify 同步？',
-    disableBody:
-      '同步将在下一次运行时停止。队列中的更改会保留，重新开启后继续推送。',
+    disableBody: '同步将在下一次运行时停止。队列中的更改会保留，重新开启后继续推送。',
     turnOn: '开启',
     turnOff: '关闭',
     masterSwitchOff: '总开关已关闭',
-    masterSwitchOffBody:
-      '服务器总开关已关闭，即使开启同步也不会向 Shopify 发送任何内容。',
+    masterSwitchOffBody: '服务器总开关已关闭，即使开启同步也不会向 Shopify 发送任何内容。',
     notConfigured: 'Shopify 未配置',
-    notConfiguredBody:
-      '服务器缺少 Shopify 配置，即使开启同步也不会向 Shopify 发送任何内容。',
+    notConfiguredBody: '服务器缺少 Shopify 配置，即使开启同步也不会向 Shopify 发送任何内容。',
     onButBlocked: '已开启，但未运行',
     lastRun: '上次运行',
     lastSuccess: '上次成功',
@@ -353,18 +347,15 @@ export const zhCN: Messages = {
   },
   google: {
     title: 'Google 日历',
-    intro:
-      '连接 SSNOW 的 Google 账号，让 SSMS 读取教练的空闲时间并把课程加入他们的日历。',
+    intro: '连接 SSNOW 的 Google 账号，让 SSMS 读取教练的空闲时间并把课程加入他们的日历。',
     connectionTitle: '连接',
     connected: '已连接',
     notConnected: '未连接',
-    notConnectedBody:
-      '连接之前，所有 Google 功能都处于关闭状态。请使用 admin@ssnow.club 登录，并同意所有请求的权限。',
+    notConnectedBody: '连接之前，所有 Google 功能都处于关闭状态。请使用 admin@ssnow.club 登录，并同意所有请求的权限。',
     connect: '连接 Google',
     disconnect: '断开连接',
     disconnectTitle: '断开 Google 日历？',
-    disconnectBody:
-      'SSMS 将失去对该 Google 账号的访问权限，在管理员重新连接之前不再读取空闲时间或写入日程。',
+    disconnectBody: 'SSMS 将失去对该 Google 账号的访问权限，在管理员重新连接之前不再读取空闲时间或写入日程。',
     disconnectConfirm: '断开连接',
     disconnected: '已断开 Google 日历。',
     account: '账号',
@@ -378,11 +369,9 @@ export const zhCN: Messages = {
     returnErrorTitle: '未能连接 Google 日历',
     returnErrorUnknown: 'Google 返回了错误（{code}）。请重新连接。',
     calendarsTitle: '日历',
-    calendarsIntro:
-      '与已连接账号共享的日历。SSMS 只能在拥有“编辑者”或“所有者”权限的日历中添加日程。',
+    calendarsIntro: '与已连接账号共享的日历。SSMS 只能在拥有“编辑者”或“所有者”权限的日历中添加日程。',
     calendarsEmpty: '还没有日历共享给这个账号。',
-    readOnlySummary:
-      '有 {count} 个日历共享时没有编辑权限。请让教练以“更改活动”权限共享。',
+    readOnlySummary: '有 {count} 个日历共享时没有编辑权限。请让教练以“更改活动”权限共享。',
     colName: '名称',
     colId: '日历 ID',
     colAccess: '权限',
@@ -400,8 +389,7 @@ export const zhCN: Messages = {
       missing_scopes: '请接受所有日历权限后重试。',
       invalid_state: '连接链接已过期或无效。请重新连接。',
       token_exchange_failed: 'Google 未能完成登录。请重新连接。',
-      no_refresh_token:
-        'Google 未返回离线授权。请在 Google 账号设置中移除此应用后重新连接。',
+      no_refresh_token: 'Google 未返回离线授权。请在 Google 账号设置中移除此应用后重新连接。',
       not_configured: '服务器未配置 Google。',
       oauth_error: 'Google 登录时报告了错误。请重新连接。',
       missing_code: 'Google 未返回授权码。请重新连接。',
@@ -425,8 +413,7 @@ export const zhCN: Messages = {
     titleInvalid: '请输入不超过 200 个字符的标题。',
     slugLabel: '链接名',
     slugHint: '仅限小写字母、数字和连字符。用于公开链接，创建后无法修改。',
-    slugInvalid:
-      '请使用小写字母和数字，单词之间用单个连字符分隔（最多 80 个字符）。',
+    slugInvalid: '请使用小写字母和数字，单词之间用单个连字符分隔（最多 80 个字符）。',
     slugTaken: '该链接名已被使用。',
     create: '创建页面',
     backToList: '全部页面',
@@ -503,8 +490,7 @@ export const zhCN: Messages = {
   },
   lessonTypes: {
     title: '课程类型',
-    intro:
-      '管理员预约的课程类型。每种类型有各自的费率（按小时或按天），特价课是单独的类型。',
+    intro: '管理员预约的课程类型。每种类型有各自的费率（按小时或按天），特价课是单独的类型。',
     colNameEn: '英文名称',
     colNameZh: '中文名称',
     colGroupSize: '人数',
@@ -558,14 +544,12 @@ export const zhCN: Messages = {
     currencyInvalid: '请使用 3 位字母代码，例如 CAD。',
     dateRequired: '请选择生效日期。',
     rangeInvalid: '截止日期不能早于生效日期。',
-    rateOverlap:
-      '该费率与同一课程类型、同一教练的另一条费率时间重叠。请修改日期，或先结束另一条费率。',
+    rateOverlap: '该费率与同一课程类型、同一教练的另一条费率时间重叠。请修改日期，或先结束另一条费率。',
     instructorFixed: '如需更换教练，请新增一条费率。',
   },
   customers: {
     title: '客户',
-    intro:
-      '客户来自 Shopify。可以搜索这里保存的客户、从 Shopify 同步，或在 Shopify 中创建新客户。',
+    intro: '客户来自 Shopify。可以搜索这里保存的客户、从 Shopify 同步，或在 Shopify 中创建新客户。',
     searchLabel: '按姓名、邮箱或电话搜索',
     search: '搜索',
     colName: '姓名',
@@ -614,8 +598,7 @@ export const zhCN: Messages = {
   },
   documents: {
     title: '入职资料',
-    intro:
-      '教练需要阅读或签署的入职资料。上传原始 PDF，放置签署人需要填写的字段，然后发布。',
+    intro: '教练需要阅读或签署的入职资料。上传原始 PDF，放置签署人需要填写的字段，然后发布。',
     empty: '暂无资料',
     emptyBody: '在下方新建，然后上传 PDF。',
     colTitle: '标题',
@@ -644,8 +627,7 @@ export const zhCN: Messages = {
     assignFor: '分配 {title}',
     assignEllipsis: '分配…',
     uploaded: '已上传 {title} 的 PDF（{pages}）。',
-    uploadedFieldsCleared:
-      '已上传 {title} 的 PDF（{pages}）。页面尺寸已改变，原有字段已清除，请重新放置。',
+    uploadedFieldsCleared: '已上传 {title} 的 PDF（{pages}）。页面尺寸已改变，原有字段已清除，请重新放置。',
     uploadNotPdf: '请选择 PDF 文件。',
     uploadTooLarge: 'PDF 不能超过 {mb} MB。',
     uploadFailed: '上传失败：{reason}',
@@ -670,8 +652,7 @@ export const zhCN: Messages = {
     searchInstructors: '搜索教练',
     pickedCount: '已选 {n} 人',
     pickAtLeastOne: '请至少选择一位教练。',
-    assignResult:
-      '已分配给 {created} 人。{skipped} 人本雪季已有此资料，已跳过。',
+    assignResult: '已分配给 {created} 人。{skipped} 人本雪季已有此资料，已跳过。',
     unsaved: '有未保存的更改',
     previewAsSigner: '以签署人视角预览',
     backToEditing: '返回编辑',
@@ -748,10 +729,8 @@ export const zhCN: Messages = {
     templateStatusRetired: '已停用',
     audienceAll: '所有教练',
     audienceSelected: '指定教练',
-    audienceAllDetail:
-      '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已签署',
-    audienceAllDetailRead:
-      '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已确认阅读',
+    audienceAllDetail: '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已签署',
+    audienceAllDetailRead: '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已确认阅读',
     audienceSelectedDetail: '{n} 位教练',
     publish: '发布',
     republish: '重新发布',
@@ -761,8 +740,7 @@ export const zhCN: Messages = {
     retireFor: '停用 {title}',
     publishNeedsPdf: '发布前请先上传 PDF。',
     publishNeedsField: '发布前请至少放置一个字段。',
-    lockedSigned:
-      '已有教练完成此资料，PDF 和字段不能再修改。如需修改，请停用后发布新的资料。',
+    lockedSigned: '已有教练完成此资料，PDF 和字段不能再修改。如需修改，请停用后发布新的资料。',
     publishTitle: '发布“{title}”',
     publishIntro: '发布后教练即可查看并签署。',
     publishWho: '发给谁',
@@ -809,8 +787,7 @@ export const zhCN: Messages = {
     readOnlyTag: '只读',
     readOnlyWarning: '只读，SSMS 无法添加课程',
     clear: '清除',
-    notConnected:
-      '尚未连接 Google 日历，无法列出日历。请先连接，或手动填写日历 ID。',
+    notConnected: '尚未连接 Google 日历，无法列出日历。请先连接，或手动填写日历 ID。',
     googleError: '无法从 Google 加载日历。请检查连接，或手动填写日历 ID。',
     settingsLink: '打开 设置 → Google 日历',
     manualLabel: 'Google 日历 ID',
@@ -822,11 +799,9 @@ export const zhCN: Messages = {
   },
   classImport: {
     title: '导入历史',
-    intro:
-      '从 Digital Appointments 导出的 CSV 导入过往预约。提交之前不会生成任何课程，也不会创建 Google 日历事件。',
+    intro: '从 Digital Appointments 导出的 CSV 导入过往预约。提交之前不会生成任何课程，也不会创建 Google 日历事件。',
     uploadTitle: '上传 CSV',
-    uploadBody:
-      '从 Digital Appointments 导出预约，然后上传 CSV 文件（最大 5 MB）。',
+    uploadBody: '从 Digital Appointments 导出预约，然后上传 CSV 文件（最大 5 MB）。',
     fileLabel: 'CSV 文件',
     upload: '上传',
     uploadFailed: '上传失败',
@@ -849,8 +824,7 @@ export const zhCN: Messages = {
     countDuplicate: '重复行',
     countAlreadyImported: '已导入过',
     mappingTitle: '活动名称 → 课程类型',
-    mappingBody:
-      'CSV 中的每个活动名称对应一种课程类型。映射会被保存，以后的导入会继续使用。',
+    mappingBody: 'CSV 中的每个活动名称对应一种课程类型。映射会被保存，以后的导入会继续使用。',
     colEventName: '活动名称',
     colRows: '行数',
     colLessonType: '课程类型',
@@ -904,8 +878,7 @@ export const zhCN: Messages = {
     commit: '导入 {count} 节课',
     commitConfirm: '现在导入 {count} 节课？',
     confirm: '确认',
-    commitDone:
-      '已导入 {created} 节课，其中 {participants} 节有客户。{already} 节此前已导入，跳过 {skipped} 行。',
+    commitDone: '已导入 {created} 节课，其中 {participants} 节有客户。{already} 节此前已导入，跳过 {skipped} 行。',
     commitFailed: '提交失败',
     discard: '丢弃草稿',
     discardConfirm: '丢弃此草稿？丢弃后将无法提交。',
@@ -917,8 +890,7 @@ export const zhCN: Messages = {
   },
   payroll: {
     title: '工资结算',
-    intro:
-      '每两周结算一次：除已取消外的所有课程均计酬，按课程日期生效的课时费计算。',
+    intro: '每两周结算一次：除已取消外的所有课程均计酬，按课程日期生效的课时费计算。',
     previous: '上一周期',
     next: '下一周期',
     current: '当前周期',
@@ -933,8 +905,7 @@ export const zhCN: Messages = {
     lessonsCount: '{n} 节课',
     hoursCount: '{n} 小时',
     needsRateTitle: '{n} 节课缺少课时费',
-    needsRateBody:
-      '在课程设置了课程类型且该日期有课时费之前，这些课程按 0 计算。',
+    needsRateBody: '在课程设置了课程类型且该日期有课时费之前，这些课程按 0 计算。',
     fixInClasses: '打开课程',
     openPayRates: '打开课时费',
     colInstructor: '教练',
@@ -977,8 +948,7 @@ export const zhCN: Messages = {
     adjustmentsLocked: '重新打开周期后才能修改调整。',
     finalize: '结算周期',
     finalizeTitle: '确认结算该周期？',
-    finalizeBody:
-      '费率和金额将被冻结。之后对课程或课时费的修改不会影响该周期，除非重新打开。',
+    finalizeBody: '费率和金额将被冻结。之后对课程或课时费的修改不会影响该周期，除非重新打开。',
     finalizeNeedsRate: '{n} 节课没有课时费，将按 0 支付。',
     acceptZeroRate: '按 0 结算这些课程',
     finalizeConfirm: '结算',
@@ -1001,8 +971,7 @@ export const zhCN: Messages = {
   },
   booking: {
     title: '预约课程',
-    intro:
-      '先选择客户和课程类型，再选择空闲时段。时间均为多伦多时间。预约会写入教练的 Google 日历，不会邀请客户。',
+    intro: '先选择客户和课程类型，再选择空闲时段。时间均为多伦多时间。预约会写入教练的 Google 日历，不会邀请客户。',
     customerStep: '客户',
     customerSearch: '查找客户',
     customerSearchHint: '姓名、邮箱或电话，至少输入 2 个字符。',
@@ -1071,8 +1040,7 @@ export const zhCN: Messages = {
     sourceSsms: '其他课程',
     googleFailedTitle: '无法检查 Google 日历',
     googleFailed: '没有保存任何内容。Google 返回：{code}。',
-    pastBody:
-      '补录已经上过的课程，用于记录和工资计算。只有在勾选时才会写入 Google 日历。',
+    pastBody: '补录已经上过的课程，用于记录和工资计算。只有在勾选时才会写入 Google 日历。',
     startTime: '开始时间',
     pastMustBePast: '该时间在将来，请使用“按空闲时段预约”。',
     instructor: '教练',
@@ -1168,8 +1136,7 @@ export const zhCN: Messages = {
     showPeriod: '显示 {dates} 的课程',
     hidePeriod: '隐藏 {dates} 的课程',
     emptyTitle: '暂无预约课程',
-    emptyBody:
-      '学校为你安排课程后，课程的日期、地点和你的工资会显示在这里。工资每两周结算一次，已结算的周期会列在“已上的课”下面。',
+    emptyBody: '学校为你安排课程后，课程的日期、地点和你的工资会显示在这里。工资每两周结算一次，已结算的周期会列在“已上的课”下面。',
     pendingTitle: '你的资料正在审核中',
     pendingBody: '审核通过后即可查看课程和工资。',
     pendingEmpty: '暂时没有内容。只有通过审核的教练才能被安排课程。',

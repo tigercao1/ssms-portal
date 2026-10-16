@@ -34,11 +34,18 @@ export function orderFields<F extends SignerFieldLike>(
 /** Whether a field's value is locked to the signer's identity or the signing date. */
 export function isLockedField(field: SignerFieldLike): boolean {
   return (
-    field.type === 'full_name' ||
-    field.prefill === 'full_name' ||
+    isNameField(field) ||
     field.prefill === 'email' ||
     field.prefill === 'date_signed'
   );
+}
+
+export function isNameField(field: SignerFieldLike): boolean {
+  return field.type === 'full_name' || field.prefill === 'full_name';
+}
+
+export function isReadOnlyField(field: SignerFieldLike): boolean {
+  return isLockedField(field) && !isNameField(field);
 }
 
 export function prefilledValue(
@@ -47,8 +54,7 @@ export function prefilledValue(
 ): string | boolean | undefined {
   if (field.type === 'checkbox') return false;
   if (isSignatureField(field)) return undefined;
-  if (field.type === 'full_name' || field.prefill === 'full_name')
-    return identity.signerName;
+  if (isNameField(field)) return identity.signerName;
   if (field.prefill === 'email') return identity.email ?? '';
   if (field.prefill === 'date_signed') return identity.today;
   return '';
