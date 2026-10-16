@@ -20,8 +20,12 @@ interface SignatureModalProps {
   onClose: () => void;
 }
 
-export const TYPED_SIGNATURE_FONT =
-  "'Dancing Script', 'Ma Shan Zheng', 'Brush Script MT', 'Kaiti SC', 'STKaiti', cursive";
+export const SIGNATURE_WEB_FONTS = ['Dancing Script', 'Ma Shan Zheng'];
+
+export const TYPED_SIGNATURE_FONT = [
+  ...SIGNATURE_WEB_FONTS.map((family) => `'${family}'`),
+  "'Brush Script MT', 'Kaiti SC', 'STKaiti', cursive",
+].join(', ');
 
 /** Draw / Type signature capture for a signature or initials field. */
 export function SignatureModal({

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SignatureModal } from './SignatureModal';
+import indexHtml from '../../../../index.html?raw';
+import {
+  SIGNATURE_WEB_FONTS,
+  SignatureModal,
+  TYPED_SIGNATURE_FONT,
+} from './SignatureModal';
 import { ConsentBlock } from './ConsentBlock';
 import { MOCK_CONSENT_TEXT } from '../api/fixtures';
 import { base64ByteLength } from './SignatureCanvas';
@@ -117,6 +122,29 @@ describe('SignatureModal', () => {
     expect(onAdopt).toHaveBeenCalledWith({ mode: 'typed', text: 'J.S.' });
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('previews a Chinese typed signature in the loaded script fonts', async () => {
+    renderWithProviders(
+      <SignatureModal
+        open
+        kind="signature"
+        text={en.signer}
+        defaultTypedText="王小明"
+        onAdopt={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Type' }));
+    const preview = screen.getByTestId('typed-preview');
+    expect(preview).toHaveTextContent('王小明');
+    expect(
+      TYPED_SIGNATURE_FONT.startsWith("'Dancing Script', 'Ma Shan Zheng'"),
+    ).toBe(true);
+    for (const family of SIGNATURE_WEB_FONTS) {
+      expect(preview.style.fontFamily).toContain(family);
+      expect(indexHtml).toContain(`family=${family.replace(/ /g, '+')}`);
+    }
   });
 
   it('clears the drawing', async () => {
