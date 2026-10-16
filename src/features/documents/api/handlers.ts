@@ -162,6 +162,11 @@ export function documentsHandlers(
         t.season !== null &&
         a.season === t.season,
     );
+    const approvedOpen = open.filter(
+      (a) =>
+        a.subjectType === 'instructor' &&
+        state.instructorIds.includes(a.subjectId),
+    );
     return withDerived({
       ...t,
       hasCompletedAssignments: state.assignments.some(
@@ -169,6 +174,10 @@ export function documentsHandlers(
       ),
       assignedCount: open.length,
       completedCount: open.filter((a) => a.status === 'completed').length,
+      approvedAssignedCount: approvedOpen.length,
+      approvedCompletedCount: approvedOpen.filter(
+        (a) => a.status === 'completed',
+      ).length,
       approvedCount:
         t.status === 'draft' || t.season === null
           ? 0
@@ -252,6 +261,8 @@ export function documentsHandlers(
         hasCompletedAssignments: false,
         assignedCount: 0,
         completedCount: 0,
+        approvedAssignedCount: 0,
+        approvedCompletedCount: 0,
         approvedCount: 0,
         sortOrder: body.sortOrder,
         hasSource: false,
@@ -333,6 +344,10 @@ export function documentsHandlers(
           return badRequest(
             'Only instructor documents can be published to all instructors',
           );
+        if (body.instructorIds && body.assignTo !== 'selected')
+          return badRequest(
+            'instructorIds can only be sent when assigning to selected instructors',
+          );
         const season = body.season ?? state.season ?? MOCK_SEASON;
         Object.assign(t, {
           status: 'live',
@@ -344,7 +359,7 @@ export function documentsHandlers(
         const { created, skipped } =
           body.assignTo === 'all'
             ? assignToInstructors(t, season, state.instructorIds)
-            : { created: 0, skipped: 0 };
+            : assignToInstructors(t, season, body.instructorIds ?? []);
         return HttpResponse.json({ template: present(t), created, skipped });
       },
     ),

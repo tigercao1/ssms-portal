@@ -85,6 +85,8 @@ export interface TemplateSummary {
   hasCompletedAssignments: boolean;
   assignedCount: number;
   completedCount: number;
+  approvedAssignedCount: number;
+  approvedCompletedCount: number;
   approvedCount: number;
   sortOrder: number;
   hasSource: boolean;
@@ -137,6 +139,7 @@ export interface PublishPreview {
 export interface PublishRequest {
   assignTo: TemplateAssignTo;
   season?: string;
+  instructorIds?: string[];
 }
 
 export interface PublishResult {
