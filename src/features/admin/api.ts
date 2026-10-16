@@ -126,7 +126,7 @@ function useInvalidate(id: string) {
 function useInvalidateWithDocuments(id: string) {
   const qc = useQueryClient();
   const sync = useInvalidate(id);
-  return (record: AdminInstructorRecord) => {
+  return (record?: AdminInstructorRecord) => {
     sync(record);
     void qc.invalidateQueries({ queryKey: documentsKeys.templates });
   };
