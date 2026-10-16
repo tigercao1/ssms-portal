@@ -23,20 +23,26 @@ import {
   useReferenceUsage,
   useUpdateReference,
 } from './api';
+import { SeasonsPanel } from './SeasonsPanel';
 import type { ReferenceRecord } from '@/lib/types';
 
-const TABS: { slug: ReferenceSlug; labelKey: keyof ReturnType<typeof useT>['reference'] }[] =
-  [
-    { slug: 'teaching-locations', labelKey: 'teachingLocations' },
-    { slug: 'languages', labelKey: 'languages' },
-    { slug: 'course-levels-offered', labelKey: 'courseLevels' },
-    { slug: 'exam-preparations', labelKey: 'examPreps' },
-  ];
+type ReferenceTab = ReferenceSlug | 'seasons';
+
+const TABS: {
+  slug: ReferenceTab;
+  labelKey: keyof ReturnType<typeof useT>['reference'];
+}[] = [
+  { slug: 'teaching-locations', labelKey: 'teachingLocations' },
+  { slug: 'languages', labelKey: 'languages' },
+  { slug: 'course-levels-offered', labelKey: 'courseLevels' },
+  { slug: 'exam-preparations', labelKey: 'examPreps' },
+  { slug: 'seasons', labelKey: 'seasons' },
+];
 
 /** W2.13 — admin reference-data manager: tabs, row status/actions, add/edit-row form. */
 export function ReferenceManagerPage() {
   const t = useT();
-  const [slug, setSlug] = useState<ReferenceSlug>('teaching-locations');
+  const [slug, setSlug] = useState<ReferenceTab>('teaching-locations');
   const [editing, setEditing] = useState<ReferenceRecord | null>(null);
 
   return (
@@ -63,19 +69,23 @@ export function ReferenceManagerPage() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-6">
-        <ReferenceTable
-          key={slug}
-          slug={slug}
-          editing={editing}
-          onEdit={setEditing}
-          onDoneEditing={() => setEditing(null)}
-          onRemoved={(id) =>
-            setEditing((current) => (current?.id === id ? null : current))
-          }
-        />
-        <AddRow slug={slug} />
-      </div>
+      {slug === 'seasons' ? (
+        <SeasonsPanel />
+      ) : (
+        <div className="flex flex-col gap-6">
+          <ReferenceTable
+            key={slug}
+            slug={slug}
+            editing={editing}
+            onEdit={setEditing}
+            onDoneEditing={() => setEditing(null)}
+            onRemoved={(id) =>
+              setEditing((current) => (current?.id === id ? null : current))
+            }
+          />
+          <AddRow slug={slug} />
+        </div>
+      )}
     </div>
   );
 }
