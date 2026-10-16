@@ -757,6 +757,15 @@ export interface Messages {
     publishAndEmail: string;
     published: string;
     retired: string;
+    changeAudience: string;
+    changeAudienceFor: string;
+    changeAudienceTitle: string;
+    changeAudienceFromTo: string;
+    changeAudienceAllLater: string;
+    changeAudienceSelectedEffect: string;
+    changeAudienceAndEmail: string;
+    changedToAll: string;
+    changedToSelected: string;
     approve: string;
     reject: string;
     saveDate: string;

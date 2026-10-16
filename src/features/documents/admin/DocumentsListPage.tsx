@@ -29,6 +29,7 @@ import {
   valuesToPatch,
 } from './TemplateForm';
 import { AssignDialog } from './AssignDialog';
+import { ChangeAudienceDialog } from './ChangeAudienceDialog';
 import { PublishDialog } from './PublishDialog';
 import { KindBadge, TemplateStatusChip } from './badges';
 import { errorText, templateTitle } from './format';
@@ -44,6 +45,8 @@ export function DocumentsListPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<TemplateSummary | null>(null);
   const [publishing, setPublishing] = useState<TemplateSummary | null>(null);
+  const [changingAudience, setChangingAudience] =
+    useState<TemplateSummary | null>(null);
   const { locale } = useLocale();
   const [notice, setNotice] = useState<UploadNotice | null>(null);
 
@@ -113,6 +116,7 @@ export function DocumentsListPage() {
                       }
                       onAssign={() => setAssigning(row)}
                       onPublish={() => setPublishing(row)}
+                      onChangeAudience={() => setChangingAudience(row)}
                       onNotice={setNotice}
                     />
                     {editing === row.id && (
@@ -154,6 +158,27 @@ export function DocumentsListPage() {
               text: t.documents.published
                 .replace('{title}', templateTitle(result.template, locale))
                 .replace('{created}', String(result.created)),
+            });
+          }}
+        />
+      )}
+
+      {changingAudience && (
+        <ChangeAudienceDialog
+          template={changingAudience}
+          onClose={() => setChangingAudience(null)}
+          onChanged={(result) => {
+            setChangingAudience(null);
+            const title = templateTitle(result.template, locale);
+            setNotice({
+              id: result.template.id,
+              tone: 'approved',
+              text:
+                result.template.assignTo === 'all'
+                  ? t.documents.changedToAll
+                      .replace('{title}', title)
+                      .replace('{created}', String(result.created))
+                  : t.documents.changedToSelected.replace('{title}', title),
             });
           }}
         />
@@ -320,6 +345,7 @@ function TemplateRow({
   onEdit,
   onAssign,
   onPublish,
+  onChangeAudience,
   onNotice,
 }: {
   row: TemplateSummary;
@@ -328,6 +354,7 @@ function TemplateRow({
   onEdit: () => void;
   onAssign: () => void;
   onPublish: () => void;
+  onChangeAudience: () => void;
   onNotice: (n: UploadNotice | null) => void;
 }) {
   const t = useT();
@@ -440,6 +467,19 @@ function TemplateRow({
                   onClick={onAssign}
                 >
                   {t.documents.assign}
+                </Button>
+              )}
+              {row.audience === 'instructor' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t.documents.changeAudienceFor.replace(
+                    '{title}',
+                    title,
+                  )}
+                  onClick={onChangeAudience}
+                >
+                  {t.documents.changeAudience}
                 </Button>
               )}
               <Button

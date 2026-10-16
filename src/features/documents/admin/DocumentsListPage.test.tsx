@@ -21,6 +21,8 @@ let state: DocumentsMockState;
 let patches: { id: string; body: unknown }[];
 let assignBodies: unknown[];
 let publishBodies: { id: string; body: unknown }[];
+let audienceBodies: { id: string; body: unknown }[];
+let previewSeasons: (string | null)[];
 
 afterEach(() => {
   vi.useRealTimers();
@@ -34,6 +36,8 @@ beforeEach(() => {
   patches = [];
   assignBodies = [];
   publishBodies = [];
+  audienceBodies = [];
+  previewSeasons = [];
   const li: AdminInstructorRecord = {
     ...(fakeAdminList[0] as AdminInstructorRecord),
     id: 'inst-2',
@@ -59,6 +63,23 @@ beforeEach(() => {
           id: String(params.id),
           body: await request.clone().json(),
         });
+        return undefined;
+      },
+    ),
+    http.post(
+      `${API}/admin/documents/templates/:id/audience`,
+      async ({ request, params }) => {
+        audienceBodies.push({
+          id: String(params.id),
+          body: await request.clone().json(),
+        });
+        return undefined;
+      },
+    ),
+    http.get(
+      `${API}/admin/documents/templates/:id/publish-preview`,
+      ({ request }) => {
+        previewSeasons.push(new URL(request.url).searchParams.get('season'));
         return undefined;
       },
     ),
@@ -433,6 +454,235 @@ describe('DocumentsListPage', () => {
       await screen.findByRole('button', { name: 'Retire Liability waiver' }),
     );
     expect(await screen.findByRole('alert')).toHaveTextContent('Not live');
+  });
+
+  it('changes a selected document to all instructors with the preview count', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change audience of Liability waiver',
+      }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Change audience of “Liability waiver”',
+    });
+    expect(
+      within(dialog).getByText('From Selected instructors to All instructors.'),
+    ).toBeInTheDocument();
+    const summary = await within(dialog).findByTestId(
+      'change-audience-summary',
+    );
+    expect(summary).toHaveTextContent(
+      'Assigns now to 1 approved instructors and emails them.',
+    );
+    expect(summary).toHaveTextContent(
+      "1 already have it and won't be emailed again.",
+    );
+    expect(summary).toHaveTextContent(
+      'Instructors you approve later in this season get it automatically.',
+    );
+    expect(previewSeasons).toContain(MOCK_SEASON);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Change and email 1' }),
+    );
+    expect(
+      await screen.findByText(
+        'Liability waiver now goes to all instructors. Assigned to 1 instructors.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(audienceBodies).toEqual([
+      { id: 'tpl-waiver', body: { assignTo: 'all' } },
+    ]);
+    expect(
+      await within(row('Liability waiver')).findByText(
+        '2 of 2 approved assigned · 0 signed',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Liability waiver')).getByText('All instructors'),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Liability waiver')).queryByRole('button', {
+        name: 'Assign Liability waiver',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('changes an all-instructors document to selected and keeps its assignments', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change audience of Code of conduct',
+      }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Change audience of “Code of conduct”',
+    });
+    expect(
+      within(dialog).getByText('From All instructors to Selected instructors.'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByTestId('change-audience-summary'),
+    ).toHaveTextContent(
+      "Existing assignments are kept; new instructors won't get it automatically.",
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Change audience' }),
+    );
+    expect(
+      await screen.findByText(
+        'Code of conduct now goes to selected instructors. Existing assignments are kept.',
+      ),
+    ).toBeInTheDocument();
+    expect(audienceBodies).toEqual([
+      { id: 'tpl-conduct', body: { assignTo: 'selected' } },
+    ]);
+    expect(
+      await within(row('Code of conduct')).findByText('1 instructors'),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Code of conduct')).getByText('Selected'),
+    ).toBeInTheDocument();
+    expect(
+      within(row('Code of conduct')).getByRole('button', {
+        name: 'Assign Code of conduct',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('re-reads the preview each time the dialog opens, so a repeat switch shows no one left to email', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />, { staleTime: 30_000 });
+    const openDialog = async () => {
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Change audience of Liability waiver',
+        }),
+      );
+      return screen.getByRole('dialog', {
+        name: 'Change audience of “Liability waiver”',
+      });
+    };
+    let dialog = await openDialog();
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Change and email 1' }),
+    );
+    await screen.findByText(
+      'Liability waiver now goes to all instructors. Assigned to 1 instructors.',
+    );
+    dialog = await openDialog();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Change audience' }),
+    );
+    await screen.findByText(
+      'Liability waiver now goes to selected instructors. Existing assignments are kept.',
+    );
+    dialog = await openDialog();
+    expect(
+      await within(dialog).findByRole('button', { name: 'Change audience' }),
+    ).toBeEnabled();
+    expect(
+      within(dialog).queryByRole('button', { name: /Change and email/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps confirm disabled when the fresh preview fails, even with an older count cached', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />, { staleTime: 30_000 });
+    const openDialog = async () => {
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Change audience of Liability waiver',
+        }),
+      );
+      return screen.getByRole('dialog', {
+        name: 'Change audience of “Liability waiver”',
+      });
+    };
+    let dialog = await openDialog();
+    await within(dialog).findByRole('button', { name: 'Change and email 1' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    server.use(
+      http.get(`${API}/admin/documents/templates/:id/publish-preview`, () =>
+        HttpResponse.json({ message: 'Preview failed' }, { status: 500 }),
+      ),
+    );
+    dialog = await openDialog();
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: /Change and email/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Change audience' }),
+    ).toBeDisabled();
+    expect(audienceBodies).toEqual([]);
+  });
+
+  it('offers Change audience only on live instructor documents', async () => {
+    const customer = state.templates.find((x) => x.id === 'tpl-handbook')!;
+    customer.audience = 'customer';
+    renderWithProviders(<DocumentsListPage />);
+    await screen.findByText('Code of conduct');
+    expect(
+      screen
+        .getAllByRole('button', { name: /^Change audience of / })
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual([
+      'Change audience of Code of conduct',
+      'Change audience of Liability waiver',
+    ]);
+  });
+
+  it('shows the API error when changing the audience fails', async () => {
+    server.use(
+      http.post(`${API}/admin/documents/templates/:id/audience`, () =>
+        HttpResponse.json(
+          { message: "Only a published document's audience can be changed" },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Change audience of Code of conduct',
+      }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Change audience' }),
+    );
+    expect(
+      await within(dialog).findByText(
+        "Only a published document's audience can be changed",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('shows the change audience dialog in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: '更改 免责声明 的对象' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: '更改“免责声明”的对象',
+    });
+    expect(
+      within(dialog).getByText('从指定教练改为所有教练。'),
+    ).toBeInTheDocument();
+    expect(
+      await within(dialog).findByTestId('change-audience-summary'),
+    ).toHaveTextContent('现在分配给 1 位已审核教练，并发邮件通知。');
+    expect(
+      within(dialog).getByRole('button', { name: '更改并发邮件给 1 人' }),
+    ).toBeInTheDocument();
   });
 
   it('locks Replace PDF and Place fields once a copy has been completed', async () => {

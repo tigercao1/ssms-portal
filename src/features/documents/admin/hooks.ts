@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import {
   archiveAssignment,
+  changeTemplateAudience,
   confirmTemplateSource,
   createAssignments,
   createTemplate,
@@ -19,6 +20,7 @@ import {
   saveTemplateFields,
   updateTemplate,
   type AssignRequest,
+  type ChangeAudienceRequest,
   type CertUploadReview,
   type Field,
   type PublishRequest,
@@ -73,11 +75,18 @@ export function useUpdateTemplate() {
 }
 
 /** Who a publish would reach; `season` null lets the API pick the current one. */
-export function usePublishPreview(id: string, season: string | null) {
+export function usePublishPreview(
+  id: string,
+  season: string | null,
+  options: { fresh?: boolean } = {},
+) {
   return useQuery({
     queryKey: documentsKeys.publishPreview(id, season),
     queryFn: () => getPublishPreview(id, season ?? undefined),
-    placeholderData: (prev) => prev,
+    placeholderData: options.fresh ? undefined : (prev) => prev,
+    ...(options.fresh
+      ? { staleTime: 0, refetchOnMount: 'always' as const }
+      : {}),
   });
 }
 
@@ -89,6 +98,25 @@ export function usePublishTemplate() {
       publishTemplate(id, body),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
+      return sync(result.template);
+    },
+  });
+}
+
+export function useChangeAudience() {
+  const sync = useTemplateSync();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: ChangeAudienceRequest & { id: string }) =>
+      changeTemplateAudience(id, body),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
+      void qc.invalidateQueries({
+        queryKey: [
+          ...documentsKeys.template(result.template.id),
+          'publish-preview',
+        ],
+      });
       return sync(result.template);
     },
   });

@@ -7,10 +7,10 @@ import { I18nProvider } from '@/i18n/core/I18nProvider';
 /** Wraps a component in the app providers for tests (W3.5). */
 export function renderWithProviders(
   ui: ReactElement,
-  { route = '/' }: { route?: string } = {},
+  { route = '/', staleTime }: { route?: string; staleTime?: number } = {},
 ) {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime } },
   });
   function Wrapper({ children }: { children: ReactNode }) {
     return (

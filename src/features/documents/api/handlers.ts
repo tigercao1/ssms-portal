@@ -5,6 +5,7 @@ import type {
   CertUpload,
   CertUploadReview,
   CertUploadUrlRequest,
+  ChangeAudienceRequest,
   CompleteRequest,
   ConsentText,
   Field,
@@ -371,6 +372,37 @@ export function documentsHandlers(
           body.assignTo === 'all'
             ? assignToInstructors(t, season, state.instructorIds)
             : assignToInstructors(t, season, body.instructorIds ?? []);
+        return HttpResponse.json({ template: present(t), created, skipped });
+      },
+    ),
+    http.post(
+      `${A}/admin/documents/templates/:id/audience`,
+      async ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const body = (await request.json()) as ChangeAudienceRequest;
+        if (body.assignTo !== 'all' && body.assignTo !== 'selected')
+          return badRequest('assignTo must be all or selected');
+        if (t.status !== 'live')
+          return conflict(
+            "Only a published document's audience can be changed",
+          );
+        if (t.assignTo === body.assignTo)
+          return conflict('This document already has that audience');
+        if (body.assignTo === 'all' && t.audience !== 'instructor')
+          return badRequest(
+            'Only instructor documents can be published to all instructors',
+          );
+        const season = t.season ?? state.season ?? MOCK_SEASON;
+        Object.assign(t, {
+          assignTo: body.assignTo,
+          season,
+          updatedAt: nowIso(),
+        });
+        const { created, skipped } =
+          body.assignTo === 'all'
+            ? assignToInstructors(t, season, state.instructorIds)
+            : { created: 0, skipped: 0 };
         return HttpResponse.json({ template: present(t), created, skipped });
       },
     ),
