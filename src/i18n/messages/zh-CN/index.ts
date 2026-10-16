@@ -1259,6 +1259,8 @@ export const zhCN: Messages = {
     submitFailed: '提交失败，请重试。',
     zoomIn: '放大',
     zoomOut: '缩小',
+    reviewAndSubmit: '核对并提交',
+    draftRestored: '已恢复您在本设备上保存的填写进度。',
   },
   validation: {
     required: '此字段为必填项。',

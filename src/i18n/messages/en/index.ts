@@ -1286,6 +1286,8 @@ export const en: Messages = {
     submitFailed: 'Could not submit. Try again.',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
+    reviewAndSubmit: 'Review & submit',
+    draftRestored: 'We restored the progress you saved on this device.',
   },
   validation: {
     required: 'This field is required.',
