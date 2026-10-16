@@ -198,6 +198,7 @@ export const zhCN: Messages = {
     actionsHint: '可选：“AI 润色”会优化措辞并翻译，保存前可查看两个版本。',
     refine: 'AI 润色',
     notTranslated: '简介已保存，但另一种语言暂时无法翻译。稍后可点击“更新翻译”补上。',
+    notCleared: '另一种语言暂时无法翻译，因此此简介未被清空。请稍后再试，或点击“取消”保留原文。',
     remaining: '今日剩余 {n}/{limit} 次',
     limitReached: '今日 {limit} 次 AI 请求已用完，请在 {time} 之后再试。',
     limitReachedNoTime: '今日 {limit} 次 AI 请求已用完。',

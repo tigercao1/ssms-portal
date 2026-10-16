@@ -199,6 +199,7 @@ export interface Messages {
     actionsHint: string;
     refine: string;
     notTranslated: string;
+    notCleared: string;
     remaining: string;
     limitReached: string;
     limitReachedNoTime: string;

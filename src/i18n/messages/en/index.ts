@@ -210,6 +210,7 @@ export const en: Messages = {
     actionsHint: 'Optional: Refine polishes your wording and translates it so you can review both before saving.',
     refine: 'Refine',
     notTranslated: 'Your bio is saved, but the other language couldn’t be translated right now. Use “Update translation” to add it later.',
+    notCleared: 'This bio wasn’t cleared because the other language couldn’t be translated right now. Try again later, or Cancel to keep it.',
     remaining: '{n} of {limit} left today',
     limitReached: 'You’ve used all {limit} AI requests for today. Try again after {time}',
     limitReachedNoTime: 'You’ve used all {limit} AI requests for today.',

@@ -63,6 +63,14 @@ function useSaveBio() {
   const save = useUpdateProfile();
   const translate = useBioDraft();
 
+  async function translateFrom(source: Lang, text: string): Promise<string> {
+    const missing = otherLang(source);
+    return translate.mutateAsync({ text, mode: 'translate' }).then(
+      (d) => d[missing],
+      () => '',
+    );
+  }
+
   async function saveBio(
     values: Record<Lang, string>,
     machine: Record<Lang, boolean> = { en: false, zh: false },
@@ -76,12 +84,7 @@ function useSaveBio() {
       return null;
     }
     const missing = otherLang(source);
-    const translation = await translate
-      .mutateAsync({ text: values[source], mode: 'translate' })
-      .then(
-        (d) => d[missing],
-        () => '',
-      );
+    const translation = await translateFrom(source, values[source]);
     await save.mutateAsync({
       ...bioField(source, values[source], machine[source]),
       ...(translation.trim() ? bioField(missing, translation, true) : {}),
@@ -91,6 +94,7 @@ function useSaveBio() {
 
   return {
     saveBio,
+    translateFrom,
     save,
     pending: save.isPending || translate.isPending,
   };
@@ -368,8 +372,9 @@ function SavedBioCard({
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const { saveBio, save, pending } = useSaveBio();
+  const { saveBio, translateFrom, save, pending } = useSaveBio();
   const [value, setValue] = useState<string | null>(null);
+  const [notCleared, setNotCleared] = useState(false);
   const saved = bioOf(profile, lang);
   const machineModel =
     lang === 'en'
@@ -384,7 +389,17 @@ function SavedBioCard({
   async function onSave() {
     if (value === null) return;
     const other = otherLang(lang);
-    if (value.trim() && !bioOf(profile, other).trim()) {
+    const otherSaved = bioOf(profile, other);
+    setNotCleared(false);
+    if (!value.trim() && otherSaved.trim()) {
+      const translation = await translateFrom(other, otherSaved);
+      if (!translation.trim()) {
+        setNotCleared(true);
+        return;
+      }
+      await save.mutateAsync(bioField(lang, translation, true));
+      onSaved(null);
+    } else if (value.trim() && !otherSaved.trim()) {
       const values = { [lang]: value, [other]: '' } as Record<Lang, string>;
       onSaved(await saveBio(values));
     } else {
@@ -408,8 +423,12 @@ function SavedBioCard({
           <BioTextarea
             label={titleOf(t, lang)}
             value={value}
-            onChange={setValue}
+            onChange={(v) => {
+              setValue(v);
+              setNotCleared(false);
+            }}
           />
+          {notCleared && <Banner tone="pending">{t.bio.notCleared}</Banner>}
           {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -418,6 +437,7 @@ function SavedBioCard({
               size="sm"
               onClick={() => {
                 setValue(null);
+                setNotCleared(false);
                 save.reset();
               }}
             >

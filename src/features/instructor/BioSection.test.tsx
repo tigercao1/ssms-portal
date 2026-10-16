@@ -588,6 +588,64 @@ describe('BioSection existing bio', () => {
     expect(await screen.findByText('新的英文。')).toBeInTheDocument();
   });
 
+  it.each([
+    {
+      lang: 'Chinese',
+      box: '中文',
+      source: 'Veteran instructor.',
+      patch: { bioZh: '中文稿', bioZhMachineTranslated: true },
+      shown: '中文稿',
+    },
+    {
+      lang: 'English',
+      box: 'English',
+      source: '资深教练。',
+      patch: { bioEn: 'EN draft', bioEnMachineTranslated: true },
+      shown: 'EN draft',
+    },
+  ])(
+    'clearing the saved $lang bio translates it from the other side instead of saving empty',
+    async ({ lang, box, source, patch, shown }) => {
+      const { patches, drafts } = setup(bothBios);
+      renderWithProviders(<EditProfilePage />);
+      await userEvent.click(
+        await screen.findByRole('button', { name: `Edit ${lang} bio` }),
+      );
+      await userEvent.clear(screen.getByRole('textbox', { name: box }));
+      await userEvent.click(saveButton());
+      await waitFor(() => expect(patches).toEqual([patch]));
+      expect(drafts).toEqual([{ text: source, mode: 'translate' }]);
+      expect(await screen.findByText(shown)).toBeInTheDocument();
+      expect(within(bioCard()).queryByRole('textbox')).not.toBeInTheDocument();
+    },
+  );
+
+  it('keeps the saved bio when clearing it and the translation fails', async () => {
+    const { patches, drafts } = setup(bothBios, {
+      draft: () => new HttpResponse(null, { status: 503 }),
+    });
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    const zh = screen.getByRole('textbox', { name: '中文' });
+    await userEvent.clear(zh);
+    await userEvent.click(saveButton());
+    expect(
+      await screen.findByText(/This bio wasn’t cleared/),
+    ).toBeInTheDocument();
+    expect(drafts).toHaveLength(1);
+    expect(patches).toHaveLength(0);
+    expect(zh).toHaveValue('');
+    await userEvent.click(
+      within(bioCard()).getByRole('button', { name: 'Cancel' }),
+    );
+    expect(screen.getByText('资深教练。')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/This bio wasn’t cleared/),
+    ).not.toBeInTheDocument();
+  });
+
   it('cancels an in-place edit without saving', async () => {
     const { patches } = setup(bothBios);
     renderWithProviders(<EditProfilePage />);
