@@ -1,23 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
-import { Banner, Button, Field, Input, Modal } from '@/components';
-import { todayIso, type AssignResult, type TemplateSummary } from '../api';
+import { Banner, Button, Field, Modal } from '@/components';
+import { currentSeasonKey, useSeasons } from '@/features/reference/api';
+import { SeasonSelect } from '@/features/reference/SeasonSelect';
+import type { AssignResult, TemplateSummary } from '../api';
 import { useCreateAssignments } from './hooks';
 import { errorText, templateTitle } from './format';
 import { InstructorPicker, useToggleSet } from './InstructorPicker';
-
-export const SEASON_RE = /^\d{4}\/\d{2}$/;
-
-/**
- * Ski season label for a date in America/Toronto, e.g. `2026/27` from
- * August 2026 through July 2027.
- */
-export function seasonFor(now: Date = new Date()): string {
-  const today = todayIso(now);
-  const year = Number(today.slice(0, 4));
-  const start = Number(today.slice(5, 7)) >= 8 ? year : year - 1;
-  return `${start}/${String((start + 1) % 100).padStart(2, '0')}`;
-}
 
 /** Assigns a template to picked instructors for a season. */
 export function AssignDialog({
@@ -32,12 +21,14 @@ export function AssignDialog({
   const t = useT();
   const { locale } = useLocale();
   const assign = useCreateAssignments();
-  const [season, setSeason] = useState(seasonFor);
+  const seasons = useSeasons();
+  const [pickedSeason, setPickedSeason] = useState<string | null>(null);
+  const season = pickedSeason ?? currentSeasonKey(seasons.data);
   const [picked, toggle] = useToggleSet(initialInstructorIds);
   const [touched, setTouched] = useState(false);
   const [result, setResult] = useState<AssignResult | null>(null);
 
-  const seasonInvalid = !SEASON_RE.test(season.trim());
+  const seasonInvalid = season === '';
   const nothingPicked = picked.size === 0;
 
   function submit(e?: FormEvent) {
@@ -47,7 +38,7 @@ export function AssignDialog({
     assign.mutate(
       {
         templateId: template.id,
-        season: season.trim(),
+        season,
         instructorIds: [...picked],
       },
       { onSuccess: setResult },
@@ -96,17 +87,10 @@ export function AssignDialog({
             label={t.documents.seasonLabel}
             hint={t.documents.seasonHint}
             required
-            error={
-              touched && seasonInvalid ? t.documents.seasonInvalid : undefined
-            }
+            error={touched && seasonInvalid ? t.seasons.required : undefined}
           >
             {(p) => (
-              <Input
-                {...p}
-                value={season}
-                placeholder="2026/27"
-                onChange={(e) => setSeason(e.target.value)}
-              />
+              <SeasonSelect {...p} value={season} onChange={setPickedSeason} />
             )}
           </Field>
           <InstructorPicker

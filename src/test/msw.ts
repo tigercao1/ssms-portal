@@ -14,6 +14,7 @@ import type {
   ShopifyInstructorSync,
   ShopifySyncStatus,
 } from '@/lib/types';
+import type { Season } from '@/features/reference/api';
 
 const API = 'http://localhost:3000';
 
@@ -283,6 +284,27 @@ export function listAdminClasses(
 
 const refs: RefItem[] = [{ id: 'l1', key: 'loc.whistler', name: 'Whistler' }];
 
+export const fakeSeasons: Season[] = [
+  {
+    key: '2027/28',
+    startsOn: '2027-11-01',
+    endsOn: '2028-04-30',
+    isCurrent: false,
+  },
+  {
+    key: '2026/27',
+    startsOn: '2026-11-01',
+    endsOn: '2027-04-30',
+    isCurrent: true,
+  },
+  {
+    key: '2025/26',
+    startsOn: '2025-11-01',
+    endsOn: '2026-04-30',
+    isCurrent: false,
+  },
+];
+
 export const handlers = [
   http.get(`${API}/me/instructor`, () => HttpResponse.json(fakeProfile)),
   http.patch(`${API}/me/instructor`, async ({ request }) => {
@@ -304,6 +326,7 @@ export const handlers = [
   http.get(`${API}/admin/instructors/:id`, () =>
     HttpResponse.json(fakeAdminList[0]),
   ),
+  http.get(`${API}/reference/seasons`, () => HttpResponse.json(fakeSeasons)),
   http.get(`${API}/reference/:slug`, () => HttpResponse.json(refs)),
   http.get(`${API}/admin/classes`, ({ request }) => {
     const { rows, total } = listAdminClasses(

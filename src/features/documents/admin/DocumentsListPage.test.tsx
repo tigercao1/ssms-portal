@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { fakeAdminList, server } from '@/test/msw';
+import { fakeAdminList, fakeSeasons, server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import type { AdminInstructorRecord } from '@/lib/types';
 import { DocumentsListPage } from './DocumentsListPage';
-import { seasonFor } from './AssignDialog';
 import {
   createDocumentsState,
   documentsHandlers,
@@ -296,15 +295,13 @@ describe('DocumentsListPage', () => {
     const dialog = screen.getByRole('dialog');
     const season = await within(dialog).findByLabelText(/Season/);
     await waitFor(() => expect(season).toHaveValue('2026/27'));
-    await user.clear(season);
-    await user.type(season, '2027');
     expect(
-      within(dialog).getByText('Use the form 2026/27.'),
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole('button', { name: /^Publish/ }),
-    ).toBeDisabled();
-    await user.type(season, '/28');
+      within(season)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['2027/28', '2026/27 (current)', '2025/26']);
+    await user.selectOptions(season, '2027/28');
+    expect(season).toHaveValue('2027/28');
     await user.click(within(dialog).getByLabelText(/Selected instructors/));
     await user.click(within(dialog).getByRole('button', { name: 'Publish' }));
     expect(
@@ -912,15 +909,7 @@ describe('DocumentsListPage', () => {
     });
     expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument();
     const season = within(dialog).getByLabelText(/Season/);
-    expect(season).toHaveValue(seasonFor());
-    await user.clear(season);
-    await user.type(season, '2027');
-    await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
-    expect(
-      within(dialog).getByText('Use the form 2026/27.'),
-    ).toBeInTheDocument();
-    await user.clear(season);
-    await user.type(season, MOCK_SEASON);
+    await waitFor(() => expect(season).toHaveValue(MOCK_SEASON));
     await user.type(within(dialog).getByLabelText('Search instructors'), 'li');
     await user.click(await within(dialog).findByRole('checkbox'));
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
@@ -963,7 +952,7 @@ describe('DocumentsListPage', () => {
     expect(assignBodies).toEqual([
       {
         templateId: 'tpl-waiver',
-        season: seasonFor(),
+        season: MOCK_SEASON,
         instructorIds: ['inst-2'],
       },
     ]);
@@ -994,22 +983,16 @@ describe('DocumentsListPage', () => {
   });
 });
 
-describe('seasonFor', () => {
-  it('rolls over on August 1 in Toronto', () => {
-    expect(seasonFor(new Date('2026-07-31T23:59:00-04:00'))).toBe('2025/26');
-    expect(seasonFor(new Date('2026-08-01T00:00:00-04:00'))).toBe('2026/27');
-    expect(seasonFor(new Date('2099-10-01T12:00:00-04:00'))).toBe('2099/00');
-  });
-
-  it('uses the Toronto date, not UTC or the browser zone', () => {
-    expect(seasonFor(new Date('2026-08-01T03:30:00Z'))).toBe('2025/26');
-    expect(seasonFor(new Date('2026-08-01T00:30:00+08:00'))).toBe('2025/26');
-    expect(seasonFor(new Date('2027-08-01T04:00:00Z'))).toBe('2027/28');
-  });
-
-  it('defaults the assign dialog to the Toronto season', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-08-01T03:30:00Z'));
+describe('season selects', () => {
+  it('default to the current season from the API, not the newest', async () => {
+    server.use(
+      http.get(`${API}/reference/seasons`, () =>
+        HttpResponse.json([
+          { ...fakeSeasons[0], isCurrent: true },
+          { ...fakeSeasons[1], isCurrent: false },
+        ]),
+      ),
+    );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
@@ -1018,6 +1001,39 @@ describe('seasonFor', () => {
     const dialog = screen.getByRole('dialog', {
       name: 'Assign “Liability waiver”',
     });
-    expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2025/26');
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2027/28'),
+    );
+  });
+
+  it('blocks assigning when no season exists', async () => {
+    server.use(
+      http.get(`${API}/reference/seasons`, () => HttpResponse.json([])),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    const season = within(dialog).getByLabelText(/Season/);
+    await waitFor(() => expect(season).toHaveTextContent('No seasons yet'));
+    expect(season).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
+    expect(within(dialog).getByText('Choose a season.')).toBeInTheDocument();
+    expect(assignBodies).toEqual([]);
+  });
+
+  it('shows the season select in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const assign = await screen.findAllByRole('button', { name: /^分配/ });
+    await user.click(assign[0]!);
+    const season = within(screen.getByRole('dialog')).getByLabelText(/雪季/);
+    await waitFor(() => expect(season).toHaveValue('2026/27'));
+    expect(
+      within(season).getByRole('option', { name: '2026/27（当前）' }),
+    ).toBeInTheDocument();
   });
 });

@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
-import { Banner, Button, Field, Input, Modal, Spinner } from '@/components';
+import { Banner, Button, Field, Modal, Spinner } from '@/components';
 import { cn } from '@/lib/cn';
+import { currentSeasonKey, useSeasons } from '@/features/reference/api';
+import { SeasonSelect } from '@/features/reference/SeasonSelect';
 import type { PublishResult, TemplateAssignTo, TemplateSummary } from '../api';
-import { SEASON_RE } from './AssignDialog';
 import { usePublishPreview, usePublishTemplate } from './hooks';
 import { errorText, templateTitle } from './format';
 import { InstructorPicker, useToggleSet } from './InstructorPicker';
@@ -66,14 +67,12 @@ export function PublishDialog({
   const [touched, setTouched] = useState(false);
   const picksInstructors = canAssignAll && assignTo === 'selected';
   const nothingPicked = picksInstructors && picked.size === 0;
-  const [seasonInput, setSeasonInput] = useState<string | null>(null);
-  const seasonValid =
-    seasonInput === null || SEASON_RE.test(seasonInput.trim());
-  const [querySeason, setQuerySeason] = useState<string | null>(null);
-  const preview = usePublishPreview(template.id, querySeason);
+  const seasons = useSeasons();
+  const [pickedSeason, setPickedSeason] = useState<string | null>(null);
+  const preview = usePublishPreview(template.id, pickedSeason);
   const publish = usePublishTemplate();
-  const season = seasonInput ?? preview.data?.season ?? '';
-  const ready = Boolean(preview.data) && seasonValid && season !== '';
+  const season = pickedSeason ?? currentSeasonKey(seasons.data);
+  const ready = Boolean(preview.data) && season !== '';
 
   const counts = preview.data;
   const newCount = counts
@@ -81,11 +80,6 @@ export function PublishDialog({
     : 0;
   const emails =
     assignTo === 'all' ? newCount : picksInstructors ? picked.size : 0;
-
-  function changeSeason(value: string) {
-    setSeasonInput(value);
-    if (SEASON_RE.test(value.trim())) setQuerySeason(value.trim());
-  }
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
@@ -95,7 +89,7 @@ export function PublishDialog({
       {
         id: template.id,
         assignTo,
-        season: season.trim(),
+        season,
         ...(picksInstructors && { instructorIds: [...picked] }),
       },
       { onSuccess: onPublished },
@@ -158,18 +152,13 @@ export function PublishDialog({
             showError={touched && nothingPicked}
           />
         )}
-        <Field
-          label={t.documents.seasonLabel}
-          required
-          error={seasonValid ? undefined : t.documents.seasonInvalid}
-        >
+        <Field label={t.documents.seasonLabel} required>
           {(p) => (
-            <Input
+            <SeasonSelect
               {...p}
-              className="max-w-[10rem]"
+              className="max-w-[14rem]"
               value={season}
-              placeholder="2026/27"
-              onChange={(e) => changeSeason(e.target.value)}
+              onChange={setPickedSeason}
             />
           )}
         </Field>

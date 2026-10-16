@@ -7,6 +7,7 @@ import {
 import { api, apiWithHeaders } from '@/lib/api';
 import { removePhoto, uploadAvatar } from '@/features/instructor/api';
 import { documentsKeys } from '@/features/documents/api';
+import { SEASONS_KEY, type AdminSeason } from '@/features/reference/api';
 import type {
   AdminInstructorRecord,
   ApprovalStatus,
@@ -313,6 +314,59 @@ export function useDeleteReference(slug: string) {
       api<DeletedReferenceRecord>(`/admin/reference/${slug}/${id}`, {
         method: 'DELETE',
       }),
+    onSuccess: invalidate,
+  });
+}
+
+const ADMIN_SEASONS_KEY = ['admin', 'reference', 'seasons'] as const;
+const seasonPath = (key: string) =>
+  `/admin/reference/seasons/${encodeURIComponent(key)}`;
+
+function useInvalidateSeasons() {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ADMIN_SEASONS_KEY }),
+      qc.invalidateQueries({ queryKey: SEASONS_KEY }),
+    ]);
+}
+
+export function useAdminSeasons() {
+  return useQuery({
+    queryKey: ADMIN_SEASONS_KEY,
+    queryFn: () => api<AdminSeason[]>('/admin/reference/seasons'),
+  });
+}
+
+export function useAddSeason() {
+  const invalidate = useInvalidateSeasons();
+  return useMutation({
+    mutationFn: (body: { key: string; startsOn: string; endsOn: string }) =>
+      api<AdminSeason>('/admin/reference/seasons', { method: 'POST', body }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateSeason() {
+  const invalidate = useInvalidateSeasons();
+  return useMutation({
+    mutationFn: ({
+      key,
+      ...body
+    }: {
+      key: string;
+      startsOn?: string;
+      endsOn?: string;
+    }) => api<AdminSeason>(seasonPath(key), { method: 'PATCH', body }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteSeason() {
+  const invalidate = useInvalidateSeasons();
+  return useMutation({
+    mutationFn: (key: string) =>
+      api<AdminSeason>(seasonPath(key), { method: 'DELETE' }),
     onSuccess: invalidate,
   });
 }

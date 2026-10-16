@@ -20,8 +20,10 @@ function refQuery(slug: string) {
 export const useTeachingLocations = () =>
   useQuery(refQuery('teaching-locations'));
 export const useLanguages = () => useQuery(refQuery('languages'));
-export const useCourseLevels = () => useQuery(refQuery('course-levels-offered'));
-export const useExamPreparations = () => useQuery(refQuery('exam-preparations'));
+export const useCourseLevels = () =>
+  useQuery(refQuery('course-levels-offered'));
+export const useExamPreparations = () =>
+  useQuery(refQuery('exam-preparations'));
 
 /** The four reference tables, keyed by the admin URL slug (W2.13). */
 export const REFERENCE_TABLES = [
@@ -31,3 +33,28 @@ export const REFERENCE_TABLES = [
   'exam-preparations',
 ] as const;
 export type ReferenceSlug = (typeof REFERENCE_TABLES)[number];
+
+export interface Season {
+  key: string;
+  startsOn: string;
+  endsOn: string;
+  isCurrent: boolean;
+}
+
+export interface AdminSeason extends Season {
+  inUse: boolean;
+}
+
+export const SEASONS_KEY = ['reference', 'seasons'] as const;
+
+export const useSeasons = () =>
+  useQuery({
+    queryKey: SEASONS_KEY,
+    queryFn: () => api<Season[]>('/reference/seasons'),
+    staleTime: REF_STALE,
+  });
+
+export function currentSeasonKey(seasons: Season[] | undefined): string {
+  if (!seasons?.length) return '';
+  return (seasons.find((s) => s.isCurrent) ?? seasons[0]!).key;
+}

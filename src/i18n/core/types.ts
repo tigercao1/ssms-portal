@@ -462,6 +462,7 @@ export interface Messages {
     languages: string;
     courseLevels: string;
     examPreps: string;
+    seasons: string;
   };
   lessons: {
     classesTitle: string;
@@ -649,7 +650,6 @@ export interface Messages {
     assignSubmit: string;
     seasonLabel: string;
     seasonHint: string;
-    seasonInvalid: string;
     searchInstructors: string;
     pickedCount: string;
     pickAtLeastOne: string;
@@ -1271,6 +1271,34 @@ export interface Messages {
     zoomOut: string;
     reviewAndSubmit: string;
     draftRestored: string;
+  };
+  seasons: {
+    tab: string;
+    intro: string;
+    loading: string;
+    none: string;
+    currentOption: string;
+    required: string;
+    current: string;
+    colKey: string;
+    startsLabel: string;
+    endsLabel: string;
+    empty: string;
+    addTitle: string;
+    keyHint: string;
+    keyInvalid: string;
+    endsBeforeStart: string;
+    added: string;
+    conflict: string;
+    editFor: string;
+    editTitle: string;
+    keyLocked: string;
+    removeFor: string;
+    removeTitle: string;
+    removeBody: string;
+    removeConfirm: string;
+    inUseTag: string;
+    inUse: string;
   };
   validation: {
     required: string;
