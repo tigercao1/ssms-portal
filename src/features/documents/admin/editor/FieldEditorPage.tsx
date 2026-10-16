@@ -332,14 +332,16 @@ function Editor({ template }: { template: Template }) {
           >
             {preview ? t.documents.backToEditing : t.documents.previewAsSigner}
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={template.status !== 'live' || !template.sourceUrl}
-            onClick={() => setAssigning(true)}
-          >
-            {t.documents.assignEllipsis}
-          </Button>
+          {template.assignTo !== 'all' && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={template.status !== 'live' || !template.sourceUrl}
+              onClick={() => setAssigning(true)}
+            >
+              {t.documents.assignEllipsis}
+            </Button>
+          )}
           {template.kind === 'sign' && !locked && (
             <Button
               size="sm"

@@ -132,7 +132,10 @@ export function useCreateAssignments() {
   return useMutation({
     mutationFn: (body: AssignRequest) => createAssignments(body),
     onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['admin', 'instructor'] }),
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ['admin', 'instructor'] }),
+        qc.invalidateQueries({ queryKey: documentsKeys.templates }),
+      ]),
   });
 }
 

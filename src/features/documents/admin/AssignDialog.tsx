@@ -1,19 +1,10 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
-import { localizeField } from '@/i18n/core/localize';
-import {
-  Banner,
-  Button,
-  Field,
-  Input,
-  Modal,
-  Spinner,
-  StatusPill,
-} from '@/components';
-import { useAdminInstructors } from '@/features/admin/api';
+import { Banner, Button, Field, Input, Modal } from '@/components';
 import { todayIso, type AssignResult, type TemplateSummary } from '../api';
 import { useCreateAssignments } from './hooks';
 import { errorText, templateTitle } from './format';
+import { InstructorPicker, useToggleSet } from './InstructorPicker';
 
 export const SEASON_RE = /^\d{4}\/\d{2}$/;
 
@@ -28,7 +19,7 @@ export function seasonFor(now: Date = new Date()): string {
   return `${start}/${String((start + 1) % 100).padStart(2, '0')}`;
 }
 
-/** Assigns a template to picked instructors or every active one, for a season. */
+/** Assigns a template to picked instructors for a season. */
 export function AssignDialog({
   template,
   onClose,
@@ -40,45 +31,14 @@ export function AssignDialog({
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const instructors = useAdminInstructors({});
   const assign = useCreateAssignments();
   const [season, setSeason] = useState(seasonFor);
-  const [mode, setMode] = useState<'all' | 'pick'>(
-    initialInstructorIds.length ? 'pick' : 'all',
-  );
-  const [picked, setPicked] = useState(() => new Set(initialInstructorIds));
-  const [query, setQuery] = useState('');
+  const [picked, toggle] = useToggleSet(initialInstructorIds);
   const [touched, setTouched] = useState(false);
   const [result, setResult] = useState<AssignResult | null>(null);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (instructors.data ?? [])
-      .map((i) => ({
-        ...i,
-        name:
-          localizeField(i.displayNameEn, i.displayNameZh, locale) || i.email,
-      }))
-      .filter(
-        (i) =>
-          !q ||
-          i.name.toLowerCase().includes(q) ||
-          i.email.toLowerCase().includes(q),
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [instructors.data, query, locale]);
-
   const seasonInvalid = !SEASON_RE.test(season.trim());
-  const nothingPicked = mode === 'pick' && picked.size === 0;
-
-  function toggle(id: string) {
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const nothingPicked = picked.size === 0;
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
@@ -88,9 +48,7 @@ export function AssignDialog({
       {
         templateId: template.id,
         season: season.trim(),
-        ...(mode === 'all'
-          ? { allActiveInstructors: true }
-          : { instructorIds: [...picked] }),
+        instructorIds: [...picked],
       },
       { onSuccess: setResult },
     );
@@ -151,74 +109,11 @@ export function AssignDialog({
               />
             )}
           </Field>
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium text-navy">
-              {t.documents.assignWho}
-            </legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="assign-mode"
-                checked={mode === 'all'}
-                onChange={() => setMode('all')}
-              />
-              {t.documents.assignAll}
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="assign-mode"
-                checked={mode === 'pick'}
-                onChange={() => setMode('pick')}
-              />
-              {t.documents.assignPick}
-            </label>
-          </fieldset>
-          {mode === 'pick' && (
-            <div className="flex flex-col gap-2">
-              <Input
-                aria-label={t.documents.searchInstructors}
-                placeholder={t.documents.searchInstructors}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <p className="text-xs text-slate">
-                {t.documents.pickedCount.replace('{n}', String(picked.size))}
-              </p>
-              {instructors.isLoading ? (
-                <Spinner />
-              ) : (
-                <ul className="max-h-64 divide-y divide-grey/40 overflow-y-auto rounded-md border border-grey/60">
-                  {rows.map((i) => (
-                    <li key={i.id}>
-                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-sunken">
-                        <input
-                          type="checkbox"
-                          checked={picked.has(i.id)}
-                          onChange={() => toggle(i.id)}
-                        />
-                        <span className="flex-1">
-                          <span className="block text-ink">{i.name}</span>
-                          <span className="block font-mono text-xs text-slate">
-                            {i.email}
-                          </span>
-                        </span>
-                        <StatusPill
-                          status={i.approvalStatus}
-                          isActive={i.isActive}
-                        />
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {touched && nothingPicked && (
-                <p className="text-sm text-status-rejected">
-                  {t.documents.pickAtLeastOne}
-                </p>
-              )}
-            </div>
-          )}
+          <InstructorPicker
+            picked={picked}
+            onToggle={toggle}
+            showError={touched && nothingPicked}
+          />
           {assign.isError && (
             <Banner tone="error">
               {errorText(assign.error, t.errors.generic)}
