@@ -19,9 +19,11 @@ export function ChangeAudienceDialog({
   const target: TemplateAssignTo =
     template.assignTo === 'all' ? 'selected' : 'all';
   const toAll = target === 'all';
-  const preview = usePublishPreview(template.id, template.season);
+  const preview = usePublishPreview(template.id, template.season, {
+    fresh: true,
+  });
   const change = useChangeAudience();
-  const counts = preview.data;
+  const counts = preview.isFetching ? undefined : preview.data;
   const newCount = counts
     ? Math.max(0, counts.approvedCount - counts.alreadyAssignedCount)
     : 0;

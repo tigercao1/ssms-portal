@@ -553,6 +553,42 @@ describe('DocumentsListPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('re-reads the preview each time the dialog opens, so a repeat switch shows no one left to email', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />, { staleTime: 30_000 });
+    const openDialog = async () => {
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Change audience of Liability waiver',
+        }),
+      );
+      return screen.getByRole('dialog', {
+        name: 'Change audience of “Liability waiver”',
+      });
+    };
+    let dialog = await openDialog();
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Change and email 1' }),
+    );
+    await screen.findByText(
+      'Liability waiver now goes to all instructors. Assigned to 1 instructors.',
+    );
+    dialog = await openDialog();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Change audience' }),
+    );
+    await screen.findByText(
+      'Liability waiver now goes to selected instructors. Existing assignments are kept.',
+    );
+    dialog = await openDialog();
+    expect(
+      await within(dialog).findByRole('button', { name: 'Change audience' }),
+    ).toBeEnabled();
+    expect(
+      within(dialog).queryByRole('button', { name: /Change and email/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it('offers Change audience only on live instructor documents', async () => {
     const customer = state.templates.find((x) => x.id === 'tpl-handbook')!;
     customer.audience = 'customer';

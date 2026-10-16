@@ -75,11 +75,18 @@ export function useUpdateTemplate() {
 }
 
 /** Who a publish would reach; `season` null lets the API pick the current one. */
-export function usePublishPreview(id: string, season: string | null) {
+export function usePublishPreview(
+  id: string,
+  season: string | null,
+  options: { fresh?: boolean } = {},
+) {
   return useQuery({
     queryKey: documentsKeys.publishPreview(id, season),
     queryFn: () => getPublishPreview(id, season ?? undefined),
-    placeholderData: (prev) => prev,
+    placeholderData: options.fresh ? undefined : (prev) => prev,
+    ...(options.fresh
+      ? { staleTime: 0, refetchOnMount: 'always' as const }
+      : {}),
   });
 }
 
@@ -104,6 +111,12 @@ export function useChangeAudience() {
       changeTemplateAudience(id, body),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
+      void qc.invalidateQueries({
+        queryKey: [
+          ...documentsKeys.template(result.template.id),
+          'publish-preview',
+        ],
+      });
       return sync(result.template);
     },
   });
