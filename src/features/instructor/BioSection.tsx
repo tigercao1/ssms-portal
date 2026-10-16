@@ -45,6 +45,12 @@ function bioOf(p: InstructorProfile, lang: Lang): string {
   return (lang === 'en' ? p.bioEn : p.bioZh) ?? '';
 }
 
+function machineOf(p: InstructorProfile, lang: Lang): boolean {
+  return Boolean(
+    lang === 'en' ? p.bioEnMachineTranslated : p.bioZhMachineTranslated,
+  );
+}
+
 function otherLang(lang: Lang): Lang {
   return lang === 'en' ? 'zh' : 'en';
 }
@@ -437,7 +443,10 @@ function SavedBioCard({
         setNotCleared(true);
         return;
       }
-      await save.mutateAsync(bioField(lang, translation, true));
+      await save.mutateAsync({
+        ...bioField(other, otherSaved, machineOf(profile, other)),
+        ...bioField(lang, translation, true),
+      });
       onSaved(null);
     } else if (value.trim() && !otherSaved.trim()) {
       const values = { [lang]: value, [other]: '' } as Record<Lang, string>;

@@ -41,6 +41,47 @@ const bothBios: InstructorProfile = {
   bioZhUpdatedAt: '2026-10-01T00:00:00Z',
 };
 
+const BIO_SIDES = [
+  {
+    text: 'bioEn',
+    machine: 'bioEnMachineTranslated',
+    by: 'bioEnTranslatedBy',
+    at: 'bioEnUpdatedAt',
+  },
+  {
+    text: 'bioZh',
+    machine: 'bioZhMachineTranslated',
+    by: 'bioZhTranslatedBy',
+    at: 'bioZhUpdatedAt',
+  },
+] as const;
+
+function applyPatch(
+  current: InstructorProfile,
+  body: UpdateProfileBody,
+): InstructorProfile {
+  const now = new Date().toISOString();
+  const next: InstructorProfile = { ...current, ...body } as InstructorProfile;
+  for (const side of BIO_SIDES) {
+    next[side.machine] = current[side.machine];
+    if (!(side.text in body)) continue;
+    const text = body[side.text] ?? null;
+    if ((text ?? '') === (current[side.text] ?? '')) {
+      next[side.text] = current[side.text];
+      continue;
+    }
+    const machine = body[side.machine] === true && Boolean(text);
+    next[side.machine] = machine;
+    if (machine) next[side.by] = 'gemini-test';
+    next[side.at] = now;
+  }
+  if ('bioEn' in body && 'bioZh' in body) {
+    next.bioEnUpdatedAt = now;
+    next.bioZhUpdatedAt = now;
+  }
+  return next;
+}
+
 function setup(
   profile: InstructorProfile,
   {
@@ -75,13 +116,7 @@ function setup(
     http.patch(`${API}/me/instructor`, async ({ request }) => {
       const body = (await request.json()) as UpdateProfileBody;
       patches.push(body);
-      const now = new Date().toISOString();
-      current = {
-        ...current,
-        ...body,
-        ...('bioEn' in body && { bioEnUpdatedAt: now }),
-        ...('bioZh' in body && { bioZhUpdatedAt: now }),
-      } as InstructorProfile;
+      current = applyPatch(current, body);
       return HttpResponse.json(current);
     }),
   );
@@ -593,14 +628,24 @@ describe('BioSection existing bio', () => {
       lang: 'Chinese',
       box: '中文',
       source: 'Veteran instructor.',
-      patch: { bioZh: '中文稿', bioZhMachineTranslated: true },
+      patch: {
+        bioEn: 'Veteran instructor.',
+        bioEnMachineTranslated: false,
+        bioZh: '中文稿',
+        bioZhMachineTranslated: true,
+      },
       shown: '中文稿',
     },
     {
       lang: 'English',
       box: 'English',
       source: '资深教练。',
-      patch: { bioEn: 'EN draft', bioEnMachineTranslated: true },
+      patch: {
+        bioZh: '资深教练。',
+        bioZhMachineTranslated: true,
+        bioEn: 'EN draft',
+        bioEnMachineTranslated: true,
+      },
       shown: 'EN draft',
     },
   ])(
@@ -617,6 +662,10 @@ describe('BioSection existing bio', () => {
       expect(drafts).toEqual([{ text: source, mode: 'translate' }]);
       expect(await screen.findByText(shown)).toBeInTheDocument();
       expect(within(bioCard()).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(screen.queryByText('May be out of date')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Update translation' }),
+      ).not.toBeInTheDocument();
     },
   );
 
