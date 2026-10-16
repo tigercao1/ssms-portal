@@ -10,6 +10,7 @@ import {
   insuranceHandlers,
   insuranceRecord,
   myInsurance,
+  SEASON_2025,
   withHistory,
   type InsuranceMockState,
 } from './fixtures';
@@ -26,9 +27,24 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function serve(data: MyInsurance) {
-  state = createInsuranceState(data);
+const RECORDS_URL = 'http://localhost:3000/me/insurance/records';
+
+function serve(data: MyInsurance, otherSeasons: MyInsurance[] = []) {
+  state = createInsuranceState(data, otherSeasons);
   server.use(...insuranceHandlers(state));
+}
+
+function failNextRegistration() {
+  server.use(
+    http.post(
+      RECORDS_URL,
+      async ({ request }) => {
+        state.posts.push((await request.json()) as never);
+        return HttpResponse.json({ message: 'boom' }, { status: 500 });
+      },
+      { once: true },
+    ),
+  );
 }
 
 async function renderPage(locale: 'en' | 'zh-CN' = 'en') {
@@ -39,6 +55,16 @@ async function renderPage(locale: 'en' | 'zh-CN' = 'en') {
     level: 1,
     name: locale === 'en' ? 'Private lesson insurance' : '私课保险登记',
   });
+  const date = screen.queryByLabelText(
+    locale === 'en' ? 'Lesson date' : '上课日期',
+  );
+  if (date)
+    await waitFor(() =>
+      expect(
+        (date as HTMLInputElement).value !== '' ||
+          screen.queryByTestId('date-hint') !== null,
+      ).toBe(true),
+    );
   return user;
 }
 
@@ -63,7 +89,7 @@ async function fillStudents(
 }
 
 function submitButton() {
-  return screen.getByRole('button', { name: /^Register( ·| for free)/ });
+  return screen.getByRole('button', { name: /^Register( ·| for free|$)/ });
 }
 
 describe('InsurancePage header and form', () => {
@@ -176,7 +202,7 @@ describe('InsurancePage header and form', () => {
     expect(waiver(1)).not.toBeChecked();
     await waitFor(() =>
       expect(screen.getByTestId('cap-total')).toHaveTextContent(
-        '$90 of $400 this season',
+        'Season total $90 / $400',
       ),
     );
     await fillStudents(user, ['Leo']);
@@ -302,6 +328,10 @@ describe('InsurancePage cap', () => {
     expect(dialog).toHaveTextContent('Lesson price$20');
     expect(dialog).toHaveTextContent('Registered this season$380');
     expect(within(dialog).getByTestId('cap-top-up')).toHaveTextContent('$20');
+    const actions = within(dialog).getByTestId('cap-actions');
+    expect(actions).toHaveClass('flex-col-reverse', 'sm:flex-row');
+    for (const button of within(actions).getAllByRole('button'))
+      expect(button).toHaveClass('w-full', 'sm:w-auto');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(nameInput(1)).toHaveValue('Wei Zhang');
@@ -376,7 +406,7 @@ describe('InsurancePage cap', () => {
     expect(submitButton()).toHaveTextContent('Register for free');
   });
 
-  it('prices a lesson outside the shown season at the list price', async () => {
+  it("prices a lesson in another, uncovered season from that season's coverage", async () => {
     serve(
       myInsurance({ owedCents: 40000, paidCents: 40000, coverage: 'capped' }),
     );
@@ -384,8 +414,110 @@ describe('InsurancePage cap', () => {
     const date = screen.getByLabelText('Lesson date');
     await user.clear(date);
     await user.type(date, '2027-12-05');
-    expect(screen.getByTestId('price-amount')).toHaveTextContent('$10');
+    await waitFor(() =>
+      expect(screen.getByTestId('price-amount')).toHaveTextContent('$10'),
+    );
     expect(submitButton()).toHaveTextContent('Register · $10 due');
+    expect(state.seasonGets).toContain('2027/28');
+  });
+
+  it('quotes $0 for a lesson in a previous season that has a season pass', async () => {
+    serve(myInsurance(), [
+      myInsurance({
+        season: SEASON_2025,
+        owedCents: 40000,
+        unpaidCents: 40000,
+        coverage: 'season_pass',
+      }),
+    ]);
+    const user = await renderPage();
+    const date = screen.getByLabelText('Lesson date');
+    await user.clear(date);
+    await user.type(date, '2026-02-15');
+    await user.click(screen.getByRole('button', { name: '2 hours' }));
+    await fillStudents(user, ['A', 'B', 'C', 'D', 'E']);
+    await waitFor(() =>
+      expect(screen.getByTestId('price-amount')).toHaveTextContent('$0'),
+    );
+    expect(state.seasonGets).toContain('2025/26');
+    expect(screen.getByText('Season pass is active')).toBeInTheDocument();
+    expect(screen.queryByTestId('price-breakdown')).not.toBeInTheDocument();
+    expect(submitButton()).toHaveTextContent('Register for free');
+    expect(screen.getByTestId('cap-total')).toHaveTextContent(
+      'Season total $0 / $400',
+    );
+    await user.click(submitButton());
+    expect(
+      await screen.findByText('Registered INS-20261015-0001 · free'),
+    ).toBeInTheDocument();
+    expect(state.posts[0]).toMatchObject({ lessonDate: '2026-02-15' });
+    expect(state.posts[0]).not.toHaveProperty('topUp');
+  });
+
+  it('disables submit with a hint naming the nearest season when no season covers the date', async () => {
+    serve(myInsurance());
+    const user = await renderPage();
+    await fillStudents(user, ['Wei Zhang']);
+    const date = screen.getByLabelText('Lesson date');
+    await user.clear(date);
+    await user.type(date, '2026-07-01');
+    expect(screen.getByTestId('date-hint')).toHaveTextContent(
+      "This date isn't in any insurance season (2025/26: Nov 1, 2025 – Apr 30, 2026)",
+    );
+    expect(date).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('price-amount')).toHaveTextContent('—');
+    expect(submitButton()).toHaveTextContent(/^Register$/);
+    expect(submitButton()).toBeDisabled();
+    await user.click(submitButton());
+    await user.type(nameInput(1), '{Enter}');
+    expect(state.posts).toHaveLength(0);
+    expect(
+      screen.queryByText("Please confirm every student's waiver is signed"),
+    ).not.toBeInTheDocument();
+
+    await user.clear(date);
+    await user.type(date, '2026-09-20');
+    expect(screen.getByTestId('date-hint')).toHaveTextContent(
+      '(2026/27: Nov 1, 2026 – Apr 30, 2027)',
+    );
+    await user.clear(date);
+    await user.type(date, '2026-11-01');
+    expect(screen.queryByTestId('date-hint')).not.toBeInTheDocument();
+    expect(submitButton()).toHaveTextContent('Register · $10 due');
+    expect(submitButton()).toBeEnabled();
+  });
+
+  it('shows the outside-season hint in Chinese', async () => {
+    serve(myInsurance());
+    const user = await renderPage('zh-CN');
+    const date = screen.getByLabelText('上课日期');
+    await user.clear(date);
+    await user.type(date, '2026-07-01');
+    expect(screen.getByTestId('date-hint')).toHaveTextContent(
+      /^该日期不在任何保险季内（2025\/26：2025年11月1日 – 2026年4月30日）$/,
+    );
+    expect(screen.getByRole('button', { name: /^登记$/ })).toBeDisabled();
+  });
+
+  it("leaves the date empty and shows the current season's range when today is outside every season", async () => {
+    vi.setSystemTime(new Date('2026-10-16T15:00:00Z'));
+    serve(myInsurance());
+    const user = await renderPage();
+    const date = screen.getByLabelText('Lesson date');
+    expect(date).toHaveValue('');
+    expect(screen.getByTestId('date-hint')).toHaveTextContent(
+      'Choose the lesson date (insurance season 2026/27: Nov 1, 2026 – Apr 30, 2027)',
+    );
+    expect(date).toHaveAttribute('aria-invalid', 'false');
+    await fillStudents(user, ['Wei Zhang']);
+    expect(submitButton()).toBeDisabled();
+    expect(submitButton()).toHaveTextContent(/^Register$/);
+    await user.type(date, '2026-11-05');
+    expect(screen.queryByTestId('date-hint')).not.toBeInTheDocument();
+    expect(submitButton()).toHaveTextContent('Register · $10 due');
+    await user.click(submitButton());
+    await waitFor(() => expect(state.posts).toHaveLength(1));
+    expect(state.posts[0]).toMatchObject({ lessonDate: '2026-11-05' });
   });
 
   it('buys a season pass after confirming', async () => {
@@ -434,7 +566,7 @@ describe('InsurancePage cap', () => {
     serve(withHistory);
     await renderPage();
     expect(screen.getByTestId('cap-total')).toHaveTextContent(
-      '$50 of $400 this season',
+      'Season total $50 / $400',
     );
     const bar = screen.getByRole('progressbar', {
       name: 'Season cap progress',
@@ -463,6 +595,56 @@ describe('InsurancePage cap', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/of it is unpaid/)).not.toBeInTheDocument();
+  });
+});
+
+describe('InsurancePage retries', () => {
+  it('reuses the idempotency key after a failed submit and rotates it after success', async () => {
+    serve(myInsurance());
+    const user = await renderPage();
+    await fillStudents(user, ['Wei Zhang']);
+    failNextRegistration();
+    await user.click(submitButton());
+    expect(await screen.findByText('boom')).toBeInTheDocument();
+    expect(nameInput(1)).toHaveValue('Wei Zhang');
+    await user.click(submitButton());
+    await screen.findByText('Registered INS-20261015-0001 · $10 due');
+    await fillStudents(user, ['Amy Li']);
+    await user.click(submitButton());
+    await screen.findByText('Registered INS-20261015-0002 · $10 due');
+    const keys = state.posts.map((p) => p.idempotencyKey);
+    expect(keys).toHaveLength(3);
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it('keeps the same key through the cap modal and a failed top-up', async () => {
+    serve(myInsurance({ owedCents: 38000, paidCents: 38000 }));
+    const user = await renderPage();
+    await user.click(screen.getByRole('button', { name: '2 hours' }));
+    await fillStudents(user, ['Wei Zhang']);
+    await user.click(submitButton());
+    const dialog = await screen.findByRole('dialog');
+    const topUp = within(dialog).getByRole('button', {
+      name: 'Pay $20 top-up for a season pass',
+    });
+    failNextRegistration();
+    await user.click(topUp);
+    expect(await within(dialog).findByText('boom')).toBeInTheDocument();
+    await user.click(topUp);
+    await screen.findByText('Registered INS-20261015-0001 · $20 due');
+    await fillStudents(user, ['Amy Li']);
+    await user.click(submitButton());
+    await screen.findByText('Registered INS-20261015-0002 · free');
+    expect(state.posts.map((p) => p.topUp ?? false)).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
+    const keys = state.posts.map((p) => p.idempotencyKey);
+    expect(new Set(keys.slice(0, 3)).size).toBe(1);
+    expect(keys[3]).not.toBe(keys[0]);
   });
 });
 
@@ -524,7 +706,7 @@ describe('InsurancePage records and states', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('form')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /^Register( ·| for free)/ }),
+      screen.queryByRole('button', { name: /^Register( ·| for free|$)/ }),
     ).toBeNull();
     expect(screen.queryByText('My registrations')).not.toBeInTheDocument();
   });
@@ -596,7 +778,7 @@ describe('InsurancePage in Chinese', () => {
     ).toBeDisabled();
     expect(screen.getByText('本季封顶进度')).toBeInTheDocument();
     expect(screen.getByTestId('cap-total')).toHaveTextContent(
-      '本季已付 $50 / $400',
+      '本季累计 $50 / $400',
     );
     expect(screen.getByText('其中待付款 $10')).toBeInTheDocument();
     expect(screen.getByText('整季私课保险')).toBeInTheDocument();

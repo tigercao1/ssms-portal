@@ -27,9 +27,9 @@ export interface InsuranceRecord {
   locationId: string | null;
   locationName: string | null;
   locationOther: string | null;
-  students: InsuranceStudent[] | null;
+  students: InsuranceStudent[];
   studentCount: number | null;
-  listCents: number | null;
+  listCents: number;
   amountCents: number;
   coverage: InsuranceCoverage | null;
   paymentStatus: InsurancePaymentStatus;
@@ -97,7 +97,7 @@ export interface AdminInsuranceRecord extends InsuranceRecord {
   paidNote: string | null;
   voidedAt: string | null;
   voidedReason: string | null;
-  voidedFromStatus: InsurancePaymentStatus | null;
+  voidedFromStatus: Exclude<InsurancePaymentStatus, 'voided'> | null;
 }
 
 export interface AdminInsuranceRecordsPage {

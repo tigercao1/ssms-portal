@@ -12,9 +12,14 @@ import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { todayIso } from '@/features/documents/api/validity';
-import { errorText } from '@/features/admin/payroll/payrollFormat';
-import { useTeachingLocations } from '@/features/reference/api';
-import { capReachedOf, errorCodeOf, useRegisterLesson } from './api';
+import { errorText, formatDay } from '@/features/admin/payroll/payrollFormat';
+import { useSeasons, useTeachingLocations } from '@/features/reference/api';
+import {
+  capReachedOf,
+  errorCodeOf,
+  useRegisterLesson,
+  useSeasonInsurance,
+} from './api';
 import { BILLED_STUDENTS_MAX, dollars, listCents } from './money';
 import type {
   CapReached,
@@ -46,8 +51,21 @@ const emptyRow = (): StudentRow => ({
   waiverConfirmed: false,
 });
 
-function inSeason(date: string, season: InsuranceSeason | null) {
-  return Boolean(season && date >= season.startsOn && date <= season.endsOn);
+function inSeason(date: string, season: InsuranceSeason) {
+  return date >= season.startsOn && date <= season.endsOn;
+}
+
+const dayNumber = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 86400000;
+
+function nearestSeason<S extends InsuranceSeason>(date: string, seasons: S[]) {
+  const distance = (s: S) =>
+    date < s.startsOn
+      ? dayNumber(s.startsOn) - dayNumber(date)
+      : dayNumber(date) - dayNumber(s.endsOn);
+  return seasons.reduce<S | undefined>(
+    (best, s) => (!best || distance(s) < distance(best) ? s : best),
+    undefined,
+  );
 }
 
 export const RegisterLessonCard = forwardRef<
@@ -66,7 +84,8 @@ export const RegisterLessonCard = forwardRef<
   const firstNameRef = useRef<HTMLInputElement>(null);
   const locations = useTeachingLocations();
   const register = useRegisterLesson();
-  const [lessonDate, setLessonDate] = useState(() => todayIso());
+  const seasons = useSeasons();
+  const [dateInput, setDateInput] = useState<string | null>(null);
   const [hours, setHours] = useState<1 | 2>(1);
   const [location, setLocation] = useState('');
   const [locationOther, setLocationOther] = useState('');
@@ -82,12 +101,48 @@ export const RegisterLessonCard = forwardRef<
     },
   }));
 
-  const covered = coverage !== 'none' && inSeason(lessonDate, season);
+  const seasonsReady = !seasons.isPending;
+  const knownSeasons: InsuranceSeason[] =
+    seasons.data ?? (season ? [season] : []);
+  const today = todayIso();
+  const lessonDate =
+    dateInput ??
+    (seasonsReady && knownSeasons.some((x) => inSeason(today, x)) ? today : '');
+  const lessonSeason = lessonDate
+    ? knownSeasons.find((x) => inSeason(lessonDate, x))
+    : undefined;
+  const pageSeason = Boolean(lessonSeason && lessonSeason.key === season?.key);
+  const seasonInsurance = useSeasonInsurance(
+    lessonSeason?.key ?? null,
+    !pageSeason,
+  );
+  const dateCoverage = !lessonSeason
+    ? undefined
+    : pageSeason
+      ? coverage
+      : seasonInsurance.data?.coverage;
+  const quoteReady = seasonsReady && dateCoverage !== undefined;
+  const outsideSeason = seasonsReady && Boolean(lessonDate) && !lessonSeason;
+  const covered = quoteReady && dateCoverage !== 'none';
   const count = rows.length;
   const amount = covered ? 0 : listCents(hours, count);
   const missingName = rows.some((r) => !r.name.trim());
   const missingWaiver = rows.some((r) => !r.waiverConfirmed);
-  const blocked = missingName || missingWaiver || !lessonDate;
+  const studentsBlocked = missingName || missingWaiver;
+  const blocked = studentsBlocked || !quoteReady;
+  const hintSeason = !seasonsReady
+    ? undefined
+    : outsideSeason
+      ? nearestSeason(lessonDate, knownSeasons)
+      : !lessonDate
+        ? (seasons.data?.find((x) => x.isCurrent) ?? season ?? undefined)
+        : undefined;
+  const dateHint =
+    hintSeason &&
+    (outsideSeason ? s.outsideSeason : s.chooseLessonDate)
+      .replace('{key}', hintSeason.key)
+      .replace('{start}', formatDay(hintSeason.startsOn, locale))
+      .replace('{end}', formatDay(hintSeason.endsOn, locale));
 
   function updateRow(id: number, patch: Partial<StudentRow>) {
     setTouched(true);
@@ -186,8 +241,24 @@ export const RegisterLessonCard = forwardRef<
               id={`${headingId}-date`}
               type="date"
               value={lessonDate}
-              onChange={(e) => setLessonDate(e.target.value)}
+              aria-invalid={outsideSeason}
+              aria-describedby={dateHint ? `${headingId}-date-hint` : undefined}
+              onChange={(e) => setDateInput(e.target.value)}
             />
+            {dateHint && (
+              <p
+                id={`${headingId}-date-hint`}
+                data-testid="date-hint"
+                className={cn(
+                  'text-xs',
+                  outsideSeason
+                    ? 'font-medium text-status-rejected'
+                    : 'text-slate',
+                )}
+              >
+                {dateHint}
+              </p>
+            )}
           </div>
           <fieldset className="flex flex-col gap-1.5">
             <legend className={cn(label, 'mb-1.5')}>{s.duration}</legend>
@@ -334,7 +405,7 @@ export const RegisterLessonCard = forwardRef<
             <div className="min-w-0 text-sm">
               {covered ? (
                 <p className="font-semibold text-navy">
-                  {coverage === 'season_pass'
+                  {dateCoverage === 'season_pass'
                     ? s.coveredSeasonPass
                     : s.coveredCapped}
                 </p>
@@ -363,7 +434,7 @@ export const RegisterLessonCard = forwardRef<
                 data-testid="price-amount"
                 className="text-3xl font-bold tabular-nums text-navy"
               >
-                {dollars(amount)}
+                {quoteReady ? dollars(amount) : '—'}
               </p>
             </div>
           </div>
@@ -373,17 +444,24 @@ export const RegisterLessonCard = forwardRef<
             disabled={blocked}
             loading={register.isPending}
           >
-            {covered
-              ? s.submitFree
-              : s.submitDue.replace('{amount}', dollars(amount))}
+            {!quoteReady
+              ? s.submit
+              : covered
+                ? s.submitFree
+                : s.submitDue.replace('{amount}', dollars(amount))}
           </Button>
-          {blocked && (
+          {studentsBlocked && (
             <p
               role="note"
               className="text-center text-sm font-medium text-status-rejected"
             >
               {s.waiverRequired}
             </p>
+          )}
+          {seasonInsurance.isError && (
+            <Banner tone="error">
+              {errorText(seasonInsurance.error, t.errors.generic)}
+            </Banner>
           )}
           {submitError && !capReached && (
             <Banner tone="error">{submitError}</Banner>
@@ -425,14 +503,26 @@ function CapModal({
       title={s.capTitle}
       onClose={pending ? () => undefined : onCancel}
       footer={
-        <>
-          <Button variant="ghost" onClick={onCancel} disabled={pending}>
+        <div
+          data-testid="cap-actions"
+          className="flex w-full min-w-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+        >
+          <Button
+            variant="ghost"
+            className="w-full sm:w-auto"
+            onClick={onCancel}
+            disabled={pending}
+          >
             {t.common.cancel}
           </Button>
-          <Button loading={pending} onClick={onTopUp}>
+          <Button
+            className="w-full sm:w-auto"
+            loading={pending}
+            onClick={onTopUp}
+          >
             {s.capTopUp.replace('{amount}', topUp)}
           </Button>
-        </>
+        </div>
       }
     >
       <div className="flex flex-col gap-3 text-sm">

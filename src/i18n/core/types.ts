@@ -1340,6 +1340,9 @@ export interface Messages {
     coveredCapped: string;
     submitDue: string;
     submitFree: string;
+    submit: string;
+    outsideSeason: string;
+    chooseLessonDate: string;
     waiverRequired: string;
     noSeason: string;
     lockedSubmit: string;

@@ -12,7 +12,7 @@ import type { InsuranceRecord } from './types';
 const SURFACE = 'rounded-lg border border-grey/60 bg-surface shadow-card';
 
 export function studentNames(record: InsuranceRecord, separator: string) {
-  return (record.students ?? []).map((s) => s.name).join(separator);
+  return record.students.map((s) => s.name).join(separator);
 }
 
 export function durationText(hours: number | null, t: Messages) {

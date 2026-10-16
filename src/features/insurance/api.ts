@@ -17,6 +17,17 @@ export function useMyInsurance() {
   });
 }
 
+export function useSeasonInsurance(season: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...MY_INSURANCE_KEY, { season }],
+    queryFn: () =>
+      api<MyInsurance>(
+        `/me/insurance?season=${encodeURIComponent(season ?? '')}`,
+      ),
+    enabled: enabled && Boolean(season),
+  });
+}
+
 function useInvalidateMyInsurance() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: MY_INSURANCE_KEY });

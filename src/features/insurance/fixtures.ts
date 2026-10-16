@@ -100,19 +100,49 @@ export const withHistory = myInsurance({
   records: historyRecords,
 });
 
+export const SEASON_2025 = {
+  key: '2025/26',
+  startsOn: '2025-11-01',
+  endsOn: '2026-04-30',
+};
+
 export interface InsuranceMockState {
   data: MyInsurance;
+  otherSeasons: Record<string, MyInsurance>;
+  seasonGets: string[];
   posts: RegisterLessonBody[];
   passPosts: SeasonPassBody[];
   nextNo: number;
 }
 
-export function createInsuranceState(data: MyInsurance): InsuranceMockState {
-  return { data: structuredClone(data), posts: [], passPosts: [], nextNo: 1 };
+export function createInsuranceState(
+  data: MyInsurance,
+  otherSeasons: MyInsurance[] = [],
+): InsuranceMockState {
+  return {
+    data: structuredClone(data),
+    otherSeasons: Object.fromEntries(
+      otherSeasons.map((o) => [o.season!.key, structuredClone(o)]),
+    ),
+    seasonGets: [],
+    posts: [],
+    passPosts: [],
+    nextNo: 1,
+  };
 }
 
-function addRecord(state: InsuranceMockState, record: InsuranceRecord) {
-  const d = state.data;
+function overviewFor(state: InsuranceMockState, lessonDate: string) {
+  return (
+    Object.values(state.otherSeasons).find(
+      (o) =>
+        o.season &&
+        lessonDate >= o.season.startsOn &&
+        lessonDate <= o.season.endsOn,
+    ) ?? state.data
+  );
+}
+
+function addRecord(d: MyInsurance, record: InsuranceRecord) {
   d.records = [record, ...d.records];
   d.owedCents += record.amountCents;
   if (record.paymentStatus === 'unpaid') d.unpaidCents += record.amountCents;
@@ -129,11 +159,20 @@ function recordNo(state: InsuranceMockState) {
 
 export function insuranceHandlers(state: InsuranceMockState) {
   return [
-    http.get(`${API}/me/insurance`, () => HttpResponse.json(state.data)),
+    http.get(`${API}/me/insurance`, ({ request }) => {
+      const season = new URL(request.url).searchParams.get('season');
+      if (!season || season === state.data.season?.key)
+        return HttpResponse.json(state.data);
+      state.seasonGets.push(season);
+      return HttpResponse.json(
+        state.otherSeasons[season] ??
+          myInsurance({ season: { ...SEASON_2026, key: season } }),
+      );
+    }),
     http.post(`${API}/me/insurance/records`, async ({ request }) => {
       const body = (await request.json()) as RegisterLessonBody;
       state.posts.push(body);
-      const d = state.data;
+      const d = overviewFor(state, body.lessonDate);
       const list = listCents(body.durationHours, body.students.length);
       const base = {
         id: `new-${state.nextNo}`,
@@ -188,7 +227,7 @@ export function insuranceHandlers(state: InsuranceMockState) {
           paymentStatus: 'unpaid',
         };
       }
-      addRecord(state, record);
+      addRecord(d, record);
       return HttpResponse.json(record, { status: 201 });
     }),
     http.post(`${API}/me/insurance/season-pass`, async ({ request }) => {
@@ -223,7 +262,7 @@ export function insuranceHandlers(state: InsuranceMockState) {
         paidOn: null,
         createdAt: '2026-10-15T14:00:00Z',
       };
-      addRecord(state, record);
+      addRecord(d, record);
       return HttpResponse.json(record, { status: 201 });
     }),
   ];
@@ -294,9 +333,9 @@ export const adminRecords: AdminInsuranceRecord[] = [
     kind: 'season_pass',
     lessonDate: null,
     durationHours: null,
-    students: null,
+    students: [],
     studentCount: null,
-    listCents: null,
+    listCents: 40000,
     amountCents: 40000,
     coverage: null,
     createdAt: '2026-11-01T16:00:00Z',
