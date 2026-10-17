@@ -1,12 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
-import type {
-  CapReached,
-  InsuranceRecord,
-  MyInsurance,
-  RegisterLessonBody,
-  SeasonPassBody,
-} from './types';
+import type { InsuranceRecord, MyInsurance, RegisterLessonBody } from './types';
 
 export const MY_INSURANCE_KEY = ['me', 'insurance'] as const;
 
@@ -40,29 +34,6 @@ export function useRegisterLesson() {
       api<InsuranceRecord>('/me/insurance/records', { method: 'POST', body }),
     onSuccess: invalidate,
   });
-}
-
-export function useBuySeasonPass() {
-  const invalidate = useInvalidateMyInsurance();
-  return useMutation({
-    mutationFn: (body: SeasonPassBody) =>
-      api<InsuranceRecord>('/me/insurance/season-pass', {
-        method: 'POST',
-        body,
-      }),
-    onSuccess: invalidate,
-  });
-}
-
-export function capReachedOf(error: unknown): CapReached | null {
-  if (!(error instanceof ApiError) || error.status !== 409) return null;
-  const body = error.body as Partial<CapReached> | undefined;
-  return body?.code === 'cap_reached' &&
-    typeof body.topUpCents === 'number' &&
-    typeof body.listCents === 'number' &&
-    typeof body.owedCents === 'number'
-    ? (body as CapReached)
-    : null;
 }
 
 export function errorCodeOf(error: unknown): string | null {

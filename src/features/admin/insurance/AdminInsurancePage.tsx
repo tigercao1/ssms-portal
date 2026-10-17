@@ -33,8 +33,10 @@ import type {
   InsurancePaymentStatus,
   SeasonCoverage,
 } from '@/features/insurance/types';
+import { errorCodeOf } from '@/features/insurance/api';
 import { errorText, formatDay } from '../payroll/payrollFormat';
 import {
+  useGrantSeasonPass,
   useInsuranceRecords,
   useInsuranceSummary,
   useMarkPaid,
@@ -51,10 +53,10 @@ const STATUSES: InsurancePaymentStatus[] = [
   'voided',
 ];
 
-type Dialog = {
-  kind: 'paid' | 'unpaid' | 'void';
-  record: AdminInsuranceRecord;
-} | null;
+type Dialog =
+  | { kind: 'paid' | 'unpaid' | 'void'; record: AdminInsuranceRecord }
+  | { kind: 'grant' | 'removePass'; row: AdminInsuranceSummary }
+  | null;
 
 export function AdminInsurancePage() {
   const t = useT();
@@ -109,6 +111,7 @@ export function AdminInsurancePage() {
           setInstructorId(id);
           setPage(1);
         }}
+        onAction={setDialog}
       />
 
       <section
@@ -193,11 +196,49 @@ export function AdminInsurancePage() {
       )}
       {dialog?.kind === 'void' && (
         <VoidDialog
-          record={dialog.record}
+          recordId={dialog.record.id}
+          title={s.voidTitle.replace('{recordNo}', dialog.record.recordNo)}
+          summary={recordSummary(dialog.record, locale)}
+          body={s.voidBody}
+          confirm={s.voidConfirm}
           onClose={() => setDialog(null)}
           onDone={(r) => {
             setDialog(null);
             showToast(s.voidToast.replace('{recordNo}', r.recordNo));
+          }}
+        />
+      )}
+      {dialog?.kind === 'grant' && (
+        <GrantSeasonPassDialog
+          row={dialog.row}
+          season={season}
+          onClose={() => setDialog(null)}
+          onDone={(r) => {
+            setDialog(null);
+            showToast(
+              s.grantToast
+                .replace('{recordNo}', r.recordNo)
+                .replace('{name}', rowLabel(dialog.row, locale)),
+            );
+          }}
+        />
+      )}
+      {dialog?.kind === 'removePass' && dialog.row.seasonPassRecordId && (
+        <VoidDialog
+          recordId={dialog.row.seasonPassRecordId}
+          title={s.removePassTitle.replace(
+            '{name}',
+            rowLabel(dialog.row, locale),
+          )}
+          summary={`${rowLabel(dialog.row, locale)} · ${season}`}
+          body={s.removePassBody}
+          confirm={s.removePassConfirm}
+          onClose={() => setDialog(null)}
+          onDone={() => {
+            setDialog(null);
+            showToast(
+              s.removePassToast.replace('{name}', rowLabel(dialog.row, locale)),
+            );
           }}
         />
       )}
@@ -234,6 +275,10 @@ function instructorLabel(
   return localizeField(name, nameZh, locale) || email || '—';
 }
 
+function rowLabel(row: AdminInsuranceSummary, locale: Locale) {
+  return instructorLabel(row.name, row.nameZh, row.email, locale);
+}
+
 function InstructorName({
   row,
 }: {
@@ -247,10 +292,12 @@ function SummaryTable({
   query,
   waiting,
   onPick,
+  onAction,
 }: {
   query: ReturnType<typeof useInsuranceSummary>;
   waiting: boolean;
   onPick: (instructorId: string) => void;
+  onAction: (dialog: Dialog) => void;
 }) {
   const t = useT();
   const s = t.adminInsurance;
@@ -298,6 +345,7 @@ function SummaryTable({
                     row={row}
                     striped={i % 2 === 1}
                     onPick={onPick}
+                    onAction={onAction}
                   />
                 ))}
               </tbody>
@@ -313,10 +361,12 @@ function SummaryRow({
   row,
   striped,
   onPick,
+  onAction,
 }: {
   row: AdminInsuranceSummary;
   striped: boolean;
   onPick: (instructorId: string) => void;
+  onAction: (dialog: Dialog) => void;
 }) {
   const t = useT();
   const s = t.adminInsurance;
@@ -370,10 +420,46 @@ function SummaryRow({
         </div>
       </td>
       <td className={td}>
-        <StatePill
-          tone={row.coverage === 'none' ? 'muted' : 'done'}
-          label={coverageLabel(row.coverage, s)}
-        />
+        <div className="flex flex-col items-start gap-1.5">
+          <StatePill
+            tone={row.coverage === 'none' ? 'muted' : 'done'}
+            label={
+              row.seasonPassRecordId
+                ? s.coverageSeasonPass
+                : coverageLabel(row.coverage, s)
+            }
+          />
+          {row.seasonPassPaymentStatus && (
+            <span
+              className={cn(
+                'text-xs',
+                row.seasonPassPaymentStatus === 'unpaid'
+                  ? 'font-medium text-status-pending'
+                  : 'text-slate',
+              )}
+            >
+              {paymentLabel(row.seasonPassPaymentStatus, s)}
+            </span>
+          )}
+          {row.seasonPassRecordId ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="-ml-3"
+              onClick={() => onAction({ kind: 'removePass', row })}
+            >
+              {s.removePass}
+            </Button>
+          ) : row.coverage === 'none' && row.owedCents < CAP_CENTS ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => onAction({ kind: 'grant', row })}
+            >
+              {s.grantPass}
+            </Button>
+          ) : null}
+        </div>
       </td>
       <td className={cn(td, 'text-right tabular-nums')}>{row.records}</td>
     </tr>
@@ -706,18 +792,147 @@ function MarkUnpaidDialog({
   );
 }
 
-function VoidDialog({
-  record,
+function GrantSeasonPassDialog({
+  row,
+  season,
   onClose,
   onDone,
 }: {
-  record: AdminInsuranceRecord;
+  row: AdminInsuranceSummary;
+  season: string;
   onClose: () => void;
   onDone: (record: AdminInsuranceRecord) => void;
 }) {
   const t = useT();
   const s = t.adminInsurance;
   const { locale } = useLocale();
+  const grant = useGrantSeasonPass();
+  const [note, setNote] = useState('');
+  const [markPaid, setMarkPaid] = useState(false);
+  const [paidOn, setPaidOn] = useState(() => todayIso());
+  const name = rowLabel(row, locale);
+  const owed = dollars(row.owedCents);
+  const amount = dollars(Math.max(0, CAP_CENTS - row.owedCents));
+  const ready = !markPaid || Boolean(paidOn);
+
+  function submit(e?: FormEvent) {
+    e?.preventDefault();
+    if (!ready || grant.isPending) return;
+    grant.mutate(
+      {
+        instructorId: row.instructorId,
+        body: {
+          season,
+          ...(note.trim() && { note: note.trim() }),
+          ...(markPaid && { paidOn }),
+        },
+      },
+      { onSuccess: onDone },
+    );
+  }
+
+  const code = grant.isError ? errorCodeOf(grant.error) : null;
+  const grantError = !grant.isError
+    ? null
+    : code === 'already_covered'
+      ? s.grantAlreadyCovered
+      : code === 'already_has_pass'
+        ? s.grantAlreadyHasPass
+        : code === 'not_approved'
+          ? s.grantNotApproved
+          : errorText(grant.error, t.errors.generic);
+
+  return (
+    <Modal
+      title={s.grantTitle.replace('{name}', name)}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={grant.isPending}>
+            {t.common.cancel}
+          </Button>
+          <Button
+            loading={grant.isPending}
+            disabled={!ready}
+            onClick={() => submit()}
+          >
+            {s.grantConfirm.replace('{amount}', amount)}
+          </Button>
+        </>
+      }
+    >
+      <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        <dl className="grid grid-cols-[1fr_auto] gap-x-4 rounded-md bg-sunken px-4 py-3 text-sm">
+          <dt className="font-semibold text-navy">
+            {s.grantAmount.replace('{owed}', owed)}
+          </dt>
+          <dd
+            data-testid="grant-amount"
+            className="text-right text-lg font-bold tabular-nums text-navy"
+          >
+            {amount}
+          </dd>
+        </dl>
+        <p className="text-sm text-slate">
+          {s.grantBody.replace('{owed}', owed).replace('{season}', season)}
+        </p>
+        <Field label={s.noteLabel} hint={s.grantNoteHint}>
+          {(p) => (
+            <Textarea
+              {...p}
+              rows={2}
+              maxLength={500}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          )}
+        </Field>
+        <label className="flex items-center gap-2 text-sm font-medium text-ink">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[var(--navy)]"
+            checked={markPaid}
+            onChange={(e) => setMarkPaid(e.target.checked)}
+          />
+          {s.grantMarkPaid}
+        </label>
+        {markPaid && (
+          <Field label={s.paidOnLabel} required>
+            {(p) => (
+              <Input
+                {...p}
+                type="date"
+                value={paidOn}
+                onChange={(e) => setPaidOn(e.target.value)}
+              />
+            )}
+          </Field>
+        )}
+        {grantError && <Banner tone="error">{grantError}</Banner>}
+      </form>
+    </Modal>
+  );
+}
+
+function VoidDialog({
+  recordId,
+  title,
+  summary,
+  body,
+  confirm,
+  onClose,
+  onDone,
+}: {
+  recordId: string;
+  title: string;
+  summary: string;
+  body: string;
+  confirm: string;
+  onClose: () => void;
+  onDone: (record: AdminInsuranceRecord) => void;
+}) {
+  const t = useT();
+  const s = t.adminInsurance;
   const voidRecord = useVoidRecord();
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
@@ -728,14 +943,14 @@ function VoidDialog({
     setTouched(true);
     if (missing || voidRecord.isPending) return;
     voidRecord.mutate(
-      { id: record.id, body: { reason: reason.trim() } },
+      { id: recordId, body: { reason: reason.trim() } },
       { onSuccess: onDone },
     );
   }
 
   return (
     <Modal
-      title={s.voidTitle.replace('{recordNo}', record.recordNo)}
+      title={title}
       onClose={onClose}
       footer={
         <>
@@ -752,14 +967,14 @@ function VoidDialog({
             disabled={touched && missing}
             onClick={() => submit()}
           >
-            {s.voidConfirm}
+            {confirm}
           </Button>
         </>
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">{recordSummary(record, locale)}</p>
-        <p className="text-sm">{s.voidBody}</p>
+        <p className="text-sm text-slate">{summary}</p>
+        <p className="text-sm">{body}</p>
         <Field
           label={s.voidReason}
           required

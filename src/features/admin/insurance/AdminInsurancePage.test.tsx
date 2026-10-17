@@ -9,7 +9,10 @@ import {
   adminRecords,
   adminSummary,
 } from '@/features/insurance/fixtures';
-import type { AdminInsuranceRecord } from '@/features/insurance/types';
+import type {
+  AdminInsuranceRecord,
+  AdminInsuranceSummary,
+} from '@/features/insurance/types';
 import { AdminInsurancePage, INSURANCE_PAGE_SIZE } from './AdminInsurancePage';
 
 const API = 'http://localhost:3000';
@@ -19,6 +22,8 @@ let total: number | null;
 let summaryQueries: string[];
 let recordQueries: URLSearchParams[];
 let actions: { id: string; action: string; body: unknown }[];
+let summary: AdminInsuranceSummary[];
+let grants: { instructorId: string; body: unknown }[];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -28,11 +33,44 @@ beforeEach(() => {
   summaryQueries = [];
   recordQueries = [];
   actions = [];
+  summary = adminSummary.map((row) => ({ ...row }));
+  grants = [];
   server.use(
     http.get(`${API}/admin/insurance/summary`, ({ request }) => {
       summaryQueries.push(new URL(request.url).search);
-      return HttpResponse.json(adminSummary);
+      return HttpResponse.json(summary);
     }),
+    http.post(
+      `${API}/admin/insurance/instructors/:instructorId/season-pass`,
+      async ({ request, params }) => {
+        const instructorId = String(params.instructorId);
+        const body = (await request.json()) as { paidOn?: string };
+        grants.push({ instructorId, body });
+        const row = summary.find((r) => r.instructorId === instructorId)!;
+        const record = adminRecord({
+          id: 'pass-new',
+          recordNo: 'INS-20261220-0001',
+          instructorId,
+          kind: 'season_pass',
+          lessonDate: null,
+          durationHours: null,
+          students: [],
+          studentCount: null,
+          listCents: 40000 - row.owedCents,
+          amountCents: 40000 - row.owedCents,
+          coverage: null,
+          paymentStatus: body.paidOn ? 'paid' : 'unpaid',
+          paidOn: body.paidOn ?? null,
+        });
+        Object.assign(row, {
+          owedCents: 40000,
+          coverage: 'season_pass',
+          seasonPassRecordId: record.id,
+          seasonPassPaymentStatus: record.paymentStatus,
+        });
+        return HttpResponse.json(record, { status: 201 });
+      },
+    ),
     http.get(`${API}/admin/insurance/records`, ({ request }) => {
       const params = new URL(request.url).searchParams;
       recordQueries.push(params);
@@ -91,6 +129,12 @@ async function renderPage(locale: 'en' | 'zh-CN' = 'en') {
   return user;
 }
 
+function summaryRow(name: string) {
+  return within(screen.getByRole('table', { name: /By instructor|按教练汇总/ }))
+    .getByRole('button', { name })
+    .closest('tr') as HTMLElement;
+}
+
 function recordRow(recordNo: string) {
   return screen.getByText(recordNo).closest('tr') as HTMLElement;
 }
@@ -121,13 +165,173 @@ describe('AdminInsurancePage', () => {
     ]);
     const rows = within(summary).getAllByRole('row').slice(1);
     expect(rows[0]).toHaveTextContent(
-      'Jane Snowjane@example.com$380$300$80$380 / $400Per lesson14',
+      'Jane Snowjane@example.com$380$300$80$380 / $400Per lessonGrant season pass14',
     );
     expect(rows[1]).toHaveTextContent('Li Wei');
-    expect(rows[1]).toHaveTextContent('$400 / $400Season pass3');
+    expect(rows[1]).toHaveTextContent(
+      '$400 / $400Season passPaidRemove season pass3',
+    );
     expect(
       within(rows[0] as HTMLElement).getByRole('progressbar'),
     ).toHaveAttribute('aria-valuenow', '380');
+  });
+
+  it('grants a season pass for the remainder and marks it paid now', async () => {
+    const user = await renderPage();
+    await user.click(
+      within(summaryRow('Jane Snow')).getByRole('button', {
+        name: 'Grant season pass',
+      }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Grant Jane Snow a season pass',
+    });
+    expect(dialog).toHaveTextContent('Season pass ($400 − $380)');
+    expect(within(dialog).getByTestId('grant-amount')).toHaveTextContent('$20');
+    expect(dialog).toHaveTextContent(
+      '$380 is already registered for 2026/27. Every later registration this season is free.',
+    );
+    expect(within(dialog).queryByLabelText(/Payment date/)).toBeNull();
+    await user.click(within(dialog).getByLabelText('Mark paid now'));
+    const paidOn = within(dialog).getByLabelText(/Payment date/);
+    expect(paidOn).toHaveValue('2026-12-20');
+    await user.clear(paidOn);
+    const confirm = within(dialog).getByRole('button', { name: 'Grant · $20' });
+    expect(confirm).toBeDisabled();
+    await user.type(paidOn, '2026-12-18');
+    await user.type(within(dialog).getByLabelText('Note'), ' paid up front ');
+    await user.click(confirm);
+    expect(
+      await screen.findByText(
+        'Season pass INS-20261220-0001 granted to Jane Snow.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(grants).toEqual([
+      {
+        instructorId: 'inst-1',
+        body: {
+          season: '2026/27',
+          note: 'paid up front',
+          paidOn: '2026-12-18',
+        },
+      },
+    ]);
+    await waitFor(() =>
+      expect(summaryRow('Jane Snow')).toHaveTextContent(
+        'Season passPaidRemove season pass14',
+      ),
+    );
+    expect(
+      within(summaryRow('Jane Snow')).queryByRole('button', {
+        name: 'Grant season pass',
+      }),
+    ).toBeNull();
+  });
+
+  it('grants an unpaid season pass with no note', async () => {
+    const user = await renderPage();
+    await user.click(
+      within(summaryRow('Jane Snow')).getByRole('button', {
+        name: 'Grant season pass',
+      }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByLabelText('Mark paid now'));
+    await user.click(within(dialog).getByLabelText('Mark paid now'));
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Grant · $20' }),
+    );
+    await screen.findByText(
+      'Season pass INS-20261220-0001 granted to Jane Snow.',
+    );
+    expect(grants).toEqual([
+      { instructorId: 'inst-1', body: { season: '2026/27' } },
+    ]);
+    await waitFor(() =>
+      expect(summaryRow('Jane Snow')).toHaveTextContent('Season passUnpaid'),
+    );
+  });
+
+  it.each([
+    [
+      'already_covered',
+      'This instructor already reached the $400 cap this season.',
+    ],
+    [
+      'already_has_pass',
+      'This instructor already has a season pass this season.',
+    ],
+    ['not_approved', 'Only approved instructors can get a season pass.'],
+    ['other', 'Grant failed'],
+  ])('explains a %s grant error', async (code, message) => {
+    server.use(
+      http.post(
+        `${API}/admin/insurance/instructors/:instructorId/season-pass`,
+        () =>
+          HttpResponse.json(
+            { statusCode: 409, code, message: 'Grant failed' },
+            { status: 409 },
+          ),
+      ),
+    );
+    const user = await renderPage();
+    await user.click(
+      within(summaryRow('Jane Snow')).getByRole('button', {
+        name: 'Grant season pass',
+      }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Grant · $20' }),
+    );
+    expect(await within(dialog).findByText(message)).toBeInTheDocument();
+  });
+
+  it('hides the grant action once a coach is capped without a pass', async () => {
+    summary = [
+      {
+        ...adminSummary[0]!,
+        owedCents: 40000,
+        coverage: 'capped',
+      },
+    ];
+    await renderPage();
+    const row = summaryRow('Jane Snow');
+    expect(row).toHaveTextContent('Capped');
+    expect(
+      within(row).queryAllByRole('button', { name: /season pass/ }),
+    ).toEqual([]);
+  });
+
+  it('removes a season pass by voiding its record with a reason', async () => {
+    const user = await renderPage();
+    await user.click(
+      within(summaryRow('Li Wei')).getByRole('button', {
+        name: 'Remove season pass',
+      }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: "Remove Li Wei's season pass?",
+    });
+    expect(dialog).toHaveTextContent('Li Wei · 2026/27');
+    expect(dialog).toHaveTextContent(
+      'The season pass record is voided and no longer counts toward the $400 cap, so later registrations are charged again.',
+    );
+    const confirm = within(dialog).getByRole('button', {
+      name: 'Remove season pass',
+    });
+    await user.click(confirm);
+    expect(within(dialog).getByText('Enter a reason.')).toBeInTheDocument();
+    expect(actions).toEqual([]);
+    await user.type(within(dialog).getByLabelText(/Reason/), 'Paid by mistake');
+    await user.click(confirm);
+    expect(
+      await screen.findByText("Li Wei's season pass was removed."),
+    ).toBeInTheDocument();
+    expect(actions).toEqual([
+      { id: 'a-3', action: 'void', body: { reason: 'Paid by mistake' } },
+    ]);
   });
 
   it('lists records with the right actions per status', async () => {
@@ -389,6 +593,43 @@ describe('AdminInsurancePage', () => {
     );
     expect(
       await screen.findByText('INS-20261212-0001 已作废。'),
+    ).toBeInTheDocument();
+  });
+
+  it('grants and removes a season pass in Chinese', async () => {
+    const user = await renderPage('zh-CN');
+    const summaryTable = screen.getByRole('table', { name: '按教练汇总' });
+    expect(within(summaryTable).getByText('已支付')).toBeInTheDocument();
+    await user.click(
+      within(summaryRow('简雪')).getByRole('button', { name: '设为整季保险' }),
+    );
+    const grant = screen.getByRole('dialog', { name: '为 简雪 设为整季保险' });
+    expect(grant).toHaveTextContent('整季保险金额（$400 − $380）$20');
+    expect(grant).toHaveTextContent(
+      '2026/27 雪季已累计 $380。设为整季保险后，本季之后的登记全部免费。',
+    );
+    await user.click(within(grant).getByLabelText('现在标记为已付'));
+    expect(within(grant).getByLabelText(/付款日期/)).toHaveValue('2026-12-20');
+    await user.click(
+      within(grant).getByRole('button', { name: '设为整季保险 · $20' }),
+    );
+    expect(
+      await screen.findByText('已为 简雪 设为整季保险 INS-20261220-0001。'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(summaryRow('Li Wei')).getByRole('button', { name: '取消整季' }),
+    );
+    const remove = screen.getByRole('dialog', {
+      name: '取消 Li Wei 的整季保险？',
+    });
+    expect(remove).toHaveTextContent(
+      '整季保险记录将被作废，不再计入 $400 封顶，之后的登记会重新按次收费。此操作无法撤销。',
+    );
+    await user.type(within(remove).getByLabelText(/原因/), '误操作');
+    await user.click(within(remove).getByRole('button', { name: '取消整季' }));
+    expect(
+      await screen.findByText('已取消 Li Wei 的整季保险。'),
     ).toBeInTheDocument();
   });
 });
