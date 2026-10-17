@@ -1218,8 +1218,9 @@ describe('DocumentsListPage — language versions', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
-      await screen.findByRole('button', { name: '编辑 免责声明' }),
+      await screen.findByRole('button', { name: '免责声明 的更多操作' }),
     );
+    await user.click(screen.getByRole('menuitem', { name: '编辑 免责声明' }));
     const section = await screen.findByRole('region', {
       name: '另一种语言版本',
     });
