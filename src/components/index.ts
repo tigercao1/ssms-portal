@@ -14,3 +14,8 @@ export { Logo, Brandmark } from './Logo';
 export { statusMeta, type ApprovalStatus, type StatusMeta } from './statusMeta';
 export { Modal } from './Modal';
 export { Pager, type PagerText } from './Pager';
+export {
+  ActionsMenu,
+  RowActions,
+  type ActionsMenuItem,
+} from './ActionsMenu';

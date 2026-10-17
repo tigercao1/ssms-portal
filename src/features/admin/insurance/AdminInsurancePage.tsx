@@ -7,6 +7,7 @@ import {
   Input,
   Modal,
   Pager,
+  RowActions,
   Select,
   Spinner,
   Textarea,
@@ -583,43 +584,45 @@ function RecordsTable({
                     {formatDate(r.createdAt, locale)}
                   </td>
                   <td className={td}>
-                    <div
-                      role="group"
-                      aria-label={s.actionsFor.replace(
-                        '{recordNo}',
-                        r.recordNo,
-                      )}
-                      className="flex flex-col items-end gap-1.5"
-                    >
-                      {r.paymentStatus === 'unpaid' && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => onAction({ kind: 'paid', record: r })}
-                        >
-                          {s.markPaid}
-                        </Button>
-                      )}
-                      {r.paymentStatus === 'paid' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            onAction({ kind: 'unpaid', record: r })
-                          }
-                        >
-                          {s.markUnpaid}
-                        </Button>
-                      )}
-                      {r.paymentStatus !== 'voided' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onAction({ kind: 'void', record: r })}
-                        >
-                          {s.void}
-                        </Button>
-                      )}
+                    <div className="flex justify-end">
+                      <RowActions
+                        label={s.actionsFor.replace('{recordNo}', r.recordNo)}
+                        items={[
+                          ...(r.paymentStatus === 'unpaid'
+                            ? [
+                                {
+                                  key: 'paid',
+                                  label: s.markPaid,
+                                  onSelect: () =>
+                                    onAction({ kind: 'paid', record: r }),
+                                },
+                              ]
+                            : []),
+                          ...(r.paymentStatus === 'paid'
+                            ? [
+                                {
+                                  key: 'unpaid',
+                                  label: s.markUnpaid,
+                                  variant: 'ghost' as const,
+                                  onSelect: () =>
+                                    onAction({ kind: 'unpaid', record: r }),
+                                },
+                              ]
+                            : []),
+                          ...(r.paymentStatus !== 'voided'
+                            ? [
+                                {
+                                  key: 'void',
+                                  label: s.void,
+                                  variant: 'ghost' as const,
+                                  destructive: true,
+                                  onSelect: () =>
+                                    onAction({ kind: 'void', record: r }),
+                                },
+                              ]
+                            : []),
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>

@@ -1,7 +1,16 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
-import { Banner, Button, Field, Input, Select, Textarea } from '@/components';
+import {
+  Banner,
+  Button,
+  Field,
+  Input,
+  RowActions,
+  Select,
+  Textarea,
+  type ActionsMenuItem,
+} from '@/components';
 import type { AdminClass } from '@/lib/types';
 import { useAdminInstructors } from '../api';
 import { useLessonTypes } from '../lessonsApi';
@@ -23,77 +32,86 @@ import {
 } from './bookingRules';
 import type { BookableStatus, UpdateBookingInput } from './types';
 
-type Open = 'menu' | 'move' | 'cancel' | null;
+type Open = 'move' | 'cancel' | null;
 
 export function ClassActions({ item }: { item: AdminClass }) {
   const t = useT();
+  const { locale } = useLocale();
   const [open, setOpen] = useState<Open>(null);
   const status = useSetClassStatus();
-  const menuRef = useRef<HTMLDivElement>(null);
   const cancelled = item.status === 'cancelled';
 
-  useEffect(() => {
-    if (open !== 'menu') return;
-    const onClick = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setOpen(null);
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
-
   function mark(next: BookableStatus) {
-    setOpen(null);
     status.mutate({ id: item.id, status: next });
   }
 
-  const items: { label: string; run: () => void }[] = cancelled
-    ? [{ label: t.booking.actionRestore, run: () => mark('scheduled') }]
+  const pending = status.isPending;
+  const items: ActionsMenuItem[] = cancelled
+    ? [
+        {
+          key: 'restore',
+          label: t.booking.actionRestore,
+          variant: 'ghost',
+          loading: pending,
+          onSelect: () => mark('scheduled'),
+        },
+      ]
     : [
-        { label: t.booking.actionMove, run: () => setOpen('move') },
+        {
+          key: 'move',
+          label: t.booking.actionMove,
+          disabled: pending,
+          onSelect: () => setOpen('move'),
+        },
         ...(item.status !== 'completed'
-          ? [{ label: t.booking.actionCompleted, run: () => mark('completed') }]
+          ? [
+              {
+                key: 'completed',
+                label: t.booking.actionCompleted,
+                disabled: pending,
+                onSelect: () => mark('completed'),
+              },
+            ]
           : []),
         ...(item.status !== 'no_show'
-          ? [{ label: t.booking.actionNoShow, run: () => mark('no_show') }]
+          ? [
+              {
+                key: 'no_show',
+                label: t.booking.actionNoShow,
+                disabled: pending,
+                onSelect: () => mark('no_show'),
+              },
+            ]
           : []),
         ...(item.status !== 'scheduled'
-          ? [{ label: t.booking.actionScheduled, run: () => mark('scheduled') }]
+          ? [
+              {
+                key: 'scheduled',
+                label: t.booking.actionScheduled,
+                disabled: pending,
+                onSelect: () => mark('scheduled'),
+              },
+            ]
           : []),
-        { label: t.booking.actionCancel, run: () => setOpen('cancel') },
+        {
+          key: 'cancel',
+          label: t.booking.actionCancel,
+          destructive: true,
+          disabled: pending,
+          onSelect: () => setOpen('cancel'),
+        },
       ];
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <div ref={menuRef} className="relative">
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-haspopup="menu"
-          aria-expanded={open === 'menu'}
-          loading={status.isPending}
-          onClick={() => setOpen(open === 'menu' ? null : 'menu')}
-        >
-          {t.booking.actions}
-        </Button>
-        {open === 'menu' && (
-          <div
-            role="menu"
-            className="absolute right-0 z-20 mt-1 flex min-w-[12rem] flex-col rounded-md border border-grey/60 bg-surface py-1 shadow-pop"
-          >
-            {items.map((entry) => (
-              <button
-                key={entry.label}
-                type="button"
-                role="menuitem"
-                className="px-4 py-2 text-left text-sm text-ink hover:bg-navy-tint"
-                onClick={entry.run}
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
+      <RowActions
+        items={items}
+        busy={pending}
+        label={t.common.moreActionsFor.replace(
+          '{name}',
+          formatSchoolDateTime(item.startsAt, locale),
         )}
-      </div>
+      />
       {status.isError && <BookingErrorBanner error={status.error} />}
       {open === 'move' && (
         <MoveDialog item={item} onClose={() => setOpen(null)} />

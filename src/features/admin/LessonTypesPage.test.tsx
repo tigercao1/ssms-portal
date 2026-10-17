@@ -137,6 +137,17 @@ function row(name: string) {
   return screen.getByText(name).closest('tr') as HTMLElement;
 }
 
+async function rowAction(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+  item: string,
+) {
+  await user.click(
+    await screen.findByRole('button', { name: `More actions for ${name}` }),
+  );
+  await user.click(screen.getByRole('menuitem', { name: item }));
+}
+
 describe('LessonTypesPage table', () => {
   it('lists types in sort order with names, size, duration, promo and status', async () => {
     serve();
@@ -199,12 +210,10 @@ describe('LessonTypesPage editing', () => {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit Private 2h' }),
-    );
+    await rowAction(user, 'Private 2h', 'Edit Private 2h');
     expect(
-      screen.getByRole('button', { name: 'Edit Private 2h' }),
-    ).toHaveAttribute('aria-expanded', 'true');
+      screen.getByRole('button', { name: 'More actions for Private 2h' }),
+    ).toHaveFocus();
     const form = screen
       .getByRole('heading', { name: 'Edit lesson type' })
       .closest('form') as HTMLElement;
@@ -248,9 +257,7 @@ describe('LessonTypesPage editing', () => {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit Promo 1-on-2 1h' }),
-    );
+    await rowAction(user, 'Promo 1-on-2 1h', 'Edit Promo 1-on-2 1h');
     const form = screen
       .getByRole('heading', { name: 'Edit lesson type' })
       .closest('form') as HTMLElement;
@@ -283,9 +290,7 @@ describe('LessonTypesPage editing', () => {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit Group 4h' }),
-    );
+    await rowAction(user, 'Group 4h', 'Edit Group 4h');
     const form = screen
       .getByRole('heading', { name: 'Edit lesson type' })
       .closest('form') as HTMLElement;
@@ -449,21 +454,28 @@ describe('LessonTypesPage pay rates', () => {
   async function openRates(name = 'Private 2h') {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
-    const button = await screen.findByRole('button', {
+    await user.click(
+      await screen.findByRole('button', { name: `More actions for ${name}` }),
+    );
+    const item = screen.getByRole('menuitem', {
       name: `Pay rates for ${name}`,
     });
-    await waitFor(() => expect(button).toHaveTextContent('Pay rates (3)'));
-    await user.click(button);
+    await waitFor(() => expect(item).toHaveTextContent('Pay rates (3)'));
+    await user.click(item);
     const panel = screen.getByRole('region', { name: `Pay rates for ${name}` });
     return { user, panel: within(panel) };
   }
 
   it('counts rates per type and lists default first, then overrides', async () => {
     serve({ rates });
-    const { panel } = await openRates();
+    const { user, panel } = await openRates();
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for Promo 1-on-2 1h' }),
+    );
     expect(
-      screen.getByRole('button', { name: 'Pay rates for Promo 1-on-2 1h' }),
+      screen.getByRole('menuitem', { name: 'Pay rates for Promo 1-on-2 1h' }),
     ).toHaveTextContent('Pay rates (1)');
+    await user.keyboard('{Escape}');
 
     const rows = panel.getAllByRole('row').slice(1);
     expect(rows.map((r) => r.textContent)).toEqual([
@@ -478,9 +490,7 @@ describe('LessonTypesPage pay rates', () => {
     const calls = serve({ types: [privateType], rates: [] });
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Pay rates for Private 2h' }),
-    );
+    await rowAction(user, 'Private 2h', 'Pay rates for Private 2h');
     const panel = within(
       screen.getByRole('region', { name: 'Pay rates for Private 2h' }),
     );
@@ -551,9 +561,7 @@ describe('LessonTypesPage pay rates', () => {
     const calls = serve({ types: [privateType] });
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Pay rates for Private 2h' }),
-    );
+    await rowAction(user, 'Private 2h', 'Pay rates for Private 2h');
     const panel = within(
       screen.getByRole('region', { name: 'Pay rates for Private 2h' }),
     );
@@ -693,7 +701,10 @@ describe('LessonTypesPage pay rates', () => {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
     await user.click(
-      await screen.findByRole('button', { name: 'Private 2h 的费率' }),
+      await screen.findByRole('button', { name: 'Private 2h 的更多操作' }),
+    );
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Private 2h 的费率' }),
     );
     const panel = within(
       screen.getByRole('region', { name: 'Private 2h 的费率' }),
@@ -716,9 +727,7 @@ describe('LessonTypesPage pay rates', () => {
     const calls = serve({ types: [privateType], rates: [] });
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Pay rates for Private 2h' }),
-    );
+    await rowAction(user, 'Private 2h', 'Pay rates for Private 2h');
     const panel = within(
       screen.getByRole('region', { name: 'Pay rates for Private 2h' }),
     );
@@ -787,8 +796,9 @@ describe('LessonTypesPage pay rates', () => {
     const user = userEvent.setup();
     renderWithProviders(<LessonTypesPage />);
     await user.click(
-      await screen.findByRole('button', { name: 'Group 4h 的费率' }),
+      await screen.findByRole('button', { name: 'Group 4h 的更多操作' }),
     );
+    await user.click(screen.getByRole('menuitem', { name: 'Group 4h 的费率' }));
     const panel = within(
       screen.getByRole('region', { name: 'Group 4h 的费率' }),
     );

@@ -3,6 +3,7 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
+  ActionsMenu,
   Banner,
   Button,
   Card,
@@ -115,7 +116,9 @@ function ReferenceTable({
     returnFocusTo.current = null;
     const target =
       document.getElementById(editTriggerId(id)) ??
-      tableRef.current?.querySelector<HTMLElement>('[data-edit-trigger]') ??
+      tableRef.current?.querySelector<HTMLElement>(
+        '[data-actions-menu-trigger]',
+      ) ??
       tableRef.current;
     target?.focus();
   }, [editing]);
@@ -210,29 +213,31 @@ function ReferenceTable({
                         <RefStatus isActive={r.isActive} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">
-                        <div className="flex justify-end gap-2">
-                          <Button
+                        <div className="flex justify-end">
+                          <ActionsMenu
                             id={editTriggerId(r.id)}
-                            data-edit-trigger
-                            size="sm"
-                            variant="secondary"
-                            aria-expanded={selected}
-                            aria-controls={editPanelId(r.id)}
-                            aria-label={t.admin.editRowFor.replace(
+                            label={t.common.moreActionsFor.replace(
                               '{name}',
                               r.name,
                             )}
-                            onClick={() => onEdit(r)}
-                          >
-                            {t.common.edit}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setRemoving(r)}
-                          >
-                            {t.admin.removeRow}
-                          </Button>
+                            items={[
+                              {
+                                key: 'edit',
+                                label: t.common.edit,
+                                ariaLabel: t.admin.editRowFor.replace(
+                                  '{name}',
+                                  r.name,
+                                ),
+                                onSelect: () => onEdit(r),
+                              },
+                              {
+                                key: 'remove',
+                                label: t.admin.removeRow,
+                                destructive: true,
+                                onSelect: () => setRemoving(r),
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>

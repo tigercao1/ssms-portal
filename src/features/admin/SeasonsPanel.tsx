@@ -2,7 +2,15 @@ import { Fragment, useState, type FormEvent } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { Banner, Button, Card, Field, Input, Spinner } from '@/components';
+import {
+  ActionsMenu,
+  Banner,
+  Button,
+  Card,
+  Field,
+  Input,
+  Spinner,
+} from '@/components';
 import type { AdminSeason } from '@/features/reference/api';
 import { errorText, formatDay } from './payroll/payrollFormat';
 import {
@@ -101,32 +109,38 @@ export function SeasonsPanel() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            aria-expanded={editing === s.key}
-                            aria-label={t.seasons.editFor.replace(
-                              '{key}',
+                        <div className="flex justify-end">
+                          <ActionsMenu
+                            label={t.common.moreActionsFor.replace(
+                              '{name}',
                               s.key,
                             )}
-                            onClick={() => setEditing(s.key)}
-                          >
-                            {t.common.edit}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label={t.seasons.removeFor.replace(
-                              '{key}',
-                              s.key,
-                            )}
-                            disabled={s.inUse}
-                            title={s.inUse ? t.seasons.inUse : undefined}
-                            onClick={() => setRemoving(s)}
-                          >
-                            {t.admin.removeRow}
-                          </Button>
+                            items={[
+                              {
+                                key: 'edit',
+                                label: t.common.edit,
+                                ariaLabel: t.seasons.editFor.replace(
+                                  '{key}',
+                                  s.key,
+                                ),
+                                onSelect: () => setEditing(s.key),
+                              },
+                              {
+                                key: 'remove',
+                                label: t.admin.removeRow,
+                                ariaLabel: t.seasons.removeFor.replace(
+                                  '{key}',
+                                  s.key,
+                                ),
+                                destructive: true,
+                                disabled: s.inUse,
+                                description: s.inUse
+                                  ? t.seasons.inUse
+                                  : undefined,
+                                onSelect: () => setRemoving(s),
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
