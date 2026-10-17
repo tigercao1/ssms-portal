@@ -158,8 +158,8 @@ export function AppShell() {
       <div
         className={cn(
           'relative flex min-w-0 flex-col',
-          'transition-transform duration-300 ease-out motion-reduce:transition-none lg:translate-x-0 lg:transition-none',
-          open ? 'translate-x-64' : 'translate-x-0',
+          'transition-transform duration-300 ease-out motion-reduce:transition-none lg:transform-none lg:transition-none',
+          open && 'translate-x-64',
         )}
       >
         <div

@@ -68,6 +68,7 @@ function mainColumn() {
 function expectClosed() {
   expect(menu()).toHaveClass('invisible', '-translate-x-full');
   expect(mainColumn()).not.toHaveClass('translate-x-64');
+  expect(mainColumn()).not.toHaveClass('translate-x-0');
 }
 
 async function openMenu() {
@@ -161,10 +162,10 @@ describe('AppShell mobile menu', () => {
       'lg:translate-x-0',
     ];
     expect(menu()).toHaveClass(...desktop);
-    expect(mainColumn()).toHaveClass('lg:translate-x-0');
+    expect(mainColumn()).toHaveClass('lg:transform-none');
     await openMenu();
     expect(menu()).toHaveClass(...desktop);
-    expect(mainColumn()).toHaveClass('lg:translate-x-0');
+    expect(mainColumn()).toHaveClass('lg:transform-none');
   });
 });
 
