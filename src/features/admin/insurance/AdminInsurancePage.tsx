@@ -127,7 +127,7 @@ export function AdminInsurancePage() {
               {(p) => (
                 <Select
                   {...p}
-                  className="w-56"
+                  className="sm:w-56"
                   value={instructorId}
                   onChange={(e) => {
                     setInstructorId(e.target.value);
@@ -147,7 +147,7 @@ export function AdminInsurancePage() {
               {(p) => (
                 <Select
                   {...p}
-                  className="w-44"
+                  className="sm:w-44"
                   value={status}
                   onChange={(e) => {
                     setStatus(e.target.value as InsurancePaymentStatus | '');

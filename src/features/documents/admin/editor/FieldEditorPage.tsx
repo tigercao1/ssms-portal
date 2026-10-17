@@ -400,7 +400,7 @@ function Editor({ template }: { template: Template }) {
           </div>
           <div className="order-first flex h-fit flex-col gap-4 md:sticky md:top-4 md:order-none md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">
             {canPlace && (
-              <Card className="flex flex-col gap-2 !p-3">
+              <Card className="flex flex-col gap-2 p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <h2 className="text-sm font-medium uppercase tracking-wide text-slate">
                     {t.documents.palette}
@@ -441,7 +441,7 @@ function Editor({ template }: { template: Template }) {
               </Card>
             )}
 
-            <Card className="!p-4">
+            <Card className="p-4">
               {selected && canPlace ? (
                 <PropertiesPanel
                   key={selected.id}
