@@ -118,6 +118,48 @@ describe('InstructorDocumentsSection — documents', () => {
     ).toBeNull();
   });
 
+  it('shows the language a document was signed or read in, only when recorded', async () => {
+    state.assignments = state.assignments.map((a) =>
+      a.id === 'asg-conduct'
+        ? { ...a, language: 'zh' }
+        : a.id === 'asg-handbook'
+          ? { ...a, language: 'en' }
+          : a,
+    );
+    renderSection();
+    const conduct = await screen.findByRole('listitem', {
+      name: 'Code of conduct',
+    });
+    expect(within(conduct).getByText('Signed in')).toBeInTheDocument();
+    expect(within(conduct).getByText('Chinese')).toBeInTheDocument();
+    const handbook = screen.getByRole('listitem', {
+      name: 'Instructor handbook',
+    });
+    expect(within(handbook).getByText('Read in')).toBeInTheDocument();
+    expect(within(handbook).getByText('English')).toBeInTheDocument();
+    const waiver = screen.getByRole('listitem', { name: 'Liability waiver' });
+    expect(within(waiver).queryByText(/Signed in|Read in/)).toBeNull();
+  });
+
+  it('shows the signed language in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    state.assignments = state.assignments.map((a) =>
+      a.id === 'asg-conduct' ? { ...a, language: 'en' } : a,
+    );
+    renderSection();
+    const conduct = await screen.findByRole('listitem', { name: '行为准则' });
+    expect(within(conduct).getByText('签署语言')).toBeInTheDocument();
+    expect(within(conduct).getByText('英文')).toBeInTheDocument();
+  });
+
+  it('shows no signed language for documents signed before language versions', async () => {
+    renderSection();
+    const conduct = await screen.findByRole('listitem', {
+      name: 'Code of conduct',
+    });
+    expect(within(conduct).queryByText(/Signed in/)).toBeNull();
+  });
+
   it('titles rows from the embedded template and offers downloads only with a signed copy', async () => {
     state.templates = state.templates.filter((tpl) => tpl.id !== 'tpl-waiver');
     state.assignments = state.assignments.map((a) =>
