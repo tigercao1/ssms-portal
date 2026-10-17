@@ -1,5 +1,6 @@
 import { useLocale } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
+import { track } from '@/lib/analytics';
 
 /** Compact EN / 中文 switch (W1.5). Persists via the i18n provider. */
 export function LangSwitch({ className }: { className?: string }) {
@@ -19,7 +20,11 @@ export function LangSwitch({ className }: { className?: string }) {
         <button
           key={o.value}
           type="button"
-          onClick={() => setLocale(o.value)}
+          onClick={() => {
+            if (o.value !== locale)
+              track('language_switched', { locale: o.value });
+            setLocale(o.value);
+          }}
           aria-pressed={locale === o.value}
           className={cn(
             'px-2.5 py-1 font-medium transition-colors',

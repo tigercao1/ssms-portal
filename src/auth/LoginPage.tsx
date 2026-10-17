@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input } from '@/components';
 import { AuthLayout } from './AuthLayout';
+import { track } from '@/lib/analytics';
 
 function isRateLimited(err: AuthError) {
   return err.status === 429 || Boolean(err.code?.startsWith('over_'));
@@ -35,11 +36,16 @@ export function LoginPage() {
     });
     setBusy(false);
     if (err) {
+      track('login_failed', {
+        method: 'password',
+        reason: err.status === 400 ? 'invalid_credentials' : 'error',
+      });
       setError(
         err.status === 400 ? t.auth.invalidCredentials : t.auth.genericError,
       );
       return;
     }
+    track('login_succeeded', { method: 'password' });
     navigate(data.user?.email_confirmed_at ? '/' : '/verify-email', {
       replace: true,
     });
@@ -69,6 +75,7 @@ export function LoginPage() {
       setError(t.auth.genericError);
       return;
     }
+    track('magic_link_requested');
     setLinkSent(true);
   }
 

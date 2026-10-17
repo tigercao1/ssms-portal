@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input } from '@/components';
 import { AuthLayout } from './AuthLayout';
+import { track } from '@/lib/analytics';
 
 /** W1.3 — request a password-reset email. */
 export function RequestResetPage() {
@@ -19,6 +20,7 @@ export function RequestResetPage() {
       redirectTo: `${window.location.origin}/update-password`,
     });
     setBusy(false);
+    track('password_reset_requested');
     setSent(true);
   }
 

@@ -7,6 +7,7 @@ import { AuthLayout } from './AuthLayout';
 import { NewPasswordForm } from './NewPasswordForm';
 import { useSession } from './SessionProvider';
 import { completeActivation } from './activationApi';
+import { track } from '@/lib/analytics';
 
 /**
  * Second activation step (`/activate/password`). The invite link already
@@ -30,6 +31,7 @@ export function ActivatePasswordPage() {
     } catch {
       return t.auth.genericError;
     }
+    track('activation_password_set');
     navigate('/profile/edit', { replace: true });
     return null;
   }

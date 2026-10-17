@@ -13,6 +13,7 @@ import type {
 } from '@/lib/types';
 import { MAX_AVATAR_BYTES } from '@/lib/types';
 import { resizeImage } from '@/lib/resizeImage';
+import { track } from '@/lib/analytics';
 
 const PROFILE_KEY = ['me', 'instructor'] as const;
 
@@ -31,7 +32,10 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: (body: UpdateProfileBody) =>
       api<InstructorProfile>('/me/instructor', { method: 'PATCH', body }),
-    onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
+    onSuccess: (profile) => {
+      qc.setQueryData(PROFILE_KEY, profile);
+      track('profile_saved');
+    },
   });
 }
 
@@ -51,7 +55,8 @@ export function bioDraftError(error: unknown): BioDraftError {
   if (!(error instanceof ApiError)) return 'generic';
   const code = (error.body as { code?: string } | undefined)?.code;
   if (error.status === 429 && code === 'bio_ai_limit') return 'limit';
-  if (error.status === 503 && code === 'bio_ai_unavailable') return 'unavailable';
+  if (error.status === 503 && code === 'bio_ai_unavailable')
+    return 'unavailable';
   return 'generic';
 }
 
@@ -61,7 +66,10 @@ export function useBioDraft() {
   return useMutation({
     mutationFn: (body: { text: string; mode: BioDraftMode }) =>
       api<BioDraft>('/me/instructor/bio/draft', { method: 'POST', body }),
-    onSuccess: (draft) => qc.setQueryData(BIO_USAGE_KEY, draft.usage),
+    onSuccess: (draft, { mode }) => {
+      qc.setQueryData(BIO_USAGE_KEY, draft.usage);
+      track('bio_draft_generated', { mode });
+    },
     onError: (error) => {
       const usage =
         error instanceof ApiError
@@ -154,7 +162,10 @@ export function useUploadAvatar() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (file: File) => uploadAvatar(file, '/me/instructor/photo'),
-    onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
+    onSuccess: (profile) => {
+      qc.setQueryData(PROFILE_KEY, profile);
+      track('photo_uploaded', { slot: 'avatar' });
+    },
   });
 }
 
@@ -163,7 +174,10 @@ export function useUploadPhoto(slot: ExtraPhotoSlot) {
   return useMutation({
     mutationFn: (file: File) =>
       uploadAvatar(file, '/me/instructor/photo', slot),
-    onSuccess: (profile) => qc.setQueryData(PROFILE_KEY, profile),
+    onSuccess: (profile) => {
+      qc.setQueryData(PROFILE_KEY, profile);
+      track('photo_uploaded', { slot });
+    },
   });
 }
 
@@ -172,6 +186,7 @@ export function useRemovePhoto(slot: ExtraPhotoSlot) {
   return useMutation({
     mutationFn: () => removePhoto('/me/instructor/photo', slot),
     onSuccess: (profile) => {
+      track('photo_removed', { slot });
       if (profile) qc.setQueryData(PROFILE_KEY, profile);
       else void qc.invalidateQueries({ queryKey: PROFILE_KEY });
     },
