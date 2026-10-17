@@ -21,7 +21,7 @@ import {
   type DocumentsMockState,
 } from '../../api/handlers';
 import type { Field } from '../../api';
-import { fakeAssignment } from '../../api/fixtures';
+import { fakeAssignment, fakeTranslation } from '../../api/fixtures';
 import { FieldEditorPage } from './FieldEditorPage';
 
 vi.mock('../../pdf/pdfjs', () => ({ loadPdf: vi.fn() }));
@@ -111,12 +111,12 @@ beforeEach(() => {
 
 afterEach(() => restoreWidth());
 
-function renderEditor(id = 'tpl-conduct') {
+function renderEditor(id = 'tpl-conduct', search = '') {
   return renderWithProviders(
     <Routes>
       <Route path="/admin/documents/:id/edit" element={<FieldEditorPage />} />
     </Routes>,
-    { route: `/admin/documents/${id}/edit` },
+    { route: `/admin/documents/${id}/edit${search}` },
   );
 }
 
@@ -452,5 +452,85 @@ describe('FieldEditorPage', () => {
     );
     fireEvent.mouseDown(screen.getByTestId('page-overlay-1'));
     expect(screen.getByText('Select a field to edit it.')).toBeInTheDocument();
+  });
+});
+
+describe('FieldEditorPage — language versions', () => {
+  let translationPuts: { language: string; fields: Field[] }[];
+
+  beforeEach(() => {
+    translationPuts = [];
+    const conduct = state.templates.find((t) => t.id === 'tpl-conduct')!;
+    Object.assign(conduct, {
+      sourceLanguage: 'zh',
+      translations: [fakeTranslation('tpl-conduct', { language: 'en' })],
+    });
+    server.use(
+      http.put(
+        `${API}/admin/documents/templates/:id/translations/:language/fields`,
+        async ({ params, request }) => {
+          translationPuts.push({
+            language: String(params.language),
+            fields: ((await request.clone().json()) as { fields: Field[] })
+              .fields,
+          });
+          return undefined;
+        },
+      ),
+    );
+  });
+
+  const versionSwitch = () =>
+    screen.getByRole('group', { name: 'Language version' });
+
+  it('places fields on the other language version and saves them there', async () => {
+    const user = userEvent.setup();
+    renderEditor('tpl-conduct', '?language=en');
+    await screen.findByTestId('page-overlay-1');
+    expect(vi.mocked(loadPdf)).toHaveBeenLastCalledWith(
+      'https://storage.mock/templates/tpl-conduct/en/source.pdf',
+    );
+    expect(
+      within(versionSwitch()).getByRole('button', { name: 'English' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('0 fields placed')).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Add Signature field' }),
+    );
+    expect(
+      within(versionSwitch()).getByRole('button', { name: 'Chinese' }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Save fields' }));
+    expect(await screen.findByText('Saved 1 fields.')).toBeInTheDocument();
+    expect(puts).toHaveLength(0);
+    expect(translationPuts).toEqual([
+      {
+        language: 'en',
+        fields: [expect.objectContaining({ type: 'signature', page: 1 })],
+      },
+    ]);
+    const conduct = state.templates.find((t) => t.id === 'tpl-conduct')!;
+    expect(conduct.translations[0]!.fields).toEqual(translationPuts[0]!.fields);
+    expect(conduct.fields).toHaveLength(4);
+
+    await user.click(
+      within(versionSwitch()).getByRole('button', { name: 'Chinese' }),
+    );
+    expect(await screen.findByText('4 fields placed')).toBeInTheDocument();
+    expect(vi.mocked(loadPdf)).toHaveBeenLastCalledWith(
+      'https://storage.mock/templates/tpl-conduct/source.pdf',
+    );
+  });
+
+  it('shows no language switch for a single-language document', async () => {
+    const conduct = state.templates.find((t) => t.id === 'tpl-conduct')!;
+    Object.assign(conduct, { sourceLanguage: null, translations: [] });
+    renderEditor('tpl-conduct', '?language=en');
+    await screen.findByTestId('page-overlay-1');
+    expect(screen.getByText('4 fields placed')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('group', { name: 'Language version' }),
+    ).toBeNull();
   });
 });
