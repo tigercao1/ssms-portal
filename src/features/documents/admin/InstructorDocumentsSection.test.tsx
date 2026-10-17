@@ -10,7 +10,8 @@ import {
   type DocumentsMockState,
 } from '../api/handlers';
 import { todayIso } from '../api';
-import { fakeCertUpload } from '../api/fixtures';
+import { fakeAssignment, fakeCertUpload, fakeTemplate } from '../api/fixtures';
+import type { ApprovalStatus } from '@/lib/types';
 import { InstructorDocumentsSection } from './InstructorDocumentsSection';
 
 const API = 'http://localhost:3000';
@@ -77,10 +78,12 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-function renderSection() {
+function renderSection(approvalStatus: ApprovalStatus = 'approved') {
   return renderWithProviders(
     <InstructorDocumentsSection
       instructorId="inst-1"
+      instructorName="Jane Doe"
+      approvalStatus={approvalStatus}
       certifications={[
         { org: 'csia', track: 'regular', level: 3 },
         { org: 'casi', track: 'park', level: 2 },
@@ -355,19 +358,162 @@ describe('InstructorDocumentsSection — documents', () => {
     );
   });
 
-  it('assigns another document to this instructor', async () => {
-    const user = userEvent.setup();
-    renderSection();
-    await screen.findByRole('listitem', { name: 'Liability waiver' });
-    const assign = screen.getByRole('button', { name: 'Assign' });
-    expect(assign).toBeDisabled();
-    const picker = screen.getByLabelText('Choose a document');
-    expect(within(picker).queryByText('Uniform policy')).toBeNull();
-    await user.selectOptions(picker, 'tpl-conduct');
-    await user.click(assign);
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument();
-    expect(within(dialog).getByText('1 selected')).toBeInTheDocument();
+  describe('assigning a document', () => {
+    let posts: unknown[];
+
+    beforeEach(() => {
+      posts = [];
+      state.templates.push(
+        fakeTemplate({
+          id: 'tpl-ski',
+          titleEn: 'Ski school policy',
+          assignTo: 'selected',
+          required: false,
+        }),
+        fakeTemplate({
+          id: 'tpl-medical',
+          titleEn: 'Medical form',
+          assignTo: 'selected',
+          required: false,
+        }),
+        fakeTemplate({
+          id: 'tpl-nopdf',
+          titleEn: 'Parking rules',
+          assignTo: 'selected',
+          sourceSha256: null,
+        }),
+        fakeTemplate({
+          id: 'tpl-new-all',
+          titleEn: 'Season kickoff',
+          assignTo: 'all',
+        }),
+      );
+      state.assignments.push(
+        fakeAssignment({
+          id: 'asg-medical',
+          templateId: 'tpl-medical',
+          status: 'archived',
+        }),
+      );
+      server.events.on('request:start', async ({ request }) => {
+        if (
+          request.method === 'POST' &&
+          new URL(request.url).pathname === '/admin/documents/assignments'
+        )
+          posts.push(await request.clone().json());
+      });
+    });
+
+    afterEach(() => server.events.removeAllListeners());
+
+    it('offers only documents this instructor does not hold', async () => {
+      const user = userEvent.setup();
+      renderSection();
+      await user.click(
+        await screen.findByRole('button', { name: 'Assign a document' }),
+      );
+      const dialog = screen.getByRole('dialog', { name: 'Assign a document' });
+      expect(
+        within(dialog).getByText(
+          'Assign to Jane Doe for 2026/27. They’ll get an email.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog)
+          .getAllByRole('radio')
+          .map((r) => r.closest('label')!.textContent),
+      ).toEqual(['Ski school policy', 'Medical form']);
+      expect(within(dialog).queryByRole('checkbox')).toBeNull();
+      expect(within(dialog).queryByLabelText('Search instructors')).toBeNull();
+    });
+
+    it('assigns the picked document to this instructor and refreshes the list', async () => {
+      const user = userEvent.setup();
+      renderSection();
+      await user.click(
+        await screen.findByRole('button', { name: 'Assign a document' }),
+      );
+      const dialog = screen.getByRole('dialog');
+      await user.click(within(dialog).getByLabelText('Medical form'));
+      await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(posts).toEqual([
+        {
+          templateId: 'tpl-medical',
+          season: '2026/27',
+          instructorIds: ['inst-1'],
+        },
+      ]);
+      expect(screen.getByText('Assigned “Medical form”.')).toBeInTheDocument();
+      expect(
+        await screen.findByRole('listitem', { name: 'Medical form' }),
+      ).toBeInTheDocument();
+      await user.click(
+        screen.getByRole('button', { name: 'Assign a document' }),
+      );
+      expect(
+        within(screen.getByRole('dialog')).getAllByRole('radio'),
+      ).toHaveLength(1);
+    });
+
+    it('shows an API error in the dialog', async () => {
+      server.use(
+        http.post(`${API}/admin/documents/assignments`, () =>
+          HttpResponse.json({ message: 'Season is closed' }, { status: 422 }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderSection();
+      await user.click(
+        await screen.findByRole('button', { name: 'Assign a document' }),
+      );
+      const dialog = screen.getByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Season is closed',
+      );
+    });
+
+    it('hides the button when every document is already held', async () => {
+      state.templates = state.templates.filter(
+        (tpl) => tpl.id !== 'tpl-ski' && tpl.id !== 'tpl-medical',
+      );
+      renderSection();
+      await screen.findByRole('listitem', { name: 'Liability waiver' });
+      expect(
+        screen.queryByRole('button', { name: 'Assign a document' }),
+      ).toBeNull();
+    });
+
+    it('explains that a not-approved instructor gets documents on approval', async () => {
+      state.assignments = [];
+      renderSection('pending');
+      expect(
+        await screen.findByText(
+          'Documents are assigned when this instructor is approved.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('No documents assigned yet.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Required and not completed')).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: 'Assign a document' }),
+      ).toBeNull();
+      expect(screen.getByText('Show archived (0)')).toBeInTheDocument();
+    });
+
+    it('still flags missing required documents for an approved instructor', async () => {
+      renderSection();
+      expect(
+        await screen.findByText('Required and not completed'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          'Documents are assigned when this instructor is approved.',
+        ),
+      ).toBeNull();
+    });
   });
 
   it('handles an instructor with nothing yet, and load errors', async () => {

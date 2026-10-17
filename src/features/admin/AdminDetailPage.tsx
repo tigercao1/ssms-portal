@@ -49,6 +49,9 @@ export function AdminDetailPage() {
       </Card>
     );
 
+  const name =
+    localizeField(rec.displayNameEn, rec.displayNameZh, locale) || rec.email;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -59,9 +62,7 @@ export function AdminDetailPage() {
       </div>
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl">
-          {localizeField(rec.displayNameEn, rec.displayNameZh, locale) || rec.email}
-        </h1>
+        <h1 className="text-2xl">{name}</h1>
         <p className="font-mono text-xs text-slate">{rec.email}</p>
       </div>
 
@@ -78,6 +79,8 @@ export function AdminDetailPage() {
 
       <InstructorDocumentsSection
         instructorId={rec.id}
+        instructorName={name}
+        approvalStatus={rec.approvalStatus}
         certifications={profile.data?.certifications ?? []}
       />
     </div>
