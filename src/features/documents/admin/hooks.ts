@@ -1,15 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import {
   archiveAssignment,
   changeTemplateAudience,
   confirmTemplateSource,
   createAssignments,
+  createDocumentExport,
   createTemplate,
   documentsKeys,
+  getDocumentExport,
   getInstructorDocuments,
   getPublishPreview,
   getTemplate,
+  listDocumentExports,
+  listTemplateAssignments,
   listTemplates,
   publishTemplate,
   putToPresignedUrl,
@@ -22,9 +31,12 @@ import {
   type AssignRequest,
   type ChangeAudienceRequest,
   type CertUploadReview,
+  type DocumentExport,
+  type DocumentExportRequest,
   type Field,
   type PublishRequest,
   type Template,
+  type TemplateAssignmentQuery,
   type TemplateCreate,
   type TemplatePatch,
 } from '../api';
@@ -204,5 +216,97 @@ export function useReviewCertUpload(instructorId: string) {
     mutationFn: ({ id, ...body }: CertUploadReview & { id: string }) =>
       reviewCertUpload(id, body),
     onSuccess: invalidate,
+  });
+}
+
+export const SIGNED_COPIES_PAGE_SIZE = 50;
+export const EXPORT_POLL_MS = 2_000;
+
+export function isExportActive(e: Pick<DocumentExport, 'status'>): boolean {
+  return e.status === 'queued' || e.status === 'running';
+}
+
+export function useTemplateAssignments(
+  id: string,
+  query: TemplateAssignmentQuery,
+) {
+  return useQuery({
+    queryKey: documentsKeys.templateAssignments(id, query),
+    queryFn: () => listTemplateAssignments(id, query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Count of completed assignments for a season, read from `X-Total-Count`. */
+export function useCompletedCount(id: string, season: string | undefined) {
+  return useQuery({
+    queryKey: documentsKeys.templateAssignments(id, {
+      season,
+      status: 'completed',
+      page: 1,
+      limit: 1,
+    }),
+    queryFn: () =>
+      listTemplateAssignments(id, {
+        season,
+        status: 'completed',
+        page: 1,
+        limit: 1,
+      }),
+    select: (page) => page.total,
+  });
+}
+
+export function useDocumentExports(templateId: string) {
+  return useQuery({
+    queryKey: documentsKeys.templateExports(templateId),
+    queryFn: () => listDocumentExports(templateId),
+  });
+}
+
+function mergeExport(list: DocumentExport[] | undefined, e: DocumentExport) {
+  const rest = (list ?? []).filter((x) => x.id !== e.id);
+  return [e, ...rest]
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+    .slice(0, 10);
+}
+
+/**
+ * Polls one export every {@link EXPORT_POLL_MS} while it is queued or running
+ * and writes each result into the template's export list.
+ */
+export function useDocumentExportPolling(exp: DocumentExport) {
+  const qc = useQueryClient();
+  const active = isExportActive(exp);
+  return useQuery({
+    queryKey: documentsKeys.documentExport(exp.id),
+    queryFn: async () => {
+      const e = await getDocumentExport(exp.id);
+      qc.setQueryData<DocumentExport[]>(
+        documentsKeys.templateExports(e.templateId),
+        (list) => mergeExport(list, e),
+      );
+      return e;
+    },
+    enabled: active,
+    refetchInterval: (query) => {
+      if (query.state.status === 'error') return false;
+      const data = query.state.data;
+      return !data || isExportActive(data) ? EXPORT_POLL_MS : false;
+    },
+  });
+}
+
+export function useCreateDocumentExport(templateId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: DocumentExportRequest) =>
+      createDocumentExport(templateId, body),
+    onSuccess: (e) => {
+      qc.setQueryData<DocumentExport[]>(
+        documentsKeys.templateExports(templateId),
+        (list) => mergeExport(list, e),
+      );
+    },
   });
 }

@@ -8,19 +8,26 @@ import type {
   ChangeAudienceRequest,
   CompleteRequest,
   ConsentText,
+  DocumentExport,
+  DocumentExportRequest,
+  DocumentExportStatus,
   Field,
   PublishRequest,
   Template,
   TemplateCreate,
   TemplatePatch,
   TemplatePage,
+  TemplateAssignmentRow,
 } from './types';
 import {
   MOCK_CONSENT_TEXT,
+  MOCK_INSTRUCTORS,
   MOCK_SEASON,
   MOCK_STORAGE_ORIGIN,
   buildChecklist,
   buildPreviewChecklist,
+  fakeDocumentExport,
+  type MockInstructor,
   fakeAssignment,
   fakeCertUpload,
   presentCertUploads,
@@ -49,6 +56,11 @@ export interface DocumentsMockState {
   reminded: string[];
   season: string | null;
   consentText: ConsentText;
+  instructors: Record<string, MockInstructor>;
+  exports: DocumentExport[];
+  exportBodies: DocumentExportRequest[];
+  /** Status each `GET /admin/documents/exports/:id` moves a queued export through. */
+  exportSteps: DocumentExportStatus[];
 }
 
 /** Fresh, deep-copied mock database seeded with the sample fixtures. */
@@ -73,6 +85,10 @@ export function createDocumentsState(
     reminded: [],
     season: MOCK_SEASON,
     consentText: structuredClone(MOCK_CONSENT_TEXT),
+    instructors: structuredClone(MOCK_INSTRUCTORS),
+    exports: [],
+    exportBodies: [],
+    exportSteps: ['running', 'ready'],
     ...overrides,
   };
 }
@@ -133,6 +149,22 @@ function nextId(prefix: string) {
 }
 
 const EDGE_TOLERANCE = 0.01;
+const MAX_EXPORT_FILES = 1000;
+const EXPORT_TTL_MS = 24 * 60 * 60 * 1000;
+
+function sortTemplateRows(
+  rows: TemplateAssignmentRow[],
+): TemplateAssignmentRow[] {
+  const done = rows
+    .filter((r) => r.status === 'completed')
+    .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+  const open = rows
+    .filter((r) => r.status !== 'completed')
+    .sort((a, b) =>
+      (a.instructor.lastName ?? '').localeCompare(b.instructor.lastName ?? ''),
+    );
+  return [...done, ...open];
+}
 
 /** Mirrors the API's `PUT …/fields` validation. */
 export function validateFields(template: Template, fields: Field[]) {
@@ -249,6 +281,57 @@ export function documentsHandlers(
         lines: [t.titleEn, `Page ${i + 1}`],
       })),
     );
+
+  const templateRows = (templateId: string): TemplateAssignmentRow[] =>
+    state.assignments
+      .filter(
+        (a) =>
+          a.templateId === templateId &&
+          a.subjectType === 'instructor' &&
+          a.status !== 'archived',
+      )
+      .map((a) => {
+        const who = state.instructors[a.subjectId];
+        return {
+          id: a.id,
+          status: a.status as TemplateAssignmentRow['status'],
+          season: a.season,
+          instructor: {
+            id: a.subjectId,
+            firstName: who?.firstName ?? null,
+            lastName: who?.lastName ?? null,
+            email: who?.email ?? null,
+          },
+          signerName: a.signerName,
+          signerEmail: a.signerEmail,
+          assignedAt: a.assignedAt,
+          viewedAt: a.viewedAt,
+          completedAt: a.completedAt,
+          signedSha256: a.signedSha256,
+          hasSignedCopy: a.hasSignedCopy,
+        };
+      });
+  const findExport = (id: unknown) => state.exports.find((e) => e.id === id);
+  const exportPolls = new Map<string, number>();
+  const exportFiles = new Map<string, number>();
+  const advanceExport = (e: DocumentExport) => {
+    if (e.status !== 'queued' && e.status !== 'running') return;
+    const polls = exportPolls.get(e.id) ?? 0;
+    exportPolls.set(e.id, polls + 1);
+    const steps = state.exportSteps;
+    const next = steps[Math.min(polls, steps.length - 1)] ?? 'ready';
+    e.status = next;
+    if (next === 'ready') {
+      e.finishedAt = nowIso();
+      e.fileCount = exportFiles.get(e.id) ?? e.selectedCount ?? 0;
+      e.skippedCount = 0;
+      e.sizeBytes = e.fileCount * 180_000;
+      e.expiresAt = new Date(Date.now() + EXPORT_TTL_MS).toISOString();
+    } else if (next === 'failed') {
+      e.finishedAt = nowIso();
+      e.error = 'Storage upload failed';
+    }
+  };
 
   return [
     http.get(`${A}/admin/documents/templates`, () =>
@@ -467,6 +550,118 @@ export function documentsHandlers(
         return HttpResponse.json(present(t));
       },
     ),
+    http.get(
+      `${A}/admin/documents/templates/:id/assignments`,
+      ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const qs = new URL(request.url).searchParams;
+        const season = qs.get('season');
+        const status = qs.get('status') ?? 'all';
+        const tokens = (qs.get('q') ?? '')
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(Boolean);
+        const page = Math.max(1, Number(qs.get('page') ?? 1));
+        const limit = Math.min(100, Math.max(1, Number(qs.get('limit') ?? 50)));
+        const matches = sortTemplateRows(
+          templateRows(t.id).filter((r) => {
+            const haystack = [
+              r.instructor.firstName,
+              r.instructor.lastName,
+              r.instructor.email,
+            ]
+              .join(' ')
+              .toLowerCase();
+            return (
+              (!season || r.season === season) &&
+              (status === 'all' ||
+                (status === 'completed'
+                  ? r.status === 'completed'
+                  : r.status !== 'completed')) &&
+              tokens.every((token) => haystack.includes(token))
+            );
+          }),
+        );
+        return HttpResponse.json(
+          matches.slice((page - 1) * limit, page * limit),
+          { headers: { 'X-Total-Count': String(matches.length) } },
+        );
+      },
+    ),
+    http.post(
+      `${A}/admin/documents/templates/:id/exports`,
+      async ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const body = (await request.json()) as DocumentExportRequest;
+        state.exportBodies.push(body);
+        if (t.kind !== 'sign')
+          return badRequest('Only sign documents can be exported');
+        const completed = templateRows(t.id).filter(
+          (r) =>
+            r.status === 'completed' &&
+            (!body.season || r.season === body.season),
+        );
+        let count = completed.length;
+        if (body.assignmentIds) {
+          const ids = new Set(completed.map((r) => r.id));
+          if (
+            body.assignmentIds.length < 1 ||
+            body.assignmentIds.length > MAX_EXPORT_FILES
+          )
+            return badRequest('assignmentIds must have 1 to 1000 items');
+          if (body.assignmentIds.some((id) => !ids.has(id)))
+            return badRequest(
+              'Some assignments are not completed copies of this document',
+            );
+          count = body.assignmentIds.length;
+        }
+        if (count === 0) return badRequest('Nothing signed matches');
+        if (count > MAX_EXPORT_FILES)
+          return badRequest('An export holds at most 1000 files');
+        const e = fakeDocumentExport({
+          id: nextId('exp'),
+          templateId: t.id,
+          season: body.season ?? null,
+          selectedCount: body.assignmentIds?.length ?? null,
+          requestedAt: nowIso(),
+        });
+        exportFiles.set(e.id, count);
+        state.exports.unshift(e);
+        return HttpResponse.json(e, { status: 202 });
+      },
+    ),
+    http.get(`${A}/admin/documents/templates/:id/exports`, ({ params }) => {
+      if (!findTemplate(params.id)) return notFound();
+      return HttpResponse.json(
+        state.exports
+          .filter((e) => e.templateId === params.id)
+          .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+          .slice(0, 10),
+      );
+    }),
+    http.get(`${A}/admin/documents/exports/:exportId`, ({ params }) => {
+      const e = findExport(params.exportId);
+      if (!e) return notFound();
+      advanceExport(e);
+      return HttpResponse.json(e);
+    }),
+    http.get(`${A}/admin/documents/exports/:exportId/url`, ({ params }) => {
+      const e = findExport(params.exportId);
+      if (!e) return notFound();
+      if (e.status === 'expired')
+        return HttpResponse.json(
+          { message: 'This export has expired' },
+          { status: 410 },
+        );
+      if (e.status !== 'ready') return conflict('Export is not ready');
+      return HttpResponse.json({
+        url: `${MOCK_STORAGE_ORIGIN}/exports/${e.id}.zip?sig=mock`,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        sizeBytes: e.sizeBytes ?? 0,
+      });
+    }),
     http.post(`${A}/admin/documents/assignments`, async ({ request }) => {
       const body = (await request.json()) as AssignRequest;
       const template = findTemplate(body.templateId);
