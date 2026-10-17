@@ -52,7 +52,9 @@ function renderShell() {
 }
 
 function hamburger() {
-  return screen.getByRole('button', { name: 'Open menu' });
+  return document.querySelector<HTMLButtonElement>(
+    'button[aria-controls="app-nav"]',
+  )!;
 }
 
 function menu() {
@@ -70,32 +72,42 @@ function expectClosed() {
 
 async function openMenu() {
   await userEvent.click(hamburger());
-  return screen.getByRole('button', { name: 'Close menu' });
 }
 
 describe('AppShell mobile menu', () => {
   it('starts collapsed', () => {
     renderShell();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
-    expect(hamburger()).toHaveAttribute('aria-controls', 'app-nav');
+    expect(hamburger()).toHaveAccessibleName('Open menu');
     expectClosed();
     expect(document.body).not.toHaveClass('overflow-hidden');
   });
 
-  it('slides in a drawer that pushes the page right and focuses the close button', async () => {
+  it('slides in a drawer that pushes the page right and focuses the first link', async () => {
     renderShell();
-    const close = await openMenu();
+    await openMenu();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'true');
+    expect(hamburger()).toHaveAccessibleName('Close menu');
     expect(menu()).toHaveClass('visible', 'translate-x-0', 'w-64');
     expect(menu()).not.toHaveClass('invisible', 'inset-0');
     expect(mainColumn()).toHaveClass('translate-x-64');
-    expect(close).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveFocus();
     expect(document.body).toHaveClass('overflow-hidden');
   });
 
-  it('closes via the close button and returns focus to the hamburger', async () => {
+  it('has no close button inside the drawer', async () => {
     renderShell();
-    await userEvent.click(await openMenu());
+    await openMenu();
+    expect(
+      within(menu()).queryByRole('button', { name: 'Close menu' }),
+    ).toBeNull();
+  });
+
+  it('closes via the menu button and returns focus to it', async () => {
+    renderShell();
+    await openMenu();
+    hamburger().focus();
+    await userEvent.keyboard('{Enter}');
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
     expectClosed();
     expect(hamburger()).toHaveFocus();

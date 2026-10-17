@@ -21,7 +21,7 @@ export function AppShell() {
   const { isAdmin, user, signOut } = useSession();
   const [open, setOpen] = useState(false);
   const openButtonRef = useRef<HTMLButtonElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
   const { pathname } = useLocation();
   const checklist = useMyChecklist({ enabled: !isAdmin });
@@ -32,7 +32,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (open) {
-      closeButtonRef.current?.focus();
+      navRef.current?.querySelector('a')?.focus();
     } else if (wasOpen.current) {
       openButtonRef.current?.focus();
     }
@@ -107,27 +107,9 @@ export function AppShell() {
           <span className="rounded-sm bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-white/70">
             {isAdmin ? t.nav.adminArea : t.nav.instructorArea}
           </span>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={() => setOpen(false)}
-            aria-label={t.nav.closeMenu}
-            className="ml-auto rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white lg:hidden"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-            >
-              <path d="M5 5l10 10M15 5L5 15" />
-            </svg>
-          </button>
         </div>
         <nav
+          ref={navRef}
           aria-label={isAdmin ? t.nav.adminArea : t.nav.instructorArea}
           className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3"
         >
@@ -193,9 +175,9 @@ export function AppShell() {
           <button
             ref={openButtonRef}
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={() => setOpen((o) => !o)}
             className="rounded-md p-2 text-navy hover:bg-navy-tint lg:hidden"
-            aria-label={t.nav.openMenu}
+            aria-label={open ? t.nav.closeMenu : t.nav.openMenu}
             aria-expanded={open}
             aria-controls="app-nav"
           >
