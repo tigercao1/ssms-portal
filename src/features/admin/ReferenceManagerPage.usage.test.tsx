@@ -37,7 +37,10 @@ describe('ReferenceManagerPage remove confirmation', () => {
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Remove' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'More actions for Whistler' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
     let dialog = screen.getByRole('alertdialog');
     await within(dialog).findByText(
       'It will be removed from 3 instructor profiles.',
@@ -49,7 +52,10 @@ describe('ReferenceManagerPage remove confirmation', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Remove' }));
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for Whistler' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
     dialog = screen.getByRole('alertdialog');
     const confirm = within(dialog).getByRole('button', {
       name: 'Remove permanently',

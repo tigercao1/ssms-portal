@@ -82,6 +82,17 @@ function seasonRow(key: string) {
   return screen.getByRole('cell', { name: key }).closest('tr') as HTMLElement;
 }
 
+async function seasonAction(
+  user: ReturnType<typeof userEvent.setup>,
+  key: string,
+  name: string,
+) {
+  await user.click(
+    screen.getByRole('button', { name: `More actions for ${key}` }),
+  );
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
 describe('ReferenceManagerPage seasons', () => {
   it('lists seasons newest first with dates and the current one marked', async () => {
     await openSeasons();
@@ -149,11 +160,7 @@ describe('ReferenceManagerPage seasons', () => {
   it('edits only the dates of a season and sends the key encoded', async () => {
     const user = await openSeasons();
     await screen.findByRole('table', { name: 'Seasons' });
-    await user.click(
-      within(seasonRow('2026/27')).getByRole('button', {
-        name: 'Edit season 2026/27',
-      }),
-    );
+    await seasonAction(user, '2026/27', 'Edit season 2026/27');
     expect(
       screen.getByRole('heading', { name: 'Edit 2026/27' }),
     ).toBeInTheDocument();
@@ -188,16 +195,23 @@ describe('ReferenceManagerPage seasons', () => {
     seasons = fakeSeasons.map((s) => ({ ...s, inUse: s.key === '2025/26' }));
     const user = await openSeasons();
     await screen.findByRole('table', { name: 'Seasons' });
-    const inUseButton = screen.getByRole('button', {
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for 2025/26' }),
+    );
+    const inUseItem = screen.getByRole('menuitem', {
       name: 'Remove season 2025/26',
     });
-    expect(inUseButton).toBeDisabled();
+    expect(inUseItem).toHaveAttribute('aria-disabled', 'true');
+    expect(inUseItem).toHaveAccessibleDescription(
+      "Documents or invites use this season, so it can't be removed.",
+    );
+    await user.click(inUseItem);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await user.keyboard('{Escape}');
     expect(
       within(seasonRow('2025/26')).getByText('In use'),
     ).toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', { name: 'Remove season 2027/28' }),
-    );
+    await seasonAction(user, '2027/28', 'Remove season 2027/28');
     const confirm = screen.getByRole('alertdialog', {
       name: 'Remove season 2027/28?',
     });
@@ -214,9 +228,7 @@ describe('ReferenceManagerPage seasons', () => {
     ).toBeDisabled();
     await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
 
-    await user.click(
-      screen.getByRole('button', { name: 'Remove season 2026/27' }),
-    );
+    await seasonAction(user, '2026/27', 'Remove season 2026/27');
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', {
         name: 'Remove permanently',
