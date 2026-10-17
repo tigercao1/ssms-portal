@@ -75,7 +75,7 @@ export interface AdminInsuranceSummary {
   coverage: SeasonCoverage;
   records: number;
   seasonPassRecordId: string | null;
-  seasonPassPaymentStatus?: Extract<
+  seasonPassPaymentStatus: Extract<
     InsurancePaymentStatus,
     'unpaid' | 'paid'
   > | null;

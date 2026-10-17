@@ -429,7 +429,7 @@ function SummaryRow({
                 : coverageLabel(row.coverage, s)
             }
           />
-          {row.seasonPassRecordId && row.seasonPassPaymentStatus && (
+          {row.seasonPassPaymentStatus && (
             <span
               className={cn(
                 'text-xs',

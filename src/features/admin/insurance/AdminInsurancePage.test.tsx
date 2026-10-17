@@ -304,16 +304,6 @@ describe('AdminInsurancePage', () => {
     ).toEqual([]);
   });
 
-  it('shows a pass without a payment label when the summary omits it', async () => {
-    const row: AdminInsuranceSummary = { ...adminSummary[1]! };
-    delete row.seasonPassPaymentStatus;
-    summary = [row];
-    await renderPage();
-    const passRow = summaryRow('Li Wei');
-    expect(passRow).toHaveTextContent('Season passRemove season pass3');
-    expect(within(passRow).queryByText('Paid')).toBeNull();
-  });
-
   it('removes a season pass by voiding its record with a reason', async () => {
     const user = await renderPage();
     await user.click(
