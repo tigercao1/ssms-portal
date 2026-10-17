@@ -198,6 +198,7 @@ describe('DocumentsListPage', () => {
     expect(await actionNames(user, 'Uniform policy')).toEqual([
       'Edit Uniform policy',
       'Upload PDF',
+      'Delete Uniform policy',
     ]);
     const publish = within(row('Uniform policy')).getByRole('button', {
       name: 'Publish Uniform policy',
@@ -215,12 +216,14 @@ describe('DocumentsListPage', () => {
       'Edit Code of conduct',
       'Change audience of Code of conduct',
       'Retire Code of conduct',
+      'Delete Code of conduct',
     ]);
     expect(await actionNames(user, 'Liability waiver')).toEqual([
       'Edit Liability waiver',
       'Assign Liability waiver',
       'Change audience of Liability waiver',
       'Retire Liability waiver',
+      'Delete Liability waiver',
     ]);
     await openActions(user, 'Liability waiver');
     expect(
@@ -429,6 +432,7 @@ describe('DocumentsListPage', () => {
     expect(await actionNames(user, 'Liability waiver')).toEqual([
       'Edit Liability waiver',
       'Re-publish Liability waiver',
+      'Delete Liability waiver',
     ]);
     await chooseAction(user, 'Liability waiver', 'Re-publish Liability waiver');
     const dialog = screen.getByRole('dialog', {
@@ -701,6 +705,123 @@ describe('DocumentsListPage', () => {
     expect(
       within(dialog).getByRole('button', { name: '更改并发邮件给 1 人' }),
     ).toBeInTheDocument();
+  });
+
+  it('deletes a live document after confirming and drops it from the list', async () => {
+    const deletes: string[] = [];
+    server.use(
+      http.delete(`${API}/admin/documents/templates/:id`, ({ params }) => {
+        deletes.push(String(params.id));
+        return undefined;
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await chooseAction(user, 'Liability waiver', 'Delete Liability waiver');
+    const dialog = screen.getByRole('dialog', {
+      name: 'Delete “Liability waiver”',
+    });
+    expect(
+      within(dialog).getByTestId('delete-template-summary'),
+    ).toHaveTextContent(
+      "1 instructors have it assigned and will lose it from their checklist.This can't be undone.",
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Delete document' }),
+    );
+    expect(
+      await screen.findByText('Liability waiver is deleted.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('Liability waiver')).not.toBeInTheDocument();
+    expect(screen.getByText('Code of conduct')).toBeInTheDocument();
+    expect(deletes).toEqual(['tpl-waiver']);
+    expect(state.assignments.some((a) => a.templateId === 'tpl-waiver')).toBe(
+      false,
+    );
+  });
+
+  it('says nobody loses a draft document, and cancels without deleting', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await chooseAction(user, 'Uniform policy', 'Delete Uniform policy');
+    const dialog = screen.getByRole('dialog', {
+      name: 'Delete “Uniform policy”',
+    });
+    expect(
+      within(dialog).getByTestId('delete-template-summary'),
+    ).toHaveTextContent("No instructor has it assigned.This can't be undone.");
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(state.templates.some((x) => x.id === 'tpl-draft')).toBe(true);
+  });
+
+  it('disables Delete with the reason once someone has completed the document', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const menu = await openActions(user, 'Code of conduct');
+    const item = within(menu).getByRole('menuitem', {
+      name: 'Delete Code of conduct',
+    });
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(item).toHaveAccessibleDescription(
+      'Someone has completed this document. Retire it instead.',
+    );
+    await user.click(item);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps the API error in the delete dialog', async () => {
+    server.use(
+      http.delete(`${API}/admin/documents/templates/:id`, () =>
+        HttpResponse.json(
+          {
+            message:
+              'Someone has completed this document, so it cannot be deleted. Retire it instead.',
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await chooseAction(user, 'Liability waiver', 'Delete Liability waiver');
+    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Delete document' }),
+    );
+    expect(
+      await within(dialog).findByText(
+        'Someone has completed this document, so it cannot be deleted. Retire it instead.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(row('Liability waiver')).toBeInTheDocument();
+  });
+
+  it('shows the delete dialog and the locked reason in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: '行为准则 的更多操作' }),
+    );
+    expect(
+      screen.getByRole('menuitem', { name: '删除 行为准则' }),
+    ).toHaveAccessibleDescription('已有教练完成此资料，请改为停用。');
+    await user.keyboard('{Escape}');
+    await user.click(
+      await screen.findByRole('button', { name: '免责声明 的更多操作' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: '删除 免责声明' }));
+    const dialog = screen.getByRole('dialog', { name: '删除“免责声明”' });
+    expect(
+      within(dialog).getByTestId('delete-template-summary'),
+    ).toHaveTextContent(
+      '1 位教练已分配此资料，删除后会从他们的清单中移除。此操作无法撤销。',
+    );
+    await user.click(within(dialog).getByRole('button', { name: '删除资料' }));
+    expect(await screen.findByText('免责声明 已删除。')).toBeInTheDocument();
   });
 
   it('locks Replace PDF and Place fields once a copy has been completed', async () => {

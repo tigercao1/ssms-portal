@@ -13,6 +13,7 @@ import {
   createAssignments,
   createDocumentExport,
   createTemplate,
+  deleteTemplate,
   deleteTranslation,
   documentsKeys,
   getDocumentExport,
@@ -44,6 +45,7 @@ import {
   type TemplateAssignmentQuery,
   type TemplateCreate,
   type TemplatePatch,
+  type TemplateSummary,
 } from '../api';
 
 export const MAX_TEMPLATE_BYTES = 20 * 1024 * 1024;
@@ -144,6 +146,24 @@ export function useRetireTemplate() {
   return useMutation({
     mutationFn: (id: string) => retireTemplate(id),
     onSuccess: sync,
+  });
+}
+
+export function useDeleteTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteTemplate(id),
+    onSuccess: (_, id) => {
+      qc.setQueryData<TemplateSummary[]>(documentsKeys.templates, (rows) =>
+        rows?.filter((row) => row.id !== id),
+      );
+      qc.removeQueries({ queryKey: documentsKeys.template(id) });
+      void qc.invalidateQueries({ queryKey: ['admin', 'instructor'] });
+      return qc.invalidateQueries({
+        queryKey: documentsKeys.templates,
+        exact: true,
+      });
+    },
   });
 }
 

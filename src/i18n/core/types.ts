@@ -784,6 +784,15 @@ export interface Messages {
     changeAudienceAndEmail: string;
     changedToAll: string;
     changedToSelected: string;
+    delete: string;
+    deleteFor: string;
+    deleteLocked: string;
+    deleteTitle: string;
+    deleteAssigned: string;
+    deleteAssignedNone: string;
+    deleteIrreversible: string;
+    deleteConfirm: string;
+    deleted: string;
     approve: string;
     reject: string;
     saveDate: string;
