@@ -38,6 +38,10 @@ import {
   sameFields,
   scaleOf,
 } from './fieldModel';
+import {
+  type SourceRecovery,
+  useSourceRecovery,
+} from '../../pdf/presignedSource';
 import { PropertiesPanel } from './PropertiesPanel';
 import { SignerPreviewField } from './SignerPreviewField';
 import { FIELD_ICONS, useFieldTypeLabel } from './labels';
@@ -79,6 +83,7 @@ export function FieldEditorPage() {
   const [params, setParams] = useSearchParams();
   const t = useT();
   const template = useTemplate(id);
+  const sourceRecovery = useSourceRecovery(template);
 
   if (template.isLoading)
     return (
@@ -102,6 +107,7 @@ export function FieldEditorPage() {
       onLanguageChange={(language) =>
         setParams(language === sourceLanguage ? {} : { language })
       }
+      sourceRecovery={sourceRecovery}
     />
   );
 }
@@ -110,10 +116,12 @@ function Editor({
   template,
   version,
   onLanguageChange,
+  sourceRecovery,
 }: {
   template: Template;
   version: EditorVersion;
   onLanguageChange: (language: DocumentLanguage) => void;
+  sourceRecovery: SourceRecovery;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -465,8 +473,12 @@ function Editor({
             <PdfPages
               ref={pdfRef}
               source={version.sourceUrl}
+              onError={sourceRecovery.onError}
               renderOverlay={renderOverlay}
-              onLoad={(info) => setNumPages(info.numPages)}
+              onLoad={(info) => {
+                setNumPages(info.numPages);
+                sourceRecovery.onLoad();
+              }}
             />
           </div>
           <div className="order-first flex h-fit flex-col gap-4 md:sticky md:top-4 md:order-none md:max-h-[calc(100vh-2rem)] md:overflow-y-auto">

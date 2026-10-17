@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Banner, Button } from '@/components';
 import { PdfPages } from '../pdf/PdfPages';
+import type { SourceRecovery } from '../pdf/presignedSource';
 
 export interface ReadDocumentText {
   ack: string;
@@ -14,6 +15,7 @@ interface ReadDocumentProps {
   submitting?: boolean;
   submitError?: string | null;
   onSubmit: (body: { acknowledged: true }) => void;
+  sourceRecovery?: SourceRecovery;
 }
 
 /** Read-only document: scroll to the end, tick "I have read and understood", done. */
@@ -23,6 +25,7 @@ export function ReadDocument({
   submitting,
   submitError,
   onSubmit,
+  sourceRecovery,
 }: ReadDocumentProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
@@ -46,7 +49,14 @@ export function ReadDocument({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg bg-sunken p-2 sm:p-4">
-        <PdfPages source={sourceUrl} onLoad={() => setLoaded(true)} />
+        <PdfPages
+          source={sourceUrl}
+          onLoad={() => {
+            setLoaded(true);
+            sourceRecovery?.onLoad();
+          }}
+          onError={sourceRecovery?.onError}
+        />
         <div ref={endRef} data-testid="read-end" className="h-px" />
       </div>
       <div className="sticky bottom-0 flex flex-col gap-3 rounded-lg border border-grey/60 bg-surface p-4 shadow-card">

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { Route, Routes } from 'react-router-dom';
+import { Link, Route, Routes } from 'react-router-dom';
 import { OnboardingDocumentPage } from './OnboardingDocumentPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
@@ -1009,5 +1009,96 @@ describe('OnboardingDocumentPage — language versions', () => {
       screen.getByRole('checkbox', { name: '我同意 (必填)' }),
     ).toBeChecked();
     expect(screen.queryByText('已恢复您在本设备上保存的填写进度。')).toBeNull();
+  });
+});
+
+describe('OnboardingDocumentPage — expiring PDF links', () => {
+  const SOURCE = 'https://storage.mock/templates/tpl-conduct/source.pdf';
+  let opens: number;
+
+  function countOpens() {
+    opens = 0;
+    server.events.on('request:start', ({ request }) => {
+      if (
+        request.method === 'GET' &&
+        new URL(request.url).pathname === '/me/documents/asg-new'
+      )
+        opens += 1;
+    });
+  }
+
+  function renderWithChecklist() {
+    return renderWithProviders(
+      <Routes>
+        <Route
+          path="/onboarding/:assignmentId"
+          element={<OnboardingDocumentPage />}
+        />
+        <Route
+          path="/onboarding"
+          element={<Link to="/onboarding/asg-new">Open again</Link>}
+        />
+      </Routes>,
+      { route: '/onboarding/asg-new' },
+    );
+  }
+
+  function renameOnServer() {
+    state.templates.find((t) => t.id === 'tpl-conduct')!.titleEn =
+      'Code of conduct (fresh)';
+  }
+
+  async function leaveAndReturnAt(
+    user: ReturnType<typeof userEvent.setup>,
+    time: string,
+  ) {
+    await user.click(
+      screen.getAllByRole('link', { name: /Back to checklist/ })[0]!,
+    );
+    renameOnServer();
+    vi.setSystemTime(new Date(time));
+    await user.click(screen.getByRole('link', { name: 'Open again' }));
+  }
+
+  afterEach(() => {
+    server.events.removeAllListeners();
+    fakePdf.failingSources.clear();
+  });
+
+  it('fetches the document again, with a new PDF link, when the instructor comes back after it may have expired', async () => {
+    countOpens();
+    const user = userEvent.setup();
+    renderWithChecklist();
+    await screen.findByRole('heading', { name: 'Code of conduct' });
+    await leaveAndReturnAt(user, '2026-10-12T10:05:00-04:00');
+    expect(
+      await screen.findByRole('heading', { name: 'Code of conduct (fresh)' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-pages')).toHaveAttribute(
+      'data-source',
+      SOURCE,
+    );
+    expect(opens).toBe(2);
+  });
+
+  it('reuses the cached document when the instructor comes back within a few minutes', async () => {
+    countOpens();
+    const user = userEvent.setup();
+    renderWithChecklist();
+    await screen.findByRole('heading', { name: 'Code of conduct' });
+    await leaveAndReturnAt(user, '2026-10-12T10:01:00-04:00');
+    expect(
+      await screen.findByRole('heading', { name: 'Code of conduct' }),
+    ).toBeInTheDocument();
+    expect(opens).toBe(1);
+  });
+
+  it('does not refetch in a loop when a just-fetched link fails to load', async () => {
+    countOpens();
+    fakePdf.failingSources.add(SOURCE);
+    renderWithChecklist();
+    await screen.findByRole('heading', { name: 'Code of conduct' });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(opens).toBe(1);
   });
 });

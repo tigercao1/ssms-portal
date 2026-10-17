@@ -14,6 +14,7 @@ import {
 } from '../api';
 import type { CertOrg, CertTrack } from '@/lib/types';
 import { isCertContentType, prepareCertFile } from './certFile';
+import { PRESIGNED_URL_FRESH_MS } from '../pdf/presignedSource';
 
 export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
@@ -31,7 +32,7 @@ export function useMyDocument(
   return useQuery({
     queryKey: documentsKeys.myDocument(assignmentId, language),
     queryFn: () => getMyDocument(assignmentId, language),
-    staleTime: Infinity,
+    staleTime: PRESIGNED_URL_FRESH_MS,
     refetchOnWindowFocus: false,
   });
 }
