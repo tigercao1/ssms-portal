@@ -4,6 +4,7 @@ import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
+  ActionsMenu,
   Banner,
   Button,
   Card,
@@ -134,34 +135,36 @@ export function LessonTypesPage() {
                           <ActiveStatus active={row.active} />
                         </td>
                         <td className="whitespace-nowrap px-4 py-2">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              aria-expanded={open === 'edit'}
-                              aria-label={t.lessonTypes.editFor.replace(
+                          <div className="flex justify-end">
+                            <ActionsMenu
+                              label={t.common.moreActionsFor.replace(
                                 '{name}',
                                 row.nameEn,
                               )}
-                              onClick={() => toggle(row.id, 'edit')}
-                            >
-                              {t.common.edit}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              aria-expanded={open === 'rates'}
-                              aria-label={t.lessonTypes.ratesFor.replace(
-                                '{name}',
-                                row.nameEn,
-                              )}
-                              onClick={() => toggle(row.id, 'rates')}
-                            >
-                              {t.lessonTypes.ratesButton.replace(
-                                '{count}',
-                                String(typeRates.length),
-                              )}
-                            </Button>
+                              items={[
+                                {
+                                  key: 'edit',
+                                  label: t.common.edit,
+                                  ariaLabel: t.lessonTypes.editFor.replace(
+                                    '{name}',
+                                    row.nameEn,
+                                  ),
+                                  onSelect: () => toggle(row.id, 'edit'),
+                                },
+                                {
+                                  key: 'rates',
+                                  label: t.lessonTypes.ratesButton.replace(
+                                    '{count}',
+                                    String(typeRates.length),
+                                  ),
+                                  ariaLabel: t.lessonTypes.ratesFor.replace(
+                                    '{name}',
+                                    row.nameEn,
+                                  ),
+                                  onSelect: () => toggle(row.id, 'rates'),
+                                },
+                              ]}
+                            />
                           </div>
                         </td>
                       </tr>
