@@ -59,6 +59,15 @@ function menu() {
   return document.getElementById('app-nav')!;
 }
 
+function mainColumn() {
+  return screen.getByRole('main').parentElement!;
+}
+
+function expectClosed() {
+  expect(menu()).toHaveClass('invisible', '-translate-x-full');
+  expect(mainColumn()).not.toHaveClass('translate-x-64');
+}
+
 async function openMenu() {
   await userEvent.click(hamburger());
   return screen.getByRole('button', { name: 'Close menu' });
@@ -69,16 +78,17 @@ describe('AppShell mobile menu', () => {
     renderShell();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
     expect(hamburger()).toHaveAttribute('aria-controls', 'app-nav');
-    expect(menu()).toHaveClass('hidden');
+    expectClosed();
     expect(document.body).not.toHaveClass('overflow-hidden');
   });
 
-  it('opens a full-screen overlay and focuses the close button', async () => {
+  it('slides in a drawer that pushes the page right and focuses the close button', async () => {
     renderShell();
     const close = await openMenu();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'true');
-    expect(menu()).toHaveClass('fixed', 'inset-0');
-    expect(menu()).not.toHaveClass('hidden');
+    expect(menu()).toHaveClass('visible', 'translate-x-0', 'w-64');
+    expect(menu()).not.toHaveClass('invisible', 'inset-0');
+    expect(mainColumn()).toHaveClass('translate-x-64');
     expect(close).toHaveFocus();
     expect(document.body).toHaveClass('overflow-hidden');
   });
@@ -87,9 +97,17 @@ describe('AppShell mobile menu', () => {
     renderShell();
     await userEvent.click(await openMenu());
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
-    expect(menu()).toHaveClass('hidden');
+    expectClosed();
     expect(hamburger()).toHaveFocus();
     expect(document.body).not.toHaveClass('overflow-hidden');
+  });
+
+  it('closes when the pushed page is tapped', async () => {
+    renderShell();
+    await openMenu();
+    await userEvent.click(screen.getByTestId('app-nav-backdrop'));
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
+    expectClosed();
   });
 
   it('closes on Escape', async () => {
@@ -97,7 +115,7 @@ describe('AppShell mobile menu', () => {
     await openMenu();
     await userEvent.keyboard('{Escape}');
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
-    expect(menu()).toHaveClass('hidden');
+    expectClosed();
     expect(hamburger()).toHaveFocus();
   });
 
@@ -107,7 +125,7 @@ describe('AppShell mobile menu', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Instructors' }));
     expect(screen.getByText('Instructors page')).toBeInTheDocument();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
-    expect(menu()).toHaveClass('hidden');
+    expectClosed();
   });
 
   it('closes and releases the scroll lock when the route changes elsewhere', async () => {
@@ -116,8 +134,7 @@ describe('AppShell mobile menu', () => {
     act(() => navigate('/admin/instructors'));
     expect(screen.getByText('Instructors page')).toBeInTheDocument();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
-    expect(menu()).toHaveClass('hidden');
-    expect(menu()).not.toHaveClass('fixed');
+    expectClosed();
     expect(document.body).not.toHaveClass('overflow-hidden');
   });
 
@@ -128,13 +145,14 @@ describe('AppShell mobile menu', () => {
       'lg:top-0',
       'lg:h-screen',
       'lg:z-20',
-      'lg:flex',
+      'lg:visible',
       'lg:translate-x-0',
     ];
     expect(menu()).toHaveClass(...desktop);
+    expect(mainColumn()).toHaveClass('lg:translate-x-0');
     await openMenu();
-    expect(menu()).toHaveClass(...desktop, 'lg:overflow-hidden');
-    expect(menu()).not.toHaveClass('lg:z-auto');
+    expect(menu()).toHaveClass(...desktop);
+    expect(mainColumn()).toHaveClass('lg:translate-x-0');
   });
 });
 

@@ -88,16 +88,17 @@ export function AppShell() {
       ];
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
+    <div className="grid min-h-screen overflow-x-clip lg:grid-cols-[240px_1fr]">
       {/* Sidebar */}
       <aside
         id="app-nav"
         className={cn(
-          'flex-col overflow-hidden bg-navy text-white',
-          'lg:sticky lg:top-0 lg:z-20 lg:flex lg:h-screen lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-hidden bg-navy text-white',
+          'duration-300 ease-out motion-reduce:transition-none',
+          'lg:sticky lg:bottom-auto lg:top-0 lg:z-20 lg:h-screen lg:w-auto lg:visible lg:translate-x-0 lg:transition-none',
           open
-            ? 'fixed inset-0 z-50 flex overflow-y-auto lg:overflow-hidden'
-            : 'hidden',
+            ? 'visible translate-x-0 transition-transform'
+            : 'invisible -translate-x-full transition-[transform,visibility]',
         )}
       >
         <Contour className="pointer-events-none absolute inset-0 h-full w-full text-white" />
@@ -172,7 +173,22 @@ export function AppShell() {
       </aside>
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-col">
+      <div
+        className={cn(
+          'relative flex min-w-0 flex-col',
+          'transition-transform duration-300 ease-out motion-reduce:transition-none lg:translate-x-0 lg:transition-none',
+          open ? 'translate-x-64' : 'translate-x-0',
+        )}
+      >
+        <div
+          data-testid="app-nav-backdrop"
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+          className={cn(
+            'absolute inset-0 z-30 bg-navy/20 transition-opacity duration-300 motion-reduce:transition-none lg:hidden',
+            open ? 'opacity-100' : 'pointer-events-none opacity-0',
+          )}
+        />
         <header className="flex items-center justify-between border-b border-grey/60 bg-surface px-4 py-3 lg:px-8">
           <button
             ref={openButtonRef}
