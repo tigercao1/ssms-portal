@@ -384,18 +384,26 @@ export function RowActions({
   items,
   label,
   id,
+  busy,
   className,
 }: {
   items: ActionsMenuItem[];
   label?: string;
   id?: string;
+  busy?: boolean;
   className?: string;
 }) {
   const [only, ...rest] = items;
   if (!only) return null;
   if (rest.length > 0)
     return (
-      <ActionsMenu items={items} label={label} id={id} className={className} />
+      <ActionsMenu
+        items={items}
+        label={label}
+        id={id}
+        busy={busy}
+        className={className}
+      />
     );
   if (only.to && !only.disabled)
     return (
