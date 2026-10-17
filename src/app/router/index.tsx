@@ -30,6 +30,7 @@ import { AdminInsurancePage } from '@/features/admin/insurance/AdminInsurancePag
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
 import { DocumentsListPage } from '@/features/documents/admin/DocumentsListPage';
 import { FieldEditorPage } from '@/features/documents/admin/editor/FieldEditorPage';
+import { SignedCopiesPage } from '@/features/documents/admin/signed/SignedCopiesPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -206,6 +207,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAdmin>
             <FieldEditorPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: '/admin/documents/:id/signed',
+        element: (
+          <RequireAdmin>
+            <SignedCopiesPage />
           </RequireAdmin>
         ),
       },

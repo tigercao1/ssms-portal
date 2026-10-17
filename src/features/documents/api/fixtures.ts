@@ -5,6 +5,7 @@ import type {
   CertificationChecklistItem,
   ConsentText,
   DocumentChecklistItem,
+  DocumentExport,
   DocumentPreviewItem,
   Field,
   MyChecklist,
@@ -457,4 +458,97 @@ export function buildPreviewChecklist(
     lockReason: 'pending_approval',
     items: [...docs, ...certItems],
   };
+}
+
+export interface MockInstructor {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+}
+
+export const MOCK_INSTRUCTORS: Record<string, MockInstructor> = {
+  'inst-1': { firstName: 'Jane', lastName: 'Snow', email: 'jane@example.com' },
+  'inst-2': { firstName: 'Li', lastName: 'Wei', email: 'li@example.com' },
+};
+
+export function fakeDocumentExport(
+  overrides: Partial<DocumentExport> = {},
+): DocumentExport {
+  return {
+    id: 'exp-1',
+    templateId: 'tpl-conduct',
+    season: MOCK_SEASON,
+    selectedCount: null,
+    status: 'queued',
+    fileCount: null,
+    skippedCount: null,
+    sizeBytes: null,
+    error: null,
+    requestedAt: '2026-10-17T15:00:00Z',
+    finishedAt: null,
+    expiresAt: null,
+    ...overrides,
+  };
+}
+
+/**
+ * `count` instructors with one assignment each of `templateId`; every
+ * `completeEvery`-th one is completed with a signed copy.
+ */
+export function fakeRoster(
+  templateId: string,
+  count: number,
+  { completeEvery = 2, season = MOCK_SEASON } = {},
+): { instructors: Record<string, MockInstructor>; assignments: Assignment[] } {
+  const first = [
+    'Alex',
+    'Bo',
+    'Chloé',
+    'Dmitri',
+    'Emi',
+    'Farah',
+    'Gus',
+    'Hana',
+  ];
+  const last = [
+    'Anders',
+    'Brooks',
+    'Chen',
+    'Dube',
+    'Evans',
+    'Fox',
+    'Gray',
+    'Hall',
+  ];
+  const instructors: Record<string, MockInstructor> = {};
+  const assignments: Assignment[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const id = `roster-${i + 1}`;
+    const firstName = first[i % first.length]!;
+    const lastName = `${last[(i * 3) % last.length]!}${i >= last.length ? ` ${i + 1}` : ''}`;
+    const email = `${firstName.toLowerCase()}.${i + 1}@example.com`;
+    instructors[id] = { firstName, lastName, email };
+    const done = i % completeEvery === 0;
+    const day = String((i % 27) + 1).padStart(2, '0');
+    assignments.push(
+      fakeAssignment({
+        id: `asg-${templateId}-${i + 1}`,
+        templateId,
+        subjectId: id,
+        season,
+        status: done ? 'completed' : i % 3 === 0 ? 'viewed' : 'assigned',
+        viewedAt: done || i % 3 === 0 ? `2026-10-${day}T14:00:00Z` : null,
+        completedAt: done
+          ? `2026-10-${day}T15:${String(i % 60).padStart(2, '0')}:00Z`
+          : null,
+        signerName: done ? `${firstName} ${lastName}` : null,
+        signerEmail: done ? email : null,
+        signedSha256: done
+          ? (i + 1).toString(16).padStart(8, '0').repeat(8)
+          : null,
+        hasSignedCopy: done,
+      }),
+    );
+  }
+  return { instructors, assignments };
 }

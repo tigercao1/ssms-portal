@@ -23,3 +23,15 @@ export function formatDay(isoDate: string | null, locale: Locale): string {
 export function shortHash(hash: string | null): string {
   return hash ? `${hash.slice(0, 12)}…` : '—';
 }
+
+export function formatBytes(bytes: number, locale: Locale): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const digits = unit === 0 || value >= 10 ? 0 : 1;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
+}

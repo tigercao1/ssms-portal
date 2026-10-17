@@ -198,8 +198,27 @@ function publishBlocker(row: TemplateSummary, t: Messages): string | null {
 
 function AudienceCell({ row }: { row: TemplateSummary }) {
   const t = useT();
+  const { locale } = useLocale();
+  if (row.status === 'draft') return <span className="text-slate">—</span>;
+  const signedLink = (text: string) => (
+    <Link
+      to={`/admin/documents/${row.id}/signed`}
+      className="text-xs text-navy hover:underline"
+      title={t.signedCopies.linkFor.replace(
+        '{title}',
+        templateTitle(row, locale),
+      )}
+    >
+      {text}
+    </Link>
+  );
   if (row.status !== 'live' || !row.assignTo)
-    return <span className="text-slate">—</span>;
+    return (
+      <>
+        <div className="text-slate">—</div>
+        {signedLink(t.signedCopies.link)}
+      </>
+    );
   const detail =
     row.assignTo === 'all'
       ? (row.kind === 'read'
@@ -220,7 +239,7 @@ function AudienceCell({ row }: { row: TemplateSummary }) {
           ? t.documents.audienceAll
           : t.documents.audienceSelected}
       </div>
-      <div className="text-xs text-slate">{detail}</div>
+      <div>{signedLink(detail)}</div>
     </>
   );
 }
