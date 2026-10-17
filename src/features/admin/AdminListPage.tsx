@@ -323,7 +323,7 @@ function CalendarStatus({ connected }: { connected: boolean }) {
     <span
       className={cn(
         'inline-flex items-center whitespace-nowrap rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium text-ink',
-        connected ? 'border-status-approved' : 'border-status-inactive',
+        connected ? 'border-status-approved' : 'border-status-pending',
       )}
     >
       {connected
