@@ -14,6 +14,7 @@ import type {
   DocumentExport,
   DocumentExportRequest,
   DocumentExportUrl,
+  DocumentLanguage,
   Field,
   FileUrl,
   InstructorDocuments,
@@ -50,8 +51,8 @@ export const documentsKeys = {
   instructorDocuments: (instructorId: string) =>
     ['admin', 'instructor', instructorId, 'documents'] as const,
   myChecklist: ['me', 'documents'] as const,
-  myDocument: (assignmentId: string) =>
-    ['me', 'documents', assignmentId] as const,
+  myDocument: (assignmentId: string, language?: DocumentLanguage) =>
+    ['me', 'documents', assignmentId, language ?? null] as const,
 };
 
 const enc = encodeURIComponent;
@@ -126,6 +127,46 @@ export function saveTemplateFields(id: string, fields: Field[]) {
     method: 'PUT',
     body: { fields },
   });
+}
+
+function translationPath(id: string, language: DocumentLanguage) {
+  return `/admin/documents/templates/${enc(id)}/translations/${enc(language)}`;
+}
+
+export function requestTranslationSourceUpload(
+  id: string,
+  language: DocumentLanguage,
+  contentLength: number,
+) {
+  return api<UploadUrl>(`${translationPath(id, language)}/source/upload-url`, {
+    method: 'POST',
+    body: { contentLength },
+  });
+}
+
+export function confirmTranslationSource(
+  id: string,
+  language: DocumentLanguage,
+) {
+  return api<ConfirmedTemplate>(
+    `${translationPath(id, language)}/source/confirm`,
+    { method: 'POST' },
+  );
+}
+
+export function saveTranslationFields(
+  id: string,
+  language: DocumentLanguage,
+  fields: Field[],
+) {
+  return api<Template>(`${translationPath(id, language)}/fields`, {
+    method: 'PUT',
+    body: { fields },
+  });
+}
+
+export function deleteTranslation(id: string, language: DocumentLanguage) {
+  return api<Template>(translationPath(id, language), { method: 'DELETE' });
 }
 
 export function createAssignments(body: AssignRequest) {
@@ -226,8 +267,12 @@ export function getMyChecklist() {
   return api<MyChecklist>('/me/documents');
 }
 
-export function getMyDocument(assignmentId: string) {
-  return api<MyDocument>(`/me/documents/${enc(assignmentId)}`);
+export function getMyDocument(
+  assignmentId: string,
+  language?: DocumentLanguage,
+) {
+  const query = language ? `?language=${enc(language)}` : '';
+  return api<MyDocument>(`/me/documents/${enc(assignmentId)}${query}`);
 }
 
 export function completeMyDocument(
