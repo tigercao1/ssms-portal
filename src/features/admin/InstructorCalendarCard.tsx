@@ -1,10 +1,16 @@
-import { useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
-import { Banner, Button, Card, Field, Input, Select, Spinner } from '@/components';
+import { Banner, Button, Card, Field, Input, Spinner } from '@/components';
 import type {
   CalendarMatchStatus,
   GoogleCalendar,
@@ -197,13 +203,17 @@ function CalendarEditor({
   );
 }
 
-function optionLabel(calendar: GoogleCalendar, extras: string[]) {
-  return [
-    calendar.summary !== calendar.id
-      ? `${calendar.summary} (${calendar.id})`
-      : calendar.id,
-    ...extras,
-  ].join(' · ');
+function calendarLabel(calendar: GoogleCalendar) {
+  return calendar.summary !== calendar.id
+    ? `${calendar.summary} (${calendar.id})`
+    : calendar.id;
+}
+
+interface PickerOption {
+  id: string;
+  label: string;
+  tags: string[];
+  disabled: boolean;
 }
 
 function CalendarPicker({
@@ -222,11 +232,13 @@ function CalendarPicker({
   onSubmit: (googleCalendarId: string | null) => void;
 }) {
   const t = useT();
-  const [query, setQuery] = useState('');
+  const listId = useId();
   const [picked, setPicked] = useState(current.googleCalendarId ?? '');
-  const needle = query.trim().toLowerCase();
-  const visible = (c: GoogleCalendar) =>
-    c.id === picked ||
+  const [query, setQuery] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const needle = (query ?? '').trim().toLowerCase();
+  const matches = (c: GoogleCalendar) =>
     !needle ||
     c.summary.toLowerCase().includes(needle) ||
     c.id.toLowerCase().includes(needle);
@@ -235,86 +247,243 @@ function CalendarPicker({
     !calendars.some((c) => c.id === current.googleCalendarId)
       ? current.googleCalendarId
       : null;
-  const available = calendars
-    .filter((c) => !owners.has(c.id) && visible(c))
-    .sort((a, b) => Number(b.id === suggestedId) - Number(a.id === suggestedId));
-  const linked = calendars.filter((c) => owners.has(c.id) && visible(c));
+  const unlistedLabel = unlisted ? current.calendarSummary || unlisted : '';
+  const available: PickerOption[] = [
+    ...(unlisted &&
+    (!needle ||
+      unlistedLabel.toLowerCase().includes(needle) ||
+      unlisted.toLowerCase().includes(needle))
+      ? [
+          {
+            id: unlisted,
+            label: unlistedLabel,
+            tags: [t.instructorCalendar.notShared],
+            disabled: false,
+          },
+        ]
+      : []),
+    ...calendars
+      .filter((c) => !owners.has(c.id) && matches(c))
+      .sort(
+        (a, b) => Number(b.id === suggestedId) - Number(a.id === suggestedId),
+      )
+      .map((c) => ({
+        id: c.id,
+        label: calendarLabel(c),
+        tags: [
+          ...(c.id === suggestedId ? [t.instructorCalendar.suggestedTag] : []),
+          ...(c.canWrite ? [] : [t.instructorCalendar.readOnlyTag]),
+        ],
+        disabled: false,
+      })),
+  ];
+  const linked: PickerOption[] = calendars
+    .filter((c) => owners.has(c.id) && matches(c))
+    .map((c) => ({
+      id: c.id,
+      label: calendarLabel(c),
+      tags: [
+        t.instructorCalendar.linkedTo.replace('{name}', owners.get(c.id) ?? ''),
+      ],
+      disabled: true,
+    }));
+  const activeIndex = available.findIndex((o) => o.id === activeId);
   const pickedCalendar = calendars.find((c) => c.id === picked);
+  const pickedText = pickedCalendar
+    ? calendarLabel(pickedCalendar)
+    : picked === unlisted && unlisted
+      ? unlistedLabel
+      : '';
   const unchanged =
     picked === (current.googleCalendarId ?? '') &&
     current.matchStatus === 'confirmed';
+  const optionId = (id: string) => `${listId}-${id}`;
+
+  useEffect(() => {
+    if (!open || !activeId) return;
+    document
+      .getElementById(`${listId}-${activeId}`)
+      ?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, activeId, listId]);
+
+  function openList() {
+    setOpen(true);
+    setActiveId(picked || null);
+  }
+
+  function closeList() {
+    setOpen(false);
+    setQuery(null);
+    setActiveId(null);
+  }
+
+  function choose(option: PickerOption) {
+    if (option.disabled) return;
+    setPicked(option.id);
+    save.reset();
+    closeList();
+  }
+
+  function onKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      if (open) {
+        e.preventDefault();
+        closeList();
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) {
+        openList();
+        return;
+      }
+      if (available.length === 0) return;
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      const next =
+        activeIndex === -1
+          ? step === 1
+            ? 0
+            : available.length - 1
+          : (activeIndex + step + available.length) % available.length;
+      setActiveId(available[next]?.id ?? null);
+    } else if (e.key === 'Enter' && open) {
+      e.preventDefault();
+      const pick = available[activeIndex] ?? (needle ? available[0] : null);
+      if (pick) choose(pick);
+      else closeList();
+    }
+  }
 
   function onFormSubmit(e: FormEvent) {
     e.preventDefault();
     if (picked) onSubmit(picked);
   }
 
+  function renderOption(option: PickerOption) {
+    const selected = option.id === picked;
+    return (
+      <li
+        key={option.id}
+        id={optionId(option.id)}
+        role="option"
+        aria-selected={selected}
+        aria-disabled={option.disabled || undefined}
+        className={cn(
+          'flex items-start gap-2 px-3 py-2 text-sm',
+          option.disabled
+            ? 'cursor-not-allowed text-slate'
+            : 'cursor-pointer text-ink hover:bg-navy-tint',
+          option.id === activeId && 'bg-navy-tint',
+        )}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => choose(option)}
+      >
+        <span aria-hidden className="w-3 shrink-0 text-navy">
+          {selected ? '✓' : ''}
+        </span>
+        <span className="min-w-0 break-words">
+          {[option.label, ...option.tags].join(' · ')}
+        </span>
+      </li>
+    );
+  }
+
   return (
     <form onSubmit={onFormSubmit} noValidate className="flex flex-col gap-3">
-      <Field label={t.instructorCalendar.searchLabel}>
-        {(p) => (
-          <Input
-            {...p}
-            type="search"
-            value={query}
-            autoComplete="off"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        )}
-      </Field>
       <Field label={t.instructorCalendar.pickLabel}>
         {(p) => (
-          <Select
-            {...p}
-            value={picked}
-            onChange={(e) => {
-              setPicked(e.target.value);
-              save.reset();
-            }}
-          >
-            <option value="">{t.instructorCalendar.noCalendar}</option>
-            {(available.length > 0 || unlisted) && (
-              <optgroup label={t.instructorCalendar.groupAvailable}>
-                {unlisted && (
-                  <option value={unlisted}>
-                    {[
-                      current.calendarSummary || unlisted,
-                      t.instructorCalendar.notShared,
-                    ].join(' · ')}
-                  </option>
+          <div className="relative">
+            <Input
+              {...p}
+              role="combobox"
+              autoComplete="off"
+              spellCheck={false}
+              aria-autocomplete="list"
+              aria-expanded={open}
+              aria-controls={open ? listId : undefined}
+              aria-activedescendant={
+                open && activeId ? optionId(activeId) : undefined
+              }
+              className="pr-9"
+              placeholder={
+                open
+                  ? t.instructorCalendar.searchPlaceholder
+                  : t.instructorCalendar.noCalendar
+              }
+              value={query ?? pickedText}
+              onFocus={(e) => {
+                e.target.select();
+                openList();
+              }}
+              onClick={() => {
+                if (!open) openList();
+              }}
+              onBlur={closeList}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setOpen(true);
+                setActiveId(null);
+              }}
+              onKeyDown={onKeyDown}
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate"
+            >
+              ▾
+            </span>
+            {open && (
+              <div className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-y-auto rounded-md border border-grey/60 bg-surface py-1 shadow-pop">
+                {available.length === 0 && linked.length === 0 ? (
+                  <p role="status" className="px-3 py-2 text-sm text-slate">
+                    {t.instructorCalendar.noMatches}
+                  </p>
+                ) : (
+                  <ul
+                    id={listId}
+                    role="listbox"
+                    aria-label={t.instructorCalendar.pickLabel}
+                  >
+                    {available.length > 0 && (
+                      <li role="presentation">
+                        <ul
+                          role="group"
+                          aria-label={t.instructorCalendar.groupAvailable}
+                        >
+                          <li
+                            role="presentation"
+                            className="px-3 pb-1 pt-2 text-xs font-medium uppercase text-slate"
+                          >
+                            {t.instructorCalendar.groupAvailable}
+                          </li>
+                          {available.map(renderOption)}
+                        </ul>
+                      </li>
+                    )}
+                    {linked.length > 0 && (
+                      <li role="presentation">
+                        <ul
+                          role="group"
+                          aria-label={t.instructorCalendar.groupLinked}
+                        >
+                          <li
+                            role="presentation"
+                            className="px-3 pb-1 pt-2 text-xs font-medium uppercase text-slate"
+                          >
+                            {t.instructorCalendar.groupLinked}
+                          </li>
+                          {linked.map(renderOption)}
+                        </ul>
+                      </li>
+                    )}
+                  </ul>
                 )}
-                {available.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {optionLabel(c, [
-                      ...(c.id === suggestedId
-                        ? [t.instructorCalendar.suggestedTag]
-                        : []),
-                      ...(c.canWrite ? [] : [t.instructorCalendar.readOnlyTag]),
-                    ])}
-                  </option>
-                ))}
-              </optgroup>
+              </div>
             )}
-            {linked.length > 0 && (
-              <optgroup label={t.instructorCalendar.groupLinked}>
-                {linked.map((c) => (
-                  <option key={c.id} value={c.id} disabled>
-                    {optionLabel(c, [
-                      t.instructorCalendar.linkedTo.replace(
-                        '{name}',
-                        owners.get(c.id) ?? '',
-                      ),
-                    ])}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </Select>
+          </div>
         )}
       </Field>
-      {needle && available.length === 0 && linked.length === 0 && (
-        <p className="text-sm text-slate">{t.instructorCalendar.noMatches}</p>
-      )}
       {pickedCalendar && !pickedCalendar.canWrite && (
         <p className="flex items-start gap-1.5 text-sm text-status-rejected">
           <span aria-hidden>⚠</span>

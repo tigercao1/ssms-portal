@@ -122,37 +122,130 @@ function renderCard() {
 
 const picker = () => screen.findByRole('combobox', { name: 'Calendar' });
 
+async function openPicker() {
+  const input = await picker();
+  await userEvent.click(input);
+  return input;
+}
+
+const optionTexts = () =>
+  within(screen.getByRole('listbox'))
+    .getAllByRole('option')
+    .map((o) => o.textContent);
+
+async function choose(name: RegExp | string) {
+  await openPicker();
+  await userEvent.click(screen.getByRole('option', { name }));
+}
+
 describe('InstructorCalendarCard picker', () => {
   it('lists unassigned calendars first and disables ones linked to another instructor', async () => {
     serve();
     renderCard();
 
-    const select = await picker();
-    expect(
-      within(select)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual([
-      'No calendar',
+    const input = await openPicker();
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(optionTexts()).toEqual([
       'SSNOW Admin (admin@ssnow.club)',
       'Jane Snow (jane.snow@ssnow.club)',
       'Sam Ski (sam.ski@gmail.com) · read-only',
       'Li Wei (li.wei@gmail.com) · Linked to Li Wei',
     ]);
-    const groups = within(select).getAllByRole('group');
-    expect(groups.map((g) => g.getAttribute('label'))).toEqual([
-      'Unassigned',
-      'Linked to other instructors',
-    ]);
     expect(
-      within(select).getByRole('option', { name: /Linked to Li Wei/ }),
-    ).toBeDisabled();
+      within(screen.getByRole('listbox'))
+        .getAllByRole('group')
+        .map((g) => g.getAttribute('aria-label')),
+    ).toEqual(['Unassigned', 'Linked to other instructors']);
     expect(
-      within(select).getByRole('option', { name: /SSNOW Admin/ }),
-    ).toBeEnabled();
+      screen.getByRole('option', { name: /Linked to Li Wei/ }),
+    ).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.click(screen.getByRole('option', { name: /Linked to Li Wei/ }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(input).toHaveValue('');
   });
 
-  it('selects the current calendar and saves a new pick as confirmed', async () => {
+  it('filters the list as you type and picks a match', async () => {
+    const { bodies } = serve();
+    renderCard();
+
+    const input = await openPicker();
+    await userEvent.type(input, 'gmail');
+    expect(optionTexts()).toEqual([
+      'Sam Ski (sam.ski@gmail.com) · read-only',
+      'Li Wei (li.wei@gmail.com) · Linked to Li Wei',
+    ]);
+
+    await userEvent.clear(input);
+    await userEvent.type(input, 'jane');
+    expect(optionTexts()).toEqual(['Jane Snow (jane.snow@ssnow.club)']);
+    await userEvent.click(screen.getByRole('option', { name: /Jane Snow/ }));
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(input).toHaveValue('Jane Snow (jane.snow@ssnow.club)');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { googleCalendarId: 'jane.snow@ssnow.club', matchStatus: 'confirmed' },
+      ]),
+    );
+  });
+
+  it('says when nothing matches the search', async () => {
+    serve();
+    renderCard();
+
+    await userEvent.type(await openPicker(), 'zzz');
+    expect(
+      screen.getByText('No calendars match your search.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+  });
+
+  it('picks with the keyboard and skips calendars linked elsewhere', async () => {
+    const { bodies } = serve();
+    renderCard();
+
+    const input = await picker();
+    input.focus();
+    await userEvent.type(input, 'i');
+    expect(optionTexts()).toEqual([
+      'SSNOW Admin (admin@ssnow.club)',
+      'Sam Ski (sam.ski@gmail.com) · read-only',
+      'Li Wei (li.wei@gmail.com) · Linked to Li Wei',
+    ]);
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+    expect(input).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { name: /SSNOW Admin/ }).id,
+    );
+    await userEvent.keyboard('{Enter}');
+    expect(input).toHaveValue('SSNOW Admin (admin@ssnow.club)');
+    expect(bodies).toEqual([]);
+  });
+
+  it('restores the picked calendar when the search is abandoned', async () => {
+    serve({
+      current: {
+        googleCalendarId: 'admin@ssnow.club',
+        calendarSummary: 'SSNOW Admin',
+        matchStatus: 'confirmed',
+      },
+    });
+    renderCard();
+
+    const input = await openPicker();
+    await userEvent.type(input, 'sam');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(input).toHaveValue('SSNOW Admin (admin@ssnow.club)');
+
+    await userEvent.type(input, 'sam');
+    await userEvent.tab();
+    expect(input).toHaveValue('SSNOW Admin (admin@ssnow.club)');
+  });
+
+  it('shows the current calendar and saves a new pick as confirmed', async () => {
     const { bodies } = serve({
       current: {
         googleCalendarId: 'admin@ssnow.club',
@@ -162,13 +255,16 @@ describe('InstructorCalendarCard picker', () => {
     });
     renderCard();
 
-    const select = await picker();
-    expect(select).toHaveValue('admin@ssnow.club');
+    expect(await picker()).toHaveValue('SSNOW Admin (admin@ssnow.club)');
     expect(screen.getByText('Confirmed')).toBeInTheDocument();
     const save = screen.getByRole('button', { name: 'Save' });
     expect(save).toBeDisabled();
 
-    await userEvent.selectOptions(select, 'jane.snow@ssnow.club');
+    await openPicker();
+    expect(
+      screen.getByRole('option', { name: /SSNOW Admin/ }),
+    ).toHaveAttribute('aria-selected', 'true');
+    await userEvent.click(screen.getByRole('option', { name: /Jane Snow/ }));
     await userEvent.click(save);
 
     await waitFor(() =>
@@ -189,9 +285,8 @@ describe('InstructorCalendarCard picker', () => {
     });
     renderCard();
 
-    const select = await picker();
-    const options = within(select).getAllByRole('option');
-    expect(options[1]).toHaveTextContent(
+    await openPicker();
+    expect(optionTexts()[0]).toBe(
       'Jane Snow (jane.snow@ssnow.club) · Suggested',
     );
     expect(screen.getByText('Suggested match: Jane Snow')).toBeInTheDocument();
@@ -218,7 +313,7 @@ describe('InstructorCalendarCard picker', () => {
     });
     renderCard();
 
-    expect(await picker()).toHaveValue('jane.snow@ssnow.club');
+    expect(await picker()).toHaveValue('Jane Snow (jane.snow@ssnow.club)');
     expect(screen.getByText('Suggested', { selector: 'span' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
@@ -233,11 +328,11 @@ describe('InstructorCalendarCard picker', () => {
     const { bodies } = serve();
     renderCard();
 
-    const select = await picker();
+    await picker();
     expect(
       screen.queryByText("Read-only, SSMS can't add lessons"),
     ).not.toBeInTheDocument();
-    await userEvent.selectOptions(select, 'sam.ski@gmail.com');
+    await choose(/Sam Ski/);
     expect(
       screen.getByText("Read-only, SSMS can't add lessons"),
     ).toBeInTheDocument();
@@ -263,7 +358,9 @@ describe('InstructorCalendarCard picker', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
 
     await waitFor(() => expect(bodies).toEqual([{ googleCalendarId: null }]));
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Calendar' })).toHaveValue(''));
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Calendar' })).toHaveValue(''),
+    );
     expect(
       screen.queryByRole('button', { name: 'Clear' }),
     ).not.toBeInTheDocument();
@@ -273,7 +370,7 @@ describe('InstructorCalendarCard picker', () => {
     serve({ patchStatus: 409 });
     renderCard();
 
-    await userEvent.selectOptions(await picker(), 'admin@ssnow.club');
+    await choose(/SSNOW Admin/);
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(
@@ -287,38 +384,10 @@ describe('InstructorCalendarCard picker', () => {
     serve({ patchStatus: 400 });
     renderCard();
 
-    await userEvent.selectOptions(await picker(), 'admin@ssnow.club');
+    await choose(/SSNOW Admin/);
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText('nope')).toBeInTheDocument();
-  });
-
-  it('filters calendars by name or ID', async () => {
-    serve();
-    renderCard();
-
-    const select = await picker();
-    await userEvent.type(
-      screen.getByRole('searchbox', { name: 'Search calendars' }),
-      'gmail',
-    );
-    expect(
-      within(select)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual([
-      'No calendar',
-      'Sam Ski (sam.ski@gmail.com) · read-only',
-      'Li Wei (li.wei@gmail.com) · Linked to Li Wei',
-    ]);
-
-    await userEvent.type(
-      screen.getByRole('searchbox', { name: 'Search calendars' }),
-      'zzz',
-    );
-    expect(
-      screen.getByText('No calendars match your search.'),
-    ).toBeInTheDocument();
   });
 
   it('keeps a current calendar that Google no longer lists', async () => {
@@ -331,13 +400,12 @@ describe('InstructorCalendarCard picker', () => {
     });
     renderCard();
 
-    const select = await picker();
-    expect(select).toHaveValue('gone@group.calendar.google.com');
+    expect(await openPicker()).toHaveValue('Old calendar');
     expect(
-      within(select).getByRole('option', {
+      screen.getByRole('option', {
         name: 'Old calendar · not shared with SSMS',
       }),
-    ).toBeInTheDocument();
+    ).toHaveAttribute('aria-selected', 'true');
   });
 });
 
@@ -429,9 +497,9 @@ describe('InstructorCalendarCard without Google', () => {
     serve();
     renderCard();
 
+    await userEvent.click(await screen.findByRole('combobox', { name: '日历' }));
     expect(
-      await screen.findByRole('combobox', { name: '日历' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /已关联 Li Wei/ })).toBeDisabled();
+      screen.getByRole('option', { name: /已关联 Li Wei/ }),
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 });
