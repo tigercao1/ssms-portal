@@ -76,7 +76,6 @@ export const sampleFields: Field[] = [
   }),
 ];
 
-/** Languages with an uploaded PDF: the labelled main version, then each translation. */
 export function templateLanguages(t: Template): DocumentLanguage[] {
   return [
     ...(t.sourceLanguage && t.sourceSha256 !== null ? [t.sourceLanguage] : []),
