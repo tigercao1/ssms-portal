@@ -1,8 +1,10 @@
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
+import { languageName } from './format';
 import type {
   AssignmentStatus,
   CertState,
+  DocumentLanguage,
   ReviewStatus,
   TemplateKind,
   TemplateStatus,
@@ -41,6 +43,28 @@ export function KindBadge({ kind }: { kind: TemplateKind }) {
   return (
     <span className="whitespace-nowrap rounded-sm bg-navy-tint px-2 py-0.5 text-xs font-medium text-navy">
       {kind === 'sign' ? t.documents.kindSign : t.documents.kindRead}
+    </span>
+  );
+}
+
+export function LanguageBadges({
+  languages,
+}: {
+  languages: readonly DocumentLanguage[];
+}) {
+  const t = useT();
+  if (languages.length === 0) return null;
+  return (
+    <span className="inline-flex gap-1">
+      {languages.map((language) => (
+        <span
+          key={language}
+          title={languageName(language, t)}
+          className="whitespace-nowrap rounded-sm border border-grey px-1.5 py-0.5 text-xs font-medium text-slate"
+        >
+          {language === 'zh' ? t.documents.badgeZh : t.documents.badgeEn}
+        </span>
+      ))}
     </span>
   );
 }

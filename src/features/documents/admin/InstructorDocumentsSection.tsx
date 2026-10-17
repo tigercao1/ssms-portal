@@ -37,7 +37,13 @@ import {
   ReviewStatusChip,
 } from './badges';
 import { AssignDialog } from './AssignDialog';
-import { errorText, formatDay, shortHash, templateTitle } from './format';
+import {
+  errorText,
+  formatDay,
+  languageName,
+  shortHash,
+  templateTitle,
+} from './format';
 
 const ORG_LABEL: Record<CertOrg, string> = { csia: 'CSIA', casi: 'CASI' };
 
@@ -300,6 +306,16 @@ function AssignmentRow({
                 : t.documents.signedAs}{' '}
             </dt>
             <dd className="inline text-ink">{a.signerName}</dd>
+          </div>
+        )}
+        {a.language && (
+          <div>
+            <dt className="inline">
+              {template?.kind === 'read'
+                ? t.documents.readInLanguage
+                : t.documents.signedInLanguage}{' '}
+            </dt>
+            <dd className="inline text-ink">{languageName(a.language, t)}</dd>
           </div>
         )}
         {a.signedSha256 && (
