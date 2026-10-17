@@ -245,6 +245,9 @@ export interface Messages {
     colStatus: string;
     colActive: string;
     colApplied: string;
+    colCalendar: string;
+    calendarConnected: string;
+    calendarNotConnected: string;
     noInstructors: string;
     searchLabel: string;
     search: string;
@@ -783,8 +786,6 @@ export interface Messages {
   };
   instructorCalendar: {
     title: string;
-    statusSuggested: string;
-    statusConfirmed: string;
     searchPlaceholder: string;
     pickLabel: string;
     noCalendar: string;
@@ -793,9 +794,6 @@ export interface Messages {
     linkedTo: string;
     notShared: string;
     noMatches: string;
-    suggestedTag: string;
-    suggestion: string;
-    confirm: string;
     readOnlyTag: string;
     readOnlyWarning: string;
     clear: string;
@@ -805,9 +803,6 @@ export interface Messages {
     manualLabel: string;
     manualHint: string;
     taken: string;
-    suggest: string;
-    suggested: string;
-    suggestFailed: string;
   };
   classImport: {
     title: string;
@@ -1021,7 +1016,6 @@ export interface Messages {
     unavailableTitle: string;
     reasonInactive: string;
     reasonNoCalendar: string;
-    reasonNotConfirmed: string;
     reasonNotWritable: string;
     reasonCalendarError: string;
     reasonGoogleNotConnected: string;

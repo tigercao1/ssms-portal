@@ -149,6 +149,7 @@ export interface AdminInstructorRecord {
   preferredLanguage: PreferredLanguage;
   approvalStatus: ApprovalStatus;
   isActive: boolean;
+  calendarConnected: boolean;
   displayOrder?: number | null;
   insertedAt: string;
   updatedAt: string;
@@ -380,25 +381,15 @@ export interface AdminClass {
   updatedAt: string;
 }
 
-export type CalendarMatchStatus = 'suggested' | 'confirmed';
-
 export interface InstructorGoogleCalendar {
   instructorId: string;
   googleCalendarId: string | null;
   calendarSummary: string | null;
-  matchStatus: CalendarMatchStatus | null;
   updatedAt: string | null;
 }
 
 export interface InstructorGoogleCalendarInput {
   googleCalendarId: string | null;
-  matchStatus?: CalendarMatchStatus;
-}
-
-export interface CalendarCandidate {
-  calendarId: string;
-  calendarSummary: string;
-  matchedBy: 'email' | 'name';
 }
 
 export interface InstructorCalendarOverview extends InstructorGoogleCalendar {
@@ -407,18 +398,11 @@ export interface InstructorCalendarOverview extends InstructorGoogleCalendar {
   email: string | null;
   approvalStatus: string;
   isActive: boolean;
-  candidates: CalendarCandidate[];
-  suggestion: CalendarCandidate | null;
 }
 
 export interface InstructorCalendarsOverview {
   google: { connected: boolean; error: string | null };
   instructors: InstructorCalendarOverview[];
-}
-
-export interface SuggestCalendarsResult {
-  suggested: number;
-  overview: InstructorCalendarsOverview;
 }
 
 export interface GoogleConnectionStatus {

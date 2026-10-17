@@ -31,7 +31,6 @@ export type BookingSettingsInput = Omit<BookingSettings, 'updatedAt'>;
 export type UnavailableReason =
   | 'inactive'
   | 'no_calendar'
-  | 'calendar_not_confirmed'
   | 'calendar_not_writable'
   | 'calendar_error'
   | 'google_not_connected'

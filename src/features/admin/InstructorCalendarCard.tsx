@@ -12,7 +12,6 @@ import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { Banner, Button, Card, Field, Input, Spinner } from '@/components';
 import type {
-  CalendarMatchStatus,
   GoogleCalendar,
   InstructorCalendarsOverview,
   InstructorGoogleCalendar,
@@ -25,11 +24,6 @@ import {
 } from './lessonsApi';
 
 type SaveMutation = ReturnType<typeof useSetInstructorGoogleCalendar>;
-
-interface Suggestion {
-  calendarId: string;
-  summary: string;
-}
 
 export function InstructorCalendarCard({
   instructorId,
@@ -50,19 +44,14 @@ export function InstructorCalendarCard({
 
   return (
     <Card className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg">{t.instructorCalendar.title}</h2>
-        {current.data?.matchStatus && (
-          <CalendarStatusBadge status={current.data.matchStatus} />
-        )}
-      </div>
+      <h2 className="text-lg">{t.instructorCalendar.title}</h2>
       {loading ? (
         <Spinner />
       ) : current.isError || !current.data ? (
         <Banner tone="error">{t.errors.generic}</Banner>
       ) : (
         <CalendarEditor
-          key={`${current.data.googleCalendarId}:${current.data.matchStatus}`}
+          key={current.data.googleCalendarId ?? ''}
           current={current.data}
           overview={overview.data}
           calendars={listable ? calendars.data : undefined}
@@ -77,24 +66,6 @@ export function InstructorCalendarCard({
         />
       )}
     </Card>
-  );
-}
-
-function CalendarStatusBadge({ status }: { status: CalendarMatchStatus }) {
-  const t = useT();
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center whitespace-nowrap rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium text-ink',
-        status === 'confirmed'
-          ? 'border-status-approved'
-          : 'border-status-pending',
-      )}
-    >
-      {status === 'confirmed'
-        ? t.instructorCalendar.statusConfirmed
-        : t.instructorCalendar.statusSuggested}
-    </span>
   );
 }
 
@@ -124,60 +95,20 @@ function CalendarEditor({
       );
     }
   }
-  const own = overview?.instructors.find(
-    (entry) => entry.instructorId === current.instructorId,
-  );
-  const suggestion: Suggestion | null =
-    current.matchStatus === 'suggested' && current.googleCalendarId
-      ? {
-          calendarId: current.googleCalendarId,
-          summary: current.calendarSummary || current.googleCalendarId,
-        }
-      : !current.googleCalendarId &&
-          own?.suggestion &&
-          !owners.has(own.suggestion.calendarId)
-        ? {
-            calendarId: own.suggestion.calendarId,
-            summary: own.suggestion.calendarSummary,
-          }
-        : null;
-
   function submit(googleCalendarId: string | null) {
     save.mutate({
       instructorId: current.instructorId,
       googleCalendarId,
-      ...(googleCalendarId !== null && { matchStatus: 'confirmed' as const }),
     });
   }
 
   return (
     <div className="flex flex-col gap-3">
-      {suggestion && (
-        <Banner tone="pending">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span>
-              {t.instructorCalendar.suggestion.replace(
-                '{name}',
-                suggestion.summary,
-              )}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              disabled={save.isPending}
-              onClick={() => submit(suggestion.calendarId)}
-            >
-              {t.instructorCalendar.confirm}
-            </Button>
-          </div>
-        </Banner>
-      )}
       {calendars && !unavailable ? (
         <CalendarPicker
           current={current}
           calendars={calendars}
           owners={owners}
-          suggestedId={suggestion?.calendarId ?? null}
           save={save}
           onSubmit={submit}
         />
@@ -220,14 +151,12 @@ function CalendarPicker({
   current,
   calendars,
   owners,
-  suggestedId,
   save,
   onSubmit,
 }: {
   current: InstructorGoogleCalendar;
   calendars: GoogleCalendar[];
   owners: Map<string, string>;
-  suggestedId: string | null;
   save: SaveMutation;
   onSubmit: (googleCalendarId: string | null) => void;
 }) {
@@ -264,16 +193,10 @@ function CalendarPicker({
       : []),
     ...calendars
       .filter((c) => !owners.has(c.id) && matches(c))
-      .sort(
-        (a, b) => Number(b.id === suggestedId) - Number(a.id === suggestedId),
-      )
       .map((c) => ({
         id: c.id,
         label: calendarLabel(c),
-        tags: [
-          ...(c.id === suggestedId ? [t.instructorCalendar.suggestedTag] : []),
-          ...(c.canWrite ? [] : [t.instructorCalendar.readOnlyTag]),
-        ],
+        tags: c.canWrite ? [] : [t.instructorCalendar.readOnlyTag],
         disabled: false,
       })),
   ];
@@ -294,9 +217,7 @@ function CalendarPicker({
     : picked === unlisted && unlisted
       ? unlistedLabel
       : '';
-  const unchanged =
-    picked === (current.googleCalendarId ?? '') &&
-    current.matchStatus === 'confirmed';
+  const unchanged = picked === (current.googleCalendarId ?? '');
   const optionId = (id: string) => `${listId}-${id}`;
 
   useEffect(() => {

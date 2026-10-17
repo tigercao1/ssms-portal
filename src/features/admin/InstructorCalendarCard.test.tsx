@@ -6,7 +6,6 @@ import { InstructorCalendarCard } from './InstructorCalendarCard';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/msw';
 import type {
-  CalendarCandidate,
   InstructorCalendarOverview,
   InstructorCalendarsOverview,
   InstructorGoogleCalendar,
@@ -22,15 +21,12 @@ function entry(
     instructorId: 'inst-1',
     googleCalendarId: null,
     calendarSummary: null,
-    matchStatus: null,
     updatedAt: null,
     displayNameEn: 'Jane Snow',
     displayNameZh: null,
     email: 'jane@example.com',
     approvalStatus: 'approved',
     isActive: true,
-    candidates: [],
-    suggestion: null,
     ...overrides,
   };
 }
@@ -41,18 +37,15 @@ const liWei = entry({
   email: 'li@example.com',
   googleCalendarId: 'li.wei@gmail.com',
   calendarSummary: 'Li Wei',
-  matchStatus: 'confirmed',
 });
 
 function serve({
   current = {},
   google = { connected: true, error: null },
-  suggestion = null,
   patchStatus = 200,
 }: {
   current?: Partial<InstructorGoogleCalendar>;
   google?: InstructorCalendarsOverview['google'];
-  suggestion?: CalendarCandidate | null;
   patchStatus?: number;
 } = {}) {
   const bodies: unknown[] = [];
@@ -61,13 +54,12 @@ function serve({
     instructorId: 'inst-1',
     googleCalendarId: null,
     calendarSummary: null,
-    matchStatus: null,
     updatedAt: null,
     ...current,
   };
   const overview: InstructorCalendarsOverview = {
     google,
-    instructors: [entry({ ...stored, suggestion }), liWei],
+    instructors: [entry(stored), liWei],
   };
   server.use(
     http.get(`${API}/admin/instructor-calendars`, () =>
@@ -105,9 +97,6 @@ function serve({
           ...stored,
           googleCalendarId: body.googleCalendarId,
           calendarSummary: body.googleCalendarId,
-          matchStatus: body.googleCalendarId
-            ? (body.matchStatus ?? 'confirmed')
-            : null,
         };
         return HttpResponse.json(stored);
       },
@@ -185,9 +174,7 @@ describe('InstructorCalendarCard picker', () => {
     expect(input).toHaveValue('Jane Snow (jane.snow@ssnow.club)');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(bodies).toEqual([
-        { googleCalendarId: 'jane.snow@ssnow.club', matchStatus: 'confirmed' },
-      ]),
+      expect(bodies).toEqual([{ googleCalendarId: 'jane.snow@ssnow.club' }]),
     );
   });
 
@@ -244,7 +231,6 @@ describe('InstructorCalendarCard picker', () => {
       current: {
         googleCalendarId: 'admin@ssnow.club',
         calendarSummary: 'SSNOW Admin',
-        matchStatus: 'confirmed',
       },
     });
     renderCard();
@@ -260,18 +246,16 @@ describe('InstructorCalendarCard picker', () => {
     expect(input).toHaveValue('SSNOW Admin (admin@ssnow.club)');
   });
 
-  it('shows the current calendar and saves a new pick as confirmed', async () => {
+  it('shows the current calendar and saves a new pick', async () => {
     const { bodies } = serve({
       current: {
         googleCalendarId: 'admin@ssnow.club',
         calendarSummary: 'SSNOW Admin',
-        matchStatus: 'confirmed',
       },
     });
     renderCard();
 
     expect(await picker()).toHaveValue('SSNOW Admin (admin@ssnow.club)');
-    expect(screen.getByText('Confirmed')).toBeInTheDocument();
     const save = screen.getByRole('button', { name: 'Save' });
     expect(save).toBeDisabled();
 
@@ -283,60 +267,32 @@ describe('InstructorCalendarCard picker', () => {
     await userEvent.click(save);
 
     await waitFor(() =>
-      expect(bodies).toEqual([
-        { googleCalendarId: 'jane.snow@ssnow.club', matchStatus: 'confirmed' },
-      ]),
+      expect(bodies).toEqual([{ googleCalendarId: 'jane.snow@ssnow.club' }]),
     );
     expect(await screen.findByText('Saved')).toBeInTheDocument();
   });
 
-  it('marks the suggested match and confirms it in one click', async () => {
-    const { bodies } = serve({
-      suggestion: {
-        calendarId: 'jane.snow@ssnow.club',
-        calendarSummary: 'Jane Snow',
-        matchedBy: 'email',
-      },
-    });
-    renderCard();
-
-    await openPicker();
-    expect(optionTexts()[0]).toBe(
-      'Jane Snow (jane.snow@ssnow.club) · Suggested',
-    );
-    expect(screen.getByText('Suggested match: Jane Snow')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-
-    await waitFor(() =>
-      expect(bodies).toEqual([
-        { googleCalendarId: 'jane.snow@ssnow.club', matchStatus: 'confirmed' },
-      ]),
-    );
-    expect(await screen.findByText('Confirmed')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Confirm' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('confirms a stored suggestion', async () => {
-    const { bodies } = serve({
+  it('keeps Save disabled until the pick differs from the current calendar', async () => {
+    serve({
       current: {
         googleCalendarId: 'jane.snow@ssnow.club',
         calendarSummary: 'Jane Snow',
-        matchStatus: 'suggested',
       },
     });
     renderCard();
 
     expect(await picker()).toHaveValue('Jane Snow (jane.snow@ssnow.club)');
-    expect(screen.getByText('Suggested', { selector: 'span' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    expect(screen.queryByText(/Suggested/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Confirm' }),
+    ).not.toBeInTheDocument();
 
-    await waitFor(() =>
-      expect(bodies).toEqual([
-        { googleCalendarId: 'jane.snow@ssnow.club', matchStatus: 'confirmed' },
-      ]),
-    );
+    await choose(/SSNOW Admin/);
+    expect(save).toBeEnabled();
+    await choose(/Jane Snow/);
+    expect(save).toBeDisabled();
   });
 
   it('warns that a read-only calendar cannot take lessons but still saves it', async () => {
@@ -354,9 +310,7 @@ describe('InstructorCalendarCard picker', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
-      expect(bodies).toEqual([
-        { googleCalendarId: 'sam.ski@gmail.com', matchStatus: 'confirmed' },
-      ]),
+      expect(bodies).toEqual([{ googleCalendarId: 'sam.ski@gmail.com' }]),
     );
   });
 
@@ -364,7 +318,6 @@ describe('InstructorCalendarCard picker', () => {
     const { bodies } = serve({
       current: {
         googleCalendarId: 'admin@ssnow.club',
-        matchStatus: 'confirmed',
       },
     });
     renderCard();
@@ -410,7 +363,6 @@ describe('InstructorCalendarCard picker', () => {
       current: {
         googleCalendarId: 'gone@group.calendar.google.com',
         calendarSummary: 'Old calendar',
-        matchStatus: 'confirmed',
       },
     });
     renderCard();
@@ -451,10 +403,7 @@ describe('InstructorCalendarCard without Google', () => {
 
     await waitFor(() =>
       expect(bodies).toEqual([
-        {
-          googleCalendarId: 'jane@group.calendar.google.com',
-          matchStatus: 'confirmed',
-        },
+        { googleCalendarId: 'jane@group.calendar.google.com' },
       ]),
     );
     expect(calendarRequests).toEqual([]);
@@ -463,7 +412,7 @@ describe('InstructorCalendarCard without Google', () => {
   it('falls back to a manual ID when Google returns an error', async () => {
     const { bodies } = serve({
       google: { connected: true, error: 'Google Calendar is unavailable' },
-      current: { googleCalendarId: 'old@group.calendar.google.com', matchStatus: 'confirmed' },
+      current: { googleCalendarId: 'old@group.calendar.google.com' },
     });
     renderCard();
 

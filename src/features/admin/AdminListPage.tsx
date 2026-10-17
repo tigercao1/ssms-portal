@@ -23,7 +23,6 @@ import {
   StatusPill,
 } from '@/components';
 import { INSTRUCTORS_PAGE_SIZE, useAdminInstructorPage } from './api';
-import { useSuggestInstructorCalendars } from './lessonsApi';
 import type { AdminInstructorRecord, ApprovalStatus } from '@/lib/types';
 
 const SEARCH_DEBOUNCE_MS = 200;
@@ -123,10 +122,7 @@ export function AdminListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-3xl">{t.admin.listTitle}</h1>
-        <SuggestCalendarsButton />
-      </div>
+      <h1 className="text-3xl">{t.admin.listTitle}</h1>
 
       <div className="flex flex-wrap items-end gap-4">
         <form
@@ -217,6 +213,9 @@ export function AdminListPage() {
                       {t.admin.colStatus}
                     </th>
                     <th className="px-4 py-3 font-medium">
+                      {t.admin.colCalendar}
+                    </th>
+                    <th className="px-4 py-3 font-medium">
                       {t.admin.colApplied}
                     </th>
                   </tr>
@@ -244,6 +243,9 @@ export function AdminListPage() {
                           status={row.approvalStatus}
                           isActive={row.isActive}
                         />
+                      </td>
+                      <td className="px-4 py-3">
+                        <CalendarStatus connected={row.calendarConnected} />
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-slate">
                         {formatDate(row.insertedAt, locale)}
@@ -274,6 +276,10 @@ export function AdminListPage() {
                     <span className="font-mono text-xs text-slate">
                       {row.email}
                     </span>
+                    <div className="flex items-center gap-2 text-xs text-slate">
+                      {t.admin.colCalendar}
+                      <CalendarStatus connected={row.calendarConnected} />
+                    </div>
                     <span className="font-mono text-xs text-slate">
                       {formatDate(row.insertedAt, locale)}
                     </span>
@@ -311,33 +317,18 @@ export function AdminListPage() {
   );
 }
 
-function SuggestCalendarsButton() {
+function CalendarStatus({ connected }: { connected: boolean }) {
   const t = useT();
-  const suggest = useSuggestInstructorCalendars();
   return (
-    <div className="flex flex-col items-end gap-2">
-      <Button
-        variant="secondary"
-        loading={suggest.isPending}
-        onClick={() => suggest.mutate()}
-      >
-        {t.instructorCalendar.suggest}
-      </Button>
-      {suggest.isError && (
-        <Banner tone="error" title={t.instructorCalendar.suggestFailed}>
-          {suggest.error instanceof ApiError
-            ? suggest.error.message
-            : t.errors.generic}
-        </Banner>
+    <span
+      className={cn(
+        'inline-flex items-center whitespace-nowrap rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium text-ink',
+        connected ? 'border-status-approved' : 'border-status-inactive',
       )}
-      {suggest.isSuccess && (
-        <Banner tone="approved">
-          {t.instructorCalendar.suggested.replace(
-            '{count}',
-            String(suggest.data.suggested),
-          )}
-        </Banner>
-      )}
-    </div>
+    >
+      {connected
+        ? t.admin.calendarConnected
+        : t.admin.calendarNotConnected}
+    </span>
   );
 }
