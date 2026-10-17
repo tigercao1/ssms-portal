@@ -69,6 +69,24 @@ describe('template assignment requests', () => {
     });
   });
 
+  it('lists only rows with a signed copy when hasSignedCopy is set', async () => {
+    const [first, second] = state.assignments.filter(
+      (a) => a.templateId === 'tpl-conduct' && a.status === 'completed',
+    );
+    first!.hasSignedCopy = false;
+    const page = await listTemplateAssignments('tpl-conduct', {
+      status: 'completed',
+      hasSignedCopy: true,
+      page: 1,
+      limit: 50,
+    });
+    const ids = page.rows.map((r) => r.id);
+    expect(ids).toContain(second!.id);
+    expect(ids).not.toContain(first!.id);
+    expect(page.rows.every((r) => r.hasSignedCopy)).toBe(true);
+    expect(page.total).toBe(page.rows.length);
+  });
+
   it('falls back to the rows seen when X-Total-Count is missing', async () => {
     server.use(
       http.get(`${API}/admin/documents/templates/:id/assignments`, () =>
@@ -132,6 +150,49 @@ describe('export requests', () => {
     expect((await rejection(createDocumentExport('nope', {}))).status).toBe(
       404,
     );
+  });
+
+  it('rejects exports without a signed copy', async () => {
+    const completed = state.assignments.filter(
+      (a) => a.templateId === 'tpl-conduct' && a.status === 'completed',
+    );
+    completed[0]!.hasSignedCopy = false;
+    expect(
+      (
+        await rejection(
+          createDocumentExport('tpl-conduct', {
+            assignmentIds: [completed[0]!.id],
+          }),
+        )
+      ).status,
+    ).toBe(400);
+    for (const a of completed) a.hasSignedCopy = false;
+    expect(
+      (await rejection(createDocumentExport('tpl-conduct', {}))).status,
+    ).toBe(400);
+  });
+
+  it('rejects selected ids from another season than the one given', async () => {
+    const [other, same] = state.assignments.filter(
+      (a) => a.templateId === 'tpl-conduct' && a.status === 'completed',
+    );
+    other!.season = '2025/26';
+    expect(
+      (
+        await rejection(
+          createDocumentExport('tpl-conduct', {
+            season: same!.season!,
+            assignmentIds: [same!.id, other!.id],
+          }),
+        )
+      ).status,
+    ).toBe(400);
+    await expect(
+      createDocumentExport('tpl-conduct', {
+        season: same!.season!,
+        assignmentIds: [same!.id],
+      }),
+    ).resolves.toMatchObject({ selectedCount: 1 });
   });
 
   it('410s an expired export', async () => {

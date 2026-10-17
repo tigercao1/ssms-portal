@@ -237,22 +237,21 @@ export function useTemplateAssignments(
   });
 }
 
-/** Count of completed assignments for a season, read from `X-Total-Count`. */
-export function useCompletedCount(id: string, season: string | undefined) {
+/**
+ * Count of completed assignments with a signed copy for a season, read from
+ * `X-Total-Count`.
+ */
+export function useSignedCopyCount(id: string, season: string | undefined) {
+  const query: TemplateAssignmentQuery = {
+    season,
+    status: 'completed',
+    hasSignedCopy: true,
+    page: 1,
+    limit: 1,
+  };
   return useQuery({
-    queryKey: documentsKeys.templateAssignments(id, {
-      season,
-      status: 'completed',
-      page: 1,
-      limit: 1,
-    }),
-    queryFn: () =>
-      listTemplateAssignments(id, {
-        season,
-        status: 'completed',
-        page: 1,
-        limit: 1,
-      }),
+    queryKey: documentsKeys.templateAssignments(id, query),
+    queryFn: () => listTemplateAssignments(id, query),
     select: (page) => page.total,
   });
 }

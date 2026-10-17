@@ -157,6 +157,7 @@ export async function listTemplateAssignments(
   });
   if (query.season) qs.set('season', query.season);
   if (query.status && query.status !== 'all') qs.set('status', query.status);
+  if (query.hasSignedCopy) qs.set('hasSignedCopy', 'true');
   if (query.q) qs.set('q', query.q);
   const { data, headers } = await apiWithHeaders<TemplateAssignmentRow[]>(
     `/admin/documents/templates/${enc(id)}/assignments?${qs.toString()}`,

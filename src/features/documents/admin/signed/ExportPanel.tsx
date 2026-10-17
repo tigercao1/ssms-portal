@@ -10,10 +10,10 @@ import {
   type DocumentExportStatus,
 } from '../../api';
 import {
-  useCompletedCount,
   useCreateDocumentExport,
   useDocumentExportPolling,
   useDocumentExports,
+  useSignedCopyCount,
 } from '../hooks';
 import { Chip } from '../badges';
 import { errorText, formatBytes } from '../format';
@@ -34,10 +34,10 @@ export function ExportPanel({
 }) {
   const t = useT();
   const s = t.signedCopies;
-  const completed = useCompletedCount(templateId, season || undefined);
+  const signed = useSignedCopyCount(templateId, season || undefined);
   const exports = useDocumentExports(templateId);
   const create = useCreateDocumentExport(templateId);
-  const allCount = completed.data ?? 0;
+  const allCount = signed.data ?? 0;
   const tooManyAll = allCount > MAX_EXPORT_FILES;
   const tooManySelected = selected.size > MAX_EXPORT_FILES;
 
@@ -76,7 +76,7 @@ export function ExportPanel({
           <Button
             variant="primary"
             disabled={
-              !completed.isSuccess ||
+              !signed.isSuccess ||
               allCount === 0 ||
               tooManyAll ||
               create.isPending
@@ -100,7 +100,7 @@ export function ExportPanel({
             {s.exportTooMany.replace('{max}', String(MAX_EXPORT_FILES))}
           </p>
         )}
-        {completed.isSuccess && allCount === 0 && (
+        {signed.isSuccess && allCount === 0 && (
           <p className="text-sm text-slate">{s.exportNothing}</p>
         )}
         {create.isError && (

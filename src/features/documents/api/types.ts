@@ -370,6 +370,7 @@ export type TemplateAssignmentStatusFilter = 'all' | 'completed' | 'open';
 export interface TemplateAssignmentQuery {
   season?: string;
   status?: TemplateAssignmentStatusFilter;
+  hasSignedCopy?: boolean;
   q?: string;
   page: number;
   limit: number;

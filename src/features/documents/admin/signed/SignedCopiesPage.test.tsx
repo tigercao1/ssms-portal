@@ -275,6 +275,7 @@ describe('Export panel', () => {
       limit: '1',
       season: '2026/27',
       status: 'completed',
+      hasSignedCopy: 'true',
     });
     expect(screen.getByText('For season 2026/27.')).toBeInTheDocument();
   });
@@ -474,6 +475,36 @@ describe('Export panel', () => {
         'An export holds at most 1000 files. Pick a season or select fewer.',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('counts only completed assignments that have a signed copy', async () => {
+    for (const a of state.assignments) a.hasSignedCopy = false;
+    renderPage();
+    expect(
+      await screen.findByRole('button', { name: 'Export all signed (0)' }),
+    ).toBeDisabled();
+    expect(
+      await screen.findByText('Nothing signed to export yet.'),
+    ).toBeVisible();
+  });
+
+  it('allows export all when only a few of many completed rows are signed', async () => {
+    const big = fakeRoster('tpl-conduct', 2001, { completeEvery: 2 });
+    state.assignments = big.assignments;
+    state.instructors = big.instructors;
+    for (const a of state.assignments.slice(1)) a.hasSignedCopy = false;
+    renderPage();
+    const all = await screen.findByRole('button', {
+      name: 'Export all signed (1)',
+    });
+    expect(all).toBeEnabled();
+    expect(
+      screen.queryByText(
+        'An export holds at most 1000 files. Pick a season or select fewer.',
+      ),
+    ).not.toBeInTheDocument();
+    await userEvent.click(all);
+    await waitFor(() => expect(state.exports).toHaveLength(1));
   });
 
   it('disables export all when nothing is signed', async () => {

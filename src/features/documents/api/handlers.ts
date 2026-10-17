@@ -558,6 +558,7 @@ export function documentsHandlers(
         const qs = new URL(request.url).searchParams;
         const season = qs.get('season');
         const status = qs.get('status') ?? 'all';
+        const signedOnly = qs.get('hasSignedCopy') === 'true';
         const tokens = (qs.get('q') ?? '')
           .toLowerCase()
           .split(/\s+/)
@@ -579,6 +580,7 @@ export function documentsHandlers(
                 (status === 'completed'
                   ? r.status === 'completed'
                   : r.status !== 'completed')) &&
+              (!signedOnly || r.hasSignedCopy) &&
               tokens.every((token) => haystack.includes(token))
             );
           }),
@@ -598,14 +600,15 @@ export function documentsHandlers(
         state.exportBodies.push(body);
         if (t.kind !== 'sign')
           return badRequest('Only sign documents can be exported');
-        const completed = templateRows(t.id).filter(
+        const exportable = templateRows(t.id).filter(
           (r) =>
             r.status === 'completed' &&
+            r.hasSignedCopy &&
             (!body.season || r.season === body.season),
         );
-        let count = completed.length;
+        let count = exportable.length;
         if (body.assignmentIds) {
-          const ids = new Set(completed.map((r) => r.id));
+          const ids = new Set(exportable.map((r) => r.id));
           if (
             body.assignmentIds.length < 1 ||
             body.assignmentIds.length > MAX_EXPORT_FILES
@@ -613,9 +616,9 @@ export function documentsHandlers(
             return badRequest('assignmentIds must have 1 to 1000 items');
           if (body.assignmentIds.some((id) => !ids.has(id)))
             return badRequest(
-              'Some assignments are not completed copies of this document',
+              'Every assignment must be a completed, signed copy of this template in the chosen season',
             );
-          count = body.assignmentIds.length;
+          count = new Set(body.assignmentIds).size;
         }
         if (count === 0) return badRequest('Nothing signed matches');
         if (count > MAX_EXPORT_FILES)
