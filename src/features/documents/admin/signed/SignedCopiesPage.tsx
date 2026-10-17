@@ -206,119 +206,114 @@ function SignedCopies({ template }: { template: Template }) {
         <p className="max-w-3xl text-slate">{isSign ? s.intro : s.introRead}</p>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        {isSign && (
-          <div className="flex flex-col gap-6 xl:order-last">
-            <ExportPanel
-              templateId={template.id}
-              season={filters.season}
-              selected={selected}
-              onClearSelection={() => setSelected(new Set())}
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card>
+          <form
+            role="search"
+            onSubmit={submit}
+            className="grid gap-3 sm:grid-cols-2 md:grid-cols-[minmax(0,11rem)_minmax(0,11rem)_minmax(0,1fr)_auto] md:items-end"
+          >
+            <SeasonFilter
+              value={filters.season}
+              onChange={(season) => update({ season })}
             />
-          </div>
+            <Field label={s.statusLabel}>
+              {(p) => (
+                <Select
+                  {...p}
+                  value={filters.status}
+                  onChange={(e) =>
+                    update({
+                      status: e.target.value as TemplateAssignmentStatusFilter,
+                    })
+                  }
+                >
+                  <option value="all">{s.statusAll}</option>
+                  <option value="completed">{s.statusCompleted}</option>
+                  <option value="open">{s.statusOpen}</option>
+                </Select>
+              )}
+            </Field>
+            <Field label={s.searchLabel}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type="search"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+              )}
+            </Field>
+            <Button type="submit" variant="secondary">
+              {s.search}
+            </Button>
+          </form>
+        </Card>
+
+        {isSign && (
+          <ExportPanel
+            templateId={template.id}
+            season={filters.season}
+            selected={selected}
+            onClearSelection={() => setSelected(new Set())}
+          />
         )}
 
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card>
-            <form
-              role="search"
-              onSubmit={submit}
-              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[12rem_12rem_1fr_auto] lg:items-end"
+        {results.isLoading ? (
+          <div className="flex justify-center py-10">
+            <Spinner />
+          </div>
+        ) : results.isError ? (
+          <Banner tone="error">
+            {errorText(results.error, t.errors.generic)}
+          </Banner>
+        ) : rows.length === 0 && filters.page === 1 ? (
+          <EmptyState title={unfiltered ? s.emptyNone : s.empty} />
+        ) : (
+          <Card className="p-0">
+            <div
+              className={cn('transition-opacity', busy && 'opacity-60')}
+              aria-busy={busy}
             >
-              <SeasonFilter
-                value={filters.season}
-                onChange={(season) => update({ season })}
+              <AssignmentTable
+                rows={rows}
+                isSign={isSign}
+                selected={selected}
+                allOnPage={allOnPage}
+                canSelectPage={selectable.length > 0}
+                onToggle={toggle}
+                onTogglePage={togglePage}
               />
-              <Field label={s.statusLabel}>
-                {(p) => (
-                  <Select
-                    {...p}
-                    value={filters.status}
-                    onChange={(e) =>
-                      update({
-                        status: e.target
-                          .value as TemplateAssignmentStatusFilter,
-                      })
-                    }
-                  >
-                    <option value="all">{s.statusAll}</option>
-                    <option value="completed">{s.statusCompleted}</option>
-                    <option value="open">{s.statusOpen}</option>
-                  </Select>
-                )}
-              </Field>
-              <Field label={s.searchLabel}>
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="search"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Button type="submit" variant="secondary">
-                {s.search}
-              </Button>
-            </form>
-          </Card>
-
-          {results.isLoading ? (
-            <div className="flex justify-center py-10">
-              <Spinner />
+              <AssignmentCards
+                rows={rows}
+                isSign={isSign}
+                selected={selected}
+                onToggle={toggle}
+              />
+              {rows.length === 0 && (
+                <p className="px-4 py-6 text-center text-sm text-slate">
+                  {s.empty}
+                </p>
+              )}
             </div>
-          ) : results.isError ? (
-            <Banner tone="error">
-              {errorText(results.error, t.errors.generic)}
-            </Banner>
-          ) : rows.length === 0 && filters.page === 1 ? (
-            <EmptyState title={unfiltered ? s.emptyNone : s.empty} />
-          ) : (
-            <Card className="p-0">
-              <div
-                className={cn('transition-opacity', busy && 'opacity-60')}
-                aria-busy={busy}
-              >
-                <AssignmentTable
-                  rows={rows}
-                  isSign={isSign}
-                  selected={selected}
-                  allOnPage={allOnPage}
-                  canSelectPage={selectable.length > 0}
-                  onToggle={toggle}
-                  onTogglePage={togglePage}
-                />
-                <AssignmentCards
-                  rows={rows}
-                  isSign={isSign}
-                  selected={selected}
-                  onToggle={toggle}
-                />
-                {rows.length === 0 && (
-                  <p className="px-4 py-6 text-center text-sm text-slate">
-                    {s.empty}
-                  </p>
-                )}
-              </div>
-              <Pager
-                page={filters.page}
-                shownPage={shownPage}
-                pageSize={SIGNED_COPIES_PAGE_SIZE}
-                count={rows.length}
-                total={total}
-                busy={busy}
-                onPage={(page) => update({ page })}
-                className="border-t border-grey/60"
-                text={{
-                  label: s.pagination,
-                  showing: s.showing,
-                  previous: s.prevPage,
-                  next: s.nextPage,
-                }}
-              />
-            </Card>
-          )}
-        </div>
+            <Pager
+              page={filters.page}
+              shownPage={shownPage}
+              pageSize={SIGNED_COPIES_PAGE_SIZE}
+              count={rows.length}
+              total={total}
+              busy={busy}
+              onPage={(page) => update({ page })}
+              className="border-t border-grey/60"
+              text={{
+                label: s.pagination,
+                showing: s.showing,
+                previous: s.prevPage,
+                next: s.nextPage,
+              }}
+            />
+          </Card>
+        )}
       </div>
     </>
   );
@@ -493,7 +488,7 @@ function AssignmentCards({ rows, isSign, selected, onToggle }: RowsProps) {
           <li
             key={row.id}
             className={cn(
-              'flex gap-3 px-4 py-3',
+              'flex items-start gap-3 px-4 py-3',
               selected.has(row.id) && 'bg-navy-tint',
             )}
           >
@@ -531,7 +526,7 @@ function AssignmentCards({ rows, isSign, selected, onToggle }: RowsProps) {
                 )}
               </span>
               {isSign && (
-                <div>
+                <div className="-ml-3">
                   <DownloadButton row={row} name={name} />
                 </div>
               )}
