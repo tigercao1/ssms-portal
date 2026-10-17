@@ -149,7 +149,7 @@ export function AdminListPage() {
         <label className="flex flex-col gap-1 text-xs text-slate">
           {t.admin.filterStatus}
           <Select
-            className="w-44"
+            className="sm:w-44"
             value={status ?? ''}
             onChange={(e) =>
               update({
@@ -166,7 +166,7 @@ export function AdminListPage() {
         <label className="flex flex-col gap-1 text-xs text-slate">
           {t.admin.filterActive}
           <Select
-            className="w-44"
+            className="sm:w-44"
             value={active === undefined ? '' : String(active)}
             onChange={(e) =>
               update({
