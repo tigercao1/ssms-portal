@@ -872,7 +872,7 @@ describe('OnboardingDocumentPage — language versions', () => {
 
     await user.click(
       within(versionSwitch('文件语言')).getByRole('button', {
-        name: 'English',
+        name: 'EN',
       }),
     );
     await waitFor(() =>
@@ -884,7 +884,7 @@ describe('OnboardingDocumentPage — language versions', () => {
       screen.getByRole('heading', { name: '行为准则' }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'EN' }));
+    await user.click(screen.getAllByRole('button', { name: 'EN' })[0]!);
     await user.click(screen.getAllByRole('button', { name: '中文' })[0]!);
     await waitFor(() =>
       expect(source()).toBe(
@@ -913,7 +913,7 @@ describe('OnboardingDocumentPage — language versions', () => {
     await signTyped(user, 'Chinese signature (required)');
 
     await user.click(
-      within(versionSwitch()).getByRole('button', { name: 'English' }),
+      within(versionSwitch()).getByRole('button', { name: 'EN' }),
     );
     expect(
       await screen.findByText(

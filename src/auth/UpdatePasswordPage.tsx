@@ -5,6 +5,7 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { Banner } from '@/components';
 import { AuthLayout } from './AuthLayout';
 import { NewPasswordForm } from './NewPasswordForm';
+import { track } from '@/lib/analytics';
 
 /**
  * W1.3 — set a new password. Reached via the reset email link, which lands the
@@ -18,6 +19,7 @@ export function UpdatePasswordPage() {
   async function updatePassword(password: string) {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return t.auth.genericError;
+    track('password_updated');
     setDone(true);
     setTimeout(() => navigate('/login', { replace: true }), 1500);
     return null;

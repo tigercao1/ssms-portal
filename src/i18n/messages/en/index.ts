@@ -1283,7 +1283,7 @@ export const en: Messages = {
   onboarding: {
     documentLanguage: 'Document language',
     documentLanguageZh: '中文',
-    documentLanguageEn: 'English',
+    documentLanguageEn: 'EN',
     title: 'Onboarding',
     seasonTitle: 'Onboarding · season {season}',
     progress: '{done} of {total} done',

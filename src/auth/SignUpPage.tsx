@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input } from '@/components';
 import { AuthLayout } from './AuthLayout';
+import { track } from '@/lib/analytics';
 
 /**
  * W1.x — open instructor self sign-up (Supabase). Creates the auth user and
@@ -58,6 +59,7 @@ export function SignUpPage() {
       setError(t.auth.emailInUse);
       return;
     }
+    track('signup_completed');
     setDone(true);
   }
 

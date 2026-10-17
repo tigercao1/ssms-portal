@@ -1256,7 +1256,7 @@ export const zhCN: Messages = {
   onboarding: {
     documentLanguage: '文件语言',
     documentLanguageZh: '中文',
-    documentLanguageEn: 'English',
+    documentLanguageEn: 'EN',
     title: '入职资料',
     seasonTitle: '入职资料 · {season} 雪季',
     progress: '已完成 {done} / {total}',

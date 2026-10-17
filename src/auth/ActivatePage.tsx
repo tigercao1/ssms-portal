@@ -13,6 +13,7 @@ import { Banner, Button, Field, Input, Spinner } from '@/components';
 import { AuthLayout } from './AuthLayout';
 import { useSession } from './SessionProvider';
 import { redeemActivation, resendActivation } from './activationApi';
+import { track } from '@/lib/analytics';
 
 type Phase =
   | { kind: 'verifying' }
@@ -48,13 +49,19 @@ export function ActivatePage() {
     try {
       ({ email, tokenHash } = await redeemActivation(token));
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 410 || err.status === 404))
+      if (
+        err instanceof ApiError &&
+        (err.status === 410 || err.status === 404)
+      ) {
+        track('activation_failed', { reason: 'expired' });
         setPhase({ kind: 'expired', email: emailFromBody(err.body) });
-      else
+      } else {
+        track('activation_failed', { reason: 'redeem_error' });
         setPhase({
           kind: 'error',
           network: !(err instanceof ApiError) || err.status >= 500,
         });
+      }
       return;
     }
     const { error } = await supabase.auth.verifyOtp({
@@ -62,9 +69,11 @@ export function ActivatePage() {
       token_hash: tokenHash,
     });
     if (error) {
+      track('activation_failed', { reason: 'verify_error' });
       setPhase({ kind: 'error', network: false });
       return;
     }
+    track('activation_completed');
     setPhase({ kind: 'verified', email });
   }, [token]);
 

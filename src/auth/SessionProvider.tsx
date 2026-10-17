@@ -4,11 +4,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { identifyUser, resetUser, track } from '@/lib/analytics';
 
 interface SessionValue {
   session: Session | null;
@@ -55,7 +57,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const userId = session?.user?.id ?? null;
+  const role = readRole(session?.user ?? null);
+  const identifiedUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (loading) return;
+    if (userId && role) identifyUser(userId, role);
+    else if (identifiedUserId.current) resetUser();
+    identifiedUserId.current = userId;
+  }, [userId, role, loading]);
+
   const signOut = useCallback(async () => {
+    track('signed_out');
     await supabase.auth.signOut();
   }, []);
 

@@ -6,6 +6,8 @@ interface PortalEnv {
   apiBaseUrl: string;
   supabaseUrl: string;
   supabasePublishableKey: string;
+  posthogKey: string;
+  posthogHost: string;
 }
 
 function required(value: string | undefined, name: string): string {
@@ -23,4 +25,6 @@ export const env: PortalEnv = {
     import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     'VITE_SUPABASE_PUBLISHABLE_KEY',
   ),
+  posthogKey: import.meta.env.VITE_POSTHOG_KEY ?? '',
+  posthogHost: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
 };

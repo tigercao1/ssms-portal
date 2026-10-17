@@ -95,7 +95,7 @@ export function FieldOverlay({
           <img
             alt=""
             src={`data:image/png;base64,${signature.png}`}
-            className="h-full w-full object-contain"
+            className="ph-no-capture h-full w-full object-contain"
           />
         ) : signature?.mode === 'typed' ? (
           <span
