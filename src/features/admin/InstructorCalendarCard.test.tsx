@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { InstructorCalendarCard } from './InstructorCalendarCard';
@@ -222,6 +222,21 @@ describe('InstructorCalendarCard picker', () => {
     await userEvent.keyboard('{Enter}');
     expect(input).toHaveValue('SSNOW Admin (admin@ssnow.club)');
     expect(bodies).toEqual([]);
+  });
+
+  it('leaves Enter to the IME while a Chinese name is being composed', async () => {
+    serve();
+    renderCard();
+
+    const input = await openPicker();
+    await userEvent.type(input, 'sam');
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229, isComposing: true });
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    expect(input).toHaveValue('sam');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(input).toHaveValue('Sam Ski (sam.ski@gmail.com)');
   });
 
   it('restores the picked calendar when the search is abandoned', async () => {

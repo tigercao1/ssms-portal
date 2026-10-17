@@ -325,6 +325,7 @@ function CalendarPicker({
   }
 
   function onKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Escape') {
       if (open) {
         e.preventDefault();
