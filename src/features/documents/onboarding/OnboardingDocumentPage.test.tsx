@@ -16,6 +16,9 @@ import {
   type DocumentsMockState,
 } from '../api/handlers';
 import { fakePdf } from '../testing/fakePdfPages';
+import { AppShell } from '@/app/shell/AppShell';
+import { LessonsPayPage } from '@/features/lessons/LessonsPayPage';
+import { fullLessons, onboardingLessons } from '@/features/lessons/fixtures';
 
 vi.mock('../pdf/PdfPages', async () => {
   const m = await import('../testing/fakePdfPages');
@@ -738,6 +741,68 @@ describe('OnboardingDocumentPage — read', () => {
       await screen.findByRole('heading', { name: '教练手册' }),
     ).toBeInTheDocument();
     expect(screen.getByText('我已阅读并理解本文件')).toBeInTheDocument();
+  });
+});
+
+describe('OnboardingDocumentPage — last item', () => {
+  it('unlocks Lessons & pay without a reload once the last required item is done', async () => {
+    state.assignments = state.assignments.filter(
+      (a) => a.status === 'completed' || a.id === 'asg-read',
+    );
+    state.meCerts = [];
+    server.use(
+      http.get(`${API}/me/lessons`, () =>
+        HttpResponse.json(
+          state.assignments.every((a) => a.status === 'completed')
+            ? fullLessons
+            : onboardingLessons,
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/lessons" element={<LessonsPayPage />} />
+          <Route
+            path="/onboarding"
+            element={<Link to="/onboarding/asg-read">Open handbook</Link>}
+          />
+          <Route
+            path="/onboarding/:assignmentId"
+            element={<OnboardingDocumentPage />}
+          />
+        </Route>
+      </Routes>,
+      { route: '/lessons', staleTime: 60_000 },
+    );
+    expect(
+      await screen.findByText('Finish onboarding to see your lessons and pay'),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', {
+        name: 'Lessons & pay Locked until you finish onboarding',
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Go to onboarding' }));
+    await user.click(screen.getByRole('link', { name: 'Open handbook' }));
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: 'I have read and understood this document',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await screen.findByRole('heading', { name: 'Marked as read' });
+
+    const lessons = await screen.findByRole('link', { name: 'Lessons & pay' });
+    await user.click(lessons);
+    expect(
+      await screen.findByRole('table', { name: 'Upcoming lessons' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Finish onboarding to see your lessons and pay'),
+    ).toBeNull();
   });
 });
 

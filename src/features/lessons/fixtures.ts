@@ -173,3 +173,9 @@ export const rejectedLessons: MyLessonsResponse = {
   lockReason: 'rejected',
   periods: [awaiting, paid],
 };
+
+export const onboardingLessons: MyLessonsResponse = {
+  ...emptyLessons,
+  locked: true,
+  lockReason: 'onboarding_incomplete',
+};

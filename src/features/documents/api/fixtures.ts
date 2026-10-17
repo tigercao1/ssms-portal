@@ -439,10 +439,14 @@ export function buildChecklist(
       state: certState(upload, today),
     };
   });
+  const satisfied = new Set(['valid', 'expiring', 'pending']);
   return {
     season,
     locked: false,
     lockReason: null,
+    complete:
+      docs.every((d) => !d.required || d.status === 'completed') &&
+      certItems.every((c) => satisfied.has(c.state)),
     items: [...docs, ...certItems],
   };
 }
@@ -498,6 +502,7 @@ export function buildPreviewChecklist(
     season,
     locked: true,
     lockReason: 'pending_approval',
+    complete: false,
     items: [...docs, ...certItems],
   };
 }

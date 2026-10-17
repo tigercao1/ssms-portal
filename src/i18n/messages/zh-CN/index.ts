@@ -119,6 +119,7 @@ export const zhCN: Messages = {
     openMenu: '打开菜单',
     closeMenu: '关闭菜单',
     onboardingLocked: '资料审核通过后解锁',
+    lessonsLockedOnboarding: '完成入职资料后解锁',
   },
   status: {
     pending: '待审核',
@@ -1252,6 +1253,9 @@ export const zhCN: Messages = {
     pendingEmpty: '暂时没有内容。只有通过审核的教练才能被安排课程。',
     rejectedTitle: '你的资料未通过审核',
     rejectedBody: '你无法被安排新的课程。你过去的课程和工资见下方。',
+    onboardingTitle: '完成入职资料后即可查看课程和工资',
+    onboardingBody: '入职清单上所有必填的文件和证书都完成后，即可查看课程和工资。',
+    onboardingOpen: '前往入职资料',
   },
   onboarding: {
     documentLanguage: '文件语言',

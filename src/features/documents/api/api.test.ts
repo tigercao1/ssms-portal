@@ -405,6 +405,7 @@ describe('/me requests', () => {
     expect(list.season).toBe('2026/27');
     expect(list.locked).toBe(false);
     expect(list.lockReason).toBeNull();
+    expect(list.complete).toBe(false);
     expect(list.items.filter((i) => i.type === 'certification')).toHaveLength(
       2,
     );
@@ -495,6 +496,7 @@ describe('/me requests', () => {
       season: '2026/27',
       locked: true,
       lockReason: 'pending_approval',
+      complete: false,
     });
     expect(list.items.find((i) => i.type === 'document')).toEqual({
       type: 'document',
@@ -546,6 +548,7 @@ describe('/me requests for a rejected instructor', () => {
       season: '2026/27',
       locked: true,
       lockReason: 'rejected',
+      complete: false,
       items: [],
     });
     const forbidden = { status: 403, body: { reason: 'rejected' } };
@@ -561,6 +564,7 @@ describe('/me requests for a deactivated instructor', () => {
       season: '2026/27',
       locked: true,
       lockReason: 'deactivated',
+      complete: false,
       items: [],
     });
     const forbidden = { status: 403, body: { reason: 'deactivated' } };

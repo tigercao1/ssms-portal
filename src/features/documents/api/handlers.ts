@@ -941,6 +941,7 @@ export function documentsHandlers(
               season: state.season,
               locked: true,
               lockReason: state.meIsActive ? 'rejected' : 'deactivated',
+              complete: false,
               items: [],
             }
           : state.meApprovalStatus === 'approved'

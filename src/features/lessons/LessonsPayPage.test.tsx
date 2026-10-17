@@ -8,6 +8,7 @@ import { LessonsPayPage } from './LessonsPayPage';
 import {
   emptyLessons,
   fullLessons,
+  onboardingLessons,
   pendingLessons,
   rejectedLessons,
 } from './fixtures';
@@ -328,6 +329,40 @@ describe('LessonsPayPage states', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText('Past lessons')).toBeNull();
+  });
+
+  it('asks an approved instructor to finish onboarding and links to it', async () => {
+    serve(onboardingLessons);
+    renderPage();
+    const banner = (
+      await screen.findByText('Finish onboarding to see your lessons and pay')
+    ).closest('[role="status"]');
+    expect(banner).toHaveTextContent(
+      'Lessons and pay open once every required document and certification on your onboarding checklist is done.',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Go to onboarding' }),
+    ).toHaveAttribute('href', '/onboarding');
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText('Past lessons')).toBeNull();
+    expect(screen.queryByText('Your profile is being reviewed')).toBeNull();
+  });
+
+  it('asks to finish onboarding in Chinese', async () => {
+    serve(onboardingLessons);
+    renderPage('zh-CN');
+    expect(
+      await screen.findByText('完成入职资料后即可查看课程和工资'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '入职清单上所有必填的文件和证书都完成后，即可查看课程和工资。',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '前往入职资料' })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    );
   });
 
   it('shows the not-approved banner and past lessons, without upcoming, when rejected', async () => {

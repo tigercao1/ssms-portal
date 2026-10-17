@@ -13,6 +13,7 @@ interface NavItem {
   label: string;
   end?: boolean;
   locked?: boolean;
+  lockedLabel?: string;
 }
 
 /** App shell (W1.7): navy contour sidebar + topbar; role-aware nav; responsive. */
@@ -25,6 +26,8 @@ export function AppShell() {
   const wasOpen = useRef(false);
   const { pathname } = useLocation();
   const checklist = useMyChecklist({ enabled: !isAdmin });
+  const onboardingIncomplete =
+    checklist.data?.locked === false && checklist.data.complete === false;
 
   useEffect(() => {
     setOpen(false);
@@ -82,7 +85,12 @@ export function AppShell() {
         {
           to: '/lessons',
           label: t.nav.lessonsPay,
-          locked: checklist.data?.lockReason === 'pending_approval',
+          locked:
+            checklist.data?.lockReason === 'pending_approval' ||
+            onboardingIncomplete,
+          lockedLabel: onboardingIncomplete
+            ? t.nav.lessonsLockedOnboarding
+            : undefined,
         },
         { to: '/settings', label: t.nav.settings },
       ];
@@ -132,11 +140,13 @@ export function AppShell() {
               {it.locked ? (
                 <span
                   className="inline-flex items-center gap-2"
-                  title={t.nav.onboardingLocked}
+                  title={it.lockedLabel ?? t.nav.onboardingLocked}
                 >
                   <LockIcon />
                   {it.label}{' '}
-                  <span className="sr-only">{t.nav.onboardingLocked}</span>
+                  <span className="sr-only">
+                    {it.lockedLabel ?? t.nav.onboardingLocked}
+                  </span>
                 </span>
               ) : (
                 it.label

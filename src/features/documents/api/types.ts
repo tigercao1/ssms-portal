@@ -333,6 +333,7 @@ export interface MyChecklist {
   season: string | null;
   locked: boolean;
   lockReason: ChecklistLockReason | null;
+  complete: boolean;
   items: ChecklistItem[];
 }
 

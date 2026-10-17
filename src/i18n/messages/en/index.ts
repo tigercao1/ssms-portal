@@ -128,6 +128,7 @@ export const en: Messages = {
     openMenu: 'Open menu',
     closeMenu: 'Close menu',
     onboardingLocked: 'Locked until your profile is approved',
+    lessonsLockedOnboarding: 'Locked until you finish onboarding',
   },
   status: {
     pending: 'Pending',
@@ -1279,6 +1280,9 @@ export const en: Messages = {
     pendingEmpty: 'Nothing to show yet. Only approved instructors can be booked.',
     rejectedTitle: 'Your profile was not approved',
     rejectedBody: "You can't be booked for new lessons. Your past lessons and pay are below.",
+    onboardingTitle: 'Finish onboarding to see your lessons and pay',
+    onboardingBody: 'Lessons and pay open once every required document and certification on your onboarding checklist is done.',
+    onboardingOpen: 'Go to onboarding',
   },
   onboarding: {
     documentLanguage: 'Document language',
