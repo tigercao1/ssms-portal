@@ -226,7 +226,9 @@ export function documentsHandlers(
     return withDerived({
       ...t,
       hasCompletedAssignments: state.assignments.some(
-        (a) => a.templateId === t.id && a.status === 'completed',
+        (a) =>
+          a.templateId === t.id &&
+          (a.status === 'completed' || a.completedAt !== null),
       ),
       assignedCount: open.length,
       completedCount: open.filter((a) => a.status === 'completed').length,

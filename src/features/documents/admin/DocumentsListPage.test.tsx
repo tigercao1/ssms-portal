@@ -771,6 +771,23 @@ describe('DocumentsListPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('disables Delete when a completed assignment was later archived', async () => {
+    state.assignments.push(
+      fakeAssignment({
+        id: 'asg-archived-done',
+        templateId: 'tpl-waiver',
+        status: 'archived',
+        completedAt: '2026-10-01T12:00:00Z',
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const menu = await openActions(user, 'Liability waiver');
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Delete Liability waiver' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('keeps the API error in the delete dialog', async () => {
     server.use(
       http.delete(`${API}/admin/documents/templates/:id`, () =>
