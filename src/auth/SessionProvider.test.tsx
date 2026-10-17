@@ -1,6 +1,6 @@
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fakeSession, resetAuth, setSession } from '@/test/supabaseAuth';
+import { auth, fakeSession, resetAuth, setSession } from '@/test/supabaseAuth';
 import { SessionProvider } from './SessionProvider';
 
 vi.mock('@/lib/supabase', () => import('@/test/supabaseAuth'));
@@ -17,7 +17,12 @@ afterEach(() => vi.clearAllMocks());
 describe('SessionProvider analytics identity', () => {
   it('does not reset an anonymous visitor who never signed in', async () => {
     render(<SessionProvider>child</SessionProvider>);
-    await waitFor(() => expect(analytics.resetUser).not.toHaveBeenCalled());
+    await waitFor(() => expect(auth.getSession).toHaveBeenCalled());
+    await act(async () => {});
+    act(() => setSession(null));
+    await act(async () => {});
+
+    expect(analytics.resetUser).not.toHaveBeenCalled();
     expect(analytics.identifyUser).not.toHaveBeenCalled();
   });
 

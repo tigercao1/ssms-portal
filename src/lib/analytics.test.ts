@@ -50,9 +50,13 @@ describe('analytics', () => {
         disable_capture_url_hashes: true,
         mask_personal_data_properties: true,
         custom_personal_data_properties: expect.arrayContaining(['t']),
+        mask_all_text: true,
+        mask_all_element_attributes: true,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
           maskTextSelector: '*',
+          blockSelector: expect.stringContaining('canvas'),
+          captureCanvas: { recordCanvas: false },
         }),
       }),
     );
