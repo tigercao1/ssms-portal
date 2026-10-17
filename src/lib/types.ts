@@ -405,6 +405,10 @@ export interface InstructorCalendarsOverview {
   instructors: InstructorCalendarOverview[];
 }
 
+export interface MyCalendarStatus {
+  connected: boolean;
+}
+
 export interface GoogleConnectionStatus {
   configured: boolean;
   connected: boolean;
