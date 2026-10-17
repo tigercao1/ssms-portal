@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Banner, Button, Card, Spinner } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
+import type { Locale } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useSession } from '@/auth/SessionProvider';
@@ -12,8 +13,11 @@ import {
   getMySignedUrl,
   todayIso,
   type Assignment,
+  type CompleteRequest,
+  type DocumentLanguage,
   type TemplateKind,
 } from '../api';
+import { DocumentLanguageSwitch } from '../signer/DocumentLanguageSwitch';
 import { ReadDocument } from '../signer/ReadDocument';
 import { SignerDocument } from '../signer/SignerDocument';
 import { clearSigningDraft, signingDraftKey } from '../signer/signingDraft';
@@ -108,6 +112,32 @@ function CompletedView({
   );
 }
 
+function languageOfLocale(locale: Locale): DocumentLanguage {
+  return locale === 'zh-CN' ? 'zh' : 'en';
+}
+
+function useLocalizedDocument(assignmentId: string, locale: Locale) {
+  const [choice, setChoice] = useState<DocumentLanguage | null>(null);
+  const [choiceLocale, setChoiceLocale] = useState(locale);
+  const localeChanged = choiceLocale !== locale;
+  if (localeChanged) {
+    setChoiceLocale(locale);
+    setChoice(null);
+  }
+  const wanted = (localeChanged ? null : choice) ?? languageOfLocale(locale);
+  const [requested, setRequested] = useState(wanted);
+  const doc = useMyDocument(assignmentId, requested);
+  const served = doc.data;
+  if (
+    wanted !== requested &&
+    (!served ||
+      (served.availableLanguages.includes(wanted) &&
+        served.language !== wanted))
+  )
+    setRequested(wanted);
+  return { doc, choose: setChoice };
+}
+
 /** `/onboarding/:assignmentId` — read or sign one assigned document. */
 export function OnboardingDocumentPage() {
   const { assignmentId = '' } = useParams();
@@ -115,7 +145,7 @@ export function OnboardingDocumentPage() {
   const { locale } = useLocale();
   const { user } = useSession();
   const profile = useMyProfile();
-  const doc = useMyDocument(assignmentId);
+  const { doc, choose } = useLocalizedDocument(assignmentId, locale);
   const complete = useCompleteMyDocument(assignmentId);
   const [completed, setCompleted] = useState<Assignment | null>(null);
 
@@ -141,7 +171,14 @@ export function OnboardingDocumentPage() {
       </Card>
     );
 
-  const { assignment, template, sourceUrl, consentText } = doc.data;
+  const {
+    assignment,
+    template,
+    sourceUrl,
+    consentText,
+    language,
+    availableLanguages,
+  } = doc.data;
   const title = localizeField(template.titleEn, template.titleZh, locale);
   const done =
     completed ?? (assignment.status === 'completed' ? assignment : null);
@@ -150,17 +187,39 @@ export function OnboardingDocumentPage() {
       ? t.onboarding.alreadyCompleted
       : t.signer.submitFailed
     : null;
-  const draftKey = user?.id ? signingDraftKey(user.id, assignment.id) : null;
+  const draftKey = user?.id
+    ? signingDraftKey(user.id, assignment.id, language)
+    : null;
   const onDone = (result: { assignment: Assignment }) => {
-    if (draftKey) clearSigningDraft(draftKey);
+    if (user?.id)
+      for (const version of [null, ...availableLanguages])
+        clearSigningDraft(signingDraftKey(user.id, assignment.id, version));
     setCompleted(result.assignment);
   };
+  const submit = (body: CompleteRequest) =>
+    complete.mutate(language ? { ...body, language } : body, {
+      onSuccess: onDone,
+    });
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <BackLink />
-        <h1 className="text-3xl">{title}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-3xl">{title}</h1>
+          {!done && availableLanguages.length > 1 && (
+            <DocumentLanguageSwitch
+              languages={availableLanguages}
+              value={language}
+              label={t.onboarding.documentLanguage}
+              labels={{
+                zh: t.onboarding.documentLanguageZh,
+                en: t.onboarding.documentLanguageEn,
+              }}
+              onChange={choose}
+            />
+          )}
+        </div>
         {!done && template.descriptionEn && (
           <p className="text-sm text-slate">
             {localizeField(
@@ -180,6 +239,7 @@ export function OnboardingDocumentPage() {
         </Card>
       ) : template.kind === 'read' ? (
         <ReadDocument
+          key={language ?? ''}
           sourceUrl={sourceUrl}
           text={{
             ack: t.onboarding.readAck,
@@ -188,7 +248,7 @@ export function OnboardingDocumentPage() {
           }}
           submitting={complete.isPending}
           submitError={submitError}
-          onSubmit={(body) => complete.mutate(body, { onSuccess: onDone })}
+          onSubmit={submit}
         />
       ) : profile.isLoading ? (
         <div className="flex justify-center py-20">
@@ -196,6 +256,7 @@ export function OnboardingDocumentPage() {
         </div>
       ) : (
         <SignerDocument
+          key={language ?? ''}
           template={template}
           sourceUrl={sourceUrl}
           defaultSignerName={
@@ -211,7 +272,7 @@ export function OnboardingDocumentPage() {
           text={t.signer}
           submitting={complete.isPending}
           submitError={submitError}
-          onSubmit={(body) => complete.mutate(body, { onSuccess: onDone })}
+          onSubmit={submit}
           backAction={<BackLink compact />}
           draftKey={draftKey}
         />

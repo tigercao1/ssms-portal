@@ -6,17 +6,19 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Rnd } from 'react-rnd';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import { Banner, Button, Card, Spinner } from '@/components';
 import {
   FIELD_TYPES,
+  type DocumentLanguage,
   type Field,
   type FieldType,
   type Template,
 } from '../../api';
+import { DocumentLanguageSwitch } from '../../signer/DocumentLanguageSwitch';
 import {
   PdfPages,
   type PdfPageRenderInfo,
@@ -26,7 +28,7 @@ import { pdfRectToScreen, type PageGeometry } from '../../pdf/transforms';
 import { useSaveFields, useTemplate } from '../hooks';
 import { AssignDialog } from '../AssignDialog';
 import { KindBadge } from '../badges';
-import { errorText, templateTitle } from '../format';
+import { errorText, languageName, templateTitle } from '../format';
 import {
   createFieldAt,
   duplicateField,
@@ -42,9 +44,39 @@ import { FIELD_ICONS, useFieldTypeLabel } from './labels';
 
 const DRAG_MIME = 'application/x-ssms-field-type';
 
+interface EditorVersion {
+  language: DocumentLanguage | null;
+  translation: boolean;
+  sourceUrl: string | null;
+  pageCount: number | null;
+  fields: Field[];
+}
+
+function versionOf(template: Template, language: string | null): EditorVersion {
+  const translation = template.translations.find(
+    (tr) => tr.language === language && tr.hasSource,
+  );
+  return translation
+    ? {
+        language: translation.language,
+        translation: true,
+        sourceUrl: translation.sourceUrl,
+        pageCount: translation.pageCount,
+        fields: translation.fields,
+      }
+    : {
+        language: template.sourceLanguage,
+        translation: false,
+        sourceUrl: template.sourceUrl,
+        pageCount: template.pageCount,
+        fields: template.fields,
+      };
+}
+
 /** Field-placement editor for one template. */
 export function FieldEditorPage() {
   const { id = '' } = useParams();
+  const [params, setParams] = useSearchParams();
   const t = useT();
   const template = useTemplate(id);
 
@@ -60,22 +92,41 @@ export function FieldEditorPage() {
         {errorText(template.error, t.errors.generic)}
       </Banner>
     );
-  return <Editor key={template.data.id} template={template.data} />;
+  const version = versionOf(template.data, params.get('language'));
+  const sourceLanguage = template.data.sourceLanguage;
+  return (
+    <Editor
+      key={`${template.data.id}:${version.translation ? version.language : ''}`}
+      template={template.data}
+      version={version}
+      onLanguageChange={(language) =>
+        setParams(language === sourceLanguage ? {} : { language })
+      }
+    />
+  );
 }
 
-function Editor({ template }: { template: Template }) {
+function Editor({
+  template,
+  version,
+  onLanguageChange,
+}: {
+  template: Template;
+  version: EditorVersion;
+  onLanguageChange: (language: DocumentLanguage) => void;
+}) {
   const t = useT();
   const { locale } = useLocale();
   const typeLabel = useFieldTypeLabel();
   const save = useSaveFields();
   const pdfRef = useRef<PdfPagesHandle>(null);
-  const [saved, setSaved] = useState<Field[]>(template.fields);
-  const [fields, setFields] = useState<Field[]>(template.fields);
+  const [saved, setSaved] = useState<Field[]>(version.fields);
+  const [fields, setFields] = useState<Field[]>(version.fields);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [activePage, setActivePage] = useState(1);
-  const [numPages, setNumPages] = useState(template.pageCount ?? 0);
+  const [numPages, setNumPages] = useState(version.pageCount ?? 0);
   const fieldEls = useRef(new Map<string, HTMLElement>());
   const locked = template.hasCompletedAssignments;
   const canPlace = template.kind === 'sign' && !preview && !locked;
@@ -313,6 +364,20 @@ function Editor({ template }: { template: Template }) {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="truncate text-2xl">{title}</h1>
             <KindBadge kind={template.kind} />
+            {template.languages.length > 1 && (
+              <DocumentLanguageSwitch
+                languages={template.languages}
+                value={version.language}
+                label={t.documents.editorLanguage}
+                labels={{
+                  zh: languageName('zh', t),
+                  en: languageName('en', t),
+                }}
+                disabled={dirty}
+                disabledReason={t.documents.unsaved}
+                onChange={onLanguageChange}
+              />
+            )}
             {dirty && (
               <span className="text-xs font-medium text-status-pending">
                 {t.documents.unsaved}
@@ -349,11 +414,17 @@ function Editor({ template }: { template: Template }) {
               disabled={!dirty || fields.some((f) => !f.labelEn.trim())}
               onClick={() =>
                 save.mutate(
-                  { id: template.id, fields },
+                  {
+                    id: template.id,
+                    fields,
+                    ...(version.translation &&
+                      version.language && { language: version.language }),
+                  },
                   {
                     onSuccess: (tpl) => {
-                      setSaved(tpl.fields);
-                      setFields(tpl.fields);
+                      const next = versionOf(tpl, version.language).fields;
+                      setSaved(next);
+                      setFields(next);
                     },
                   },
                 )
@@ -386,14 +457,14 @@ function Editor({ template }: { template: Template }) {
       )}
       {preview && <Banner tone="info">{t.documents.previewNotice}</Banner>}
 
-      {!template.sourceUrl ? (
+      {!version.sourceUrl ? (
         <Banner tone="pending">{t.documents.noSourceYet}</Banner>
       ) : (
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] lg:grid-cols-[minmax(0,1fr)_270px]">
           <div className="min-w-0 rounded-lg bg-sunken p-3 sm:p-4">
             <PdfPages
               ref={pdfRef}
-              source={template.sourceUrl}
+              source={version.sourceUrl}
               renderOverlay={renderOverlay}
               onLoad={(info) => setNumPages(info.numPages)}
             />

@@ -12,7 +12,12 @@ import {
   type DocumentsMockState,
 } from '../api/handlers';
 import { buildSamplePdf } from '../api/samplePdf';
-import { MOCK_SEASON, fakeAssignment, fakeField } from '../api/fixtures';
+import {
+  MOCK_SEASON,
+  fakeAssignment,
+  fakeField,
+  fakeTranslation,
+} from '../api/fixtures';
 
 const API = 'http://localhost:3000';
 
@@ -980,6 +985,233 @@ describe('DocumentsListPage', () => {
     );
     renderWithProviders(<DocumentsListPage />);
     expect(await screen.findByText('Nope')).toBeInTheDocument();
+  });
+});
+
+describe('DocumentsListPage — language versions', () => {
+  let createBodies: unknown[];
+
+  beforeEach(() => {
+    createBodies = [];
+    server.use(
+      http.post(`${API}/admin/documents/templates`, async ({ request }) => {
+        createBodies.push(await request.clone().json());
+        return undefined;
+      }),
+    );
+  });
+
+  const pdfCell = (title: string) =>
+    within(row(title)).getAllByRole('cell')[2] as HTMLElement;
+  const pdfFile = () =>
+    new File([buildSamplePdf([{ width: 612, height: 792 }])], 'en.pdf', {
+      type: 'application/pdf',
+    });
+
+  async function createNamed(
+    user: ReturnType<typeof userEvent.setup>,
+    title: string,
+    language?: string,
+  ) {
+    const form = screen
+      .getByText('New document')
+      .closest('div')!.parentElement!;
+    await user.type(within(form).getByLabelText(/Title \(English\)/), title);
+    if (language)
+      await user.selectOptions(
+        within(form).getByLabelText('Main PDF language'),
+        language,
+      );
+    await user.click(within(form).getByRole('button', { name: 'Create' }));
+    await screen.findByText(`Created “${title}”. Upload its PDF next.`);
+  }
+
+  it('creates a template labelled with its PDF language, and leaves the label out when unspecified', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await screen.findByText('Code of conduct');
+    await createNamed(user, 'Agreement', 'zh');
+    await createNamed(user, 'Plain');
+    expect(createBodies[0]).toMatchObject({ sourceLanguage: 'zh' });
+    expect(createBodies[1]).not.toHaveProperty('sourceLanguage');
+    expect(state.templates.at(-2)?.sourceLanguage).toBe('zh');
+    expect(state.templates.at(-1)?.sourceLanguage).toBeNull();
+  });
+
+  it("labels an existing document's PDF language with PATCH", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const editor = await openEdit(user, 'Liability waiver');
+    const select = within(editor).getByLabelText('Main PDF language');
+    expect(select).toHaveValue('');
+    await user.selectOptions(select, 'en');
+    await user.click(within(editor).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(patches).toEqual([
+        { id: 'tpl-waiver', body: { sourceLanguage: 'en' } },
+      ]),
+    );
+    await waitFor(() =>
+      expect(within(pdfCell('Liability waiver')).getByText('EN')).toBeVisible(),
+    );
+  });
+
+  it('uploads, links and removes the other language version, with badges', async () => {
+    state.templates.find((t) => t.id === 'tpl-waiver')!.sourceLanguage = 'zh';
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await screen.findByText('Liability waiver');
+    expect(within(pdfCell('Liability waiver')).getByText('中文')).toBeVisible();
+    expect(within(pdfCell('Liability waiver')).queryByText('EN')).toBeNull();
+
+    const editor = await openEdit(user, 'Liability waiver');
+    const section = within(editor).getByRole('region', {
+      name: 'Other language version',
+    });
+    expect(
+      within(section).getByText(
+        'Instructors using the portal in English see this PDF instead of the main one.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      await within(section).findByText('No English PDF yet.'),
+    ).toBeInTheDocument();
+    expect(
+      within(section).queryByRole('button', { name: 'Remove English version' }),
+    ).toBeNull();
+
+    await user.upload(
+      within(section).getByLabelText(
+        'Upload the English PDF for Liability waiver',
+      ),
+      pdfFile(),
+    );
+    expect(
+      await screen.findByText(
+        'Uploaded the English version of Liability waiver (1 page).',
+      ),
+    ).toBeInTheDocument();
+    expect(state.uploadedSources.has('tpl-waiver:en')).toBe(true);
+    await waitFor(() =>
+      expect(within(pdfCell('Liability waiver')).getByText('EN')).toBeVisible(),
+    );
+    expect(
+      within(section).getByText('English PDF · 1 page · 0 fields placed'),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByText(
+        'Place at least one field on the English version before publishing.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByRole('link', { name: 'Place English fields' }),
+    ).toHaveAttribute('href', '/admin/documents/tpl-waiver/edit?language=en');
+    expect(within(editor).getByLabelText('Main PDF language')).toBeDisabled();
+    expect(
+      within(editor).getByText(
+        'Remove the other language version to change this.',
+      ),
+    ).toBeInTheDocument();
+
+    expect(
+      within(section).getByRole('button', { name: 'Replace English PDF' }),
+    ).toBeEnabled();
+    await user.click(
+      within(section).getByRole('button', { name: 'Remove English version' }),
+    );
+    expect(
+      await screen.findByText(
+        'Removed the English version of Liability waiver.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      state.templates.find((t) => t.id === 'tpl-waiver')!.translations,
+    ).toEqual([]);
+    await waitFor(() =>
+      expect(within(pdfCell('Liability waiver')).queryByText('EN')).toBeNull(),
+    );
+  });
+
+  it('locks the other language version once a copy has been completed', async () => {
+    Object.assign(state.templates.find((t) => t.id === 'tpl-conduct')!, {
+      sourceLanguage: 'en',
+      translations: [fakeTranslation('tpl-conduct', { language: 'zh' })],
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const editor = await openEdit(user, 'Code of conduct');
+    const section = within(editor).getByRole('region', {
+      name: 'Other language version',
+    });
+    expect(
+      await within(section).findByRole('button', {
+        name: 'Remove Chinese version',
+      }),
+    ).toBeDisabled();
+    expect(
+      within(section).getByRole('button', { name: 'Replace Chinese PDF' }),
+    ).toBeDisabled();
+    expect(
+      within(section).queryByRole('link', { name: 'Place Chinese fields' }),
+    ).toBeNull();
+  });
+
+  it('previews a read document in the other language', async () => {
+    Object.assign(state.templates.find((t) => t.id === 'tpl-handbook')!, {
+      sourceLanguage: 'zh',
+      hasCompletedAssignments: false,
+      translations: [fakeTranslation('tpl-handbook', { language: 'en' })],
+    });
+    state.assignments = state.assignments.filter(
+      (a) => a.templateId !== 'tpl-handbook',
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const editor = await openEdit(user, 'Instructor handbook');
+    expect(
+      await within(editor).findByRole('link', {
+        name: 'Preview English version',
+      }),
+    ).toHaveAttribute('href', '/admin/documents/tpl-handbook/edit?language=en');
+    expect(within(editor).queryByText(/Place at least one field/)).toBeNull();
+  });
+
+  it('shows no language badges or other language section for an unlabelled document', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await screen.findByText('Liability waiver');
+    expect(pdfCell('Liability waiver').textContent).toBe('1 page');
+    const editor = await openEdit(user, 'Liability waiver');
+    expect(
+      within(editor).queryByRole('region', { name: 'Other language version' }),
+    ).toBeNull();
+    expect(
+      within(editor).getByText(
+        'Set this to add a version in the other language.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the other language version in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    state.templates.find((t) => t.id === 'tpl-waiver')!.sourceLanguage = 'zh';
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    await user.click(
+      await screen.findByRole('button', { name: '编辑 免责声明' }),
+    );
+    const section = await screen.findByRole('region', {
+      name: '另一种语言版本',
+    });
+    expect(
+      within(section).getByText(
+        '使用英文界面的教练会看到这个 PDF，而不是主版本。',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      await within(section).findByRole('button', { name: '上传英文 PDF' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByLabelText('主 PDF 语言')[0]).toHaveValue('zh');
   });
 });
 

@@ -41,6 +41,24 @@ describe('signing draft', () => {
     expect(key).toBe('ssms.signDraft.v1:user-1:asg-1');
   });
 
+  it('keys a language version separately from the unlabelled document', () => {
+    const zhKey = signingDraftKey('user-1', 'asg-1', 'zh');
+    expect(zhKey).toBe('ssms.signDraft.v1:user-1:asg-1:zh');
+    saveSigningDraft(zhKey, 'tpl-1', draft({ signerName: '张三' }), now);
+    expect(loadSigningDraft(key, 'tpl-1', fields, now)).toBeNull();
+    expect(
+      loadSigningDraft(
+        signingDraftKey('user-1', 'asg-1', 'en'),
+        'tpl-1',
+        fields,
+        now,
+      ),
+    ).toBeNull();
+    expect(loadSigningDraft(zhKey, 'tpl-1', fields, now)?.signerName).toBe(
+      '张三',
+    );
+  });
+
   it('round-trips values and signatures, storing a reused signature once', () => {
     saveSigningDraft(key, 'tpl-1', draft(), now);
     const raw = localStorage.getItem(key) ?? '';

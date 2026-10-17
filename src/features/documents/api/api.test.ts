@@ -7,9 +7,11 @@ import {
   completeMyDocument,
   confirmMyCertUpload,
   confirmTemplateSource,
+  confirmTranslationSource,
   createAssignments,
   createTemplate,
   currentUploads,
+  deleteTranslation,
   getAssignmentSignedUrl,
   getCertUploadUrl,
   getInstructorDocuments,
@@ -24,9 +26,11 @@ import {
   remindAssignment,
   requestMyCertUpload,
   requestTemplateSourceUpload,
+  requestTranslationSourceUpload,
   retireTemplate,
   reviewCertUpload,
   saveTemplateFields,
+  saveTranslationFields,
   todayIso,
   updateTemplate,
 } from './index';
@@ -41,6 +45,7 @@ import {
   fakeCertUpload,
   fakeField,
   fakeTemplate,
+  fakeTranslation,
   presentCertUploads,
 } from './fixtures';
 import { buildSamplePdf } from './samplePdf';
@@ -136,6 +141,121 @@ describe('admin template requests', () => {
         'application/pdf',
       ),
     ).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('language version requests', () => {
+  it('labels the main version, uploads a translation, places its fields and removes it', async () => {
+    const created = await createTemplate({
+      kind: 'sign',
+      audience: 'instructor',
+      titleEn: 'Agreement',
+      required: true,
+      sortOrder: 1,
+      sourceLanguage: 'zh',
+    });
+    expect(created).toMatchObject({
+      sourceLanguage: 'zh',
+      languages: [],
+      translations: [],
+    });
+    await expect(
+      requestTranslationSourceUpload(created.id, 'zh', 100),
+    ).rejects.toMatchObject({ status: 400 });
+    const pdf = new Blob([buildSamplePdf([{ width: 612, height: 792 }])]);
+    await putToPresignedUrl(
+      (await requestTemplateSourceUpload(created.id, pdf.size)).uploadUrl,
+      pdf,
+      'application/pdf',
+    );
+    await confirmTemplateSource(created.id);
+    const { uploadUrl } = await requestTranslationSourceUpload(
+      created.id,
+      'en',
+      pdf.size,
+    );
+    await putToPresignedUrl(uploadUrl, pdf, 'application/pdf');
+    expect(state.uploadedSources.has(`${created.id}:en`)).toBe(true);
+    const confirmed = await confirmTranslationSource(created.id, 'en');
+    expect(confirmed.languages).toEqual(['zh', 'en']);
+    expect(confirmed.translations[0]).toMatchObject({
+      language: 'en',
+      hasSource: true,
+      pageCount: 1,
+      fields: [],
+    });
+    const saved = await saveTranslationFields(created.id, 'en', [
+      fakeField({ id: 'f_en_sig' }),
+    ]);
+    expect(saved.translations[0]?.fields.map((f) => f.id)).toEqual([
+      'f_en_sig',
+    ]);
+    expect(saved.fields).toEqual([]);
+    await expect(
+      updateTemplate(created.id, { sourceLanguage: 'en' }),
+    ).rejects.toMatchObject({ status: 400 });
+    const removed = await deleteTranslation(created.id, 'en');
+    expect(removed).toMatchObject({ languages: ['zh'], translations: [] });
+    expect(
+      (await listTemplates()).find((t) => t.id === created.id),
+    ).toMatchObject({ sourceLanguage: 'zh', languages: ['zh'] });
+  });
+
+  it('rejects translations until the main version is labelled', async () => {
+    await expect(
+      requestTranslationSourceUpload('tpl-waiver', 'en', 100),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('serves the requested version, falls back to the main one and records the signed language', async () => {
+    const waiver = state.templates.find((t) => t.id === 'tpl-waiver')!;
+    Object.assign(waiver, {
+      sourceLanguage: 'zh',
+      translations: [
+        fakeTranslation('tpl-waiver', {
+          fields: [fakeField({ id: 'f_en_sig' })],
+        }),
+      ],
+    });
+    const en = await getMyDocument('asg-waiver', 'en');
+    expect(en).toMatchObject({
+      language: 'en',
+      availableLanguages: ['zh', 'en'],
+    });
+    expect(en.sourceUrl).toMatch(/\/en\/source\.pdf$/);
+    expect(en.template.fields.map((f) => f.id)).toEqual(['f_en_sig']);
+    const zh = await getMyDocument('asg-waiver', 'zh');
+    expect(zh.language).toBe('zh');
+    expect(zh.template.fields.map((f) => f.id)).toEqual(['f_w_sig']);
+    await expect(
+      completeMyDocument('asg-waiver', {
+        language: 'en',
+        consent: true,
+        signerName: 'Jane Snow',
+        values: {},
+        signatures: { f_w_sig: { mode: 'typed', text: 'Jane Snow' } },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    const done = await completeMyDocument('asg-waiver', {
+      language: 'en',
+      consent: true,
+      signerName: 'Jane Snow',
+      values: {},
+      signatures: { f_en_sig: { mode: 'typed', text: 'Jane Snow' } },
+    });
+    expect(done.assignment).toMatchObject({
+      language: 'en',
+      templateSha256: 'c4d5e6f7'.repeat(8),
+    });
+  });
+
+  it('serves the main version of an unlabelled document for either language', async () => {
+    const doc = await getMyDocument('asg-waiver', 'zh');
+    expect(doc).toMatchObject({ language: null, availableLanguages: [] });
+    expect(doc.template.fields.map((f) => f.id)).toEqual(['f_w_sig']);
+    await expect(
+      completeMyDocument('asg-waiver', { language: 'en', acknowledged: true }),
+    ).rejects.toMatchObject({ status: 400 });
   });
 });
 
@@ -304,6 +424,7 @@ describe('/me requests', () => {
       viewedAt: '2026-10-06T15:00:00Z',
       completedAt: '2026-10-06T15:10:00Z',
       dueAt: null,
+      languages: [],
     });
     expect(list.items.find((i) => i.type === 'certification')).toEqual({
       type: 'certification',
@@ -391,6 +512,7 @@ describe('/me requests', () => {
       viewedAt: null,
       completedAt: null,
       dueAt: null,
+      languages: [],
     });
     expect(
       list.items.filter((i) => i.type === 'document').map((i) => i.templateId),

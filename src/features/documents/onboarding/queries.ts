@@ -10,6 +10,7 @@ import {
   type CertUpload,
   type ChecklistItem,
   type CompleteRequest,
+  type DocumentLanguage,
 } from '../api';
 import type { CertOrg, CertTrack } from '@/lib/types';
 import { isCertContentType, prepareCertFile } from './certFile';
@@ -23,10 +24,13 @@ export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
   });
 }
 
-export function useMyDocument(assignmentId: string) {
+export function useMyDocument(
+  assignmentId: string,
+  language?: DocumentLanguage,
+) {
   return useQuery({
-    queryKey: documentsKeys.myDocument(assignmentId),
-    queryFn: () => getMyDocument(assignmentId),
+    queryKey: documentsKeys.myDocument(assignmentId, language),
+    queryFn: () => getMyDocument(assignmentId, language),
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   });

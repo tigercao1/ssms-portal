@@ -7,7 +7,8 @@ import { OnboardingDocumentPage } from './OnboardingDocumentPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
 import type { CompleteRequest } from '../api';
-import { fakeAssignment, fakeField } from '../api/fixtures';
+import { LangSwitch } from '@/components/LangSwitch';
+import { fakeAssignment, fakeField, fakeTranslation } from '../api/fixtures';
 import { signingDraftKey } from '../signer/signingDraft';
 import {
   createDocumentsState,
@@ -737,5 +738,276 @@ describe('OnboardingDocumentPage — read', () => {
       await screen.findByRole('heading', { name: '教练手册' }),
     ).toBeInTheDocument();
     expect(screen.getByText('我已阅读并理解本文件')).toBeInTheDocument();
+  });
+});
+
+describe('OnboardingDocumentPage — language versions', () => {
+  let requested: (string | null)[];
+
+  function makeBilingual() {
+    const conduct = state.templates.find((t) => t.id === 'tpl-conduct')!;
+    Object.assign(conduct, {
+      sourceLanguage: 'en',
+      translations: [
+        fakeTranslation('tpl-conduct', {
+          language: 'zh',
+          fields: [
+            fakeField({
+              id: 'f_zh_sig',
+              labelEn: 'Chinese signature',
+              labelZh: '中文签名',
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function captureRequests() {
+    requested = [];
+    server.use(
+      http.get(`${API}/me/documents/:id`, ({ request }) => {
+        requested.push(new URL(request.url).searchParams.get('language'));
+        return undefined;
+      }),
+    );
+  }
+
+  function renderWithToggle(id: string) {
+    return renderWithProviders(
+      <>
+        <LangSwitch />
+        <Routes>
+          <Route
+            path="/onboarding/:assignmentId"
+            element={<OnboardingDocumentPage />}
+          />
+        </Routes>
+      </>,
+      { route: `/onboarding/${id}` },
+    );
+  }
+
+  const source = () =>
+    screen.getByTestId('pdf-pages').getAttribute('data-source');
+  const versionSwitch = (name = 'Document language') =>
+    screen.getByRole('group', { name });
+
+  async function signTyped(
+    user: ReturnType<typeof userEvent.setup>,
+    field: string,
+  ) {
+    await user.click(screen.getByRole('button', { name: field }));
+    await user.click(screen.getByRole('tab', { name: 'Type' }));
+    await user.click(screen.getByRole('button', { name: 'Use signature' }));
+  }
+
+  beforeEach(() => {
+    captureRequests();
+  });
+
+  it("requests the UI language's version and shows its PDF and fields", async () => {
+    makeBilingual();
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderAt('asg-new');
+    expect(
+      await screen.findByRole('heading', { name: '行为准则' }),
+    ).toBeInTheDocument();
+    expect(requested).toEqual(['zh']);
+    expect(source()).toBe(
+      'https://storage.mock/templates/tpl-conduct/zh/source.pdf',
+    );
+    expect(
+      screen.getByRole('button', { name: '中文签名 (必填)' }),
+    ).toBeInTheDocument();
+    expect(
+      within(versionSwitch('文件语言')).getByRole('button', { name: '中文' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('falls back to the only version when the UI language has none', async () => {
+    const conduct = state.templates.find((t) => t.id === 'tpl-conduct')!;
+    conduct.sourceLanguage = 'zh';
+    const user = userEvent.setup();
+    renderWithToggle('asg-new');
+    expect(
+      await screen.findByRole('heading', { name: 'Code of conduct' }),
+    ).toBeInTheDocument();
+    expect(requested).toEqual(['en']);
+    expect(source()).toBe(
+      'https://storage.mock/templates/tpl-conduct/source.pdf',
+    );
+    expect(
+      screen.queryByRole('group', { name: 'Document language' }),
+    ).toBeNull();
+    await user.click(screen.getByRole('button', { name: '中文' }));
+    expect(
+      await screen.findByRole('heading', { name: '行为准则' }),
+    ).toBeInTheDocument();
+    expect(requested).toEqual(['en']);
+  });
+
+  it('switches the document when the UI language or the page switch changes', async () => {
+    makeBilingual();
+    const user = userEvent.setup();
+    renderWithToggle('asg-new');
+    await screen.findByRole('heading', { name: 'Code of conduct' });
+    expect(source()).toBe(
+      'https://storage.mock/templates/tpl-conduct/source.pdf',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Signature (required)' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('button', { name: '中文' })[0]!);
+    await waitFor(() =>
+      expect(source()).toBe(
+        'https://storage.mock/templates/tpl-conduct/zh/source.pdf',
+      ),
+    );
+    expect(requested).toEqual(['en', 'zh']);
+    expect(
+      screen.getByRole('button', { name: '中文签名 (必填)' }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(versionSwitch('文件语言')).getByRole('button', {
+        name: 'English',
+      }),
+    );
+    await waitFor(() =>
+      expect(source()).toBe(
+        'https://storage.mock/templates/tpl-conduct/source.pdf',
+      ),
+    );
+    expect(
+      screen.getByRole('heading', { name: '行为准则' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'EN' }));
+    await user.click(screen.getAllByRole('button', { name: '中文' })[0]!);
+    await waitFor(() =>
+      expect(source()).toBe(
+        'https://storage.mock/templates/tpl-conduct/zh/source.pdf',
+      ),
+    );
+  });
+
+  it('keeps a separate draft for each language version', async () => {
+    makeBilingual();
+    const user = userEvent.setup();
+    renderWithToggle('asg-new');
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'I agree (required)' }),
+    );
+    await user.click(
+      within(versionSwitch()).getByRole('button', { name: '中文' }),
+    );
+    await screen.findByRole('button', {
+      name: 'Chinese signature (required)',
+    });
+    expect(
+      localStorage.getItem(signingDraftKey('user-jane', 'asg-new', 'en')),
+    ).toContain('f_agree');
+    expect(screen.queryByText(/restored the progress/)).toBeNull();
+    await signTyped(user, 'Chinese signature (required)');
+
+    await user.click(
+      within(versionSwitch()).getByRole('button', { name: 'English' }),
+    );
+    expect(
+      await screen.findByText(
+        'We restored the progress you saved on this device.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'I agree (required)' }),
+    ).toBeChecked();
+    expect(
+      localStorage.getItem(signingDraftKey('user-jane', 'asg-new', 'zh')),
+    ).toContain('f_zh_sig');
+    expect(
+      localStorage.getItem(signingDraftKey('user-jane', 'asg-new')),
+    ).toBeNull();
+  });
+
+  it('signs the chosen version and sends its language', async () => {
+    makeBilingual();
+    const user = userEvent.setup();
+    renderAt('asg-new');
+    await screen.findByRole('heading', { name: 'Code of conduct' });
+    await user.click(
+      within(versionSwitch()).getByRole('button', { name: '中文' }),
+    );
+    await signTyped(user, 'Chinese signature (required)');
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'I agree to sign this document electronically',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Signed' }),
+    ).toBeInTheDocument();
+    expect(completeBody).toEqual({
+      language: 'zh',
+      consent: true,
+      signerName: 'Jane Snow',
+      values: {},
+      signatures: { f_zh_sig: { mode: 'typed', text: 'Jane Snow' } },
+    });
+    expect(state.assignments.find((a) => a.id === 'asg-new')?.language).toBe(
+      'zh',
+    );
+    for (const language of [null, 'en', 'zh'] as const)
+      expect(
+        localStorage.getItem(signingDraftKey('user-jane', 'asg-new', language)),
+      ).toBeNull();
+  });
+
+  it('sends the language when a read document is acknowledged', async () => {
+    const handbook = state.templates.find((t) => t.id === 'tpl-handbook')!;
+    Object.assign(handbook, {
+      sourceLanguage: 'zh',
+      translations: [fakeTranslation('tpl-handbook', { language: 'en' })],
+    });
+    const user = userEvent.setup();
+    renderAt('asg-read');
+    await screen.findByRole('heading', { name: 'Instructor handbook' });
+    expect(source()).toBe(
+      'https://storage.mock/templates/tpl-handbook/en/source.pdf',
+    );
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'I have read and understood this document',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await screen.findByRole('heading', { name: 'Marked as read' });
+    expect(completeBody).toEqual({ acknowledged: true, language: 'en' });
+  });
+
+  it('leaves an unlabelled document as it was when the UI language changes', async () => {
+    const user = userEvent.setup();
+    renderWithToggle('asg-new');
+    await screen.findByRole('heading', { name: 'Code of conduct' });
+    expect(
+      screen.queryByRole('group', { name: 'Document language' }),
+    ).toBeNull();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'I agree (required)' }),
+    );
+    await user.click(screen.getByRole('button', { name: '中文' }));
+    expect(
+      await screen.findByRole('heading', { name: '行为准则' }),
+    ).toBeInTheDocument();
+    expect(requested).toEqual(['en']);
+    expect(source()).toBe(
+      'https://storage.mock/templates/tpl-conduct/source.pdf',
+    );
+    expect(
+      screen.getByRole('checkbox', { name: '我同意 (必填)' }),
+    ).toBeChecked();
+    expect(screen.queryByText('已恢复您在本设备上保存的填写进度。')).toBeNull();
   });
 });
