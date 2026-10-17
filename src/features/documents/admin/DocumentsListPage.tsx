@@ -32,6 +32,7 @@ import {
 import { AssignDialog } from './AssignDialog';
 import { OtherLanguageVersion } from './OtherLanguageVersion';
 import { ChangeAudienceDialog } from './ChangeAudienceDialog';
+import { DeleteTemplateDialog } from './DeleteTemplateDialog';
 import { PublishDialog } from './PublishDialog';
 import { KindBadge, LanguageBadges, TemplateStatusChip } from './badges';
 import { errorText, pagesText, templateTitle, uploadErrorText } from './format';
@@ -49,6 +50,7 @@ export function DocumentsListPage() {
   const [publishing, setPublishing] = useState<TemplateSummary | null>(null);
   const [changingAudience, setChangingAudience] =
     useState<TemplateSummary | null>(null);
+  const [deleting, setDeleting] = useState<TemplateSummary | null>(null);
   const { locale } = useLocale();
   const [notice, setNotice] = useState<UploadNotice | null>(null);
 
@@ -119,6 +121,10 @@ export function DocumentsListPage() {
                       onAssign={() => setAssigning(row)}
                       onPublish={() => setPublishing(row)}
                       onChangeAudience={() => setChangingAudience(row)}
+                      onDelete={() => {
+                        setNotice(null);
+                        setDeleting(row);
+                      }}
                       onNotice={setNotice}
                     />
                     {editing === row.id && (
@@ -181,6 +187,25 @@ export function DocumentsListPage() {
                       .replace('{title}', title)
                       .replace('{created}', String(result.created))
                   : t.documents.changedToSelected.replace('{title}', title),
+            });
+          }}
+        />
+      )}
+
+      {deleting && (
+        <DeleteTemplateDialog
+          template={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null);
+            if (editing === deleting.id) setEditing(null);
+            setNotice({
+              id: deleting.id,
+              tone: 'approved',
+              text: t.documents.deleted.replace(
+                '{title}',
+                templateTitle(deleting, locale),
+              ),
             });
           }}
         />
@@ -410,6 +435,7 @@ function TemplateRow({
   onAssign,
   onPublish,
   onChangeAudience,
+  onDelete,
   onNotice,
 }: {
   row: TemplateSummary;
@@ -419,6 +445,7 @@ function TemplateRow({
   onAssign: () => void;
   onPublish: () => void;
   onChangeAudience: () => void;
+  onDelete: () => void;
   onNotice: (n: UploadNotice | null) => void;
 }) {
   const t = useT();
@@ -498,6 +525,17 @@ function TemplateRow({
     ...(row.status === 'retired'
       ? [publishItem(t.documents.republish, t.documents.republishFor)]
       : []),
+    {
+      key: 'delete',
+      label: t.documents.delete,
+      ariaLabel: t.documents.deleteFor.replace('{title}', title),
+      destructive: true,
+      disabled: row.hasCompletedAssignments,
+      description: row.hasCompletedAssignments
+        ? t.documents.deleteLocked
+        : undefined,
+      onSelect: onDelete,
+    },
   ];
 
   return (

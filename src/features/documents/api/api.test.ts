@@ -11,6 +11,7 @@ import {
   createAssignments,
   createTemplate,
   currentUploads,
+  deleteTemplate,
   deleteTranslation,
   getAssignmentSignedUrl,
   getCertUploadUrl,
@@ -319,6 +320,24 @@ describe('publish lifecycle requests', () => {
     ).rejects.toMatchObject({ status: 409 });
     const patched = await updateTemplate('tpl-conduct', { required: false });
     expect(patched).toMatchObject({ status: 'live', required: false });
+  });
+
+  it('deletes a template nobody has completed with its open assignments, and 409s otherwise', async () => {
+    await expect(deleteTemplate('tpl-waiver')).resolves.toBeUndefined();
+    expect((await listTemplates()).map((t) => t.id)).not.toContain(
+      'tpl-waiver',
+    );
+    expect(state.assignments.map((a) => a.templateId)).not.toContain(
+      'tpl-waiver',
+    );
+    await expect(deleteTemplate('tpl-conduct')).rejects.toMatchObject({
+      status: 409,
+      message:
+        'Someone has completed this document, so it cannot be deleted. Retire it instead.',
+    });
+    await expect(deleteTemplate('tpl-waiver')).rejects.toMatchObject({
+      status: 404,
+    });
   });
 
   it('rejects isActive in a template patch, like the API', async () => {

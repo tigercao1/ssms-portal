@@ -226,7 +226,9 @@ export function documentsHandlers(
     return withDerived({
       ...t,
       hasCompletedAssignments: state.assignments.some(
-        (a) => a.templateId === t.id && a.status === 'completed',
+        (a) =>
+          a.templateId === t.id &&
+          (a.status === 'completed' || a.completedAt !== null),
       ),
       assignedCount: open.length,
       completedCount: open.filter((a) => a.status === 'completed').length,
@@ -592,6 +594,28 @@ export function documentsHandlers(
         return conflict('Only a published document can be retired');
       Object.assign(t, { status: 'retired', updatedAt: nowIso() });
       return HttpResponse.json(present(t));
+    }),
+    http.delete(`${A}/admin/documents/templates/:id`, ({ params }) => {
+      const t = findTemplate(params.id);
+      if (!t) return notFound();
+      if (
+        state.assignments.some(
+          (a) =>
+            a.templateId === t.id &&
+            (a.status === 'completed' || a.completedAt !== null),
+        )
+      )
+        return conflict(
+          'Someone has completed this document, so it cannot be deleted. Retire it instead.',
+        );
+      state.templates = state.templates.filter((x) => x.id !== t.id);
+      state.assignments = state.assignments.filter(
+        (a) => a.templateId !== t.id,
+      );
+      state.exports = state.exports.filter((e) => e.templateId !== t.id);
+      for (const language of [null, ...DOCUMENT_LANGUAGES])
+        state.uploadedSources.delete(sourceKey(t.id, language));
+      return new HttpResponse(null, { status: 204 });
     }),
     http.post(
       `${A}/admin/documents/templates/:id/source/upload-url`,

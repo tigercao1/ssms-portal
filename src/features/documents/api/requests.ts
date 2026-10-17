@@ -106,6 +106,12 @@ export function retireTemplate(id: string) {
   });
 }
 
+export function deleteTemplate(id: string) {
+  return api<void>(`/admin/documents/templates/${enc(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 export function requestTemplateSourceUpload(id: string, contentLength: number) {
   return api<UploadUrl>(
     `/admin/documents/templates/${enc(id)}/source/upload-url`,
