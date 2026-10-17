@@ -24,6 +24,8 @@ export interface Messages {
     no: string;
     saved: string;
     close: string;
+    moreActions: string;
+    moreActionsFor: string;
   };
   auth: {
     signInTitle: string;
