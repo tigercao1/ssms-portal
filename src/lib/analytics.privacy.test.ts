@@ -59,5 +59,6 @@ describe('maskReplayAttribute', () => {
   it('keeps layout attributes so the replay still renders', () => {
     expect(maskReplayAttribute('class', 'flex gap-2')).toBe('flex gap-2');
     expect(maskReplayAttribute('style', 'width: 10px')).toBe('width: 10px');
+    expect(maskReplayAttribute('rr_width', '48px')).toBe('48px');
   });
 });

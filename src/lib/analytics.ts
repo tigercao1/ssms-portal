@@ -22,6 +22,8 @@ const VISIBLE_REPLAY_ATTRIBUTES = new Set([
   'aria-expanded',
   'aria-pressed',
   'aria-current',
+  'rr_width',
+  'rr_height',
 ]);
 
 export function maskReplayAttribute(name: string, value: string): string {
