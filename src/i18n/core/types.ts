@@ -24,6 +24,8 @@ export interface Messages {
     no: string;
     saved: string;
     close: string;
+    moreActions: string;
+    moreActionsFor: string;
   };
   auth: {
     signInTitle: string;
@@ -1082,7 +1084,6 @@ export interface Messages {
     settingsInvalid: string;
     settingsSaved: string;
     saveSettings: string;
-    actions: string;
     actionMove: string;
     actionCompleted: string;
     actionNoShow: string;

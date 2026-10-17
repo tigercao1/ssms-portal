@@ -60,6 +60,15 @@ function rowFor(name: string) {
   return screen.getByText(name).closest('tr') as HTMLElement;
 }
 
+async function removeRow(name: string) {
+  await userEvent.click(
+    within(rowFor(name)).getByRole('button', {
+      name: `More actions for ${name}`,
+    }),
+  );
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Remove' }));
+}
+
 describe('ReferenceManagerPage', () => {
   beforeEach(() => {
     updateMutate.mockReset();
@@ -75,27 +84,27 @@ describe('ReferenceManagerPage', () => {
     expect(within(rowFor('Cypress')).getByText('Inactive')).toBeInTheDocument();
   });
 
-  it('renders a read-only table with Edit and Remove per row', () => {
+  it('renders a read-only table with Edit and Remove in each row menu', async () => {
     renderWithProviders(<ReferenceManagerPage />);
     for (const name of ['Whistler', 'Cypress']) {
       const row = rowFor(name);
       expect(within(row).queryByRole('textbox')).not.toBeInTheDocument();
       expect(within(row).queryByRole('spinbutton')).not.toBeInTheDocument();
       expect(within(row).queryByRole('switch')).not.toBeInTheDocument();
+      const trigger = within(row).getByRole('button');
+      expect(trigger).toHaveAccessibleName(`More actions for ${name}`);
+      await userEvent.click(trigger);
       expect(
-        within(row)
-          .getAllByRole('button')
-          .map((b) => b.textContent),
+        screen.getAllByRole('menuitem').map((item) => item.textContent),
       ).toEqual(['Edit', 'Remove']);
+      await userEvent.keyboard('{Escape}');
     }
     expect(within(rowFor('Whistler')).getByText('—')).toBeInTheDocument();
   });
 
   it('shows the usage count and deletes only after confirming', async () => {
     renderWithProviders(<ReferenceManagerPage />);
-    await userEvent.click(
-      within(rowFor('Whistler')).getByRole('button', { name: 'Remove' }),
-    );
+    await removeRow('Whistler');
     const dialog = screen.getByRole('alertdialog');
     expect(usageCalls).toContain('r1');
     expect(dialog).toHaveTextContent(/can’t be undone/);
@@ -113,9 +122,7 @@ describe('ReferenceManagerPage', () => {
   it('omits the instructor line when the value is unused', async () => {
     instructorCount = 0;
     renderWithProviders(<ReferenceManagerPage />);
-    await userEvent.click(
-      within(rowFor('Cypress')).getByRole('button', { name: 'Remove' }),
-    );
+    await removeRow('Cypress');
     const dialog = screen.getByRole('alertdialog');
     expect(dialog).toHaveTextContent(/can’t be undone/);
     expect(dialog).not.toHaveTextContent(/instructor profiles/);
@@ -123,9 +130,7 @@ describe('ReferenceManagerPage', () => {
 
   it('cancelling the confirmation deletes nothing', async () => {
     renderWithProviders(<ReferenceManagerPage />);
-    await userEvent.click(
-      within(rowFor('Whistler')).getByRole('button', { name: 'Remove' }),
-    );
+    await removeRow('Whistler');
     await userEvent.click(
       within(screen.getByRole('alertdialog')).getByRole('button', {
         name: 'Cancel',

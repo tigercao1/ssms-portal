@@ -22,6 +22,8 @@ export const en: Messages = {
     no: 'No',
     saved: 'Saved',
     close: 'Close',
+    moreActions: 'More actions',
+    moreActionsFor: 'More actions for {name}',
   },
   auth: {
     signInTitle: 'Sign in',
@@ -1106,7 +1108,6 @@ export const en: Messages = {
     settingsInvalid: 'Each day must end after it starts.',
     settingsSaved: 'Booking settings saved.',
     saveSettings: 'Save settings',
-    actions: 'Actions',
     actionMove: 'Move or edit…',
     actionCompleted: 'Mark completed',
     actionNoShow: 'Mark no-show',

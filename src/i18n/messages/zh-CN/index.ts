@@ -22,6 +22,8 @@ export const zhCN: Messages = {
     no: '否',
     saved: '已保存',
     close: '关闭',
+    moreActions: '更多操作',
+    moreActionsFor: '{name} 的更多操作',
   },
   auth: {
     signInTitle: '登录',
@@ -1081,7 +1083,6 @@ export const zhCN: Messages = {
     settingsInvalid: '每天的结束时间必须晚于开始时间。',
     settingsSaved: '预约设置已保存。',
     saveSettings: '保存设置',
-    actions: '操作',
     actionMove: '改期或编辑…',
     actionCompleted: '标记为已完成',
     actionNoShow: '标记为缺席',

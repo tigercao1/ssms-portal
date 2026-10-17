@@ -97,13 +97,31 @@ function row(name: string) {
   return screen.getByText(name).closest('tr') as HTMLElement;
 }
 
-async function openEdit(
-  user: ReturnType<typeof userEvent.setup>,
-  title: string,
-) {
+type User = ReturnType<typeof userEvent.setup>;
+
+async function openActions(user: User, title: string) {
   await user.click(
-    await screen.findByRole('button', { name: `Edit ${title}` }),
+    await screen.findByRole('button', { name: `More actions for ${title}` }),
   );
+  return screen.getByRole('menu');
+}
+
+async function chooseAction(user: User, title: string, name: string) {
+  const menu = await openActions(user, title);
+  await user.click(within(menu).getByRole('menuitem', { name }));
+}
+
+async function actionNames(user: User, title: string) {
+  const menu = await openActions(user, title);
+  const names = within(menu)
+    .getAllByRole('menuitem')
+    .map((item) => item.getAttribute('aria-label') ?? item.textContent);
+  await user.keyboard('{Escape}');
+  return names;
+}
+
+async function openEdit(user: User, title: string) {
+  await chooseAction(user, title, `Edit ${title}`);
   return screen.getByText('Edit document').closest('div')!
     .parentElement as HTMLElement;
 }
@@ -121,6 +139,7 @@ function makePublishable(id = 'tpl-draft') {
 
 describe('DocumentsListPage', () => {
   it('lists templates in sort order with kind, pages and state', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await screen.findByText('Code of conduct');
     const titles = screen
@@ -171,43 +190,38 @@ describe('DocumentsListPage', () => {
     expect(
       screen.queryByRole('switch', { name: /Active/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Assign Uniform policy' }),
-    ).not.toBeInTheDocument();
-    const publish = screen.getByRole('button', {
+    expect(await actionNames(user, 'Uniform policy')).toEqual([
+      'Edit Uniform policy',
+      'Upload PDF',
+      'Publish Uniform policy',
+    ]);
+    const menu = await openActions(user, 'Uniform policy');
+    const publish = within(menu).getByRole('menuitem', {
       name: 'Publish Uniform policy',
     });
-    expect(publish).toBeDisabled();
+    expect(publish).toHaveAttribute('aria-disabled', 'true');
     expect(publish).toHaveAccessibleDescription(
       'Upload a PDF before publishing.',
     );
-    expect(publish.parentElement).toHaveAttribute(
-      'title',
-      'Upload a PDF before publishing.',
-    );
     expect(
-      within(row('Uniform policy')).getByRole('button', { name: 'Upload PDF' }),
-    ).toBeEnabled();
+      within(menu).getByRole('menuitem', { name: 'Upload PDF' }),
+    ).not.toHaveAttribute('aria-disabled');
+    await user.keyboard('{Escape}');
+    expect(await actionNames(user, 'Code of conduct')).toEqual([
+      'Edit Code of conduct',
+      'Change audience of Code of conduct',
+      'Retire Code of conduct',
+    ]);
+    expect(await actionNames(user, 'Liability waiver')).toEqual([
+      'Edit Liability waiver',
+      'Assign Liability waiver',
+      'Change audience of Liability waiver',
+      'Retire Liability waiver',
+    ]);
+    await openActions(user, 'Liability waiver');
     expect(
-      within(row('Code of conduct')).queryByRole('button', {
-        name: 'Assign Code of conduct',
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(row('Liability waiver')).getByRole('button', {
-        name: 'Assign Liability waiver',
-      }),
+      screen.getByRole('menuitem', { name: 'Assign Liability waiver' }),
     ).toHaveTextContent(/^Assign$/);
-    expect(
-      within(row('Code of conduct')).getByRole('button', {
-        name: 'Retire Code of conduct',
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(row('Code of conduct')).queryByRole('button', {
-        name: 'Replace PDF',
-      }),
-    ).not.toBeInTheDocument();
   });
 
   it('explains why a sign document without fields cannot be published', async () => {
@@ -215,15 +229,17 @@ describe('DocumentsListPage', () => {
     makePublishable();
     tpl.fields = [];
     renderWithProviders(<DocumentsListPage />);
-    const publish = await screen.findByRole('button', {
+    const user = userEvent.setup();
+    const menu = await openActions(user, 'Uniform policy');
+    const publish = within(menu).getByRole('menuitem', {
       name: 'Publish Uniform policy',
     });
-    expect(publish).toBeDisabled();
+    expect(publish).toHaveAttribute('aria-disabled', 'true');
     expect(publish).toHaveAccessibleDescription(
       'Place at least one field before publishing.',
     );
     expect(
-      within(row('Uniform policy')).getByRole('link', {
+      within(menu).getByRole('menuitem', {
         name: 'Open editor for Uniform policy',
       }),
     ).toHaveAttribute('href', '/admin/documents/tpl-draft/edit');
@@ -233,9 +249,7 @@ describe('DocumentsListPage', () => {
     makePublishable();
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
-    );
+    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
     const dialog = screen.getByRole('dialog', {
       name: 'Publish “Uniform policy”',
     });
@@ -289,9 +303,7 @@ describe('DocumentsListPage', () => {
     makePublishable();
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
-    );
+    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
     const dialog = screen.getByRole('dialog');
     const season = await within(dialog).findByLabelText(/Season/);
     await waitFor(() => expect(season).toHaveValue('2026/27'));
@@ -346,9 +358,7 @@ describe('DocumentsListPage', () => {
     state.templates.find((x) => x.id === 'tpl-draft')!.audience = 'customer';
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
-    );
+    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
     const dialog = screen.getByRole('dialog');
     await waitFor(() =>
       expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2026/27'),
@@ -379,9 +389,7 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
-    );
+    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
     const dialog = screen.getByRole('dialog');
     await user.click(
       await within(dialog).findByRole('button', {
@@ -394,9 +402,7 @@ describe('DocumentsListPage', () => {
   it('retires a live document and re-publishes it', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Retire Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Retire Liability waiver');
     expect(
       await screen.findByText(
         'Liability waiver is retired. Existing assignments are kept.',
@@ -408,14 +414,11 @@ describe('DocumentsListPage', () => {
       ).toBeInTheDocument(),
     );
     expect(within(row('Liability waiver')).getByText('—')).toBeInTheDocument();
-    expect(
-      within(row('Liability waiver')).queryByRole('button', {
-        name: 'Assign Liability waiver',
-      }),
-    ).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', { name: 'Re-publish Liability waiver' }),
-    );
+    expect(await actionNames(user, 'Liability waiver')).toEqual([
+      'Edit Liability waiver',
+      'Re-publish Liability waiver',
+    ]);
+    await chooseAction(user, 'Liability waiver', 'Re-publish Liability waiver');
     const dialog = screen.getByRole('dialog', {
       name: 'Publish “Liability waiver”',
     });
@@ -447,19 +450,17 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Retire Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Retire Liability waiver');
     expect(await screen.findByRole('alert')).toHaveTextContent('Not live');
   });
 
   it('changes a selected document to all instructors with the preview count', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', {
-        name: 'Change audience of Liability waiver',
-      }),
+    await chooseAction(
+      user,
+      'Liability waiver',
+      'Change audience of Liability waiver',
     );
     const dialog = screen.getByRole('dialog', {
       name: 'Change audience of “Liability waiver”',
@@ -500,20 +501,18 @@ describe('DocumentsListPage', () => {
     expect(
       within(row('Liability waiver')).getByText('All instructors'),
     ).toBeInTheDocument();
-    expect(
-      within(row('Liability waiver')).queryByRole('button', {
-        name: 'Assign Liability waiver',
-      }),
-    ).not.toBeInTheDocument();
+    expect(await actionNames(user, 'Liability waiver')).not.toContain(
+      'Assign Liability waiver',
+    );
   });
 
   it('changes an all-instructors document to selected and keeps its assignments', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', {
-        name: 'Change audience of Code of conduct',
-      }),
+    await chooseAction(
+      user,
+      'Code of conduct',
+      'Change audience of Code of conduct',
     );
     const dialog = screen.getByRole('dialog', {
       name: 'Change audience of “Code of conduct”',
@@ -543,21 +542,19 @@ describe('DocumentsListPage', () => {
     expect(
       within(row('Code of conduct')).getByText('Selected'),
     ).toBeInTheDocument();
-    expect(
-      within(row('Code of conduct')).getByRole('button', {
-        name: 'Assign Code of conduct',
-      }),
-    ).toBeInTheDocument();
+    expect(await actionNames(user, 'Code of conduct')).toContain(
+      'Assign Code of conduct',
+    );
   });
 
   it('re-reads the preview each time the dialog opens, so a repeat switch shows no one left to email', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />, { staleTime: 30_000 });
     const openDialog = async () => {
-      await user.click(
-        await screen.findByRole('button', {
-          name: 'Change audience of Liability waiver',
-        }),
+      await chooseAction(
+        user,
+        'Liability waiver',
+        'Change audience of Liability waiver',
       );
       return screen.getByRole('dialog', {
         name: 'Change audience of “Liability waiver”',
@@ -590,10 +587,10 @@ describe('DocumentsListPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />, { staleTime: 30_000 });
     const openDialog = async () => {
-      await user.click(
-        await screen.findByRole('button', {
-          name: 'Change audience of Liability waiver',
-        }),
+      await chooseAction(
+        user,
+        'Liability waiver',
+        'Change audience of Liability waiver',
       );
       return screen.getByRole('dialog', {
         name: 'Change audience of “Liability waiver”',
@@ -621,13 +618,22 @@ describe('DocumentsListPage', () => {
   it('offers Change audience only on live instructor documents', async () => {
     const customer = state.templates.find((x) => x.id === 'tpl-handbook')!;
     customer.audience = 'customer';
+    const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await screen.findByText('Code of conduct');
-    expect(
-      screen
-        .getAllByRole('button', { name: /^Change audience of / })
-        .map((b) => b.getAttribute('aria-label')),
-    ).toEqual([
+    const offered = [];
+    for (const title of [
+      'Instructor handbook',
+      'Code of conduct',
+      'Liability waiver',
+      'Uniform policy',
+    ])
+      offered.push(
+        ...(await actionNames(user, title)).filter((name) =>
+          name?.startsWith('Change audience of '),
+        ),
+      );
+    expect(offered).toEqual([
       'Change audience of Code of conduct',
       'Change audience of Liability waiver',
     ]);
@@ -644,10 +650,10 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', {
-        name: 'Change audience of Code of conduct',
-      }),
+    await chooseAction(
+      user,
+      'Code of conduct',
+      'Change audience of Code of conduct',
     );
     const dialog = screen.getByRole('dialog');
     await user.click(
@@ -666,7 +672,10 @@ describe('DocumentsListPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     await user.click(
-      await screen.findByRole('button', { name: '更改 免责声明 的对象' }),
+      await screen.findByRole('button', { name: '免责声明 的更多操作' }),
+    );
+    await user.click(
+      screen.getByRole('menuitem', { name: '更改 免责声明 的对象' }),
     );
     const dialog = screen.getByRole('dialog', {
       name: '更改“免责声明”的对象',
@@ -712,6 +721,18 @@ describe('DocumentsListPage', () => {
     expect(screen.getByText('1 位教练')).toBeInTheDocument();
   });
 
+  it('opens the file picker from the row menu and returns focus to it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentsListPage />);
+    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
+    const click = vi.spyOn(input, 'click');
+    await chooseAction(user, 'Uniform policy', 'Upload PDF');
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('button', { name: 'More actions for Uniform policy' }),
+    ).toHaveFocus();
+  });
+
   it('toggles required with PATCH', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
@@ -754,9 +775,7 @@ describe('DocumentsListPage', () => {
   it('closes the editor without a request when nothing changed', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Edit Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Edit Liability waiver');
     await user.click(screen.getAllByRole('button', { name: 'Save' })[0]!);
     expect(patches).toEqual([]);
     expect(screen.queryByText('Edit document')).not.toBeInTheDocument();
@@ -901,9 +920,7 @@ describe('DocumentsListPage', () => {
   it('assigns a selected document for a season and refreshes its count', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Assign Liability waiver');
     const dialog = screen.getByRole('dialog', {
       name: 'Assign “Liability waiver”',
     });
@@ -935,9 +952,7 @@ describe('DocumentsListPage', () => {
   it('assigns to picked instructors and requires a pick', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Assign Liability waiver');
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Assign' }));
     expect(
@@ -961,9 +976,7 @@ describe('DocumentsListPage', () => {
   it('closes the dialog with Escape', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Assign Liability waiver');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -995,9 +1008,7 @@ describe('season selects', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Assign Liability waiver');
     const dialog = screen.getByRole('dialog', {
       name: 'Assign “Liability waiver”',
     });
@@ -1012,9 +1023,7 @@ describe('season selects', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Assign Liability waiver' }),
-    );
+    await chooseAction(user, 'Liability waiver', 'Assign Liability waiver');
     const dialog = screen.getByRole('dialog');
     const season = within(dialog).getByLabelText(/Season/);
     await waitFor(() => expect(season).toHaveTextContent('No seasons yet'));
@@ -1028,8 +1037,10 @@ describe('season selects', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    const assign = await screen.findAllByRole('button', { name: /^分配/ });
-    await user.click(assign[0]!);
+    await user.click(
+      await screen.findByRole('button', { name: '免责声明 的更多操作' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: /^分配/ }));
     const season = within(screen.getByRole('dialog')).getByLabelText(/雪季/);
     await waitFor(() => expect(season).toHaveValue('2026/27'));
     expect(
