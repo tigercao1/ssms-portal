@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import type { InsuranceRecord, MyInsurance, RegisterLessonBody } from './types';
+import { track } from '@/lib/analytics';
 
 export const MY_INSURANCE_KEY = ['me', 'insurance'] as const;
 
@@ -32,7 +33,10 @@ export function useRegisterLesson() {
   return useMutation({
     mutationFn: (body: RegisterLessonBody) =>
       api<InsuranceRecord>('/me/insurance/records', { method: 'POST', body }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      track('insurance_lesson_registered');
+      return invalidate();
+    },
   });
 }
 

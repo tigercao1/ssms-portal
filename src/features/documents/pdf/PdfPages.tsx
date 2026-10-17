@@ -270,7 +270,7 @@ export const PdfPages = forwardRef<PdfPagesHandle, PdfPagesProps>(
     return (
       <div
         ref={rootRef}
-        className={cn('flex w-full flex-col gap-4', className)}
+        className={cn('ph-no-capture flex w-full flex-col gap-4', className)}
       >
         {error ? (
           <Banner tone="error">{t.pdf.loadError}</Banner>

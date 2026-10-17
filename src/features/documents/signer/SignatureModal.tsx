@@ -150,7 +150,7 @@ export function SignatureModal({
           />
           <div
             data-testid="typed-preview"
-            className="flex h-24 items-center justify-center overflow-hidden rounded-md border border-dashed border-grey bg-canvas px-3 text-3xl text-navy"
+            className="ph-no-capture flex h-24 items-center justify-center overflow-hidden rounded-md border border-dashed border-grey bg-canvas px-3 text-3xl text-navy"
             style={{ fontFamily: TYPED_SIGNATURE_FONT }}
           >
             {typed}

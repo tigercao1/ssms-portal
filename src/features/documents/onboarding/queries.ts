@@ -15,6 +15,7 @@ import {
 import type { CertOrg, CertTrack } from '@/lib/types';
 import { isCertContentType, prepareCertFile } from './certFile';
 import { PRESIGNED_URL_FRESH_MS } from '../pdf/presignedSource';
+import { track } from '@/lib/analytics';
 
 export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
@@ -42,8 +43,10 @@ export function useCompleteMyDocument(assignmentId: string) {
   return useMutation({
     mutationFn: (body: CompleteRequest) =>
       completeMyDocument(assignmentId, body),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
+    onSuccess: () => {
+      track('onboarding_document_completed', { assignmentId });
+      return qc.invalidateQueries({ queryKey: documentsKeys.myChecklist });
+    },
   });
 }
 
@@ -79,8 +82,10 @@ export function useUploadCertification() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: uploadCertification,
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
+    onSuccess: (_upload, { org, track: certTrack }) => {
+      track('certification_uploaded', { org, track: certTrack });
+      return qc.invalidateQueries({ queryKey: documentsKeys.myChecklist });
+    },
   });
 }
 
