@@ -22,6 +22,8 @@ export const zhCN: Messages = {
     no: '否',
     saved: '已保存',
     close: '关闭',
+    moreActions: '更多操作',
+    moreActionsFor: '{name} 的更多操作',
   },
   auth: {
     signInTitle: '登录',

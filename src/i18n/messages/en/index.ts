@@ -22,6 +22,8 @@ export const en: Messages = {
     no: 'No',
     saved: 'Saved',
     close: 'Close',
+    moreActions: 'More actions',
+    moreActionsFor: 'More actions for {name}',
   },
   auth: {
     signInTitle: 'Sign in',
