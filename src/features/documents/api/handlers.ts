@@ -11,6 +11,7 @@ import type {
   DocumentExport,
   DocumentExportRequest,
   DocumentExportStatus,
+  DocumentLanguage,
   Field,
   PublishRequest,
   Template,
@@ -18,7 +19,9 @@ import type {
   TemplatePatch,
   TemplatePage,
   TemplateAssignmentRow,
+  TemplateTranslation,
 } from './types';
+import { DOCUMENT_LANGUAGES } from './types';
 import {
   MOCK_CONSENT_TEXT,
   MOCK_INSTRUCTORS,
@@ -34,6 +37,7 @@ import {
   sampleAssignments,
   sampleCertUploads,
   sampleTemplates,
+  templateLanguages,
   toAssignmentTemplate,
   toSummary,
   withDerived,
@@ -106,6 +110,7 @@ const TEMPLATE_PATCH_KEYS = new Set<string>([
   'descriptionZh',
   'required',
   'sortOrder',
+  'sourceLanguage',
 ] satisfies (keyof TemplatePatch)[]);
 
 const badRequest = (message: string) =>
@@ -166,8 +171,15 @@ function sortTemplateRows(
   return [...done, ...open];
 }
 
+function isDocumentLanguage(value: unknown): value is DocumentLanguage {
+  return DOCUMENT_LANGUAGES.includes(value as DocumentLanguage);
+}
+
 /** Mirrors the API's `PUT …/fields` validation. */
-export function validateFields(template: Template, fields: Field[]) {
+export function validateFields(
+  template: Pick<Template, 'pages'>,
+  fields: Field[],
+) {
   const ids = new Set<string>();
   for (const f of fields) {
     if (ids.has(f.id)) return `Duplicate field id ${f.id}`;
@@ -263,10 +275,57 @@ export function documentsHandlers(
   };
   const findAssignment = (id: unknown) =>
     state.assignments.find((a) => a.id === id);
-  const pdfFor = (t: Template) =>
-    state.uploadedSources.get(t.id) ??
+  const sourceKey = (id: string, language: DocumentLanguage | null) =>
+    language ? `${id}:${language}` : id;
+  const findTranslation = (t: Template, language: unknown) =>
+    t.translations.find((tr) => tr.language === language);
+  const translationRequestError = (t: Template, language: unknown) => {
+    if (!isDocumentLanguage(language))
+      return badRequest('language must be en or zh');
+    if (!t.sourceLanguage)
+      return badRequest(
+        'Set the main version language before adding another language',
+      );
+    if (language === t.sourceLanguage)
+      return badRequest(
+        'This language is the main version; pick the other language',
+      );
+    if (present(t).hasCompletedAssignments) return conflict(TEMPLATE_LOCKED);
+    return null;
+  };
+  const servedVersion = (t: Template, requested: string | null) => {
+    const translation = t.translations.find(
+      (tr) => tr.language === requested && tr.sourceSha256 !== null,
+    );
+    return translation
+      ? {
+          language: translation.language,
+          pageCount: translation.pageCount,
+          pages: translation.pages,
+          fields: translation.fields,
+          sourceSha256: translation.sourceSha256,
+          sourceUrl: translation.sourceUrl,
+        }
+      : {
+          language: t.sourceLanguage,
+          pageCount: t.pageCount,
+          pages: t.pages,
+          fields: t.fields,
+          sourceSha256: t.sourceSha256,
+          sourceUrl: t.hasSource
+            ? `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`
+            : null,
+        };
+  };
+  const pdfFor = (
+    t: Template,
+    version: Pick<TemplateTranslation, 'pages'> & {
+      language: DocumentLanguage | null;
+    } = { pages: t.pages, language: null },
+  ) =>
+    state.uploadedSources.get(sourceKey(t.id, version.language)) ??
     buildSamplePdf(
-      (t.pages.length ? t.pages : DEFAULT_PAGES).map((p, i) => ({
+      (version.pages.length ? version.pages : DEFAULT_PAGES).map((p, i) => ({
         width: p.x + p.width,
         height: p.y + p.height,
         rotate: p.rotate,
@@ -278,7 +337,11 @@ export function documentsHandlers(
             number,
           ],
         }),
-        lines: [t.titleEn, `Page ${i + 1}`],
+        lines: [
+          t.titleEn,
+          `Page ${i + 1}`,
+          ...(version.language ? [`Language ${version.language}`] : []),
+        ],
       })),
     );
 
@@ -340,6 +403,12 @@ export function documentsHandlers(
     http.post(`${A}/admin/documents/templates`, async ({ request }) => {
       const body = (await request.json()) as TemplateCreate;
       if (!body.titleEn?.trim()) return badRequest('titleEn is required');
+      if (
+        body.sourceLanguage !== undefined &&
+        body.sourceLanguage !== null &&
+        !isDocumentLanguage(body.sourceLanguage)
+      )
+        return badRequest('sourceLanguage must be en, zh or null');
       const t: Template = {
         id: nextId('tpl'),
         kind: body.kind,
@@ -364,6 +433,9 @@ export function documentsHandlers(
         sourceSha256: null,
         pageCount: null,
         fieldCount: 0,
+        sourceLanguage: body.sourceLanguage ?? null,
+        languages: [],
+        translations: [],
         updatedBy: 'auth-admin',
         insertedAt: nowIso(),
         updatedAt: nowIso(),
@@ -389,6 +461,21 @@ export function documentsHandlers(
         );
         if (unknownKey)
           return badRequest(`property ${unknownKey} should not exist`);
+        if (body.sourceLanguage !== undefined) {
+          if (
+            body.sourceLanguage !== null &&
+            !isDocumentLanguage(body.sourceLanguage)
+          )
+            return badRequest('sourceLanguage must be en, zh or null');
+          if (
+            t.translations.length > 0 &&
+            (body.sourceLanguage === null ||
+              findTranslation(t, body.sourceLanguage))
+          )
+            return badRequest(
+              'Remove the other language version before changing the main version language',
+            );
+        }
         Object.assign(t, body, { updatedAt: nowIso() });
         return HttpResponse.json(present(t));
       },
@@ -434,6 +521,15 @@ export function documentsHandlers(
         if (t.kind === 'sign' && t.fields.length === 0)
           return badRequest(
             'Place at least one field before publishing a document to sign',
+          );
+        if (
+          t.kind === 'sign' &&
+          t.translations.some(
+            (tr) => tr.sourceSha256 !== null && tr.fields.length === 0,
+          )
+        )
+          return badRequest(
+            'Place at least one field on every language version before publishing',
           );
         if (body.assignTo === 'all' && t.audience !== 'instructor')
           return badRequest(
@@ -665,6 +761,89 @@ export function documentsHandlers(
         sizeBytes: e.sizeBytes ?? 0,
       });
     }),
+    http.post(
+      `${A}/admin/documents/templates/:id/translations/:language/source/upload-url`,
+      async ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const error = translationRequestError(t, params.language);
+        if (error) return error;
+        const { contentLength } = (await request.json()) as {
+          contentLength: number;
+        };
+        if (!(contentLength > 0) || contentLength > 20 * 1024 * 1024)
+          return badRequest('PDF must be 20 MB or smaller');
+        return HttpResponse.json({
+          uploadUrl: `${MOCK_STORAGE_ORIGIN}/upload/templates/${t.id}/${String(params.language)}/source.pdf?sig=mock`,
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        });
+      },
+    ),
+    http.post(
+      `${A}/admin/documents/templates/:id/translations/:language/source/confirm`,
+      ({ params }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const error = translationRequestError(t, params.language);
+        if (error) return error;
+        const language = params.language as DocumentLanguage;
+        if (!state.uploadedSources.has(sourceKey(t.id, language)))
+          return badRequest('No uploaded source found');
+        const existing = findTranslation(t, language);
+        const pages = existing?.pages.length ? existing.pages : DEFAULT_PAGES;
+        const translation: TemplateTranslation = {
+          language,
+          hasSource: true,
+          sourceSha256: 'c4d5e6f7'.repeat(8),
+          pageCount: pages.length,
+          pages,
+          fields: existing?.fields ?? [],
+          sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/${language}/source.pdf`,
+        };
+        t.translations = [
+          ...t.translations.filter((tr) => tr.language !== language),
+          translation,
+        ];
+        t.updatedAt = nowIso();
+        return HttpResponse.json({ ...present(t), fieldsCleared: false });
+      },
+    ),
+    http.put(
+      `${A}/admin/documents/templates/:id/translations/:language/fields`,
+      async ({ params, request }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const error = translationRequestError(t, params.language);
+        if (error) return error;
+        const translation = findTranslation(t, params.language);
+        if (!translation?.sourceSha256)
+          return badRequest('Upload this language version first');
+        const { fields } = (await request.json()) as { fields: Field[] };
+        const invalid = validateFields(translation, fields);
+        if (invalid) return badRequest(invalid);
+        translation.fields = fields;
+        t.updatedAt = nowIso();
+        return HttpResponse.json(present(t));
+      },
+    ),
+    http.delete(
+      `${A}/admin/documents/templates/:id/translations/:language`,
+      ({ params }) => {
+        const t = findTemplate(params.id);
+        if (!t) return notFound();
+        const error = translationRequestError(t, params.language);
+        if (error) return error;
+        if (!findTranslation(t, params.language)) return notFound();
+        t.translations = t.translations.filter(
+          (tr) => tr.language !== params.language,
+        );
+        state.uploadedSources.delete(
+          sourceKey(t.id, params.language as DocumentLanguage),
+        );
+        t.updatedAt = nowIso();
+        return HttpResponse.json(present(t));
+      },
+    ),
     http.post(`${A}/admin/documents/assignments`, async ({ request }) => {
       const body = (await request.json()) as AssignRequest;
       const template = findTemplate(body.templateId);
@@ -786,17 +965,21 @@ export function documentsHandlers(
               ),
       ),
     ),
-    http.get(`${A}/me/documents/:assignmentId`, ({ params }) => {
+    http.get(`${A}/me/documents/:assignmentId`, ({ params, request }) => {
       if (!state.meIsActive) return deactivated();
       if (state.meApprovalStatus !== 'approved')
         return notApproved(state.meApprovalStatus);
       const a = findAssignment(params.assignmentId);
       const t = a && findTemplate(a.templateId);
       if (!a || !t || a.subjectId !== state.meInstructorId) return notFound();
+      const requested = new URL(request.url).searchParams.get('language');
+      if (requested !== null && !isDocumentLanguage(requested))
+        return badRequest('language must be en or zh');
       if (a.status === 'assigned') {
         a.status = 'viewed';
         a.viewedAt = nowIso();
       }
+      const version = servedVersion(t, requested);
       return HttpResponse.json({
         assignment: a,
         template: {
@@ -807,14 +990,14 @@ export function documentsHandlers(
           descriptionEn: t.descriptionEn,
           descriptionZh: t.descriptionZh,
           required: t.required,
-          pageCount: t.pageCount,
-          pages: t.pages,
-          fields: t.fields,
+          pageCount: version.pageCount,
+          pages: version.pages,
+          fields: version.fields,
         },
-        sourceUrl: t.hasSource
-          ? `${MOCK_STORAGE_ORIGIN}/templates/${t.id}/source.pdf`
-          : null,
+        sourceUrl: version.sourceUrl,
         consentText: state.consentText,
+        language: version.language,
+        availableLanguages: templateLanguages(t),
       });
     }),
     http.post(
@@ -832,6 +1015,12 @@ export function documentsHandlers(
             { status: 409 },
           );
         const body = (await request.json()) as CompleteRequest;
+        if (
+          body.language !== undefined &&
+          !templateLanguages(t).includes(body.language)
+        )
+          return badRequest('That language version is not available');
+        const version = servedVersion(t, body.language ?? null);
         if (t.kind === 'read') {
           if (!('acknowledged' in body) || body.acknowledged !== true)
             return badRequest('acknowledged must be true');
@@ -840,7 +1029,7 @@ export function documentsHandlers(
             return badRequest('consent is required');
           if (!body.signerName?.trim())
             return badRequest('signerName is required');
-          for (const f of t.fields.filter((x) => x.required)) {
+          for (const f of version.fields.filter((x) => x.required)) {
             const isSig = f.type === 'signature' || f.type === 'initials';
             const present = isSig
               ? Boolean(body.signatures?.[f.id])
@@ -849,10 +1038,11 @@ export function documentsHandlers(
           }
           a.signerName = body.signerName;
           a.consentAt = nowIso();
-          a.templateSha256 = t.sourceSha256;
+          a.templateSha256 = version.sourceSha256;
           a.signedSha256 = 'e5f6a7b8'.repeat(8);
           a.hasSignedCopy = true;
         }
+        a.language = body.language ?? null;
         a.status = 'completed';
         a.completedAt = nowIso();
         return HttpResponse.json({
@@ -921,6 +1111,16 @@ export function documentsHandlers(
     ),
 
     http.put(
+      `${MOCK_STORAGE_ORIGIN}/upload/templates/:id/:language/source.pdf`,
+      async ({ params, request }) => {
+        state.uploadedSources.set(
+          sourceKey(String(params.id), params.language as DocumentLanguage),
+          await request.arrayBuffer(),
+        );
+        return new HttpResponse(null, { status: 200 });
+      },
+    ),
+    http.put(
       `${MOCK_STORAGE_ORIGIN}/upload/templates/:id/source.pdf`,
       async ({ params, request }) => {
         state.uploadedSources.set(
@@ -943,6 +1143,17 @@ export function documentsHandlers(
         const t = findTemplate(params.id);
         if (!t) return notFound();
         return new HttpResponse(pdfFor(t), {
+          headers: { 'Content-Type': 'application/pdf' },
+        });
+      },
+    ),
+    http.get(
+      `${MOCK_STORAGE_ORIGIN}/templates/:id/:language/source.pdf`,
+      ({ params }) => {
+        const t = findTemplate(params.id);
+        const translation = t && findTranslation(t, params.language);
+        if (!t || !translation) return notFound();
+        return new HttpResponse(pdfFor(t, translation), {
           headers: { 'Content-Type': 'application/pdf' },
         });
       },

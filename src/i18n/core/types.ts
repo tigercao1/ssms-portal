@@ -785,6 +785,30 @@ export interface Messages {
     certExpired: string;
     certExpiring: string;
     certValid: string;
+    languageZh: string;
+    languageEn: string;
+    badgeZh: string;
+    badgeEn: string;
+    sourceLanguageLabel: string;
+    sourceLanguageUnspecified: string;
+    sourceLanguageHint: string;
+    sourceLanguageLocked: string;
+    otherLanguageTitle: string;
+    otherLanguageIntro: string;
+    otherLanguageMissing: string;
+    otherLanguageReady: string;
+    otherLanguageNeedsFields: string;
+    uploadOtherLanguage: string;
+    replaceOtherLanguage: string;
+    uploadOtherLanguageFor: string;
+    placeOtherLanguageFields: string;
+    previewOtherLanguage: string;
+    removeOtherLanguage: string;
+    otherLanguageUploaded: string;
+    otherLanguageRemoved: string;
+    editorLanguage: string;
+    signedInLanguage: string;
+    readInLanguage: string;
   };
   signedCopies: {
     link: string;
@@ -1221,6 +1245,9 @@ export interface Messages {
     rejectedBody: string;
   };
   onboarding: {
+    documentLanguage: string;
+    documentLanguageZh: string;
+    documentLanguageEn: string;
     title: string;
     seasonTitle: string;
     progress: string;

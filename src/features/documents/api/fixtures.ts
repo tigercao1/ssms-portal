@@ -6,11 +6,13 @@ import type {
   ConsentText,
   DocumentChecklistItem,
   DocumentExport,
+  DocumentLanguage,
   DocumentPreviewItem,
   Field,
   MyChecklist,
   Template,
   TemplateSummary,
+  TemplateTranslation,
 } from './types';
 import { certState, currentUploads, todayIso } from './validity';
 
@@ -75,12 +77,44 @@ export const sampleFields: Field[] = [
   }),
 ];
 
+export function templateLanguages(t: Template): DocumentLanguage[] {
+  return [
+    ...(t.sourceLanguage && t.sourceSha256 !== null ? [t.sourceLanguage] : []),
+    ...t.translations
+      .filter((tr) => tr.sourceSha256 !== null)
+      .map((tr) => tr.language),
+  ];
+}
+
 /** Recomputes the summary flags the API derives from the source and fields. */
 export function withDerived(t: Template): Template {
+  const translations = t.translations.map((tr) => ({
+    ...tr,
+    hasSource: tr.sourceSha256 !== null,
+  }));
   return {
     ...t,
+    translations,
     hasSource: t.sourceSha256 !== null,
     fieldCount: t.fields.length,
+    languages: templateLanguages({ ...t, translations }),
+  };
+}
+
+export function fakeTranslation(
+  templateId: string,
+  overrides: Partial<TemplateTranslation> = {},
+): TemplateTranslation {
+  const language = overrides.language ?? 'en';
+  return {
+    language,
+    hasSource: true,
+    sourceSha256: 'c4d5e6f7'.repeat(8),
+    pageCount: 1,
+    pages: [{ x: 0, y: 0, width: 612, height: 792, rotate: 0 }],
+    fields: [],
+    sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${templateId}/${language}/source.pdf`,
+    ...overrides,
   };
 }
 
@@ -110,6 +144,9 @@ export function fakeTemplate(overrides: Partial<Template> = {}): Template {
     sourceSha256: HASH,
     pageCount: 2,
     fieldCount: 0,
+    sourceLanguage: null,
+    languages: [],
+    translations: [],
     updatedBy: 'auth-admin',
     insertedAt: '2026-10-01T15:00:00Z',
     updatedAt: '2026-10-10T15:00:00Z',
@@ -147,6 +184,8 @@ export function toSummary(t: Template): TemplateSummary {
     hasSource: t.sourceSha256 !== null,
     pageCount: t.pageCount,
     fieldCount: t.fields.length,
+    sourceLanguage: t.sourceLanguage,
+    languages: templateLanguages(t),
     insertedAt: t.insertedAt,
     updatedAt: t.updatedAt,
   };
@@ -238,6 +277,7 @@ export function fakeAssignment(
     templateSha256: null,
     signedSha256: null,
     hasSignedCopy: false,
+    language: null,
     insertedAt: '2026-10-05T15:00:00Z',
     updatedAt: '2026-10-05T15:00:00Z',
     ...overrides,
@@ -379,6 +419,7 @@ export function buildChecklist(
           viewedAt: a.viewedAt,
           completedAt: a.completedAt,
           dueAt: a.dueAt,
+          languages: templateLanguages(t),
         },
       ];
     });
@@ -443,6 +484,7 @@ export function buildPreviewChecklist(
       viewedAt: null,
       completedAt: null,
       dueAt: null,
+      languages: templateLanguages(t),
     }));
   const certItems = buildChecklist(
     [],
