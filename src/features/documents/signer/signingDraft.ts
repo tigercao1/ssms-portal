@@ -1,4 +1,4 @@
-import type { SignatureValue } from '../api';
+import type { DocumentLanguage, SignatureValue } from '../api';
 import {
   isSignatureField,
   type FieldSignatures,
@@ -31,8 +31,13 @@ interface StoredDraft {
   adopted: AdoptedSignatures;
 }
 
-export function signingDraftKey(userId: string, assignmentId: string): string {
-  return `${DRAFT_KEY_PREFIX}${userId}:${assignmentId}`;
+export function signingDraftKey(
+  userId: string,
+  assignmentId: string,
+  language: DocumentLanguage | null = null,
+): string {
+  const base = `${DRAFT_KEY_PREFIX}${userId}:${assignmentId}`;
+  return language ? `${base}:${language}` : base;
 }
 
 function storage(): Storage | null {
