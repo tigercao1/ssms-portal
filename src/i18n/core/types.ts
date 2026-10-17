@@ -119,6 +119,7 @@ export interface Messages {
     openMenu: string;
     closeMenu: string;
     onboardingLocked: string;
+    lessonsLockedOnboarding: string;
   };
   status: {
     pending: string;
@@ -1253,6 +1254,9 @@ export interface Messages {
     pendingEmpty: string;
     rejectedTitle: string;
     rejectedBody: string;
+    onboardingTitle: string;
+    onboardingBody: string;
+    onboardingOpen: string;
   };
   onboarding: {
     documentLanguage: string;

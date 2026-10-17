@@ -16,6 +16,7 @@ import type { CertOrg, CertTrack } from '@/lib/types';
 import { isCertContentType, prepareCertFile } from './certFile';
 import { PRESIGNED_URL_FRESH_MS } from '../pdf/presignedSource';
 import { track } from '@/lib/analytics';
+import { MY_LESSONS_KEY } from '@/features/lessons/api';
 
 export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
@@ -45,7 +46,10 @@ export function useCompleteMyDocument(assignmentId: string) {
       completeMyDocument(assignmentId, body),
     onSuccess: () => {
       track('onboarding_document_completed', { assignmentId });
-      return qc.invalidateQueries({ queryKey: documentsKeys.myChecklist });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
+        qc.invalidateQueries({ queryKey: MY_LESSONS_KEY }),
+      ]);
     },
   });
 }
@@ -84,7 +88,10 @@ export function useUploadCertification() {
     mutationFn: uploadCertification,
     onSuccess: (_upload, { org, track: certTrack }) => {
       track('certification_uploaded', { org, track: certTrack });
-      return qc.invalidateQueries({ queryKey: documentsKeys.myChecklist });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
+        qc.invalidateQueries({ queryKey: MY_LESSONS_KEY }),
+      ]);
     },
   });
 }

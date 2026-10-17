@@ -13,7 +13,9 @@ import { server } from '@/test/msw';
 import {
   createDocumentsState,
   documentsHandlers,
+  type DocumentsMockState,
 } from '@/features/documents/api/handlers';
+import { fakeAssignment } from '@/features/documents/api/fixtures';
 
 const session = vi.hoisted(() => ({ isAdmin: true }));
 
@@ -250,13 +252,23 @@ describe('AppShell admin nav', () => {
   });
 });
 
+const ONBOARDED: Partial<DocumentsMockState> = {
+  assignments: [
+    fakeAssignment({ templateId: 'tpl-handbook', status: 'completed' }),
+  ],
+  meCerts: [],
+};
+
 describe('AppShell instructor nav', () => {
   function renderInstructorShell(
     meApprovalStatus: 'approved' | 'pending' | 'rejected',
+    overrides: Partial<DocumentsMockState> = ONBOARDED,
   ) {
     session.isAdmin = false;
     server.use(
-      ...documentsHandlers(createDocumentsState({ meApprovalStatus })),
+      ...documentsHandlers(
+        createDocumentsState({ meApprovalStatus, ...overrides }),
+      ),
     );
     renderWithProviders(
       <Routes>
@@ -354,6 +366,29 @@ describe('AppShell instructor nav', () => {
     const link = screen.getByRole('link', { name: '私课保险登记' });
     expect(link).toHaveAttribute('href', '/insurance');
     await waitFor(() => expect(link.querySelector('svg')).toBeNull());
+  });
+
+  it('locks Lessons & pay for an approved instructor until onboarding is complete', async () => {
+    renderInstructorShell('approved', {});
+    expect(
+      await screen.findByRole('link', {
+        name: 'Lessons & pay Locked until you finish onboarding',
+      }),
+    ).toHaveAttribute('href', '/lessons');
+    expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    );
+  });
+
+  it('says why Lessons & pay is locked in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderInstructorShell('approved', {});
+    expect(
+      await screen.findByRole('link', {
+        name: '课程与工资 完成入职资料后解锁',
+      }),
+    ).toHaveAttribute('href', '/lessons');
   });
 
   it('shows a plain Onboarding link once approved', async () => {

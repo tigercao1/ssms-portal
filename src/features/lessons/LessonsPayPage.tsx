@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Banner, Button, Card, Spinner } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
@@ -63,6 +64,23 @@ export function LessonsPayPage() {
 
 function LessonsBody({ data }: { data: MyLessonsResponse }) {
   const t = useT();
+  if (data.locked && data.lockReason === 'onboarding_incomplete')
+    return (
+      <>
+        <LessonsBanner reason="onboarding_incomplete" />
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
+          <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken text-status-pending">
+            <LockIcon className="h-6 w-6" />
+          </span>
+          <Link
+            to="/onboarding"
+            className="text-sm font-medium text-navy underline underline-offset-4 hover:text-red"
+          >
+            {t.myLessons.onboardingOpen}
+          </Link>
+        </div>
+      </>
+    );
   if (data.locked && data.lockReason !== 'rejected')
     return (
       <>
@@ -99,6 +117,20 @@ function LessonsBody({ data }: { data: MyLessonsResponse }) {
 function LessonsBanner({ reason }: { reason: LessonsLockReason }) {
   const t = useT();
   const rejected = reason === 'rejected';
+  const copy = {
+    pending_approval: {
+      title: t.myLessons.pendingTitle,
+      body: t.myLessons.pendingBody,
+    },
+    onboarding_incomplete: {
+      title: t.myLessons.onboardingTitle,
+      body: t.myLessons.onboardingBody,
+    },
+    rejected: {
+      title: t.myLessons.rejectedTitle,
+      body: t.myLessons.rejectedBody,
+    },
+  }[reason];
   return (
     <div
       role="status"
@@ -120,12 +152,8 @@ function LessonsBanner({ reason }: { reason: LessonsLockReason }) {
         {rejected ? <CrossIcon /> : <LockIcon />}
       </span>
       <div>
-        <p className="font-semibold text-navy">
-          {rejected ? t.myLessons.rejectedTitle : t.myLessons.pendingTitle}
-        </p>
-        <p className="text-ink">
-          {rejected ? t.myLessons.rejectedBody : t.myLessons.pendingBody}
-        </p>
+        <p className="font-semibold text-navy">{copy.title}</p>
+        <p className="text-ink">{copy.body}</p>
       </div>
     </div>
   );
