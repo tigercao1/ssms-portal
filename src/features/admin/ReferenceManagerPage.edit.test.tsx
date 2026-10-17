@@ -58,7 +58,10 @@ async function startEditing(
   user: ReturnType<typeof userEvent.setup>,
   name: string,
 ) {
-  await user.click(await screen.findByRole('button', { name: `Edit ${name}` }));
+  await user.click(
+    await screen.findByRole('button', { name: `More actions for ${name}` }),
+  );
+  await user.click(screen.getByRole('menuitem', { name: `Edit ${name}` }));
 }
 
 function panel() {
@@ -204,37 +207,30 @@ describe('ReferenceManagerPage edit panel', () => {
     expect(api.patches).toHaveLength(0);
   });
 
-  it('wires the Edit button to the panel with aria-expanded and aria-controls', async () => {
+  it('opens the panel for the row whose Edit was chosen', async () => {
     serve([whistler, cypress]);
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
 
-    const edit = await screen.findByRole('button', { name: 'Edit Whistler' });
-    const other = screen.getByRole('button', { name: 'Edit Cypress' });
-    expect(edit).toHaveAttribute('aria-expanded', 'false');
-    expect(edit).toHaveAttribute('aria-controls', 'ref-edit-r1');
-    expect(other).toHaveAttribute('aria-controls', 'ref-edit-r2');
-
-    await user.click(edit);
-    expect(edit).toHaveAttribute('aria-expanded', 'true');
-    expect(other).toHaveAttribute('aria-expanded', 'false');
+    await startEditing(user, 'Whistler');
     expect(panel()).toHaveAttribute('id', 'ref-edit-r1');
 
-    await user.click(other);
-    expect(edit).toHaveAttribute('aria-expanded', 'false');
-    expect(other).toHaveAttribute('aria-expanded', 'true');
+    await startEditing(user, 'Cypress');
     expect(panel()).toHaveAttribute('id', 'ref-edit-r2');
+    expect(screen.getAllByRole('heading', { name: 'Edit row' })).toHaveLength(
+      1,
+    );
 
     await user.keyboard('{Escape}');
-    expect(other).toHaveAttribute('aria-expanded', 'false');
+    expect(editShown()).toBe(false);
   });
 
-  it('returns focus to the row Edit button after Cancel, Escape and Save', async () => {
+  it('returns focus to the row menu button after Cancel, Escape and Save', async () => {
     serve([whistler, cypress]);
     const user = userEvent.setup();
     renderWithProviders(<ReferenceManagerPage />);
     const editButton = (name: string) =>
-      screen.getByRole('button', { name: `Edit ${name}` });
+      screen.getByRole('button', { name: `More actions for ${name}` });
 
     await startEditing(user, 'Cypress');
     await user.click(within(panel()).getByRole('button', { name: 'Cancel' }));
@@ -371,8 +367,11 @@ describe('ReferenceManagerPage edit panel', () => {
 
     await startEditing(user, 'Whistler');
     await user.click(
-      within(rowFor('Whistler')).getByRole('button', { name: 'Remove' }),
+      within(rowFor('Whistler')).getByRole('button', {
+        name: 'More actions for Whistler',
+      }),
     );
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
     const confirm = within(screen.getByRole('alertdialog')).getByRole(
       'button',
       {
@@ -392,8 +391,9 @@ describe('ReferenceManagerPage edit panel', () => {
     renderWithProviders(<ReferenceManagerPage />);
 
     await user.click(
-      await screen.findByRole('button', { name: '编辑 Whistler' }),
+      await screen.findByRole('button', { name: 'Whistler 的更多操作' }),
     );
+    await user.click(screen.getByRole('menuitem', { name: '编辑 Whistler' }));
     expect(
       screen.getByRole('heading', { name: '编辑条目' }),
     ).toBeInTheDocument();

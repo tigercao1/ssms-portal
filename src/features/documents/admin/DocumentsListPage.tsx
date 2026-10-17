@@ -2,19 +2,19 @@ import { Fragment, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
-import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
+  ActionsMenu,
   Banner,
   Button,
   Card,
   EmptyState,
   Spinner,
   Toggle,
+  type ActionsMenuItem,
 } from '@/components';
 import type { ConfirmedTemplate, TemplateSummary } from '../api';
 import {
-  MAX_TEMPLATE_BYTES,
   useCreateTemplate,
   useRetireTemplate,
   useTemplates,
@@ -24,15 +24,17 @@ import {
 import {
   EMPTY_TEMPLATE_VALUES,
   TemplateForm,
+  hasOtherLanguage,
   templateToValues,
   valuesToCreate,
   valuesToPatch,
 } from './TemplateForm';
 import { AssignDialog } from './AssignDialog';
+import { OtherLanguageVersion } from './OtherLanguageVersion';
 import { ChangeAudienceDialog } from './ChangeAudienceDialog';
 import { PublishDialog } from './PublishDialog';
-import { KindBadge, TemplateStatusChip } from './badges';
-import { errorText, templateTitle } from './format';
+import { KindBadge, LanguageBadges, TemplateStatusChip } from './badges';
+import { errorText, pagesText, templateTitle, uploadErrorText } from './format';
 
 type UploadNotice =
   | { id: string; tone: 'approved' | 'pending'; text: string }
@@ -196,8 +198,27 @@ function publishBlocker(row: TemplateSummary, t: Messages): string | null {
 
 function AudienceCell({ row }: { row: TemplateSummary }) {
   const t = useT();
+  const { locale } = useLocale();
+  if (row.status === 'draft') return <span className="text-slate">—</span>;
+  const signedLink = (text: string) => (
+    <Link
+      to={`/admin/documents/${row.id}/signed`}
+      className="text-xs text-navy underline decoration-navy/30 underline-offset-2 hover:decoration-navy"
+      title={t.signedCopies.linkFor.replace(
+        '{title}',
+        templateTitle(row, locale),
+      )}
+    >
+      {text}
+    </Link>
+  );
   if (row.status !== 'live' || !row.assignTo)
-    return <span className="text-slate">—</span>;
+    return (
+      <>
+        <div className="text-slate">—</div>
+        {signedLink(t.signedCopies.link)}
+      </>
+    );
   const detail =
     row.assignTo === 'all'
       ? (row.kind === 'read'
@@ -218,25 +239,20 @@ function AudienceCell({ row }: { row: TemplateSummary }) {
           ? t.documents.audienceAll
           : t.documents.audienceSelected}
       </div>
-      <div className="text-xs text-slate">{detail}</div>
+      <div>{signedLink(detail)}</div>
     </>
   );
 }
 
-function SourceActions({
-  row,
-  onNotice,
-}: {
-  row: TemplateSummary;
-  onNotice: (n: UploadNotice | null) => void;
-}) {
+function useSourceUpload(
+  row: TemplateSummary,
+  onNotice: (n: UploadNotice | null) => void,
+) {
   const t = useT();
   const { locale } = useLocale();
   const upload = useUploadTemplateSource();
   const fileRef = useRef<HTMLInputElement>(null);
-  const reasonId = useId();
   const title = templateTitle(row, locale);
-  const hasPdf = row.hasSource;
   const locked = row.hasCompletedAssignments;
 
   function onFile(file: File | undefined) {
@@ -257,30 +273,20 @@ function SourceActions({
               .replace('{pages}', pagesText(tpl.pageCount, t)),
           }),
         onError: (err) =>
-          onNotice({ id: row.id, tone: 'error', text: uploadError(err) }),
+          onNotice({
+            id: row.id,
+            tone: 'error',
+            text: uploadErrorText(err, t),
+          }),
       },
     );
     if (fileRef.current) fileRef.current.value = '';
   }
 
-  function uploadError(err: unknown) {
-    if (err instanceof ApiError && err.message === 'not-pdf')
-      return t.documents.uploadNotPdf;
-    if (err instanceof ApiError && err.message === 'too-large')
-      return t.documents.uploadTooLarge.replace(
-        '{mb}',
-        String(MAX_TEMPLATE_BYTES / 1024 / 1024),
-      );
-    return t.documents.uploadFailed.replace(
-      '{reason}',
-      errorText(err, t.errors.generic),
-    );
-  }
-
-  const describedBy = locked ? reasonId : undefined;
-
-  return (
-    <>
+  return {
+    pending: upload.isPending,
+    pick: () => fileRef.current?.click(),
+    input: (
       <input
         ref={fileRef}
         type="file"
@@ -291,14 +297,78 @@ function SourceActions({
         disabled={locked}
         onChange={(e) => onFile(e.target.files?.[0])}
       />
+    ),
+  };
+}
+
+function sourceItems(
+  row: TemplateSummary,
+  source: ReturnType<typeof useSourceUpload>,
+  title: string,
+  t: Messages,
+): ActionsMenuItem[] {
+  const hasPdf = row.hasSource;
+  const locked = row.hasCompletedAssignments;
+  const reason = locked ? t.documents.lockedSigned : undefined;
+  const upload: ActionsMenuItem = {
+    key: 'upload',
+    label: hasPdf ? t.documents.replacePdf : t.documents.uploadPdf,
+    loading: source.pending,
+    disabled: locked,
+    description: reason,
+    onSelect: source.pick,
+  };
+  if (!hasPdf) return [upload];
+  if (row.kind === 'sign' && locked)
+    return [
+      upload,
+      {
+        key: 'fields',
+        label: t.documents.placeFields,
+        disabled: true,
+        description: reason,
+      },
+    ];
+  return [
+    upload,
+    {
+      key: 'fields',
+      label:
+        row.kind === 'sign' ? t.documents.placeFields : t.documents.preview,
+      ariaLabel: t.documents.placeFieldsFor.replace('{title}', title),
+      to: `/admin/documents/${row.id}/edit`,
+    },
+  ];
+}
+
+function SourceActions({
+  row,
+  onNotice,
+}: {
+  row: TemplateSummary;
+  onNotice: (n: UploadNotice | null) => void;
+}) {
+  const t = useT();
+  const { locale } = useLocale();
+  const source = useSourceUpload(row, onNotice);
+  const reasonId = useId();
+  const title = templateTitle(row, locale);
+  const hasPdf = row.hasSource;
+  const locked = row.hasCompletedAssignments;
+
+  const describedBy = locked ? reasonId : undefined;
+
+  return (
+    <>
+      {source.input}
       <span title={locked ? t.documents.lockedSigned : undefined}>
         <Button
           size="sm"
           variant="ghost"
-          loading={upload.isPending}
+          loading={source.pending}
           disabled={locked}
           aria-describedby={describedBy}
-          onClick={() => fileRef.current?.click()}
+          onClick={source.pick}
         >
           {hasPdf ? t.documents.replacePdf : t.documents.uploadPdf}
         </Button>
@@ -332,12 +402,6 @@ function SourceActions({
   );
 }
 
-function pagesText(n: number | null, t: Messages) {
-  return n === 1
-    ? t.documents.onePage
-    : t.documents.pages.replace('{n}', String(n ?? 0));
-}
-
 function TemplateRow({
   row,
   striped,
@@ -361,9 +425,10 @@ function TemplateRow({
   const { locale } = useLocale();
   const update = useUpdateTemplate();
   const retire = useRetireTemplate();
-  const reasonId = useId();
+  const source = useSourceUpload(row, onNotice);
   const title = templateTitle(row, locale);
   const blocker = publishBlocker(row, t);
+  const reasonId = useId();
   const error = update.error ?? retire.error;
 
   function onRetire() {
@@ -378,25 +443,62 @@ function TemplateRow({
     });
   }
 
-  const publishButton = (label: string, aria: string) => (
-    <span title={blocker ?? undefined}>
-      <Button
-        size="sm"
-        variant={row.status === 'draft' ? 'primary' : 'secondary'}
-        disabled={blocker !== null}
-        aria-label={aria.replace('{title}', title)}
-        aria-describedby={blocker ? reasonId : undefined}
-        onClick={onPublish}
-      >
-        {label}
-      </Button>
-      {blocker && (
-        <span id={reasonId} className="sr-only">
-          {blocker}
-        </span>
-      )}
-    </span>
-  );
+  const publishItem = (label: string, aria: string): ActionsMenuItem => ({
+    key: 'publish',
+    label,
+    ariaLabel: aria.replace('{title}', title),
+    disabled: blocker !== null,
+    description: blocker ?? undefined,
+    onSelect: onPublish,
+  });
+
+  const items: ActionsMenuItem[] = [
+    {
+      key: 'edit',
+      label: t.common.edit,
+      ariaLabel: t.documents.editFor.replace('{title}', title),
+      onSelect: onEdit,
+    },
+    ...(row.status === 'draft' ? sourceItems(row, source, title, t) : []),
+    ...(row.status === 'live'
+      ? [
+          ...(row.assignTo !== 'all'
+            ? [
+                {
+                  key: 'assign',
+                  label: t.documents.assign,
+                  ariaLabel: t.documents.assignFor.replace('{title}', title),
+                  onSelect: onAssign,
+                },
+              ]
+            : []),
+          ...(row.audience === 'instructor'
+            ? [
+                {
+                  key: 'audience',
+                  label: t.documents.changeAudience,
+                  ariaLabel: t.documents.changeAudienceFor.replace(
+                    '{title}',
+                    title,
+                  ),
+                  onSelect: onChangeAudience,
+                },
+              ]
+            : []),
+          {
+            key: 'retire',
+            label: t.documents.retire,
+            ariaLabel: t.documents.retireFor.replace('{title}', title),
+            loading: retire.isPending,
+            destructive: true,
+            onSelect: onRetire,
+          },
+        ]
+      : []),
+    ...(row.status === 'retired'
+      ? [publishItem(t.documents.republish, t.documents.republishFor)]
+      : []),
+  ];
 
   return (
     <tr
@@ -421,7 +523,10 @@ function TemplateRow({
       </td>
       <td className="whitespace-nowrap px-2 py-2 xl:px-3">
         {row.hasSource ? (
-          pagesText(row.pageCount, t)
+          <span className="inline-flex items-center gap-2">
+            {pagesText(row.pageCount, t)}
+            <LanguageBadges languages={row.languages} />
+          </span>
         ) : (
           <span className="text-status-rejected">{t.documents.noPdf}</span>
         )}
@@ -441,60 +546,31 @@ function TemplateRow({
         />
       </td>
       <td className="px-2 py-2 xl:px-3">
-        <div className="flex min-w-[7rem] flex-wrap items-center justify-end gap-2 xl:min-w-[15rem]">
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-expanded={expanded}
-            aria-label={t.documents.editFor.replace('{title}', title)}
-            onClick={onEdit}
-          >
-            {t.common.edit}
-          </Button>
+        <div className="flex items-center justify-end gap-1">
+          {row.status === 'draft' && source.input}
           {row.status === 'draft' && (
-            <>
-              <SourceActions row={row} onNotice={onNotice} />
-              {publishButton(t.documents.publish, t.documents.publishFor)}
-            </>
-          )}
-          {row.status === 'live' && (
-            <>
-              {row.assignTo !== 'all' && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  aria-label={t.documents.assignFor.replace('{title}', title)}
-                  onClick={onAssign}
-                >
-                  {t.documents.assign}
-                </Button>
-              )}
-              {row.audience === 'instructor' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t.documents.changeAudienceFor.replace(
-                    '{title}',
-                    title,
-                  )}
-                  onClick={onChangeAudience}
-                >
-                  {t.documents.changeAudience}
-                </Button>
-              )}
+            <span title={blocker ?? undefined}>
               <Button
                 size="sm"
-                variant="ghost"
-                loading={retire.isPending}
-                aria-label={t.documents.retireFor.replace('{title}', title)}
-                onClick={onRetire}
+                variant="primary"
+                disabled={blocker !== null}
+                aria-label={t.documents.publishFor.replace('{title}', title)}
+                aria-describedby={blocker ? reasonId : undefined}
+                onClick={onPublish}
               >
-                {t.documents.retire}
+                {t.documents.publish}
               </Button>
-            </>
+              {blocker && (
+                <span id={reasonId} className="sr-only">
+                  {blocker}
+                </span>
+              )}
+            </span>
           )}
-          {row.status === 'retired' &&
-            publishButton(t.documents.republish, t.documents.republishFor)}
+          <ActionsMenu
+            items={items}
+            label={t.common.moreActionsFor.replace('{name}', title)}
+          />
         </div>
         {error && (
           <p
@@ -533,6 +609,7 @@ function EditTemplate({
       <TemplateForm
         initial={templateToValues(row)}
         kindEditable={false}
+        languageLocked={hasOtherLanguage(row)}
         submitLabel={t.common.save}
         pending={update.isPending}
         error={update.error}
@@ -543,6 +620,13 @@ function EditTemplate({
           update.mutate({ id: row.id, ...patch }, { onSuccess: onDone });
         }}
       />
+      {row.sourceLanguage && (
+        <OtherLanguageVersion
+          row={row}
+          sourceLanguage={row.sourceLanguage}
+          onNotice={onNotice}
+        />
+      )}
     </div>
   );
 }

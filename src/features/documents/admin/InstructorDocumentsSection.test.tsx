@@ -90,6 +90,18 @@ function renderSection() {
   );
 }
 
+async function chooseAction(
+  user: ReturnType<typeof userEvent.setup>,
+  scope: HTMLElement,
+  title: string,
+  name: string,
+) {
+  await user.click(
+    within(scope).getByRole('button', { name: `More actions for ${title}` }),
+  );
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
 describe('InstructorDocumentsSection — documents', () => {
   it('lists assignments with titles, status and what is missing', async () => {
     renderSection();
@@ -116,6 +128,48 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(
       within(conduct).queryByRole('button', { name: 'Send reminder' }),
     ).toBeNull();
+  });
+
+  it('shows the language a document was signed or read in, only when recorded', async () => {
+    state.assignments = state.assignments.map((a) =>
+      a.id === 'asg-conduct'
+        ? { ...a, language: 'zh' }
+        : a.id === 'asg-handbook'
+          ? { ...a, language: 'en' }
+          : a,
+    );
+    renderSection();
+    const conduct = await screen.findByRole('listitem', {
+      name: 'Code of conduct',
+    });
+    expect(within(conduct).getByText('Signed in')).toBeInTheDocument();
+    expect(within(conduct).getByText('Chinese')).toBeInTheDocument();
+    const handbook = screen.getByRole('listitem', {
+      name: 'Instructor handbook',
+    });
+    expect(within(handbook).getByText('Read in')).toBeInTheDocument();
+    expect(within(handbook).getByText('English')).toBeInTheDocument();
+    const waiver = screen.getByRole('listitem', { name: 'Liability waiver' });
+    expect(within(waiver).queryByText(/Signed in|Read in/)).toBeNull();
+  });
+
+  it('shows the signed language in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    state.assignments = state.assignments.map((a) =>
+      a.id === 'asg-conduct' ? { ...a, language: 'en' } : a,
+    );
+    renderSection();
+    const conduct = await screen.findByRole('listitem', { name: '行为准则' });
+    expect(within(conduct).getByText('签署语言')).toBeInTheDocument();
+    expect(within(conduct).getByText('英文')).toBeInTheDocument();
+  });
+
+  it('shows no signed language for documents signed before language versions', async () => {
+    renderSection();
+    const conduct = await screen.findByRole('listitem', {
+      name: 'Code of conduct',
+    });
+    expect(within(conduct).queryByText(/Signed in/)).toBeNull();
   });
 
   it('titles rows from the embedded template and offers downloads only with a signed copy', async () => {
@@ -152,8 +206,11 @@ describe('InstructorDocumentsSection — documents', () => {
     const conduct = await screen.findByRole('listitem', {
       name: 'Code of conduct',
     });
-    await user.click(
-      within(conduct).getByRole('button', { name: 'Download signed copy' }),
+    await chooseAction(
+      user,
+      conduct,
+      'Code of conduct',
+      'Download signed copy',
     );
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith(
@@ -174,8 +231,11 @@ describe('InstructorDocumentsSection — documents', () => {
     const conduct = await screen.findByRole('listitem', {
       name: 'Code of conduct',
     });
-    await user.click(
-      within(conduct).getByRole('button', { name: 'Download signed copy' }),
+    await chooseAction(
+      user,
+      conduct,
+      'Code of conduct',
+      'Download signed copy',
     );
     expect(await within(conduct).findByRole('alert')).toHaveTextContent(
       'Signed copy missing',
@@ -217,25 +277,46 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(tab.close).toHaveBeenCalled();
   });
 
+  it('collapses two or more row actions into a menu and keeps a lone one as a button', async () => {
+    const user = userEvent.setup();
+    renderSection();
+    const handbook = await screen.findByRole('listitem', {
+      name: 'Instructor handbook',
+    });
+    expect(
+      within(handbook).getByRole('button', { name: 'Archive' }),
+    ).toBeInTheDocument();
+    expect(
+      within(handbook).queryByRole('button', { name: /More actions/ }),
+    ).toBeNull();
+    const conduct = screen.getByRole('listitem', { name: 'Code of conduct' });
+    await user.click(
+      within(conduct).getByRole('button', {
+        name: 'More actions for Code of conduct',
+      }),
+    );
+    expect(
+      screen.getAllByRole('menuitem').map((item) => item.textContent),
+    ).toEqual(['Download signed copy', 'Archive']);
+  });
+
   it('sends a reminder and archives with confirmation', async () => {
     const user = userEvent.setup();
     renderSection();
     const waiver = await screen.findByRole('listitem', {
       name: 'Liability waiver',
     });
-    await user.click(
-      within(waiver).getByRole('button', { name: 'Send reminder' }),
-    );
+    await chooseAction(user, waiver, 'Liability waiver', 'Send reminder');
     expect(
       await within(waiver).findByText('Reminder sent.'),
     ).toBeInTheDocument();
     expect(state.reminded).toEqual(['asg-waiver']);
 
-    await user.click(within(waiver).getByRole('button', { name: 'Archive' }));
+    await chooseAction(user, waiver, 'Liability waiver', 'Archive');
     const confirm = within(waiver).getByRole('alertdialog');
     await user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
     expect(within(waiver).queryByRole('alertdialog')).toBeNull();
-    await user.click(within(waiver).getByRole('button', { name: 'Archive' }));
+    await chooseAction(user, waiver, 'Liability waiver', 'Archive');
     await user.click(
       within(within(waiver).getByRole('alertdialog')).getByRole('button', {
         name: 'Archive',
@@ -252,6 +333,9 @@ describe('InstructorDocumentsSection — documents', () => {
     expect(
       within(archived).queryByRole('button', { name: 'Archive' }),
     ).toBeNull();
+    expect(
+      within(archived).queryByRole('button', { name: /More actions/ }),
+    ).toBeNull();
   });
 
   it('shows a reminder error', async () => {
@@ -265,9 +349,7 @@ describe('InstructorDocumentsSection — documents', () => {
     const waiver = await screen.findByRole('listitem', {
       name: 'Liability waiver',
     });
-    await user.click(
-      within(waiver).getByRole('button', { name: 'Send reminder' }),
-    );
+    await chooseAction(user, waiver, 'Liability waiver', 'Send reminder');
     expect(await within(waiver).findByRole('alert')).toHaveTextContent(
       'Too soon',
     );

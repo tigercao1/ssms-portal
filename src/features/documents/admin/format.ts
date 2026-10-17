@@ -1,10 +1,36 @@
 import { ApiError } from '@/lib/api';
-import type { Locale } from '@/i18n/core/types';
+import type { Locale, Messages } from '@/i18n/core/types';
+import type { DocumentLanguage } from '../api';
+import { MAX_TEMPLATE_BYTES } from './hooks';
 import { localizeField } from '@/i18n/core/localize';
 import { formatDate } from '@/lib/date';
 
 export function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError && err.message ? err.message : fallback;
+}
+
+export function pagesText(n: number | null, t: Messages): string {
+  return n === 1
+    ? t.documents.onePage
+    : t.documents.pages.replace('{n}', String(n ?? 0));
+}
+
+export function uploadErrorText(err: unknown, t: Messages): string {
+  if (err instanceof ApiError && err.message === 'not-pdf')
+    return t.documents.uploadNotPdf;
+  if (err instanceof ApiError && err.message === 'too-large')
+    return t.documents.uploadTooLarge.replace(
+      '{mb}',
+      String(MAX_TEMPLATE_BYTES / 1024 / 1024),
+    );
+  return t.documents.uploadFailed.replace(
+    '{reason}',
+    errorText(err, t.errors.generic),
+  );
+}
+
+export function languageName(language: DocumentLanguage, t: Messages): string {
+  return language === 'zh' ? t.documents.languageZh : t.documents.languageEn;
 }
 
 export function templateTitle(
@@ -22,4 +48,16 @@ export function formatDay(isoDate: string | null, locale: Locale): string {
 
 export function shortHash(hash: string | null): string {
   return hash ? `${hash.slice(0, 12)}…` : '—';
+}
+
+export function formatBytes(bytes: number, locale: Locale): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const digits = unit === 0 || value >= 10 ? 0 : 1;
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value)} ${units[unit]}`;
 }

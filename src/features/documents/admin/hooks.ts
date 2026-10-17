@@ -1,30 +1,47 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import {
   archiveAssignment,
   changeTemplateAudience,
   confirmTemplateSource,
+  confirmTranslationSource,
   createAssignments,
+  createDocumentExport,
   createTemplate,
+  deleteTranslation,
   documentsKeys,
+  getDocumentExport,
   getInstructorDocuments,
   getPublishPreview,
   getTemplate,
+  listDocumentExports,
+  listTemplateAssignments,
   listTemplates,
   publishTemplate,
   putToPresignedUrl,
   remindAssignment,
   requestTemplateSourceUpload,
+  requestTranslationSourceUpload,
   retireTemplate,
   reviewCertUpload,
   saveTemplateFields,
+  saveTranslationFields,
   updateTemplate,
   type AssignRequest,
   type ChangeAudienceRequest,
   type CertUploadReview,
+  type DocumentExport,
+  type DocumentExportRequest,
+  type DocumentLanguage,
   type Field,
   type PublishRequest,
   type Template,
+  type TemplateAssignmentQuery,
   type TemplateCreate,
   type TemplatePatch,
 } from '../api';
@@ -134,13 +151,25 @@ export function useRetireTemplate() {
 export function useUploadTemplateSource() {
   const sync = useTemplateSync();
   return useMutation({
-    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+    mutationFn: async ({
+      id,
+      file,
+      language,
+    }: {
+      id: string;
+      file: File;
+      language?: DocumentLanguage;
+    }) => {
       if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name))
         throw new ApiError(415, 'not-pdf');
       if (file.size > MAX_TEMPLATE_BYTES) throw new ApiError(413, 'too-large');
-      const { uploadUrl } = await requestTemplateSourceUpload(id, file.size);
+      const { uploadUrl } = language
+        ? await requestTranslationSourceUpload(id, language, file.size)
+        : await requestTemplateSourceUpload(id, file.size);
       await putToPresignedUrl(uploadUrl, file, 'application/pdf');
-      return confirmTemplateSource(id);
+      return language
+        ? confirmTranslationSource(id, language)
+        : confirmTemplateSource(id);
     },
     onSuccess: sync,
   });
@@ -149,8 +178,32 @@ export function useUploadTemplateSource() {
 export function useSaveFields() {
   const sync = useTemplateSync();
   return useMutation({
-    mutationFn: ({ id, fields }: { id: string; fields: Field[] }) =>
-      saveTemplateFields(id, fields),
+    mutationFn: ({
+      id,
+      fields,
+      language,
+    }: {
+      id: string;
+      fields: Field[];
+      language?: DocumentLanguage;
+    }) =>
+      language
+        ? saveTranslationFields(id, language, fields)
+        : saveTemplateFields(id, fields),
+    onSuccess: sync,
+  });
+}
+
+export function useDeleteTranslation() {
+  const sync = useTemplateSync();
+  return useMutation({
+    mutationFn: ({
+      id,
+      language,
+    }: {
+      id: string;
+      language: DocumentLanguage;
+    }) => deleteTranslation(id, language),
     onSuccess: sync,
   });
 }
@@ -204,5 +257,96 @@ export function useReviewCertUpload(instructorId: string) {
     mutationFn: ({ id, ...body }: CertUploadReview & { id: string }) =>
       reviewCertUpload(id, body),
     onSuccess: invalidate,
+  });
+}
+
+export const SIGNED_COPIES_PAGE_SIZE = 50;
+export const EXPORT_POLL_MS = 2_000;
+
+export function isExportActive(e: Pick<DocumentExport, 'status'>): boolean {
+  return e.status === 'queued' || e.status === 'running';
+}
+
+export function useTemplateAssignments(
+  id: string,
+  query: TemplateAssignmentQuery,
+) {
+  return useQuery({
+    queryKey: documentsKeys.templateAssignments(id, query),
+    queryFn: () => listTemplateAssignments(id, query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Count of completed assignments with a signed copy for a season, read from
+ * `X-Total-Count`.
+ */
+export function useSignedCopyCount(id: string, season: string | undefined) {
+  const query: TemplateAssignmentQuery = {
+    season,
+    status: 'completed',
+    hasSignedCopy: true,
+    page: 1,
+    limit: 1,
+  };
+  return useQuery({
+    queryKey: documentsKeys.templateAssignments(id, query),
+    queryFn: () => listTemplateAssignments(id, query),
+    select: (page) => page.total,
+  });
+}
+
+export function useDocumentExports(templateId: string) {
+  return useQuery({
+    queryKey: documentsKeys.templateExports(templateId),
+    queryFn: () => listDocumentExports(templateId),
+  });
+}
+
+function mergeExport(list: DocumentExport[] | undefined, e: DocumentExport) {
+  const rest = (list ?? []).filter((x) => x.id !== e.id);
+  return [e, ...rest]
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+    .slice(0, 10);
+}
+
+/**
+ * Polls one export every {@link EXPORT_POLL_MS} while it is queued or running
+ * and writes each result into the template's export list.
+ */
+export function useDocumentExportPolling(exp: DocumentExport) {
+  const qc = useQueryClient();
+  const active = isExportActive(exp);
+  return useQuery({
+    queryKey: documentsKeys.documentExport(exp.id),
+    queryFn: async () => {
+      const e = await getDocumentExport(exp.id);
+      qc.setQueryData<DocumentExport[]>(
+        documentsKeys.templateExports(e.templateId),
+        (list) => mergeExport(list, e),
+      );
+      return e;
+    },
+    enabled: active,
+    refetchInterval: (query) => {
+      if (query.state.status === 'error') return false;
+      const data = query.state.data;
+      return !data || isExportActive(data) ? EXPORT_POLL_MS : false;
+    },
+  });
+}
+
+export function useCreateDocumentExport(templateId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: DocumentExportRequest) =>
+      createDocumentExport(templateId, body),
+    onSuccess: (e) => {
+      qc.setQueryData<DocumentExport[]>(
+        documentsKeys.templateExports(templateId),
+        (list) => mergeExport(list, e),
+      );
+    },
   });
 }

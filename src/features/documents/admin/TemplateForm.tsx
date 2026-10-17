@@ -10,6 +10,7 @@ import {
   Toggle,
 } from '@/components';
 import type {
+  DocumentLanguage,
   TemplateCreate,
   TemplateKind,
   TemplatePatch,
@@ -25,6 +26,7 @@ export interface TemplateFormValues {
   descriptionZh: string;
   required: boolean;
   sortOrder: string;
+  sourceLanguage: DocumentLanguage | '';
 }
 
 export const EMPTY_TEMPLATE_VALUES: TemplateFormValues = {
@@ -35,6 +37,7 @@ export const EMPTY_TEMPLATE_VALUES: TemplateFormValues = {
   descriptionZh: '',
   required: true,
   sortOrder: '0',
+  sourceLanguage: '',
 };
 
 export function templateToValues(t: TemplateSummary): TemplateFormValues {
@@ -46,7 +49,12 @@ export function templateToValues(t: TemplateSummary): TemplateFormValues {
     descriptionZh: t.descriptionZh ?? '',
     required: t.required,
     sortOrder: String(t.sortOrder),
+    sourceLanguage: t.sourceLanguage ?? '',
   };
+}
+
+export function hasOtherLanguage(t: TemplateSummary): boolean {
+  return t.languages.some((language) => language !== t.sourceLanguage);
 }
 
 export function valuesToCreate(v: TemplateFormValues): TemplateCreate {
@@ -59,6 +67,7 @@ export function valuesToCreate(v: TemplateFormValues): TemplateCreate {
     ...(v.descriptionZh.trim() && { descriptionZh: v.descriptionZh.trim() }),
     required: v.required,
     sortOrder: Number.parseInt(v.sortOrder, 10) || 0,
+    ...(v.sourceLanguage && { sourceLanguage: v.sourceLanguage }),
   };
 }
 
@@ -78,6 +87,9 @@ export function valuesToPatch(
   if (v.required !== before.required) patch.required = v.required;
   const sort = Number.parseInt(v.sortOrder, 10) || 0;
   if (sort !== before.sortOrder) patch.sortOrder = sort;
+  const sourceLanguage = v.sourceLanguage || null;
+  if (sourceLanguage !== before.sourceLanguage)
+    patch.sourceLanguage = sourceLanguage;
   return patch;
 }
 
@@ -85,6 +97,7 @@ export function valuesToPatch(
 export function TemplateForm({
   initial,
   kindEditable,
+  languageLocked = false,
   submitLabel,
   pending,
   error,
@@ -93,6 +106,7 @@ export function TemplateForm({
 }: {
   initial: TemplateFormValues;
   kindEditable: boolean;
+  languageLocked?: boolean;
   submitLabel: string;
   pending: boolean;
   error: unknown;
@@ -180,6 +194,32 @@ export function TemplateForm({
             >
               <option value="sign">{t.documents.kindSign}</option>
               <option value="read">{t.documents.kindRead}</option>
+            </Select>
+          )}
+        </Field>
+        <Field
+          label={t.documents.sourceLanguageLabel}
+          hint={
+            languageLocked
+              ? t.documents.sourceLanguageLocked
+              : t.documents.sourceLanguageHint
+          }
+        >
+          {(p) => (
+            <Select
+              {...p}
+              value={values.sourceLanguage}
+              disabled={languageLocked}
+              onChange={(e) =>
+                set(
+                  'sourceLanguage',
+                  e.target.value as TemplateFormValues['sourceLanguage'],
+                )
+              }
+            >
+              <option value="">{t.documents.sourceLanguageUnspecified}</option>
+              <option value="zh">{t.documents.languageZh}</option>
+              <option value="en">{t.documents.languageEn}</option>
             </Select>
           )}
         </Field>

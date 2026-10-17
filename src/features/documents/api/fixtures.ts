@@ -5,11 +5,14 @@ import type {
   CertificationChecklistItem,
   ConsentText,
   DocumentChecklistItem,
+  DocumentExport,
+  DocumentLanguage,
   DocumentPreviewItem,
   Field,
   MyChecklist,
   Template,
   TemplateSummary,
+  TemplateTranslation,
 } from './types';
 import { certState, currentUploads, todayIso } from './validity';
 
@@ -74,12 +77,44 @@ export const sampleFields: Field[] = [
   }),
 ];
 
+export function templateLanguages(t: Template): DocumentLanguage[] {
+  return [
+    ...(t.sourceLanguage && t.sourceSha256 !== null ? [t.sourceLanguage] : []),
+    ...t.translations
+      .filter((tr) => tr.sourceSha256 !== null)
+      .map((tr) => tr.language),
+  ];
+}
+
 /** Recomputes the summary flags the API derives from the source and fields. */
 export function withDerived(t: Template): Template {
+  const translations = t.translations.map((tr) => ({
+    ...tr,
+    hasSource: tr.sourceSha256 !== null,
+  }));
   return {
     ...t,
+    translations,
     hasSource: t.sourceSha256 !== null,
     fieldCount: t.fields.length,
+    languages: templateLanguages({ ...t, translations }),
+  };
+}
+
+export function fakeTranslation(
+  templateId: string,
+  overrides: Partial<TemplateTranslation> = {},
+): TemplateTranslation {
+  const language = overrides.language ?? 'en';
+  return {
+    language,
+    hasSource: true,
+    sourceSha256: 'c4d5e6f7'.repeat(8),
+    pageCount: 1,
+    pages: [{ x: 0, y: 0, width: 612, height: 792, rotate: 0 }],
+    fields: [],
+    sourceUrl: `${MOCK_STORAGE_ORIGIN}/templates/${templateId}/${language}/source.pdf`,
+    ...overrides,
   };
 }
 
@@ -109,6 +144,9 @@ export function fakeTemplate(overrides: Partial<Template> = {}): Template {
     sourceSha256: HASH,
     pageCount: 2,
     fieldCount: 0,
+    sourceLanguage: null,
+    languages: [],
+    translations: [],
     updatedBy: 'auth-admin',
     insertedAt: '2026-10-01T15:00:00Z',
     updatedAt: '2026-10-10T15:00:00Z',
@@ -146,6 +184,8 @@ export function toSummary(t: Template): TemplateSummary {
     hasSource: t.sourceSha256 !== null,
     pageCount: t.pageCount,
     fieldCount: t.fields.length,
+    sourceLanguage: t.sourceLanguage,
+    languages: templateLanguages(t),
     insertedAt: t.insertedAt,
     updatedAt: t.updatedAt,
   };
@@ -237,6 +277,7 @@ export function fakeAssignment(
     templateSha256: null,
     signedSha256: null,
     hasSignedCopy: false,
+    language: null,
     insertedAt: '2026-10-05T15:00:00Z',
     updatedAt: '2026-10-05T15:00:00Z',
     ...overrides,
@@ -378,6 +419,7 @@ export function buildChecklist(
           viewedAt: a.viewedAt,
           completedAt: a.completedAt,
           dueAt: a.dueAt,
+          languages: templateLanguages(t),
         },
       ];
     });
@@ -442,6 +484,7 @@ export function buildPreviewChecklist(
       viewedAt: null,
       completedAt: null,
       dueAt: null,
+      languages: templateLanguages(t),
     }));
   const certItems = buildChecklist(
     [],
@@ -457,4 +500,97 @@ export function buildPreviewChecklist(
     lockReason: 'pending_approval',
     items: [...docs, ...certItems],
   };
+}
+
+export interface MockInstructor {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+}
+
+export const MOCK_INSTRUCTORS: Record<string, MockInstructor> = {
+  'inst-1': { firstName: 'Jane', lastName: 'Snow', email: 'jane@example.com' },
+  'inst-2': { firstName: 'Li', lastName: 'Wei', email: 'li@example.com' },
+};
+
+export function fakeDocumentExport(
+  overrides: Partial<DocumentExport> = {},
+): DocumentExport {
+  return {
+    id: 'exp-1',
+    templateId: 'tpl-conduct',
+    season: MOCK_SEASON,
+    selectedCount: null,
+    status: 'queued',
+    fileCount: null,
+    skippedCount: null,
+    sizeBytes: null,
+    error: null,
+    requestedAt: '2026-10-17T15:00:00Z',
+    finishedAt: null,
+    expiresAt: null,
+    ...overrides,
+  };
+}
+
+/**
+ * `count` instructors with one assignment each of `templateId`; every
+ * `completeEvery`-th one is completed with a signed copy.
+ */
+export function fakeRoster(
+  templateId: string,
+  count: number,
+  { completeEvery = 2, season = MOCK_SEASON } = {},
+): { instructors: Record<string, MockInstructor>; assignments: Assignment[] } {
+  const first = [
+    'Alex',
+    'Bo',
+    'Chloé',
+    'Dmitri',
+    'Emi',
+    'Farah',
+    'Gus',
+    'Hana',
+  ];
+  const last = [
+    'Anders',
+    'Brooks',
+    'Chen',
+    'Dube',
+    'Evans',
+    'Fox',
+    'Gray',
+    'Hall',
+  ];
+  const instructors: Record<string, MockInstructor> = {};
+  const assignments: Assignment[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const id = `roster-${i + 1}`;
+    const firstName = first[i % first.length]!;
+    const lastName = last[Math.floor(i / first.length) % last.length]!;
+    const email = `${firstName.toLowerCase()}.${i + 1}@example.com`;
+    instructors[id] = { firstName, lastName, email };
+    const done = i % completeEvery === 0;
+    const day = String((i % 27) + 1).padStart(2, '0');
+    assignments.push(
+      fakeAssignment({
+        id: `asg-${templateId}-${i + 1}`,
+        templateId,
+        subjectId: id,
+        season,
+        status: done ? 'completed' : i % 3 === 0 ? 'viewed' : 'assigned',
+        viewedAt: done || i % 3 === 0 ? `2026-10-${day}T14:00:00Z` : null,
+        completedAt: done
+          ? `2026-10-${day}T15:${String(i % 60).padStart(2, '0')}:00Z`
+          : null,
+        signerName: done ? `${firstName} ${lastName}` : null,
+        signerEmail: done ? email : null,
+        signedSha256: done
+          ? (i + 1).toString(16).padStart(8, '0').repeat(8)
+          : null,
+        hasSignedCopy: done,
+      }),
+    );
+  }
+  return { instructors, assignments };
 }
