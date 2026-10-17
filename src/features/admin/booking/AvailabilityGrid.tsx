@@ -15,7 +15,6 @@ export interface SlotChoice {
 const REASON_KEYS: Record<UnavailableReason, keyof Messages['booking']> = {
   inactive: 'reasonInactive',
   no_calendar: 'reasonNoCalendar',
-  calendar_not_confirmed: 'reasonNotConfirmed',
   calendar_not_writable: 'reasonNotWritable',
   calendar_error: 'reasonCalendarError',
   google_not_connected: 'reasonGoogleNotConnected',

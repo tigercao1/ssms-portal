@@ -13,6 +13,7 @@ import {
   useSetApproval,
   useUpdateReference,
 } from './api';
+import { useSetInstructorGoogleCalendar } from './lessonsApi';
 
 const API = 'http://localhost:3000';
 const record = { id: 'r1', key: 'k', name: 'n', sortOrder: 0, isActive: false };
@@ -174,6 +175,38 @@ describe('instructor status hooks', () => {
     await waitFor(() =>
       expect(invalidatedKeys(invalidate)).toEqual(
         expect.arrayContaining([['admin', 'documents', 'templates']]),
+      ),
+    );
+  });
+});
+
+describe('instructor google calendar hook', () => {
+  it('saving a calendar refreshes the instructor list', async () => {
+    server.use(
+      http.patch(`${API}/admin/instructors/i1/google-calendar`, () =>
+        HttpResponse.json({
+          instructorId: 'i1',
+          googleCalendarId: 'cal-1',
+          calendarSummary: 'Cal',
+          updatedAt: '2026-10-17T00:00:00Z',
+        }),
+      ),
+    );
+    const { invalidate, wrapper } = setup();
+    const { result } = renderHook(() => useSetInstructorGoogleCalendar(), {
+      wrapper,
+    });
+
+    await act(() =>
+      result.current.mutateAsync({
+        instructorId: 'i1',
+        googleCalendarId: 'cal-1',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(invalidatedKeys(invalidate)).toEqual(
+        expect.arrayContaining([['admin', 'instructors']]),
       ),
     );
   });
