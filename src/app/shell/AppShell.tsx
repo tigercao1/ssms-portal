@@ -94,7 +94,7 @@ export function AppShell() {
         id="app-nav"
         className={cn(
           'flex-col overflow-hidden bg-navy text-white',
-          'lg:relative lg:z-20 lg:flex lg:translate-x-0',
+          'lg:sticky lg:top-0 lg:z-20 lg:flex lg:h-screen lg:translate-x-0',
           open
             ? 'fixed inset-0 z-50 flex overflow-y-auto lg:overflow-hidden'
             : 'hidden',
@@ -128,7 +128,7 @@ export function AppShell() {
         </div>
         <nav
           aria-label={isAdmin ? t.nav.adminArea : t.nav.instructorArea}
-          className="relative flex flex-1 flex-col gap-1 px-3"
+          className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3"
         >
           {items.map((it) => (
             <NavLink
@@ -161,7 +161,7 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="relative px-3 pb-5">
+        <div className="relative shrink-0 px-3 pb-5 pt-2">
           <button
             onClick={signOut}
             className="w-full rounded-md px-3 py-2 text-left text-sm text-white/70 hover:bg-white/5 hover:text-white"

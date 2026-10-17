@@ -123,11 +123,29 @@ describe('AppShell mobile menu', () => {
 
   it('keeps the desktop sidebar classes whether or not the menu is open', async () => {
     renderShell();
-    const desktop = ['lg:relative', 'lg:z-20', 'lg:flex', 'lg:translate-x-0'];
+    const desktop = [
+      'lg:sticky',
+      'lg:top-0',
+      'lg:h-screen',
+      'lg:z-20',
+      'lg:flex',
+      'lg:translate-x-0',
+    ];
     expect(menu()).toHaveClass(...desktop);
     await openMenu();
     expect(menu()).toHaveClass(...desktop, 'lg:overflow-hidden');
     expect(menu()).not.toHaveClass('lg:z-auto');
+  });
+});
+
+describe('AppShell sidebar layout', () => {
+  it('pins the sidebar to the viewport and keeps Sign out outside the scrolling nav', () => {
+    renderShell();
+    expect(menu()).toHaveClass('lg:sticky', 'lg:top-0', 'lg:h-screen');
+    const nav = within(menu()).getByRole('navigation');
+    expect(nav).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    const signOut = within(menu()).getByRole('button', { name: 'Sign out' });
+    expect(nav).not.toContainElement(signOut);
   });
 });
 
