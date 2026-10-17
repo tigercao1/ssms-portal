@@ -149,7 +149,10 @@ export function useSetInstructorGoogleCalendar() {
       setInstructorGoogleCalendar(instructorId, body),
     onSuccess: (result) => {
       qc.setQueryData(googleCalendarKey(result.instructorId), result);
-      return qc.invalidateQueries({ queryKey: instructorCalendarsKey });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: instructorCalendarsKey }),
+        qc.invalidateQueries({ queryKey: ['admin', 'instructors'] }),
+      ]);
     },
   });
 }
