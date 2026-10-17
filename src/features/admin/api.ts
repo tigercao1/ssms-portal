@@ -25,7 +25,6 @@ import type {
 export interface AdminListFilter {
   status?: ApprovalStatus;
   active?: boolean;
-  calendarConnected?: boolean;
 }
 
 const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
@@ -42,8 +41,6 @@ export function useAdminInstructors(filter: AdminListFilter) {
       const qs = new URLSearchParams();
       if (filter.status) qs.set('status', filter.status);
       if (filter.active !== undefined) qs.set('active', String(filter.active));
-      if (filter.calendarConnected !== undefined)
-        qs.set('calendarConnected', String(filter.calendarConnected));
       const suffix = qs.toString() ? `?${qs}` : '';
       return api<AdminInstructorRecord[]>(`/admin/instructors${suffix}`);
     },
@@ -54,6 +51,7 @@ export function useAdminInstructors(filter: AdminListFilter) {
 export const INSTRUCTORS_PAGE_SIZE = 50;
 
 export interface AdminInstructorPageQuery extends AdminListFilter {
+  calendarConnected?: boolean;
   q: string;
   page: number;
 }
