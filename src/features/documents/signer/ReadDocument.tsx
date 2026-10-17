@@ -14,6 +14,7 @@ interface ReadDocumentProps {
   submitting?: boolean;
   submitError?: string | null;
   onSubmit: (body: { acknowledged: true }) => void;
+  onSourceError?: () => void;
 }
 
 /** Read-only document: scroll to the end, tick "I have read and understood", done. */
@@ -23,6 +24,7 @@ export function ReadDocument({
   submitting,
   submitError,
   onSubmit,
+  onSourceError,
 }: ReadDocumentProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
@@ -46,7 +48,11 @@ export function ReadDocument({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg bg-sunken p-2 sm:p-4">
-        <PdfPages source={sourceUrl} onLoad={() => setLoaded(true)} />
+        <PdfPages
+          source={sourceUrl}
+          onLoad={() => setLoaded(true)}
+          onError={onSourceError}
+        />
         <div ref={endRef} data-testid="read-end" className="h-px" />
       </div>
       <div className="sticky bottom-0 flex flex-col gap-3 rounded-lg border border-grey/60 bg-surface p-4 shadow-card">

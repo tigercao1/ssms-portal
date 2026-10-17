@@ -38,6 +38,7 @@ import {
   sameFields,
   scaleOf,
 } from './fieldModel';
+import { useRefreshSourceOnError } from '../../pdf/presignedSource';
 import { PropertiesPanel } from './PropertiesPanel';
 import { SignerPreviewField } from './SignerPreviewField';
 import { FIELD_ICONS, useFieldTypeLabel } from './labels';
@@ -79,6 +80,7 @@ export function FieldEditorPage() {
   const [params, setParams] = useSearchParams();
   const t = useT();
   const template = useTemplate(id);
+  const refreshSource = useRefreshSourceOnError(template);
 
   if (template.isLoading)
     return (
@@ -102,6 +104,7 @@ export function FieldEditorPage() {
       onLanguageChange={(language) =>
         setParams(language === sourceLanguage ? {} : { language })
       }
+      onSourceError={refreshSource}
     />
   );
 }
@@ -110,10 +113,12 @@ function Editor({
   template,
   version,
   onLanguageChange,
+  onSourceError,
 }: {
   template: Template;
   version: EditorVersion;
   onLanguageChange: (language: DocumentLanguage) => void;
+  onSourceError: () => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -465,6 +470,7 @@ function Editor({
             <PdfPages
               ref={pdfRef}
               source={version.sourceUrl}
+              onError={onSourceError}
               renderOverlay={renderOverlay}
               onLoad={(info) => setNumPages(info.numPages)}
             />

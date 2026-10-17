@@ -7,6 +7,7 @@ export const fakePdf = {
   pageCount: 2,
   scrollToRect: vi.fn(),
   lastZoom: 1,
+  failingSources: new Set<string>(),
 };
 
 export function fakeGeometry(zoom = 1): PageGeometry {
@@ -19,7 +20,10 @@ export function fakeGeometry(zoom = 1): PageGeometry {
 
 /** Stand-in for PdfPages in jsdom: lays out fixed Letter pages and calls the overlay. */
 export const FakePdfPages = forwardRef<PdfPagesHandle, PdfPagesProps>(
-  function FakePdfPages({ source, zoom = 1, renderOverlay, onLoad }, ref) {
+  function FakePdfPages(
+    { source, zoom = 1, renderOverlay, onLoad, onError },
+    ref,
+  ) {
     fakePdf.lastZoom = zoom;
     useImperativeHandle(ref, () => ({
       getPageElement: () => null,
@@ -28,6 +32,10 @@ export const FakePdfPages = forwardRef<PdfPagesHandle, PdfPagesProps>(
     }));
     useEffect(() => {
       if (!source) return;
+      if (typeof source === 'string' && fakePdf.failingSources.has(source)) {
+        onError?.(new Error('Unexpected server response (403)'));
+        return;
+      }
       onLoad?.({
         numPages: fakePdf.pageCount,
         pages: Array.from({ length: fakePdf.pageCount }, (_, i) => ({
@@ -38,7 +46,7 @@ export const FakePdfPages = forwardRef<PdfPagesHandle, PdfPagesProps>(
           height: 792,
         })),
       });
-    }, [source, onLoad]);
+    }, [source, onLoad, onError]);
     return (
       <div
         data-testid="pdf-pages"
