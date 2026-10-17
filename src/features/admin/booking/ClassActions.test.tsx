@@ -66,7 +66,7 @@ function serve() {
 }
 
 function openMenu(user: ReturnType<typeof userEvent.setup>) {
-  return user.click(screen.getByRole('button', { name: 'Actions' }));
+  return user.click(screen.getByRole('button', { name: /^More actions for / }));
 }
 
 describe('ClassActions', () => {
@@ -116,9 +116,10 @@ describe('ClassActions', () => {
     renderWithProviders(
       <ClassActions item={{ ...booked, status: 'cancelled' }} />,
     );
-    await openMenu(user);
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
-    await user.click(screen.getByRole('menuitem', { name: 'Restore lesson' }));
+    expect(
+      screen.queryByRole('button', { name: /^More actions for / }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Restore lesson' }));
     await waitFor(() =>
       expect(calls.at(-1)?.body).toEqual({ status: 'scheduled' }),
     );
@@ -138,8 +139,7 @@ describe('ClassActions', () => {
     renderWithProviders(
       <ClassActions item={{ ...booked, status: 'cancelled' }} />,
     );
-    await openMenu(user);
-    await user.click(screen.getByRole('menuitem', { name: 'Restore lesson' }));
+    await user.click(screen.getByRole('button', { name: 'Restore lesson' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Another booking took this slot',
     );

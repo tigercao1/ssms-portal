@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   Input,
+  RowActions,
   Select,
   Spinner,
   Textarea,
@@ -311,59 +312,71 @@ function AssignmentRow({
           </div>
         )}
       </dl>
-      <div className="flex flex-wrap gap-2">
-        {a.status === 'completed' && a.hasSignedCopy && (
-          <Button size="sm" variant="secondary" onClick={download}>
-            {t.documents.downloadSigned}
-          </Button>
-        )}
-        {isOpen && (
-          <Button
-            size="sm"
-            variant="ghost"
-            loading={remind.isPending}
-            onClick={() => remind.mutate(a.id)}
+      <div className="flex flex-wrap items-center gap-2">
+        <RowActions
+          label={t.common.moreActionsFor.replace('{name}', title)}
+          items={[
+            ...(a.status === 'completed' && a.hasSignedCopy
+              ? [
+                  {
+                    key: 'download',
+                    label: t.documents.downloadSigned,
+                    onSelect: download,
+                  },
+                ]
+              : []),
+            ...(isOpen
+              ? [
+                  {
+                    key: 'remind',
+                    label: t.documents.remind,
+                    variant: 'ghost' as const,
+                    loading: remind.isPending,
+                    onSelect: () => remind.mutate(a.id),
+                  },
+                ]
+              : []),
+            ...(a.status !== 'archived'
+              ? [
+                  {
+                    key: 'archive',
+                    label: t.documents.archive,
+                    variant: 'ghost' as const,
+                    destructive: true,
+                    onSelect: () => setConfirmArchive(true),
+                  },
+                ]
+              : []),
+          ]}
+        />
+        {a.status !== 'archived' && confirmArchive && (
+          <span
+            role="alertdialog"
+            aria-label={t.documents.archiveConfirm}
+            className="flex items-center gap-2 text-sm"
           >
-            {t.documents.remind}
-          </Button>
-        )}
-        {a.status !== 'archived' &&
-          (confirmArchive ? (
-            <span
-              role="alertdialog"
-              aria-label={t.documents.archiveConfirm}
-              className="flex items-center gap-2 text-sm"
-            >
-              <span>{t.documents.archiveConfirm}</span>
-              <Button
-                size="sm"
-                variant="danger"
-                loading={archive.isPending}
-                onClick={() =>
-                  archive.mutate(a.id, {
-                    onSuccess: () => setConfirmArchive(false),
-                  })
-                }
-              >
-                {t.documents.archive}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmArchive(false)}
-              >
-                {t.common.cancel}
-              </Button>
-            </span>
-          ) : (
+            <span>{t.documents.archiveConfirm}</span>
             <Button
               size="sm"
-              variant="ghost"
-              onClick={() => setConfirmArchive(true)}
+              variant="danger"
+              loading={archive.isPending}
+              onClick={() =>
+                archive.mutate(a.id, {
+                  onSuccess: () => setConfirmArchive(false),
+                })
+              }
             >
               {t.documents.archive}
             </Button>
-          ))}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmArchive(false)}
+            >
+              {t.common.cancel}
+            </Button>
+          </span>
+        )}
       </div>
       {remind.isSuccess && (
         <p role="status" className="text-xs text-status-approved">

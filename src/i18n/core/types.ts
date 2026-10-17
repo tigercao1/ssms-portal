@@ -1084,7 +1084,6 @@ export interface Messages {
     settingsInvalid: string;
     settingsSaved: string;
     saveSettings: string;
-    actions: string;
     actionMove: string;
     actionCompleted: string;
     actionNoShow: string;

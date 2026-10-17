@@ -1083,7 +1083,6 @@ export const zhCN: Messages = {
     settingsInvalid: '每天的结束时间必须晚于开始时间。',
     settingsSaved: '预约设置已保存。',
     saveSettings: '保存设置',
-    actions: '操作',
     actionMove: '改期或编辑…',
     actionCompleted: '标记为已完成',
     actionNoShow: '标记为缺席',
