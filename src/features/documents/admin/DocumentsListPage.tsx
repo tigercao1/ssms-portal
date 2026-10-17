@@ -2,7 +2,6 @@ import { Fragment, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
-import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import {
   ActionsMenu,
@@ -16,7 +15,6 @@ import {
 } from '@/components';
 import type { ConfirmedTemplate, TemplateSummary } from '../api';
 import {
-  MAX_TEMPLATE_BYTES,
   useCreateTemplate,
   useRetireTemplate,
   useTemplates,
@@ -26,15 +24,17 @@ import {
 import {
   EMPTY_TEMPLATE_VALUES,
   TemplateForm,
+  hasOtherLanguage,
   templateToValues,
   valuesToCreate,
   valuesToPatch,
 } from './TemplateForm';
 import { AssignDialog } from './AssignDialog';
+import { OtherLanguageVersion } from './OtherLanguageVersion';
 import { ChangeAudienceDialog } from './ChangeAudienceDialog';
 import { PublishDialog } from './PublishDialog';
-import { KindBadge, TemplateStatusChip } from './badges';
-import { errorText, templateTitle } from './format';
+import { KindBadge, LanguageBadges, TemplateStatusChip } from './badges';
+import { errorText, pagesText, templateTitle, uploadErrorText } from './format';
 
 type UploadNotice =
   | { id: string; tone: 'approved' | 'pending'; text: string }
@@ -273,24 +273,14 @@ function useSourceUpload(
               .replace('{pages}', pagesText(tpl.pageCount, t)),
           }),
         onError: (err) =>
-          onNotice({ id: row.id, tone: 'error', text: uploadError(err) }),
+          onNotice({
+            id: row.id,
+            tone: 'error',
+            text: uploadErrorText(err, t),
+          }),
       },
     );
     if (fileRef.current) fileRef.current.value = '';
-  }
-
-  function uploadError(err: unknown) {
-    if (err instanceof ApiError && err.message === 'not-pdf')
-      return t.documents.uploadNotPdf;
-    if (err instanceof ApiError && err.message === 'too-large')
-      return t.documents.uploadTooLarge.replace(
-        '{mb}',
-        String(MAX_TEMPLATE_BYTES / 1024 / 1024),
-      );
-    return t.documents.uploadFailed.replace(
-      '{reason}',
-      errorText(err, t.errors.generic),
-    );
   }
 
   return {
@@ -410,12 +400,6 @@ function SourceActions({
       )}
     </>
   );
-}
-
-function pagesText(n: number | null, t: Messages) {
-  return n === 1
-    ? t.documents.onePage
-    : t.documents.pages.replace('{n}', String(n ?? 0));
 }
 
 function TemplateRow({
@@ -539,7 +523,10 @@ function TemplateRow({
       </td>
       <td className="whitespace-nowrap px-2 py-2 xl:px-3">
         {row.hasSource ? (
-          pagesText(row.pageCount, t)
+          <span className="inline-flex items-center gap-2">
+            {pagesText(row.pageCount, t)}
+            <LanguageBadges languages={row.languages} />
+          </span>
         ) : (
           <span className="text-status-rejected">{t.documents.noPdf}</span>
         )}
@@ -622,6 +609,7 @@ function EditTemplate({
       <TemplateForm
         initial={templateToValues(row)}
         kindEditable={false}
+        languageLocked={hasOtherLanguage(row)}
         submitLabel={t.common.save}
         pending={update.isPending}
         error={update.error}
@@ -632,6 +620,13 @@ function EditTemplate({
           update.mutate({ id: row.id, ...patch }, { onSuccess: onDone });
         }}
       />
+      {row.sourceLanguage && (
+        <OtherLanguageVersion
+          row={row}
+          sourceLanguage={row.sourceLanguage}
+          onNotice={onNotice}
+        />
+      )}
     </div>
   );
 }

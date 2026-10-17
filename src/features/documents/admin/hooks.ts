@@ -9,9 +9,11 @@ import {
   archiveAssignment,
   changeTemplateAudience,
   confirmTemplateSource,
+  confirmTranslationSource,
   createAssignments,
   createDocumentExport,
   createTemplate,
+  deleteTranslation,
   documentsKeys,
   getDocumentExport,
   getInstructorDocuments,
@@ -24,15 +26,18 @@ import {
   putToPresignedUrl,
   remindAssignment,
   requestTemplateSourceUpload,
+  requestTranslationSourceUpload,
   retireTemplate,
   reviewCertUpload,
   saveTemplateFields,
+  saveTranslationFields,
   updateTemplate,
   type AssignRequest,
   type ChangeAudienceRequest,
   type CertUploadReview,
   type DocumentExport,
   type DocumentExportRequest,
+  type DocumentLanguage,
   type Field,
   type PublishRequest,
   type Template,
@@ -146,13 +151,25 @@ export function useRetireTemplate() {
 export function useUploadTemplateSource() {
   const sync = useTemplateSync();
   return useMutation({
-    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+    mutationFn: async ({
+      id,
+      file,
+      language,
+    }: {
+      id: string;
+      file: File;
+      language?: DocumentLanguage;
+    }) => {
       if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name))
         throw new ApiError(415, 'not-pdf');
       if (file.size > MAX_TEMPLATE_BYTES) throw new ApiError(413, 'too-large');
-      const { uploadUrl } = await requestTemplateSourceUpload(id, file.size);
+      const { uploadUrl } = language
+        ? await requestTranslationSourceUpload(id, language, file.size)
+        : await requestTemplateSourceUpload(id, file.size);
       await putToPresignedUrl(uploadUrl, file, 'application/pdf');
-      return confirmTemplateSource(id);
+      return language
+        ? confirmTranslationSource(id, language)
+        : confirmTemplateSource(id);
     },
     onSuccess: sync,
   });
@@ -161,8 +178,32 @@ export function useUploadTemplateSource() {
 export function useSaveFields() {
   const sync = useTemplateSync();
   return useMutation({
-    mutationFn: ({ id, fields }: { id: string; fields: Field[] }) =>
-      saveTemplateFields(id, fields),
+    mutationFn: ({
+      id,
+      fields,
+      language,
+    }: {
+      id: string;
+      fields: Field[];
+      language?: DocumentLanguage;
+    }) =>
+      language
+        ? saveTranslationFields(id, language, fields)
+        : saveTemplateFields(id, fields),
+    onSuccess: sync,
+  });
+}
+
+export function useDeleteTranslation() {
+  const sync = useTemplateSync();
+  return useMutation({
+    mutationFn: ({
+      id,
+      language,
+    }: {
+      id: string;
+      language: DocumentLanguage;
+    }) => deleteTranslation(id, language),
     onSuccess: sync,
   });
 }
