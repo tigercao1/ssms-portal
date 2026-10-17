@@ -6,7 +6,6 @@ import type {
   InsuranceRecord,
   MyInsurance,
   RegisterLessonBody,
-  SeasonPassBody,
 } from './types';
 
 const API = 'http://localhost:3000';
@@ -111,7 +110,6 @@ export interface InsuranceMockState {
   otherSeasons: Record<string, MyInsurance>;
   seasonGets: string[];
   posts: RegisterLessonBody[];
-  passPosts: SeasonPassBody[];
   nextNo: number;
 }
 
@@ -126,7 +124,6 @@ export function createInsuranceState(
     ),
     seasonGets: [],
     posts: [],
-    passPosts: [],
     nextNo: 1,
   };
 }
@@ -147,10 +144,7 @@ function addRecord(d: MyInsurance, record: InsuranceRecord) {
   d.owedCents += record.amountCents;
   if (record.paymentStatus === 'unpaid') d.unpaidCents += record.amountCents;
   if (d.owedCents >= d.capCents)
-    d.coverage =
-      record.kind === 'season_pass' || d.coverage === 'season_pass'
-        ? 'season_pass'
-        : 'capped';
+    d.coverage = d.coverage === 'season_pass' ? 'season_pass' : 'capped';
 }
 
 function recordNo(state: InsuranceMockState) {
@@ -199,18 +193,6 @@ export function insuranceHandlers(state: InsuranceMockState) {
           paymentStatus: 'not_required',
         };
       } else if (d.owedCents + list >= d.capCents) {
-        if (!body.topUp)
-          return HttpResponse.json(
-            {
-              statusCode: 409,
-              message: 'cap_reached',
-              code: 'cap_reached',
-              listCents: list,
-              owedCents: d.owedCents,
-              topUpCents: d.capCents - d.owedCents,
-            },
-            { status: 409 },
-          );
         record = {
           ...base,
           recordNo: recordNo(state),
@@ -227,41 +209,6 @@ export function insuranceHandlers(state: InsuranceMockState) {
           paymentStatus: 'unpaid',
         };
       }
-      addRecord(d, record);
-      return HttpResponse.json(record, { status: 201 });
-    }),
-    http.post(`${API}/me/insurance/season-pass`, async ({ request }) => {
-      const body = (await request.json()) as SeasonPassBody;
-      state.passPosts.push(body);
-      const d = state.data;
-      if (d.owedCents >= d.capCents)
-        return HttpResponse.json(
-          {
-            statusCode: 409,
-            message: 'Already covered',
-            code: 'already_covered',
-          },
-          { status: 409 },
-        );
-      const record: InsuranceRecord = {
-        ...insuranceRecord(),
-        id: `pass-${state.nextNo}`,
-        recordNo: recordNo(state),
-        kind: 'season_pass',
-        lessonDate: null,
-        durationHours: null,
-        locationId: null,
-        locationName: null,
-        locationOther: null,
-        students: [],
-        studentCount: null,
-        listCents: d.capCents - d.owedCents,
-        amountCents: d.capCents - d.owedCents,
-        coverage: null,
-        paymentStatus: 'unpaid',
-        paidOn: null,
-        createdAt: '2026-10-15T14:00:00Z',
-      };
       addRecord(d, record);
       return HttpResponse.json(record, { status: 201 });
     }),
@@ -296,6 +243,8 @@ export const adminSummary: AdminInsuranceSummary[] = [
     unpaidCents: 8000,
     coverage: 'none',
     records: 14,
+    seasonPassRecordId: null,
+    seasonPassPaymentStatus: null,
   },
   {
     instructorId: 'inst-2',
@@ -307,6 +256,8 @@ export const adminSummary: AdminInsuranceSummary[] = [
     unpaidCents: 0,
     coverage: 'season_pass',
     records: 3,
+    seasonPassRecordId: 'a-3',
+    seasonPassPaymentStatus: 'paid',
   },
 ];
 

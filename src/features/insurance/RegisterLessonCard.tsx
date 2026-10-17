@@ -6,7 +6,7 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-import { Banner, Button, Card, Input, Modal, Select } from '@/components';
+import { Banner, Button, Card, Input, Select } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
@@ -14,19 +14,9 @@ import { cn } from '@/lib/cn';
 import { todayIso } from '@/features/documents/api/validity';
 import { errorText, formatDay } from '@/features/admin/payroll/payrollFormat';
 import { useSeasons, useTeachingLocations } from '@/features/reference/api';
-import {
-  capReachedOf,
-  errorCodeOf,
-  useRegisterLesson,
-  useSeasonInsurance,
-} from './api';
+import { errorCodeOf, useRegisterLesson, useSeasonInsurance } from './api';
 import { BILLED_STUDENTS_MAX, dollars, listCents } from './money';
-import type {
-  CapReached,
-  InsuranceRecord,
-  InsuranceSeason,
-  SeasonCoverage,
-} from './types';
+import type { InsuranceRecord, InsuranceSeason, SeasonCoverage } from './types';
 
 export const WAIVER_URL_ZH = 'https://ssnow.club/pages/waiver';
 export const WAIVER_URL_EN = 'https://ssnow.club/en/pages/waiver';
@@ -73,9 +63,14 @@ export const RegisterLessonCard = forwardRef<
   {
     season: InsuranceSeason | null;
     coverage: SeasonCoverage;
+    owedCents: number;
+    capCents: number;
     onToast: (message: string) => void;
   }
->(function RegisterLessonCard({ season, coverage, onToast }, ref) {
+>(function RegisterLessonCard(
+  { season, coverage, owedCents, capCents, onToast },
+  ref,
+) {
   const t = useT();
   const s = t.insurance;
   const { locale } = useLocale();
@@ -91,7 +86,6 @@ export const RegisterLessonCard = forwardRef<
   const [locationOther, setLocationOther] = useState('');
   const [rows, setRows] = useState<StudentRow[]>(() => [emptyRow()]);
   const [touched, setTouched] = useState(false);
-  const [capReached, setCapReached] = useState<CapReached | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
   useImperativeHandle(ref, () => ({
@@ -116,16 +110,22 @@ export const RegisterLessonCard = forwardRef<
     lessonSeason?.key ?? null,
     !pageSeason,
   );
-  const dateCoverage = !lessonSeason
+  const dateInsurance = !lessonSeason
     ? undefined
     : pageSeason
-      ? coverage
-      : seasonInsurance.data?.coverage;
+      ? { coverage, owedCents, capCents }
+      : seasonInsurance.data;
+  const dateCoverage = dateInsurance?.coverage;
   const quoteReady = seasonsReady && dateCoverage !== undefined;
   const outsideSeason = seasonsReady && Boolean(lessonDate) && !lessonSeason;
   const covered = quoteReady && dateCoverage !== 'none';
   const count = rows.length;
-  const amount = covered ? 0 : listCents(hours, count);
+  const list = listCents(hours, count);
+  const capLeft = dateInsurance
+    ? Math.max(0, dateInsurance.capCents - dateInsurance.owedCents)
+    : list;
+  const amount = covered ? 0 : Math.min(list, capLeft);
+  const crossesCap = !covered && amount < list;
   const missingName = rows.some((r) => !r.name.trim());
   const missingWaiver = rows.some((r) => !r.waiverConfirmed);
   const studentsBlocked = missingName || missingWaiver;
@@ -149,7 +149,7 @@ export const RegisterLessonCard = forwardRef<
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
-  function body(topUp: boolean) {
+  function body() {
     return {
       lessonDate,
       durationHours: hours,
@@ -160,7 +160,6 @@ export const RegisterLessonCard = forwardRef<
         name: r.name.trim(),
         waiverConfirmed: r.waiverConfirmed,
       })),
-      ...(topUp && { topUp: true }),
       idempotencyKey: idempotencyKey.current,
     };
   }
@@ -172,37 +171,25 @@ export const RegisterLessonCard = forwardRef<
         .replace('{amount}', dollars(record.amountCents)),
     );
     idempotencyKey.current = crypto.randomUUID();
-    setCapReached(null);
     setRows([emptyRow()]);
     setTouched(false);
   }
 
-  function submit(topUp = false) {
-    if (blocked || register.isPending) return;
-    register.mutate(body(topUp), {
-      onSuccess: registered,
-      onError: (err) => {
-        const cap = capReachedOf(err);
-        if (cap && !topUp) setCapReached(cap);
-      },
-    });
-  }
-
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    submit();
+    if (blocked || register.isPending) return;
+    register.mutate(body(), { onSuccess: registered });
   }
 
-  const submitError =
-    register.isError && !capReachedOf(register.error)
-      ? errorCodeOf(register.error) === 'waiver_unconfirmed'
-        ? s.waiverRequired
-        : errorCodeOf(register.error) === 'no_season'
-          ? s.noSeason
-          : register.error instanceof ApiError && register.error.status === 403
-            ? s.lockedSubmit
-            : errorText(register.error, t.errors.generic)
-      : null;
+  const submitError = register.isError
+    ? errorCodeOf(register.error) === 'waiver_unconfirmed'
+      ? s.waiverRequired
+      : errorCodeOf(register.error) === 'no_season'
+        ? s.noSeason
+        : register.error instanceof ApiError && register.error.status === 403
+          ? s.lockedSubmit
+          : errorText(register.error, t.errors.generic)
+    : null;
 
   const hoursText = (h: number) =>
     (h === 1 ? s.hoursOne : s.hoursMany).replace('{n}', String(h));
@@ -422,6 +409,16 @@ export const RegisterLessonCard = forwardRef<
                         studentsText(Math.min(count, BILLED_STUDENTS_MAX)),
                       )}
                   </p>
+                  {crossesCap && (
+                    <p
+                      data-testid="cap-breakdown"
+                      className="text-xs font-semibold text-status-pending"
+                    >
+                      {s.capBreakdown
+                        .replace('{list}', dollars(list))
+                        .replace('{amount}', dollars(amount))}
+                    </p>
+                  )}
                   <p className="text-xs text-slate">
                     {count > BILLED_STUDENTS_MAX ? s.overFourNote : s.rateNote}
                   </p>
@@ -463,88 +460,13 @@ export const RegisterLessonCard = forwardRef<
               {errorText(seasonInsurance.error, t.errors.generic)}
             </Banner>
           )}
-          {submitError && !capReached && (
-            <Banner tone="error">{submitError}</Banner>
-          )}
+          {submitError && <Banner tone="error">{submitError}</Banner>}
           <p className="text-center text-xs text-slate">{s.ruleNote}</p>
         </div>
       </form>
-      {capReached && (
-        <CapModal
-          cap={capReached}
-          pending={register.isPending}
-          error={submitError}
-          onCancel={() => setCapReached(null)}
-          onTopUp={() => submit(true)}
-        />
-      )}
     </Card>
   );
 });
-
-function CapModal({
-  cap,
-  pending,
-  error,
-  onCancel,
-  onTopUp,
-}: {
-  cap: CapReached;
-  pending: boolean;
-  error: string | null;
-  onCancel: () => void;
-  onTopUp: () => void;
-}) {
-  const t = useT();
-  const s = t.insurance;
-  const topUp = dollars(cap.topUpCents);
-  return (
-    <Modal
-      title={s.capTitle}
-      onClose={pending ? () => undefined : onCancel}
-      footer={
-        <div
-          data-testid="cap-actions"
-          className="flex w-full min-w-0 flex-col-reverse gap-2 sm:flex-row sm:justify-end"
-        >
-          <Button
-            variant="ghost"
-            className="w-full sm:w-auto"
-            onClick={onCancel}
-            disabled={pending}
-          >
-            {t.common.cancel}
-          </Button>
-          <Button
-            className="w-full sm:w-auto"
-            loading={pending}
-            onClick={onTopUp}
-          >
-            {s.capTopUp.replace('{amount}', topUp)}
-          </Button>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-3 text-sm">
-        <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 rounded-md bg-sunken px-4 py-3">
-          <dt className="text-slate">{s.capList}</dt>
-          <dd className="text-right tabular-nums">{dollars(cap.listCents)}</dd>
-          <dt className="text-slate">{s.capOwed}</dt>
-          <dd className="text-right tabular-nums">{dollars(cap.owedCents)}</dd>
-          <dt className="font-semibold text-navy">{s.capTopUpLabel}</dt>
-          <dd
-            data-testid="cap-top-up"
-            className="text-right font-semibold tabular-nums text-navy"
-          >
-            {topUp}
-          </dd>
-        </dl>
-        <p>{s.capBody.replace('{amount}', topUp)}</p>
-        {error && <Banner tone="error">{error}</Banner>}
-      </div>
-    </Modal>
-  );
-}
 
 function WaiverLinks({ onToast }: { onToast: (message: string) => void }) {
   const t = useT();

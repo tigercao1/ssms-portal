@@ -61,20 +61,7 @@ export interface RegisterLessonBody {
   locationId?: string;
   locationOther?: string;
   students: InsuranceStudent[];
-  topUp?: boolean;
   idempotencyKey: string;
-}
-
-export interface SeasonPassBody {
-  season?: string;
-  idempotencyKey: string;
-}
-
-export interface CapReached {
-  code: 'cap_reached';
-  listCents: number;
-  owedCents: number;
-  topUpCents: number;
 }
 
 export interface AdminInsuranceSummary {
@@ -87,6 +74,17 @@ export interface AdminInsuranceSummary {
   unpaidCents: number;
   coverage: SeasonCoverage;
   records: number;
+  seasonPassRecordId: string | null;
+  seasonPassPaymentStatus?: Extract<
+    InsurancePaymentStatus,
+    'unpaid' | 'paid'
+  > | null;
+}
+
+export interface GrantSeasonPassBody {
+  season: string;
+  note?: string;
+  paidOn?: string;
 }
 
 export interface AdminInsuranceRecord extends InsuranceRecord {

@@ -10,6 +10,7 @@ import type {
   AdminInsuranceRecord,
   AdminInsuranceRecordsPage,
   AdminInsuranceSummary,
+  GrantSeasonPassBody,
 } from '@/features/insurance/types';
 
 const insuranceKey = ['admin', 'insurance'] as const;
@@ -64,3 +65,21 @@ export const useMarkPaid = () =>
   useRecordAction<{ paidOn: string; note?: string }>('mark-paid');
 export const useMarkUnpaid = () => useRecordAction<never>('mark-unpaid');
 export const useVoidRecord = () => useRecordAction<{ reason: string }>('void');
+
+export function useGrantSeasonPass() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      instructorId,
+      body,
+    }: {
+      instructorId: string;
+      body: GrantSeasonPassBody;
+    }) =>
+      api<AdminInsuranceRecord>(
+        `/admin/insurance/instructors/${encodeURIComponent(instructorId)}/season-pass`,
+        { method: 'POST', body },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: insuranceKey }),
+  });
+}

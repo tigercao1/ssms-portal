@@ -316,59 +316,60 @@ describe('InsurancePage header and form', () => {
 });
 
 describe('InsurancePage cap', () => {
-  it('shows the cap modal on cap_reached and re-submits with topUp, keeping the form', async () => {
+  it('charges the remainder when a lesson crosses the cap, with no modal', async () => {
     serve(myInsurance({ owedCents: 38000, paidCents: 38000 }));
     const user = await renderPage();
     await user.click(screen.getByRole('button', { name: '2 hours' }));
-    await fillStudents(user, ['Wei Zhang']);
-    await user.click(submitButton());
-    const dialog = await screen.findByRole('dialog', {
-      name: 'This lesson reaches the $400 cap',
-    });
-    expect(dialog).toHaveTextContent('Lesson price$20');
-    expect(dialog).toHaveTextContent('Registered this season$380');
-    expect(within(dialog).getByTestId('cap-top-up')).toHaveTextContent('$20');
-    const actions = within(dialog).getByTestId('cap-actions');
-    expect(actions).toHaveClass('flex-col-reverse', 'sm:flex-row');
-    for (const button of within(actions).getAllByRole('button'))
-      expect(button).toHaveClass('w-full', 'sm:w-auto');
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(nameInput(1)).toHaveValue('Wei Zhang');
-    expect(waiver(1)).toBeChecked();
-    expect(screen.getByRole('button', { name: '2 hours' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    expect(screen.queryByTestId('cap-breakdown')).not.toBeInTheDocument();
+    expect(submitButton()).toHaveTextContent('Register · $20 due');
+    await fillStudents(user, ['Wei Zhang', 'Amy Li']);
+    expect(screen.getByTestId('price-breakdown')).toHaveTextContent(
+      '$10 × 2 hours × 2 students',
     );
-
-    await user.click(submitButton());
-    const again = await screen.findByRole('dialog');
-    await user.click(
-      within(again).getByRole('button', {
-        name: 'Pay $20 top-up for a season pass',
-      }),
+    expect(screen.getByTestId('cap-breakdown')).toHaveTextContent(
+      'List $40 · due after cap $20',
     );
+    expect(screen.getByTestId('price-amount')).toHaveTextContent('$20');
+    expect(submitButton()).toHaveTextContent('Register · $20 due');
+    await user.click(submitButton());
     expect(
       await screen.findByText('Registered INS-20261015-0001 · $20 due'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(state.posts).toHaveLength(3);
+    expect(state.posts).toHaveLength(1);
     expect(state.posts[0]).not.toHaveProperty('topUp');
-    expect(state.posts[2]).toMatchObject({
-      durationHours: 2,
-      students: [{ name: 'Wei Zhang', waiverConfirmed: true }],
-      topUp: true,
-    });
     expect(state.data.records[0]).toMatchObject({
       coverage: 'cap_top_up',
       amountCents: 2000,
     });
-    expect(
-      await screen.findByText(
+    await waitFor(() =>
+      expect(screen.getByTestId('cap-status')).toHaveTextContent(
         'Your insurance is capped for this season. Later registrations are free.',
       ),
-    ).toBeInTheDocument();
+    );
     expect(submitButton()).toHaveTextContent('Register for free');
+    expect(screen.getByTestId('price-amount')).toHaveTextContent('$0');
+    await fillStudents(user, ['Leo Chen']);
+    await user.click(submitButton());
+    expect(
+      await screen.findByText('Registered INS-20261015-0002 · free'),
+    ).toBeInTheDocument();
+  });
+
+  it("charges the remainder from the lesson's own season", async () => {
+    serve(myInsurance(), [
+      myInsurance({ season: SEASON_2025, owedCents: 39500 }),
+    ]);
+    const user = await renderPage();
+    const date = screen.getByLabelText('Lesson date');
+    await user.clear(date);
+    await user.type(date, '2026-02-15');
+    await waitFor(() =>
+      expect(screen.getByTestId('cap-breakdown')).toHaveTextContent(
+        'List $10 · due after cap $5',
+      ),
+    );
+    expect(submitButton()).toHaveTextContent('Register · $5 due');
   });
 
   it('registers for free at $0 once capped', async () => {
@@ -377,7 +378,7 @@ describe('InsurancePage cap', () => {
     );
     const user = await renderPage();
     expect(screen.getByTestId('price-amount')).toHaveTextContent('$0');
-    expect(screen.getAllByText('This season is capped')).toHaveLength(2);
+    expect(screen.getByText('This season is capped')).toBeInTheDocument();
     expect(screen.queryByTestId('price-breakdown')).not.toBeInTheDocument();
     expect(submitButton()).toHaveTextContent('Register for free');
     await fillStudents(user, ['Wei Zhang']);
@@ -385,9 +386,6 @@ describe('InsurancePage cap', () => {
     expect(
       await screen.findByText('Registered INS-20261015-0001 · free'),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /Buy season pass/ }),
-    ).not.toBeInTheDocument();
   });
 
   it('shows the season pass as active and the lesson free', async () => {
@@ -400,10 +398,22 @@ describe('InsurancePage cap', () => {
     );
     await renderPage();
     expect(screen.getByTestId('price-amount')).toHaveTextContent('$0');
-    expect(screen.getByTestId('pass-covered')).toHaveTextContent(
+    expect(screen.getAllByText('Season pass is active')).toHaveLength(2);
+    expect(screen.getByTestId('cap-status')).toHaveTextContent(
       'Season pass is active',
     );
     expect(submitButton()).toHaveTextContent('Register for free');
+  });
+
+  it('offers no way to buy a season pass', async () => {
+    serve(withHistory);
+    await renderPage();
+    expect(
+      screen.queryByRole('heading', { name: 'Season pass' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /season pass/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("prices a lesson in another, uncovered season from that season's coverage", async () => {
@@ -520,48 +530,6 @@ describe('InsurancePage cap', () => {
     expect(state.posts[0]).toMatchObject({ lessonDate: '2026-11-05' });
   });
 
-  it('buys a season pass after confirming', async () => {
-    serve(withHistory);
-    const user = await renderPage();
-    await user.click(
-      screen.getByRole('button', { name: 'Buy season pass · $350 due' }),
-    );
-    const dialog = screen.getByRole('dialog', { name: 'Buy a season pass' });
-    expect(dialog).toHaveTextContent(
-      "You've registered $50 this season. Pay $350 more for the 2026/27 season pass.",
-    );
-    await user.click(
-      within(dialog).getByRole('button', { name: 'Buy · $350 due' }),
-    );
-    expect(
-      await screen.findByText('Season pass INS-20261015-0001 · $350 due'),
-    ).toBeInTheDocument();
-    expect(state.passPosts).toEqual([
-      {
-        season: '2026/27',
-        idempotencyKey: expect.stringMatching(/^[0-9a-f-]{36}$/),
-      },
-    ]);
-    expect(await screen.findByTestId('pass-covered')).toHaveTextContent(
-      'Season pass is active',
-    );
-  });
-
-  it('shows already_covered from the season pass', async () => {
-    serve(withHistory);
-    const user = await renderPage();
-    await user.click(screen.getByRole('button', { name: /Buy season pass/ }));
-    state.data.owedCents = 40000;
-    await user.click(
-      within(screen.getByRole('dialog')).getByRole('button', {
-        name: /^Buy ·/,
-      }),
-    );
-    expect(
-      await screen.findByText('This season is already covered.'),
-    ).toBeInTheDocument();
-  });
-
   it('shows the progress bar, the remaining amount and the unpaid line', async () => {
     serve(withHistory);
     await renderPage();
@@ -618,33 +586,20 @@ describe('InsurancePage retries', () => {
     expect(keys[2]).not.toBe(keys[0]);
   });
 
-  it('keeps the same key through the cap modal and a failed top-up', async () => {
+  it('keeps the same key when a lesson that crosses the cap fails and is retried', async () => {
     serve(myInsurance({ owedCents: 38000, paidCents: 38000 }));
     const user = await renderPage();
     await user.click(screen.getByRole('button', { name: '2 hours' }));
-    await fillStudents(user, ['Wei Zhang']);
-    await user.click(submitButton());
-    const dialog = await screen.findByRole('dialog');
-    const topUp = within(dialog).getByRole('button', {
-      name: 'Pay $20 top-up for a season pass',
-    });
+    await fillStudents(user, ['Wei Zhang', 'Amy Li']);
     failNextRegistration();
-    await user.click(topUp);
-    expect(await within(dialog).findByText('boom')).toBeInTheDocument();
-    await user.click(topUp);
-    await screen.findByText('Registered INS-20261015-0001 · $20 due');
-    await fillStudents(user, ['Amy Li']);
     await user.click(submitButton());
-    await screen.findByText('Registered INS-20261015-0002 · free');
-    expect(state.posts.map((p) => p.topUp ?? false)).toEqual([
-      false,
-      true,
-      true,
-      false,
-    ]);
+    expect(await screen.findByText('boom')).toBeInTheDocument();
+    expect(submitButton()).toHaveTextContent('Register · $20 due');
+    await user.click(submitButton());
+    await screen.findByText('Registered INS-20261015-0001 · $20 due');
     const keys = state.posts.map((p) => p.idempotencyKey);
-    expect(new Set(keys.slice(0, 3)).size).toBe(1);
-    expect(keys[3]).not.toBe(keys[0]);
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
   });
 });
 
@@ -781,10 +736,10 @@ describe('InsurancePage in Chinese', () => {
       '本季累计 $50 / $400',
     );
     expect(screen.getByText('其中待付款 $10')).toBeInTheDocument();
-    expect(screen.getByText('整季私课保险')).toBeInTheDocument();
+    expect(screen.queryByText('整季私课保险')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '购买整季保险 · 应付 $350' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /购买整季保险/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('我的登记记录')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: '我的登记记录' });
     expect(
@@ -810,9 +765,10 @@ describe('InsurancePage in Chinese', () => {
     expect(screen.getByText('超过 4 人按 4 人计')).toBeInTheDocument();
   });
 
-  it('shows the cap modal and free registration in Chinese', async () => {
+  it('charges the remainder past the cap and then registers free in Chinese', async () => {
     serve(myInsurance({ owedCents: 39000 }));
     const user = await renderPage('zh-CN');
+    await user.click(screen.getByRole('button', { name: '2 小时' }));
     await user.type(
       screen.getByRole('textbox', { name: '学生 1 姓名' }),
       '张伟',
@@ -820,23 +776,43 @@ describe('InsurancePage in Chinese', () => {
     await user.click(
       screen.getByRole('checkbox', { name: '学生 1 Waiver 已签' }),
     );
-    await user.click(screen.getByRole('button', { name: '登记 · 应付 $10' }));
-    const dialog = await screen.findByRole('dialog', {
-      name: '本次将达到 $400 封顶',
-    });
-    await user.click(
-      within(dialog).getByRole('button', { name: '补差价 $10 转为整季保险' }),
+    expect(screen.getByTestId('cap-breakdown')).toHaveTextContent(
+      '原价 $20 · 封顶后应付 $10',
     );
+    await user.click(screen.getByRole('button', { name: '登记 · 应付 $10' }));
     expect(
       await screen.findByText('已登记 INS-20261015-0001 · 应付 $10'),
     ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(
       await screen.findByText('本季保险已封顶，后续登记免费'),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: '免费登记' }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('pass-covered')).toHaveTextContent('本季已封顶');
+    expect(screen.getByText('本季已封顶')).toBeInTheDocument();
+    expect(screen.getByTestId('price-amount')).toHaveTextContent('$0');
+  });
+
+  it('shows the season pass as active in Chinese', async () => {
+    serve(
+      myInsurance({
+        owedCents: 40000,
+        unpaidCents: 40000,
+        coverage: 'season_pass',
+      }),
+    );
+    await renderPage('zh-CN');
+    expect(screen.getByTestId('cap-status')).toHaveTextContent(
+      '整季保险已生效',
+    );
+    expect(screen.getByTestId('cap-total')).toHaveTextContent(
+      '本季累计 $400 / $400',
+    );
+    expect(screen.getByText('其中待付款 $400')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '免费登记' }),
+    ).toBeInTheDocument();
   });
 
   it('shows the empty state in Chinese', async () => {

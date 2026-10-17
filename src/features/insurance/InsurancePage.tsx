@@ -1,10 +1,9 @@
-import { useRef, useState } from 'react';
-import { Banner, Button, Card, Modal, Spinner } from '@/components';
+import { useRef } from 'react';
+import { Banner, Button, Card, Spinner } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import { LockIcon } from '@/features/documents/onboarding/Locked';
-import { errorText } from '@/features/admin/payroll/payrollFormat';
-import { errorCodeOf, useBuySeasonPass, useMyInsurance } from './api';
+import { useMyInsurance } from './api';
 import { InsuranceRecords } from './InsuranceRecords';
 import { dollars } from './money';
 import {
@@ -79,11 +78,12 @@ function InsuranceBody({ data }: { data: MyInsurance }) {
           ref={formRef}
           season={data.season}
           coverage={data.coverage}
+          owedCents={data.owedCents}
+          capCents={data.capCents}
           onToast={showToast}
         />
         <div className="flex min-w-0 flex-col gap-4">
           <CapProgress data={data} />
-          <SeasonPassCard data={data} onToast={showToast} />
           <PaymentNote />
         </div>
       </div>
@@ -122,13 +122,15 @@ function CapProgress({ data }: { data: MyInsurance }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-sm text-slate">
-        {atCap
-          ? s.progressAtCap
-          : s.progressRemaining.replace(
-              '{amount}',
-              dollars(data.capCents - data.owedCents),
-            )}
+      <p data-testid="cap-status" className="text-sm text-slate">
+        {data.coverage === 'season_pass'
+          ? s.coveredSeasonPass
+          : atCap
+            ? s.progressAtCap
+            : s.progressRemaining.replace(
+                '{amount}',
+                dollars(data.capCents - data.owedCents),
+              )}
       </p>
       {data.unpaidCents > 0 && (
         <p className="text-xs text-status-pending">
@@ -136,114 +138,6 @@ function CapProgress({ data }: { data: MyInsurance }) {
         </p>
       )}
     </Card>
-  );
-}
-
-function SeasonPassCard({
-  data,
-  onToast,
-}: {
-  data: MyInsurance;
-  onToast: (message: string) => void;
-}) {
-  const t = useT();
-  const s = t.insurance;
-  const [confirming, setConfirming] = useState(false);
-  const buy = useBuySeasonPass();
-  const idempotencyKey = useRef(crypto.randomUUID());
-  const covered = data.coverage !== 'none';
-  const due = dollars(Math.max(0, data.capCents - data.owedCents));
-
-  function confirm() {
-    if (!data.season || buy.isPending) return;
-    buy.mutate(
-      { season: data.season.key, idempotencyKey: idempotencyKey.current },
-      {
-        onSuccess: (record) => {
-          idempotencyKey.current = crypto.randomUUID();
-          setConfirming(false);
-          onToast(
-            s.seasonPassToast
-              .replace('{recordNo}', record.recordNo)
-              .replace('{amount}', dollars(record.amountCents)),
-          );
-        },
-      },
-    );
-  }
-
-  const buyError = buy.isError
-    ? errorCodeOf(buy.error) === 'already_covered'
-      ? s.alreadyCovered
-      : errorText(buy.error, t.errors.generic)
-    : null;
-
-  return (
-    <div className="relative flex flex-col gap-3 overflow-hidden rounded-lg bg-navy p-5 text-white shadow-card">
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full border-[18px] border-white/5"
-      />
-      <p className="text-xs text-white/70">{s.passEyebrow}</p>
-      <h2 className="text-lg text-white">{s.passTitle}</h2>
-      <p className="text-3xl font-bold tabular-nums">
-        {dollars(data.capCents)}
-      </p>
-      <p className="text-sm text-white/80">{s.passBody}</p>
-      {covered ? (
-        <p
-          data-testid="pass-covered"
-          className="rounded-md bg-white/10 px-3 py-2 text-sm font-semibold"
-        >
-          {data.coverage === 'season_pass'
-            ? s.coveredSeasonPass
-            : s.coveredCapped}
-        </p>
-      ) : (
-        <Button
-          variant="secondary"
-          className="border-white text-white hover:bg-white/10"
-          disabled={!data.season}
-          onClick={() => {
-            buy.reset();
-            setConfirming(true);
-          }}
-        >
-          {s.passBuy.replace('{amount}', due)}
-        </Button>
-      )}
-      {confirming && (
-        <Modal
-          title={s.passConfirmTitle}
-          onClose={() => !buy.isPending && setConfirming(false)}
-          footer={
-            <>
-              <Button
-                variant="ghost"
-                onClick={() => setConfirming(false)}
-                disabled={buy.isPending}
-              >
-                {t.common.cancel}
-              </Button>
-              <Button loading={buy.isPending} onClick={confirm}>
-                {s.passConfirm.replace('{amount}', due)}
-              </Button>
-            </>
-          }
-        >
-          <div className="flex flex-col gap-3 text-sm">
-            <p>
-              {s.passConfirmBody
-                .replace('{owed}', dollars(data.owedCents))
-                .replace('{amount}', due)
-                .replace('{season}', data.season?.key ?? '')}
-            </p>
-            <p className="text-slate">{s.paymentNote}</p>
-            {buyError && <Banner tone="error">{buyError}</Banner>}
-          </div>
-        </Modal>
-      )}
-    </div>
   );
 }
 
