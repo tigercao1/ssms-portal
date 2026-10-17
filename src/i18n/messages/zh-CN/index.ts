@@ -1015,7 +1015,6 @@ export const zhCN: Messages = {
     unavailableTitle: '不可预约',
     reasonInactive: '未启用或未批准',
     reasonNoCalendar: '未关联 Google 日历',
-    reasonNotConfirmed: '日历匹配未确认',
     reasonNotWritable: '日历为只读',
     reasonCalendarError: 'Google 无法读取该日历',
     reasonGoogleNotConnected: '未连接 Google 日历',

@@ -1016,7 +1016,6 @@ export interface Messages {
     unavailableTitle: string;
     reasonInactive: string;
     reasonNoCalendar: string;
-    reasonNotConfirmed: string;
     reasonNotWritable: string;
     reasonCalendarError: string;
     reasonGoogleNotConnected: string;

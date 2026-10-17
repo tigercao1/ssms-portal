@@ -1040,7 +1040,6 @@ export const en: Messages = {
     unavailableTitle: 'Not bookable',
     reasonInactive: 'not active or not approved',
     reasonNoCalendar: 'no Google calendar linked',
-    reasonNotConfirmed: 'calendar match not confirmed',
     reasonNotWritable: 'calendar is read-only',
     reasonCalendarError: 'Google could not read this calendar',
     reasonGoogleNotConnected: 'Google Calendar is not connected',
