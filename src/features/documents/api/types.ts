@@ -3,6 +3,7 @@ import type { CertOrg, CertTrack } from '@/lib/types';
 export type TemplateKind = 'sign' | 'read';
 export type TemplateAudience = 'instructor' | 'customer';
 export type TemplateStatus = 'draft' | 'live' | 'retired';
+export type DocumentLanguage = 'en' | 'zh';
 export type TemplateAssignTo = 'all' | 'selected';
 export type ChecklistLockReason =
   | 'pending_approval'
@@ -31,6 +32,8 @@ export type CertContentType =
   | 'image/jpeg'
   | 'image/png'
   | 'image/webp';
+
+export const DOCUMENT_LANGUAGES: readonly DocumentLanguage[] = ['zh', 'en'];
 
 export const FIELD_TYPES: readonly FieldType[] = [
   'signature',
@@ -95,8 +98,21 @@ export interface TemplateSummary {
   hasSource: boolean;
   pageCount: number | null;
   fieldCount: number;
+  sourceLanguage: DocumentLanguage | null;
+  languages: DocumentLanguage[];
   insertedAt: string;
   updatedAt: string;
+}
+
+/** A second-language version of a template, with its own PDF and fields. */
+export interface TemplateTranslation {
+  language: DocumentLanguage;
+  hasSource: boolean;
+  sourceSha256: string | null;
+  pageCount: number | null;
+  pages: TemplatePage[];
+  fields: Field[];
+  sourceUrl: string | null;
 }
 
 export interface Template extends TemplateSummary {
@@ -105,6 +121,7 @@ export interface Template extends TemplateSummary {
   fields: Field[];
   sourceUrl: string | null;
   updatedBy: string | null;
+  translations: TemplateTranslation[];
 }
 
 /** Response of a source confirm: `fieldsCleared` says whether placed fields were dropped. */
@@ -121,6 +138,7 @@ export interface TemplateCreate {
   descriptionZh?: string | null;
   required: boolean;
   sortOrder: number;
+  sourceLanguage?: DocumentLanguage | null;
 }
 
 export interface TemplatePatch {
@@ -130,6 +148,7 @@ export interface TemplatePatch {
   descriptionZh?: string | null;
   required?: boolean;
   sortOrder?: number;
+  sourceLanguage?: DocumentLanguage | null;
 }
 
 export interface PublishPreview {
@@ -201,6 +220,7 @@ export interface Assignment {
   templateSha256: string | null;
   signedSha256: string | null;
   hasSignedCopy: boolean;
+  language: DocumentLanguage | null;
   insertedAt: string;
   updatedAt: string;
 }
@@ -280,6 +300,7 @@ export interface DocumentChecklistItem {
   viewedAt: string | null;
   completedAt: string | null;
   dueAt: string | null;
+  languages: DocumentLanguage[];
 }
 
 export interface CertificationChecklistItem {
@@ -327,6 +348,8 @@ export interface MyDocument {
   template: SignerTemplate;
   sourceUrl: string | null;
   consentText: ConsentText;
+  language: DocumentLanguage | null;
+  availableLanguages: DocumentLanguage[];
 }
 
 export type SignatureValue =
@@ -335,9 +358,11 @@ export type SignatureValue =
 
 export interface ReadCompletion {
   acknowledged: true;
+  language?: DocumentLanguage;
 }
 
 export interface SignCompletion {
+  language?: DocumentLanguage;
   consent: true;
   signerName: string;
   values: Record<string, string | boolean>;
