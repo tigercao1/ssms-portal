@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 export const PRESIGNED_URL_FRESH_MS = 4 * 60_000;
 
@@ -9,11 +9,24 @@ interface SourceQuery {
   refetch: () => Promise<unknown>;
 }
 
-export function useRefreshSourceOnError(query: SourceQuery): () => void {
+export interface SourceRecovery {
+  onError: () => void;
+  onLoad: () => void;
+}
+
+export function useSourceRecovery(query: SourceQuery): SourceRecovery {
   const latest = useRef(query);
   latest.current = query;
-  return useCallback(() => {
+  const refreshedSinceLoad = useRef(false);
+  const onError = useCallback(() => {
     const { dataUpdatedAt, refetch } = latest.current;
-    if (Date.now() - dataUpdatedAt >= MIN_AGE_BEFORE_REFRESH_MS) void refetch();
+    if (refreshedSinceLoad.current) return;
+    if (Date.now() - dataUpdatedAt < MIN_AGE_BEFORE_REFRESH_MS) return;
+    refreshedSinceLoad.current = true;
+    void refetch();
   }, []);
+  const onLoad = useCallback(() => {
+    refreshedSinceLoad.current = false;
+  }, []);
+  return useMemo(() => ({ onError, onLoad }), [onError, onLoad]);
 }

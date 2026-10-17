@@ -38,6 +38,7 @@ import {
   type SigningDraft,
 } from './signingDraft';
 import type { SignerText } from './types';
+import type { SourceRecovery } from '../pdf/presignedSource';
 
 export interface SignerDocumentProps {
   template: SignerTemplate;
@@ -53,7 +54,7 @@ export interface SignerDocumentProps {
   onSubmit: (body: SignCompletion) => void;
   backAction?: ReactNode;
   draftKey?: string | null;
-  onSourceError?: () => void;
+  sourceRecovery?: SourceRecovery;
 }
 
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -143,7 +144,7 @@ export function SignerDocument({
   onSubmit,
   backAction,
   draftKey,
-  onSourceError,
+  sourceRecovery,
 }: SignerDocumentProps) {
   const pdfRef = useRef<PdfPagesHandle>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -384,7 +385,8 @@ export function SignerDocument({
           <PdfPages
             ref={pdfRef}
             source={sourceUrl}
-            onError={onSourceError}
+            onLoad={sourceRecovery?.onLoad}
+            onError={sourceRecovery?.onError}
             zoom={zoom}
             renderOverlay={({ pageNumber, geometry }) =>
               ordered

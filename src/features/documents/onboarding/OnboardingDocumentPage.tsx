@@ -21,7 +21,7 @@ import { DocumentLanguageSwitch } from '../signer/DocumentLanguageSwitch';
 import { ReadDocument } from '../signer/ReadDocument';
 import { SignerDocument } from '../signer/SignerDocument';
 import { clearSigningDraft, signingDraftKey } from '../signer/signingDraft';
-import { useRefreshSourceOnError } from '../pdf/presignedSource';
+import { useSourceRecovery } from '../pdf/presignedSource';
 import { useCompleteMyDocument, useMyDocument } from './queries';
 import { LockedBanner, lockReasonOf } from './Locked';
 
@@ -149,7 +149,7 @@ export function OnboardingDocumentPage() {
   const { doc, choose } = useLocalizedDocument(assignmentId, locale);
   const complete = useCompleteMyDocument(assignmentId);
   const [completed, setCompleted] = useState<Assignment | null>(null);
-  const refreshSource = useRefreshSourceOnError(doc);
+  const sourceRecovery = useSourceRecovery(doc);
 
   if (doc.isLoading || (doc.isStale && doc.isFetching))
     return (
@@ -251,7 +251,7 @@ export function OnboardingDocumentPage() {
           submitting={complete.isPending}
           submitError={submitError}
           onSubmit={submit}
-          onSourceError={refreshSource}
+          sourceRecovery={sourceRecovery}
         />
       ) : profile.isLoading ? (
         <div className="flex justify-center py-20">
@@ -278,7 +278,7 @@ export function OnboardingDocumentPage() {
           onSubmit={submit}
           backAction={<BackLink compact />}
           draftKey={draftKey}
-          onSourceError={refreshSource}
+          sourceRecovery={sourceRecovery}
         />
       )}
     </div>
