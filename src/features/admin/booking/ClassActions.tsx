@@ -106,6 +106,7 @@ export function ClassActions({ item }: { item: AdminClass }) {
     <div className="flex flex-col items-end gap-2">
       <RowActions
         items={items}
+        busy={pending}
         label={t.common.moreActionsFor.replace(
           '{name}',
           formatSchoolDateTime(item.startsAt, locale),

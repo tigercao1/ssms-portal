@@ -125,6 +125,28 @@ describe('ClassActions', () => {
     );
   });
 
+  it('marks the menu button busy while a status change is pending', async () => {
+    serve();
+    let release: () => void = () => undefined;
+    server.use(
+      http.post(
+        `${API}/admin/booking/classes/:id/status`,
+        () =>
+          new Promise<Response>((resolve) => {
+            release = () => resolve(HttpResponse.json(booked));
+          }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ClassActions item={booked} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Mark completed' }));
+    const trigger = screen.getByRole('button', { name: /^More actions for / });
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-busy', 'true'));
+    release();
+    await waitFor(() => expect(trigger).not.toHaveAttribute('aria-busy'));
+  });
+
   it('shows why a status change was refused', async () => {
     serve();
     server.use(
