@@ -193,16 +193,15 @@ describe('DocumentsListPage', () => {
     expect(await actionNames(user, 'Uniform policy')).toEqual([
       'Edit Uniform policy',
       'Upload PDF',
-      'Publish Uniform policy',
     ]);
-    const menu = await openActions(user, 'Uniform policy');
-    const publish = within(menu).getByRole('menuitem', {
+    const publish = within(row('Uniform policy')).getByRole('button', {
       name: 'Publish Uniform policy',
     });
-    expect(publish).toHaveAttribute('aria-disabled', 'true');
+    expect(publish).toBeDisabled();
     expect(publish).toHaveAccessibleDescription(
       'Upload a PDF before publishing.',
     );
+    const menu = await openActions(user, 'Uniform policy');
     expect(
       within(menu).getByRole('menuitem', { name: 'Upload PDF' }),
     ).not.toHaveAttribute('aria-disabled');
@@ -230,14 +229,14 @@ describe('DocumentsListPage', () => {
     tpl.fields = [];
     renderWithProviders(<DocumentsListPage />);
     const user = userEvent.setup();
-    const menu = await openActions(user, 'Uniform policy');
-    const publish = within(menu).getByRole('menuitem', {
+    const publish = await screen.findByRole('button', {
       name: 'Publish Uniform policy',
     });
-    expect(publish).toHaveAttribute('aria-disabled', 'true');
+    expect(publish).toBeDisabled();
     expect(publish).toHaveAccessibleDescription(
       'Place at least one field before publishing.',
     );
+    const menu = await openActions(user, 'Uniform policy');
     expect(
       within(menu).getByRole('menuitem', {
         name: 'Open editor for Uniform policy',
@@ -249,7 +248,9 @@ describe('DocumentsListPage', () => {
     makePublishable();
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
     const dialog = screen.getByRole('dialog', {
       name: 'Publish “Uniform policy”',
     });
@@ -303,7 +304,9 @@ describe('DocumentsListPage', () => {
     makePublishable();
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
     const dialog = screen.getByRole('dialog');
     const season = await within(dialog).findByLabelText(/Season/);
     await waitFor(() => expect(season).toHaveValue('2026/27'));
@@ -358,7 +361,9 @@ describe('DocumentsListPage', () => {
     state.templates.find((x) => x.id === 'tpl-draft')!.audience = 'customer';
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
     const dialog = screen.getByRole('dialog');
     await waitFor(() =>
       expect(within(dialog).getByLabelText(/Season/)).toHaveValue('2026/27'),
@@ -389,7 +394,9 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    await chooseAction(user, 'Uniform policy', 'Publish Uniform policy');
+    await user.click(
+      await screen.findByRole('button', { name: 'Publish Uniform policy' }),
+    );
     const dialog = screen.getByRole('dialog');
     await user.click(
       await within(dialog).findByRole('button', {

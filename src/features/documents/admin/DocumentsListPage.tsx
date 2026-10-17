@@ -425,6 +425,7 @@ function TemplateRow({
   const source = useSourceUpload(row, onNotice);
   const title = templateTitle(row, locale);
   const blocker = publishBlocker(row, t);
+  const reasonId = useId();
   const error = update.error ?? retire.error;
 
   function onRetire() {
@@ -455,12 +456,7 @@ function TemplateRow({
       ariaLabel: t.documents.editFor.replace('{title}', title),
       onSelect: onEdit,
     },
-    ...(row.status === 'draft'
-      ? [
-          ...sourceItems(row, source, title, t),
-          publishItem(t.documents.publish, t.documents.publishFor),
-        ]
-      : []),
+    ...(row.status === 'draft' ? sourceItems(row, source, title, t) : []),
     ...(row.status === 'live'
       ? [
           ...(row.assignTo !== 'all'
@@ -544,8 +540,27 @@ function TemplateRow({
         />
       </td>
       <td className="px-2 py-2 xl:px-3">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-1">
           {row.status === 'draft' && source.input}
+          {row.status === 'draft' && (
+            <span title={blocker ?? undefined}>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={blocker !== null}
+                aria-label={t.documents.publishFor.replace('{title}', title)}
+                aria-describedby={blocker ? reasonId : undefined}
+                onClick={onPublish}
+              >
+                {t.documents.publish}
+              </Button>
+              {blocker && (
+                <span id={reasonId} className="sr-only">
+                  {blocker}
+                </span>
+              )}
+            </span>
+          )}
           <ActionsMenu
             items={items}
             label={t.common.moreActionsFor.replace('{name}', title)}
