@@ -364,3 +364,72 @@ export interface CertUploadUrl {
   uploadUrl: string;
   expiresAt: string;
 }
+
+export type TemplateAssignmentStatusFilter = 'all' | 'completed' | 'open';
+
+export interface TemplateAssignmentQuery {
+  season?: string;
+  status?: TemplateAssignmentStatusFilter;
+  hasSignedCopy?: boolean;
+  q?: string;
+  page: number;
+  limit: number;
+}
+
+export interface TemplateAssignmentRow {
+  id: string;
+  status: 'assigned' | 'viewed' | 'completed';
+  season: string | null;
+  instructor: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  };
+  signerName: string | null;
+  signerEmail: string | null;
+  assignedAt: string;
+  viewedAt: string | null;
+  completedAt: string | null;
+  signedSha256: string | null;
+  hasSignedCopy: boolean;
+}
+
+export interface TemplateAssignmentPage {
+  rows: TemplateAssignmentRow[];
+  total: number;
+  page: number;
+}
+
+export type DocumentExportStatus =
+  | 'queued'
+  | 'running'
+  | 'ready'
+  | 'failed'
+  | 'expired';
+
+export interface DocumentExport {
+  id: string;
+  templateId: string;
+  season: string | null;
+  selectedCount: number | null;
+  status: DocumentExportStatus;
+  fileCount: number | null;
+  skippedCount: number | null;
+  sizeBytes: number | null;
+  error: string | null;
+  requestedAt: string;
+  finishedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface DocumentExportRequest {
+  season?: string;
+  assignmentIds?: string[];
+}
+
+export interface DocumentExportUrl {
+  url: string;
+  expiresAt: string;
+  sizeBytes: number;
+}

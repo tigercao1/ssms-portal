@@ -1,4 +1,4 @@
-import { api, ApiError } from '@/lib/api';
+import { api, apiWithHeaders, ApiError } from '@/lib/api';
 import type {
   AssignRequest,
   AssignResult,
@@ -11,6 +11,9 @@ import type {
   CompleteRequest,
   CompleteResult,
   ConfirmedTemplate,
+  DocumentExport,
+  DocumentExportRequest,
+  DocumentExportUrl,
   Field,
   FileUrl,
   InstructorDocuments,
@@ -21,6 +24,9 @@ import type {
   PublishResult,
   SignedUrl,
   Template,
+  TemplateAssignmentPage,
+  TemplateAssignmentQuery,
+  TemplateAssignmentRow,
   TemplateCreate,
   TemplatePatch,
   TemplateSummary,
@@ -33,6 +39,14 @@ export const documentsKeys = {
   template: (id: string) => ['admin', 'documents', 'templates', id] as const,
   publishPreview: (id: string, season: string | null) =>
     ['admin', 'documents', 'templates', id, 'publish-preview', season] as const,
+  templateAssignments: (id: string, query?: TemplateAssignmentQuery) =>
+    query
+      ? (['admin', 'documents', 'templates', id, 'assignments', query] as const)
+      : (['admin', 'documents', 'templates', id, 'assignments'] as const),
+  templateExports: (id: string) =>
+    ['admin', 'documents', 'templates', id, 'exports'] as const,
+  documentExport: (exportId: string) =>
+    ['admin', 'documents', 'exports', exportId] as const,
   instructorDocuments: (instructorId: string) =>
     ['admin', 'instructor', instructorId, 'documents'] as const,
   myChecklist: ['me', 'documents'] as const,
@@ -130,6 +144,57 @@ export function getInstructorDocuments(instructorId: string) {
 export function getAssignmentSignedUrl(assignmentId: string) {
   return api<SignedUrl>(
     `/admin/documents/assignments/${enc(assignmentId)}/signed-url`,
+  );
+}
+
+export async function listTemplateAssignments(
+  id: string,
+  query: TemplateAssignmentQuery,
+): Promise<TemplateAssignmentPage> {
+  const qs = new URLSearchParams({
+    page: String(query.page),
+    limit: String(query.limit),
+  });
+  if (query.season) qs.set('season', query.season);
+  if (query.status && query.status !== 'all') qs.set('status', query.status);
+  if (query.hasSignedCopy) qs.set('hasSignedCopy', 'true');
+  if (query.q) qs.set('q', query.q);
+  const { data, headers } = await apiWithHeaders<TemplateAssignmentRow[]>(
+    `/admin/documents/templates/${enc(id)}/assignments?${qs.toString()}`,
+  );
+  const total = Number(headers.get('X-Total-Count') ?? Number.NaN);
+  return {
+    rows: data,
+    page: query.page,
+    total: Number.isFinite(total)
+      ? total
+      : (query.page - 1) * query.limit + data.length,
+  };
+}
+
+export function createDocumentExport(
+  templateId: string,
+  body: DocumentExportRequest,
+) {
+  return api<DocumentExport>(
+    `/admin/documents/templates/${enc(templateId)}/exports`,
+    { method: 'POST', body },
+  );
+}
+
+export function listDocumentExports(templateId: string) {
+  return api<DocumentExport[]>(
+    `/admin/documents/templates/${enc(templateId)}/exports`,
+  );
+}
+
+export function getDocumentExport(exportId: string) {
+  return api<DocumentExport>(`/admin/documents/exports/${enc(exportId)}`);
+}
+
+export function getDocumentExportUrl(exportId: string) {
+  return api<DocumentExportUrl>(
+    `/admin/documents/exports/${enc(exportId)}/url`,
   );
 }
 
