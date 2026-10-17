@@ -17,8 +17,8 @@ describe('AdminListPage (W2.7)', () => {
     // since CSS isn't applied, so the name/email appear twice.
     expect((await screen.findAllByText('Jane Snow')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('jane@example.com').length).toBeGreaterThan(0);
-    // both filter dropdowns render
-    expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    // all three filter dropdowns render
+    expect(screen.getAllByRole('combobox')).toHaveLength(3);
     expect(screen.getByText('Online')).toBeInTheDocument();
   });
 });
@@ -27,6 +27,7 @@ interface ListRequest {
   q: string | null;
   status: string | null;
   active: string | null;
+  calendarConnected: string | null;
   page: string | null;
   limit: string | null;
 }
@@ -47,6 +48,7 @@ function serveInstructors(
         q: params.get('q'),
         status: params.get('status'),
         active: params.get('active'),
+        calendarConnected: params.get('calendarConnected'),
         page: params.get('page'),
         limit: params.get('limit'),
       });
@@ -100,11 +102,12 @@ function renderPage(route = '/') {
 
 const location = () => screen.getByTestId('location').textContent;
 const filters = () =>
-  screen.getAllByRole('combobox') as [HTMLElement, HTMLElement];
+  screen.getAllByRole('combobox') as [HTMLElement, HTMLElement, HTMLElement];
 const request = (overrides: Partial<ListRequest> = {}): ListRequest => ({
   q: null,
   status: null,
   active: null,
+  calendarConnected: null,
   page: '1',
   limit: '50',
   ...overrides,
@@ -139,6 +142,38 @@ describe('AdminListPage calendar status', () => {
     expect(within(leeCard!).getByText('Connected')).toBeInTheDocument();
   });
 
+  it('shows the calendar status as a coloured pill like the Status column', async () => {
+    serveInstructors([jane, connected]);
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    const notConnected = within(table).getByText('Not connected', {
+      selector: '.text-status-pending',
+    });
+    const yes = within(table).getByText('Connected', {
+      selector: '.text-status-approved',
+    });
+    expect(notConnected.parentElement).toHaveAttribute(
+      'style',
+      'border-color: var(--status-pending);',
+    );
+    expect(yes.parentElement).toHaveAttribute(
+      'style',
+      'border-color: var(--status-approved);',
+    );
+    expect(
+      yes.parentElement!.querySelector('.rounded-full[aria-hidden]'),
+    ).toHaveAttribute('style', 'background: var(--status-approved);');
+    expect(
+      screen.getAllByText('Connected', { selector: '.text-status-approved' }),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText('Not connected', {
+        selector: '.text-status-pending',
+      }),
+    ).toHaveLength(2);
+  });
+
   it('shows the calendar status in Chinese', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     serveInstructors([jane, connected]);
@@ -148,8 +183,63 @@ describe('AdminListPage calendar status', () => {
     expect(
       within(table).getByRole('columnheader', { name: '日历' }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('未连接')).toHaveLength(2);
-    expect(screen.getAllByText('已连接')).toHaveLength(2);
+    expect(screen.getAllByText('未连接', { ignore: 'option' })).toHaveLength(2);
+    expect(screen.getAllByText('已连接', { ignore: 'option' })).toHaveLength(2);
+  });
+
+  it('filters by calendar connection and keeps it in the URL', async () => {
+    serveInstructors([jane, connected]);
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText('Showing 1–2 of 2')).toBeInTheDocument();
+
+    const calendar = screen.getByRole('combobox', { name: 'Calendar' });
+    expect(
+      within(calendar)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['All', 'Connected', 'Not connected']);
+
+    await user.selectOptions(calendar, 'true');
+    expect(await screen.findByText('Showing 1–1 of 1')).toBeInTheDocument();
+    expect(screen.getAllByText('Lee Ridge').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Jane Snow')).not.toBeInTheDocument();
+    expect(location()).toBe('?calendar=true');
+    expect(requests.at(-1)).toEqual(request({ calendarConnected: 'true' }));
+
+    await user.selectOptions(calendar, 'false');
+    await waitFor(() => expect(location()).toBe('?calendar=false'));
+    expect(requests.at(-1)).toEqual(request({ calendarConnected: 'false' }));
+    expect(screen.getAllByText('Jane Snow').length).toBeGreaterThan(0);
+
+    await user.selectOptions(calendar, '');
+    expect(await screen.findByText('Showing 1–2 of 2')).toBeInTheDocument();
+    expect(location()).toBe('');
+    expect(requests.at(-1)).toEqual(request());
+  });
+
+  it('preselects the calendar filter from the URL', async () => {
+    serveInstructors([jane, connected]);
+    renderPage('/?calendar=false&page=1');
+
+    expect(await screen.findByText('Showing 1–1 of 1')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Calendar' })).toHaveValue(
+      'false',
+    );
+    expect(requests).toEqual([request({ calendarConnected: 'false' })]);
+  });
+
+  it('shows the calendar filter in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveInstructors([jane, connected]);
+    renderPage();
+
+    const calendar = await screen.findByRole('combobox', { name: '日历' });
+    expect(
+      within(calendar)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['全部', '已连接', '未连接']);
   });
 });
 

@@ -25,6 +25,7 @@ import type {
 export interface AdminListFilter {
   status?: ApprovalStatus;
   active?: boolean;
+  calendarConnected?: boolean;
 }
 
 const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
@@ -41,6 +42,8 @@ export function useAdminInstructors(filter: AdminListFilter) {
       const qs = new URLSearchParams();
       if (filter.status) qs.set('status', filter.status);
       if (filter.active !== undefined) qs.set('active', String(filter.active));
+      if (filter.calendarConnected !== undefined)
+        qs.set('calendarConnected', String(filter.calendarConnected));
       const suffix = qs.toString() ? `?${qs}` : '';
       return api<AdminInstructorRecord[]>(`/admin/instructors${suffix}`);
     },
@@ -65,6 +68,7 @@ export function useAdminInstructorPage({
   q,
   status,
   active,
+  calendarConnected,
   page,
 }: AdminInstructorPageQuery) {
   return useQuery({
@@ -72,7 +76,7 @@ export function useAdminInstructorPage({
       'admin',
       'instructors',
       'page',
-      { q, status, active, page },
+      { q, status, active, calendarConnected, page },
     ] as const,
     queryFn: async (): Promise<AdminInstructorPage> => {
       const qs = new URLSearchParams({
@@ -82,6 +86,8 @@ export function useAdminInstructorPage({
       if (q) qs.set('q', q);
       if (status) qs.set('status', status);
       if (active !== undefined) qs.set('active', String(active));
+      if (calendarConnected !== undefined)
+        qs.set('calendarConnected', String(calendarConnected));
       const { data, headers } = await apiWithHeaders<AdminInstructorRecord[]>(
         `/admin/instructors?${qs.toString()}`,
       );

@@ -5,6 +5,7 @@ export { Select } from './Select';
 export { Field } from './Field';
 export { Card } from './Card';
 export { Banner } from './Banner';
+export { DotPill } from './DotPill';
 export { StatusPill } from './StatusPill';
 export { Spinner } from './Spinner';
 export { EmptyState } from './EmptyState';
