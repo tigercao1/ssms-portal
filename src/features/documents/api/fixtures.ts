@@ -525,7 +525,7 @@ export function fakeRoster(
   for (let i = 0; i < count; i += 1) {
     const id = `roster-${i + 1}`;
     const firstName = first[i % first.length]!;
-    const lastName = `${last[(i * 3) % last.length]!}${i >= last.length ? ` ${i + 1}` : ''}`;
+    const lastName = last[Math.floor(i / first.length) % last.length]!;
     const email = `${firstName.toLowerCase()}.${i + 1}@example.com`;
     instructors[id] = { firstName, lastName, email };
     const done = i % completeEvery === 0;

@@ -201,7 +201,7 @@ function AudienceCell({ row }: { row: TemplateSummary }) {
   const signedLink = (text: string) => (
     <Link
       to={`/admin/documents/${row.id}/signed`}
-      className="text-xs text-navy hover:underline"
+      className="text-xs text-navy underline decoration-navy/30 underline-offset-2 hover:decoration-navy"
       title={t.signedCopies.linkFor.replace(
         '{title}',
         templateTitle(row, locale),

@@ -52,64 +52,68 @@ export function ExportPanel({
   }
 
   return (
-    <Card className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg">{s.exportTitle}</h2>
-        <p className="text-sm text-slate">{s.exportBody}</p>
-        <p className="text-sm text-slate">
-          {season
-            ? s.exportScopeSeason.replace('{season}', season)
-            : s.exportScopeAllSeasons}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2 xl:flex-col">
-        <Button
-          variant="secondary"
-          disabled={selected.size === 0 || tooManySelected || create.isPending}
-          onClick={() => start([...selected])}
-        >
-          {s.exportSelected.replace('{n}', String(selected.size))}
-        </Button>
-        <Button
-          variant="primary"
-          disabled={
-            !completed.isSuccess ||
-            allCount === 0 ||
-            tooManyAll ||
-            create.isPending
-          }
-          loading={create.isPending}
-          onClick={() => start()}
-        >
-          {s.exportAll.replace('{n}', String(allCount))}
-        </Button>
-      </div>
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between gap-2 text-sm text-slate">
-          <span>{s.selectedCount.replace('{n}', String(selected.size))}</span>
-          <Button size="sm" variant="ghost" onClick={onClearSelection}>
-            {s.clearSelection}
+    <Card className="grid gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg">{s.exportTitle}</h2>
+          <p className="text-sm text-slate">{s.exportBody}</p>
+          <p className="text-sm text-slate">
+            {season
+              ? s.exportScopeSeason.replace('{season}', season)
+              : s.exportScopeAllSeasons}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            disabled={
+              selected.size === 0 || tooManySelected || create.isPending
+            }
+            onClick={() => start([...selected])}
+          >
+            {s.exportSelected.replace('{n}', String(selected.size))}
+          </Button>
+          <Button
+            variant="primary"
+            disabled={
+              !completed.isSuccess ||
+              allCount === 0 ||
+              tooManyAll ||
+              create.isPending
+            }
+            loading={create.isPending}
+            onClick={() => start()}
+          >
+            {s.exportAll.replace('{n}', String(allCount))}
           </Button>
         </div>
-      )}
-      {(tooManyAll || tooManySelected) && (
-        <p className="text-sm text-slate">
-          {s.exportTooMany.replace('{max}', String(MAX_EXPORT_FILES))}
-        </p>
-      )}
-      {completed.isSuccess && allCount === 0 && (
-        <p className="text-sm text-slate">{s.exportNothing}</p>
-      )}
-      {create.isError && (
-        <Banner tone="error">
-          {s.exportFailedToStart.replace(
-            '{reason}',
-            errorText(create.error, t.errors.generic),
-          )}
-        </Banner>
-      )}
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate">
+            <span>{s.selectedCount.replace('{n}', String(selected.size))}</span>
+            <Button size="sm" variant="ghost" onClick={onClearSelection}>
+              {s.clearSelection}
+            </Button>
+          </div>
+        )}
+        {(tooManyAll || tooManySelected) && (
+          <p className="text-sm text-slate">
+            {s.exportTooMany.replace('{max}', String(MAX_EXPORT_FILES))}
+          </p>
+        )}
+        {completed.isSuccess && allCount === 0 && (
+          <p className="text-sm text-slate">{s.exportNothing}</p>
+        )}
+        {create.isError && (
+          <Banner tone="error">
+            {s.exportFailedToStart.replace(
+              '{reason}',
+              errorText(create.error, t.errors.generic),
+            )}
+          </Banner>
+        )}
+      </div>
 
-      <div className="flex flex-col gap-2 border-t border-grey/60 pt-4">
+      <div className="flex flex-col gap-2 border-t border-grey/60 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
         <h3 className="text-base font-semibold text-ink">{s.recentTitle}</h3>
         {exports.isLoading ? (
           <Spinner />
