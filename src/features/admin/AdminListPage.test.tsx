@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { useLocation } from 'react-router-dom';
@@ -20,54 +20,6 @@ describe('AdminListPage (W2.7)', () => {
     // both filter dropdowns render
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
     expect(screen.getByText('Online')).toBeInTheDocument();
-  });
-
-  it('suggests calendar matches and shows how many were saved', async () => {
-    let calls = 0;
-    server.use(
-      http.post(`${API}/admin/instructor-calendars/suggest`, () => {
-        calls += 1;
-        return HttpResponse.json({
-          suggested: 2,
-          overview: { google: { connected: true, error: null }, instructors: [] },
-        });
-      }),
-    );
-    renderWithProviders(<AdminListPage />);
-
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Suggest calendar matches' }),
-    );
-
-    expect(
-      await screen.findByText(
-        '2 calendar suggestions saved. Review them on each instructor.',
-      ),
-    ).toBeInTheDocument();
-    expect(calls).toBe(1);
-  });
-
-  it('explains when suggesting calendar matches fails', async () => {
-    server.use(
-      http.post(`${API}/admin/instructor-calendars/suggest`, () =>
-        HttpResponse.json(
-          { message: 'Google Calendar is not connected' },
-          { status: 409 },
-        ),
-      ),
-    );
-    renderWithProviders(<AdminListPage />);
-
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Suggest calendar matches' }),
-    );
-
-    expect(
-      await screen.findByText('Could not suggest calendar matches'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Google Calendar is not connected'),
-    ).toBeInTheDocument();
   });
 });
 
@@ -156,6 +108,49 @@ const request = (overrides: Partial<ListRequest> = {}): ListRequest => ({
   page: '1',
   limit: '50',
   ...overrides,
+});
+
+describe('AdminListPage calendar status', () => {
+  const connected: AdminInstructorRecord = {
+    ...lee,
+    isActive: true,
+    calendarConnected: true,
+  };
+
+  it('shows whether each instructor has a calendar in the table and the cards', async () => {
+    serveInstructors([jane, connected]);
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    expect(
+      within(table).getByRole('columnheader', { name: 'Calendar' }),
+    ).toBeInTheDocument();
+    const janeRow = within(table).getByRole('row', { name: /Jane Snow/ });
+    const leeRow = within(table).getByRole('row', { name: /Lee Ridge/ });
+    expect(within(janeRow).getByText('Not connected')).toBeInTheDocument();
+    expect(within(leeRow).getByText('Connected')).toBeInTheDocument();
+
+    const [janeCard, leeCard] = screen
+      .getAllByRole('link')
+      .filter((link) => !table.contains(link));
+    expect(janeCard).toHaveTextContent('Jane Snow');
+    expect(within(janeCard!).getByText('Not connected')).toBeInTheDocument();
+    expect(leeCard).toHaveTextContent('Lee Ridge');
+    expect(within(leeCard!).getByText('Connected')).toBeInTheDocument();
+  });
+
+  it('shows the calendar status in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveInstructors([jane, connected]);
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    expect(
+      within(table).getByRole('columnheader', { name: '日历' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('未连接')).toHaveLength(2);
+    expect(screen.getAllByText('已连接')).toHaveLength(2);
+  });
 });
 
 describe('AdminListPage paging, search and URL state', () => {

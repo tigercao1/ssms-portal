@@ -15,7 +15,6 @@ import type {
   PayRate,
   PayRateCreate,
   PayRatePatch,
-  SuggestCalendarsResult,
 } from '@/lib/types';
 
 const lessonTypesKey = ['admin', 'lesson-types'] as const;
@@ -135,10 +134,7 @@ export function setInstructorGoogleCalendar(
     `/admin/instructors/${instructorId}/google-calendar`,
     {
       method: 'PATCH',
-      body: {
-        googleCalendarId: body.googleCalendarId,
-        ...(body.matchStatus ? { matchStatus: body.matchStatus } : {}),
-      },
+      body: { googleCalendarId: body.googleCalendarId },
     },
   );
 }
@@ -163,21 +159,5 @@ export function useInstructorCalendars() {
     queryKey: instructorCalendarsKey,
     queryFn: () =>
       api<InstructorCalendarsOverview>('/admin/instructor-calendars'),
-  });
-}
-
-export function useSuggestInstructorCalendars() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      api<SuggestCalendarsResult>('/admin/instructor-calendars/suggest', {
-        method: 'POST',
-      }),
-    onSuccess: (result) => {
-      qc.setQueryData(instructorCalendarsKey, result.overview);
-      return qc.invalidateQueries({
-        queryKey: ['admin', 'instructor'],
-      });
-    },
   });
 }
