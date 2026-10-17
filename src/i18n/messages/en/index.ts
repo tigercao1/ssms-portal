@@ -160,6 +160,14 @@ export const en: Messages = {
     courseLevels: 'Course levels offered',
     noneYet: 'Nothing here yet.',
     emptyHint: 'Add your details so admins can review your profile.',
+    calendarTitle: 'Google Calendar',
+    calendarConnected: 'Connected',
+    calendarNotConnected: 'Not connected',
+    calendarConnectedBody:
+      'Your Google Calendar is connected. Lessons you’re booked for appear on it.',
+    calendarNotConnectedBody:
+      'Your Google Calendar isn’t connected yet, so booked lessons won’t appear on it. Follow the guide to connect it.',
+    calendarGuide: 'How to connect your calendar',
     editTitle: 'Edit profile',
     identitySection: 'Identity',
     bioSection: 'Bio',

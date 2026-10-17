@@ -8,6 +8,7 @@ import type {
   BioDraftMode,
   ExtraPhotoSlot,
   InstructorProfile,
+  MyCalendarStatus,
   PhotoSlot,
   UpdateProfileBody,
 } from '@/lib/types';
@@ -22,6 +23,14 @@ export function useMyProfile() {
     queryKey: PROFILE_KEY,
     queryFn: () => api<InstructorProfile>('/me/instructor'),
     refetchOnWindowFocus: 'always',
+  });
+}
+
+export function useMyCalendarStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ['me', 'instructor', 'calendar'] as const,
+    queryFn: () => api<MyCalendarStatus>('/me/instructor/calendar'),
+    enabled,
   });
 }
 

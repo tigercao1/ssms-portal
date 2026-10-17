@@ -315,6 +315,9 @@ export const handlers = [
     const body = (await request.json()) as Partial<InstructorProfile>;
     return HttpResponse.json({ ...fakeProfile, ...body });
   }),
+  http.get(`${API}/me/instructor/calendar`, () =>
+    HttpResponse.json({ connected: false }),
+  ),
   http.get(`${API}/me/instructor/bio/ai-usage`, () =>
     HttpResponse.json({ limit: 5, used: 0, remaining: 5, resetsAt: null }),
   ),

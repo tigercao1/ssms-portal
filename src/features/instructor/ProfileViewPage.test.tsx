@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import {
   focusManager,
@@ -12,6 +12,7 @@ import { ProfileViewPage } from './ProfileViewPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
 import type { InstructorProfile } from '@/lib/types';
+import { CALENDAR_GUIDE_URL } from './calendarGuide';
 
 const API = 'http://localhost:3000';
 
@@ -304,6 +305,142 @@ describe('ProfileViewPage approval status', () => {
 
     expect(
       await screen.findByText(/Your profile was not approved/),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('ProfileViewPage Google Calendar', () => {
+  const profileWith = (overrides: Partial<InstructorProfile>) =>
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, ...overrides }),
+      ),
+    );
+  const approved = () => profileWith({ approvalStatus: 'approved' });
+  const calendar = (connected: boolean) => {
+    const requests: string[] = [];
+    server.use(
+      http.get(`${API}/me/instructor/calendar`, ({ request }) => {
+        requests.push(request.url);
+        return HttpResponse.json({ connected });
+      }),
+    );
+    return requests;
+  };
+
+  it('shows a green Connected pill and no guide link when connected', async () => {
+    approved();
+    calendar(true);
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('Connected', {
+        selector: '.text-status-approved',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Google Calendar' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your Google Calendar is connected/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'How to connect your calendar' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows an amber Not connected pill and the guide link when not connected', async () => {
+    approved();
+    const requests = calendar(false);
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('Not connected', {
+        selector: '.text-status-pending',
+      }),
+    ).toBeInTheDocument();
+    expect(requests).toHaveLength(1);
+    expect(
+      screen.getByText(/Your Google Calendar isn’t connected yet/),
+    ).toBeInTheDocument();
+    const link = screen.getByRole('link', {
+      name: 'How to connect your calendar',
+    });
+    expect(link).toHaveAttribute('href', CALENDAR_GUIDE_URL);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('shows the section to an approved but inactive instructor', async () => {
+    profileWith({ approvalStatus: 'approved', isActive: false });
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByRole('heading', { name: 'Google Calendar' }),
+    ).toBeInTheDocument();
+  });
+
+  it.each(['pending', 'rejected'] as const)(
+    'hides the section and skips the request for a %s instructor',
+    async (approvalStatus) => {
+      profileWith({ approvalStatus });
+      const requests = calendar(true);
+      renderWithProviders(<ProfileViewPage />);
+      expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(requests).toHaveLength(0);
+      expect(
+        screen.queryByRole('heading', { name: 'Google Calendar' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('status', { name: 'Loading' }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it('hides the section when the calendar status fails to load', async () => {
+    approved();
+    server.use(
+      http.get(`${API}/me/instructor/calendar`, () =>
+        HttpResponse.json({ message: 'boom' }, { status: 500 }),
+      ),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
+    expect(screen.getByText('CSIA Level 4')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('status', { name: 'Loading' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'Google Calendar' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'How to connect your calendar' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('labels the section in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    approved();
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('未连接', { selector: '.text-status-pending' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Google 日历' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '如何连接日历' })).toHaveAttribute(
+      'href',
+      CALENDAR_GUIDE_URL,
+    );
+  });
+
+  it('labels the connected state in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    approved();
+    calendar(true);
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('已连接', { selector: '.text-status-approved' }),
     ).toBeInTheDocument();
   });
 });

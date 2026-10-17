@@ -3,6 +3,7 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Card, Spinner, StatusPill } from '@/components';
 import { useMyProfile } from './api';
 import { ProfileSummary } from './ProfileSummary';
+import { CalendarStatusCard } from './CalendarStatusCard';
 import { OnboardingCard } from '@/features/documents/onboarding/OnboardingCard';
 import type { InstructorProfile } from '@/lib/types';
 
@@ -54,6 +55,7 @@ export function ProfileViewPage() {
 
       {statusBanner(profile, t)}
       <OnboardingCard />
+      <CalendarStatusCard enabled={profile.approvalStatus === 'approved'} />
       <ProfileSummary profile={profile} />
     </div>
   );

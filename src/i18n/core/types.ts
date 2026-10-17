@@ -148,6 +148,12 @@ export interface Messages {
     courseLevels: string;
     noneYet: string;
     emptyHint: string;
+    calendarTitle: string;
+    calendarConnected: string;
+    calendarNotConnected: string;
+    calendarConnectedBody: string;
+    calendarNotConnectedBody: string;
+    calendarGuide: string;
     // form
     editTitle: string;
     identitySection: string;
