@@ -8,6 +8,7 @@ vi.mock('@/lib/supabase', () => import('@/test/supabaseAuth'));
 const analytics = vi.hoisted(() => ({
   identifyUser: vi.fn(),
   resetUser: vi.fn(),
+  track: vi.fn(),
 }));
 vi.mock('@/lib/analytics', () => analytics);
 

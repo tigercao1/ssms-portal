@@ -186,6 +186,7 @@ export function useRemovePhoto(slot: ExtraPhotoSlot) {
   return useMutation({
     mutationFn: () => removePhoto('/me/instructor/photo', slot),
     onSuccess: (profile) => {
+      track('photo_removed', { slot });
       if (profile) qc.setQueryData(PROFILE_KEY, profile);
       else void qc.invalidateQueries({ queryKey: PROFILE_KEY });
     },

@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { identifyUser, resetUser } from '@/lib/analytics';
+import { identifyUser, resetUser, track } from '@/lib/analytics';
 
 interface SessionValue {
   session: Session | null;
@@ -69,6 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [userId, role, loading]);
 
   const signOut = useCallback(async () => {
+    track('signed_out');
     await supabase.auth.signOut();
   }, []);
 
