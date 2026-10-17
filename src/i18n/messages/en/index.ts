@@ -809,7 +809,7 @@ export const en: Messages = {
     title: 'Google Calendar',
     statusSuggested: 'Suggested',
     statusConfirmed: 'Confirmed',
-    searchLabel: 'Search calendars',
+    searchPlaceholder: 'Type a name or calendar ID',
     pickLabel: 'Calendar',
     noCalendar: 'No calendar',
     groupAvailable: 'Unassigned',

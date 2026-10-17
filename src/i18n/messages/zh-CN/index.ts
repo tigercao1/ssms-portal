@@ -784,7 +784,7 @@ export const zhCN: Messages = {
     title: 'Google 日历',
     statusSuggested: '待确认',
     statusConfirmed: '已确认',
-    searchLabel: '搜索日历',
+    searchPlaceholder: '输入名称或日历 ID',
     pickLabel: '日历',
     noCalendar: '不关联日历',
     groupAvailable: '未分配',

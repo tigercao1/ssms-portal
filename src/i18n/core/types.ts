@@ -785,7 +785,7 @@ export interface Messages {
     title: string;
     statusSuggested: string;
     statusConfirmed: string;
-    searchLabel: string;
+    searchPlaceholder: string;
     pickLabel: string;
     noCalendar: string;
     groupAvailable: string;
