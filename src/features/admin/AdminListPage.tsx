@@ -15,6 +15,7 @@ import {
   Banner,
   Button,
   Card,
+  DotPill,
   EmptyState,
   Input,
   Pager,
@@ -32,6 +33,7 @@ interface ListUpdate {
   q?: string;
   status?: ApprovalStatus | null;
   active?: boolean | null;
+  calendar?: boolean | null;
   page?: number;
 }
 
@@ -45,9 +47,12 @@ function statusFrom(params: URLSearchParams): ApprovalStatus | undefined {
   return STATUSES.find((s) => s === status);
 }
 
-function activeFrom(params: URLSearchParams): boolean | undefined {
-  const active = params.get('active');
-  return active === 'true' ? true : active === 'false' ? false : undefined;
+function booleanFrom(
+  params: URLSearchParams,
+  key: string,
+): boolean | undefined {
+  const value = params.get(key);
+  return value === 'true' ? true : value === 'false' ? false : undefined;
 }
 
 /** W2.7 / W3.4 — admin instructor list + filters; table on desktop, cards on mobile. */
@@ -57,11 +62,18 @@ export function AdminListPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const status = statusFrom(params);
-  const active = activeFrom(params);
+  const active = booleanFrom(params, 'active');
+  const calendarConnected = booleanFrom(params, 'calendar');
   const page = pageFrom(params);
   const [draft, setDraft] = useState(q);
   const committed = useRef(q);
-  const results = useAdminInstructorPage({ q, status, active, page });
+  const results = useAdminInstructorPage({
+    q,
+    status,
+    active,
+    calendarConnected,
+    page,
+  });
   const instructors = results.data?.instructors ?? [];
   const total = results.data?.total ?? 0;
   const shownPage = results.data?.page ?? page;
@@ -84,6 +96,10 @@ export function AdminListPage() {
           set(
             'active',
             next.active == null ? next.active : String(next.active),
+          );
+          set(
+            'calendar',
+            next.calendar == null ? next.calendar : String(next.calendar),
           );
           if (next.page !== undefined) {
             if (next.page > 1) out.set('page', String(next.page));
@@ -174,6 +190,25 @@ export function AdminListPage() {
             <option value="">{t.admin.all}</option>
             <option value="true">{t.status.active}</option>
             <option value="false">{t.status.inactive}</option>
+          </Select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate">
+          {t.admin.colCalendar}
+          <Select
+            className="sm:w-44"
+            value={
+              calendarConnected === undefined ? '' : String(calendarConnected)
+            }
+            onChange={(e) =>
+              update({
+                calendar:
+                  e.target.value === '' ? null : e.target.value === 'true',
+              })
+            }
+          >
+            <option value="">{t.admin.all}</option>
+            <option value="true">{t.admin.calendarConnected}</option>
+            <option value="false">{t.admin.calendarNotConnected}</option>
           </Select>
         </label>
       </div>
@@ -319,16 +354,17 @@ export function AdminListPage() {
 
 function CalendarStatus({ connected }: { connected: boolean }) {
   const t = useT();
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center whitespace-nowrap rounded-sm border-l-[3px] bg-sunken px-2 py-0.5 text-xs font-medium text-ink',
-        connected ? 'border-status-approved' : 'border-status-pending',
-      )}
-    >
-      {connected
-        ? t.admin.calendarConnected
-        : t.admin.calendarNotConnected}
-    </span>
+  return connected ? (
+    <DotPill
+      color="var(--status-approved)"
+      textClass="text-status-approved"
+      label={t.admin.calendarConnected}
+    />
+  ) : (
+    <DotPill
+      color="var(--status-pending)"
+      textClass="text-status-pending"
+      label={t.admin.calendarNotConnected}
+    />
   );
 }

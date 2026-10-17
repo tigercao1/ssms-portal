@@ -241,6 +241,7 @@ export function listAdminInstructors(
 ): { rows: AdminInstructorRecord[]; total: number } {
   const status = params.get('status');
   const active = params.get('active');
+  const calendarConnected = params.get('calendarConnected');
   const tokens = (params.get('q') ?? '')
     .toLowerCase()
     .split(/\s+/)
@@ -252,6 +253,8 @@ export function listAdminInstructors(
     return (
       (!status || r.approvalStatus === status) &&
       (active === null || String(r.isActive) === active) &&
+      (calendarConnected === null ||
+        String(r.calendarConnected) === calendarConnected) &&
       tokens.every((token) => haystack.includes(token))
     );
   });
