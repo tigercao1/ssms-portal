@@ -139,6 +139,31 @@ function recordRow(recordNo: string) {
   return screen.getByText(recordNo).closest('tr') as HTMLElement;
 }
 
+type User = Awaited<ReturnType<typeof renderPage>>;
+
+async function recordAction(
+  user: User,
+  recordNo: string,
+  name: string,
+  trigger = `Actions for ${recordNo}`,
+) {
+  await user.click(
+    within(recordRow(recordNo)).getByRole('button', { name: trigger }),
+  );
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
+async function recordActionNames(user: User, recordNo: string) {
+  await user.click(
+    within(recordRow(recordNo)).getByRole('button', {
+      name: `Actions for ${recordNo}`,
+    }),
+  );
+  const names = screen.getAllByRole('menuitem').map((item) => item.textContent);
+  await user.keyboard('{Escape}');
+  return names;
+}
+
 describe('AdminInsurancePage', () => {
   it('defaults to the current season and shows the per-instructor summary', async () => {
     await renderPage();
@@ -335,29 +360,22 @@ describe('AdminInsurancePage', () => {
   });
 
   it('lists records with the right actions per status', async () => {
-    await renderPage();
+    const user = await renderPage();
     const unpaid = recordRow('INS-20261219-0002');
     expect(unpaid).toHaveTextContent('Dec 19, 2026Jane SnowWei Zhang, Amy Li');
     expect(within(unpaid).getByText('Unpaid')).toBeInTheDocument();
-    expect(
-      within(unpaid).getByRole('button', { name: 'Mark paid' }),
-    ).toBeInTheDocument();
-    expect(
-      within(unpaid).queryByRole('button', { name: 'Mark unpaid' }),
-    ).toBeNull();
-    expect(
-      within(unpaid).getByRole('button', { name: 'Void' }),
-    ).toBeInTheDocument();
+    expect(await recordActionNames(user, 'INS-20261219-0002')).toEqual([
+      'Mark paid',
+      'Void',
+    ]);
 
     const paid = recordRow('INS-20261212-0001');
     expect(paid).toHaveTextContent('Paid Dec 13, 2026');
     expect(paid).toHaveTextContent('e-transfer #8812');
-    expect(
-      within(paid).queryByRole('button', { name: 'Mark paid' }),
-    ).toBeNull();
-    expect(
-      within(paid).getByRole('button', { name: 'Mark unpaid' }),
-    ).toBeInTheDocument();
+    expect(await recordActionNames(user, 'INS-20261212-0001')).toEqual([
+      'Mark unpaid',
+      'Void',
+    ]);
 
     const pass = recordRow('INS-20261101-0001');
     expect(pass).toHaveTextContent('Season passLi Wei');
@@ -370,11 +388,7 @@ describe('AdminInsurancePage', () => {
 
   it('marks a record paid with today as the default date and a note', async () => {
     const user = await renderPage();
-    await user.click(
-      within(recordRow('INS-20261219-0002')).getByRole('button', {
-        name: 'Mark paid',
-      }),
-    );
+    await recordAction(user, 'INS-20261219-0002', 'Mark paid');
     const dialog = screen.getByRole('dialog', {
       name: 'Mark INS-20261219-0002 paid',
     });
@@ -397,20 +411,18 @@ describe('AdminInsurancePage', () => {
     ]);
     await waitFor(() =>
       expect(
-        within(recordRow('INS-20261219-0002')).getByRole('button', {
-          name: 'Mark unpaid',
-        }),
+        within(recordRow('INS-20261219-0002')).getByText('Paid'),
       ).toBeInTheDocument(),
     );
+    expect(await recordActionNames(user, 'INS-20261219-0002')).toEqual([
+      'Mark unpaid',
+      'Void',
+    ]);
   });
 
   it('marks a paid record unpaid after confirming', async () => {
     const user = await renderPage();
-    await user.click(
-      within(recordRow('INS-20261212-0001')).getByRole('button', {
-        name: 'Mark unpaid',
-      }),
-    );
+    await recordAction(user, 'INS-20261212-0001', 'Mark unpaid');
     const dialog = screen.getByRole('dialog', {
       name: 'Mark INS-20261212-0001 unpaid?',
     });
@@ -425,11 +437,7 @@ describe('AdminInsurancePage', () => {
 
   it('requires a reason to void a record', async () => {
     const user = await renderPage();
-    await user.click(
-      within(recordRow('INS-20261219-0002')).getByRole('button', {
-        name: 'Void',
-      }),
-    );
+    await recordAction(user, 'INS-20261219-0002', 'Void');
     const dialog = screen.getByRole('dialog', {
       name: 'Void INS-20261219-0002?',
     });
@@ -463,11 +471,7 @@ describe('AdminInsurancePage', () => {
       ),
     );
     const user = await renderPage();
-    await user.click(
-      within(recordRow('INS-20261219-0002')).getByRole('button', {
-        name: 'Mark paid',
-      }),
-    );
+    await recordAction(user, 'INS-20261219-0002', 'Mark paid');
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
     expect(
@@ -573,13 +577,23 @@ describe('AdminInsurancePage', () => {
       '操作',
     ]);
     expect(within(table).getByText('待付款')).toBeInTheDocument();
-    await user.click(within(table).getByRole('button', { name: '标记已付' }));
+    await recordAction(
+      user,
+      'INS-20261212-0001',
+      '标记已付',
+      'INS-20261212-0001 的操作',
+    );
     const paid = screen.getByRole('dialog', {
       name: '将 INS-20261212-0001 标记为已付',
     });
     expect(within(paid).getByLabelText(/付款日期/)).toHaveValue('2026-12-20');
     await user.click(within(paid).getByRole('button', { name: '取消' }));
-    await user.click(within(table).getByRole('button', { name: '作废' }));
+    await recordAction(
+      user,
+      'INS-20261212-0001',
+      '作废',
+      'INS-20261212-0001 的操作',
+    );
     const voidDialog = screen.getByRole('dialog', {
       name: '作废 INS-20261212-0001？',
     });

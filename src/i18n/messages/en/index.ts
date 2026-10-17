@@ -1102,7 +1102,6 @@ export const en: Messages = {
     settingsInvalid: 'Each day must end after it starts.',
     settingsSaved: 'Booking settings saved.',
     saveSettings: 'Save settings',
-    actions: 'Actions',
     actionMove: 'Move or edit…',
     actionCompleted: 'Mark completed',
     actionNoShow: 'Mark no-show',
