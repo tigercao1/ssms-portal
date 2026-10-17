@@ -11,7 +11,6 @@ export interface DocumentLanguageSwitchProps {
   onChange: (language: DocumentLanguage) => void;
 }
 
-/** Picks which language version of a document is shown. */
 export function DocumentLanguageSwitch({
   languages,
   value,

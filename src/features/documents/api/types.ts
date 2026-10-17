@@ -104,7 +104,6 @@ export interface TemplateSummary {
   updatedAt: string;
 }
 
-/** A second-language version of a template, with its own PDF and fields. */
 export interface TemplateTranslation {
   language: DocumentLanguage;
   hasSource: boolean;
