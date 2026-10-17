@@ -3,14 +3,19 @@ import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { formatDate } from '@/lib/date';
 import { trackLabel } from '@/features/instructor/certLabels';
-import type { CertOrg, CertTrack, Certification } from '@/lib/types';
+import { currentSeasonKey, useSeasons } from '@/features/reference/api';
+import type {
+  ApprovalStatus,
+  CertOrg,
+  CertTrack,
+  Certification,
+} from '@/lib/types';
 import {
   Banner,
   Button,
   Card,
   Input,
   RowActions,
-  Select,
   Spinner,
   Textarea,
 } from '@/components';
@@ -37,7 +42,7 @@ import {
   KindBadge,
   ReviewStatusChip,
 } from './badges';
-import { AssignDialog } from './AssignDialog';
+import { AssignToInstructorDialog } from './AssignToInstructorDialog';
 import {
   errorText,
   formatDay,
@@ -77,9 +82,13 @@ export async function openPresigned(get: () => Promise<{ url: string }>) {
 /** Documents and certification uploads for one instructor, on the admin detail page. */
 export function InstructorDocumentsSection({
   instructorId,
+  instructorName,
+  approvalStatus,
   certifications,
 }: {
   instructorId: string;
+  instructorName: string;
+  approvalStatus: ApprovalStatus;
   certifications: Pick<Certification, 'org' | 'track' | 'level'>[];
 }) {
   const t = useT();
@@ -105,6 +114,8 @@ export function InstructorDocumentsSection({
         <>
           <DocumentsCard
             instructorId={instructorId}
+            instructorName={instructorName}
+            approved={approvalStatus === 'approved'}
             assignments={docs.data.assignments}
             templates={templates.data ?? []}
           />
@@ -121,19 +132,23 @@ export function InstructorDocumentsSection({
 
 function DocumentsCard({
   instructorId,
+  instructorName,
+  approved,
   assignments,
   templates,
 }: {
   instructorId: string;
+  instructorName: string;
+  approved: boolean;
   assignments: Assignment[];
   templates: TemplateSummary[];
 }) {
   const t = useT();
   const { locale } = useLocale();
+  const season = currentSeasonKey(useSeasons().data);
   const [showArchived, setShowArchived] = useState(false);
-  const [assignId, setAssignId] = useState('');
-  const [assigning, setAssigning] = useState<TemplateSummary | null>(null);
-  const byId = new Map(templates.map((tpl) => [tpl.id, tpl]));
+  const [assigning, setAssigning] = useState(false);
+  const [assigned, setAssigned] = useState<TemplateSummary | null>(null);
   const visible = assignments
     .filter((a) => showArchived || a.status !== 'archived')
     .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt));
@@ -148,10 +163,16 @@ function DocumentsCard({
       tpl.audience === 'instructor' &&
       !open.some((a) => a.templateId === tpl.id && a.status === 'completed'),
   );
-  const assignable = templates.filter(
-    (tpl) =>
-      tpl.status === 'live' && tpl.audience === 'instructor' && tpl.hasSource,
-  );
+  const assignable = season
+    ? templates.filter(
+        (tpl) =>
+          tpl.status === 'live' &&
+          tpl.audience === 'instructor' &&
+          tpl.assignTo !== 'all' &&
+          tpl.hasSource &&
+          !open.some((a) => a.templateId === tpl.id && a.season === season),
+      )
+    : [];
 
   return (
     <Card className="flex flex-col gap-4">
@@ -167,7 +188,11 @@ function DocumentsCard({
         </span>
       </div>
 
-      {missing.length > 0 && (
+      {!approved && (
+        <Banner tone="info">{t.documents.assignedOnApproval}</Banner>
+      )}
+
+      {approved && missing.length > 0 && (
         <Banner tone="pending" title={t.documents.missingTitle}>
           {missing.map((tpl) => templateTitle(tpl, locale)).join(' · ')}
         </Banner>
@@ -196,36 +221,40 @@ function DocumentsCard({
           />
           {t.documents.showArchived.replace('{n}', String(archivedCount))}
         </label>
-        <div className="flex items-end gap-2">
-          <Select
-            aria-label={t.documents.assignPickTemplate}
-            className="h-9 w-56 text-sm"
-            value={assignId}
-            onChange={(e) => setAssignId(e.target.value)}
-          >
-            <option value="">{t.documents.assignPickTemplate}</option>
-            {assignable.map((tpl) => (
-              <option key={tpl.id} value={tpl.id}>
-                {templateTitle(tpl, locale)}
-              </option>
-            ))}
-          </Select>
+        {approved && assignable.length > 0 && (
           <Button
             size="sm"
             variant="secondary"
-            disabled={!assignId}
-            onClick={() => setAssigning(byId.get(assignId) ?? null)}
+            onClick={() => {
+              setAssigned(null);
+              setAssigning(true);
+            }}
           >
-            {t.documents.assign}
+            {t.documents.assignDocument}
           </Button>
-        </div>
+        )}
       </div>
 
+      {assigned && (
+        <p role="status" className="text-xs text-status-approved">
+          {t.documents.assignedDocument.replace(
+            '{title}',
+            templateTitle(assigned, locale),
+          )}
+        </p>
+      )}
+
       {assigning && (
-        <AssignDialog
-          template={assigning}
-          initialInstructorIds={[instructorId]}
-          onClose={() => setAssigning(null)}
+        <AssignToInstructorDialog
+          instructorId={instructorId}
+          instructorName={instructorName}
+          season={season}
+          templates={assignable}
+          onClose={() => setAssigning(false)}
+          onAssigned={(tpl) => {
+            setAssigning(false);
+            setAssigned(tpl);
+          }}
         />
       )}
     </Card>

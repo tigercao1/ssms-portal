@@ -706,7 +706,11 @@ export interface Messages {
     missingTitle: string;
     noAssignments: string;
     showArchived: string;
-    assignPickTemplate: string;
+    assignDocument: string;
+    assignDocumentIntro: string;
+    assignDocumentChoose: string;
+    assignedDocument: string;
+    assignedOnApproval: string;
     unknownTemplate: string;
     assignedOn: string;
     viewedOn: string;
