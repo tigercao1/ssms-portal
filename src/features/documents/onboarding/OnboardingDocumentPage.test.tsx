@@ -831,7 +831,7 @@ describe('OnboardingDocumentPage — go-live banner', () => {
                   {
                     group: 'onboarding',
                     assignmentId: 'asg-read',
-                    title: 'Instructor handbook',
+                    titleEn: 'Instructor handbook',
                     titleZh: '教练手册',
                   },
                 ],

@@ -43,7 +43,7 @@ export function missingItemLabel(
     case 'certification':
       return t.goLive.noneVerified;
     case 'onboarding':
-      return localizeField(item.title, item.titleZh, locale);
+      return localizeField(item.titleEn, item.titleZh, locale);
   }
 }
 

@@ -107,7 +107,7 @@ export const fakeGoLive: GoLiveReadiness = {
     {
       group: 'onboarding',
       assignmentId: 'asg-contract',
-      title: 'Independent contractor agreement',
+      titleEn: 'Independent contractor agreement',
       titleZh: '独立承包人协议',
     },
   ],

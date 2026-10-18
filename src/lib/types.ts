@@ -423,7 +423,7 @@ export type GoLiveMissingItem =
   | {
       group: 'onboarding';
       assignmentId: string;
-      title: string;
+      titleEn: string;
       titleZh: string | null;
     };
 
