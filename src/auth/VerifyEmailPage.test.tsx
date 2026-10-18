@@ -30,7 +30,7 @@ describe('VerifyEmailPage', () => {
 
     expect(await screen.findByText('Sent — check your inbox.')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /^Resend in \d+s$/ }),
+      screen.getByRole('button', { name: /^Resend in (60|59)s$/ }),
     ).toBeDisabled();
     expect(auth.resend).toHaveBeenCalledTimes(1);
     expect(auth.resend).toHaveBeenCalledWith({
@@ -49,10 +49,15 @@ describe('VerifyEmailPage', () => {
     ).toBeDisabled();
   });
 
-  it('asks the user to wait and counts down when Supabase rate-limits', async () => {
+  it('counts down from the wait Supabase reports when it rate-limits', async () => {
     auth.resend.mockResolvedValue({
       data: {},
-      error: { status: 429, code: 'over_email_send_rate_limit' },
+      error: {
+        status: 429,
+        code: 'over_email_send_rate_limit',
+        message:
+          'For security purposes, you can only request this after 42 seconds.',
+      },
     });
 
     await userEvent.click(await renderPage());
@@ -63,8 +68,30 @@ describe('VerifyEmailPage', () => {
       ),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /^Resend in \d+s$/ }),
+      screen.getByRole('button', { name: /^Resend in (42|41)s$/ }),
     ).toBeDisabled();
+  });
+
+  it('asks the user to wait without a countdown when Supabase gives no wait', async () => {
+    auth.resend.mockResolvedValue({
+      data: {},
+      error: {
+        status: 429,
+        code: 'over_email_send_rate_limit',
+        message: 'email rate limit exceeded',
+      },
+    });
+
+    await userEvent.click(await renderPage());
+
+    expect(
+      await screen.findByText(
+        'Too many emails were requested. Please wait a minute and try again.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Resend verification email' }),
+    ).toBeEnabled();
   });
 
   it('shows an error and allows a retry when the resend fails', async () => {

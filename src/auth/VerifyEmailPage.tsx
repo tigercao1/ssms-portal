@@ -5,7 +5,11 @@ import { useSession } from './SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner } from '@/components';
 import { AuthLayout } from './AuthLayout';
-import { isRateLimited } from './authErrors';
+import {
+  SUPABASE_EMAIL_INTERVAL_SECONDS,
+  isRateLimited,
+  rateLimitWaitSeconds,
+} from './authErrors';
 import { ResendButton } from './ResendButton';
 import { useResendCooldown } from './useResendCooldown';
 
@@ -28,14 +32,14 @@ export function VerifyEmailPage() {
       });
       if (err && isRateLimited(err)) {
         setError(t.auth.rateLimited);
-        return 'rate-limited';
+        return rateLimitWaitSeconds(err);
       }
       if (err) {
         setError(t.auth.genericError);
-        return 'failed';
+        return null;
       }
       setSent(true);
-      return 'sent';
+      return SUPABASE_EMAIL_INTERVAL_SECONDS;
     });
   }
 

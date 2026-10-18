@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const RESEND_COOLDOWN_MS = 60_000;
 const STORAGE_PREFIX = 'ssms.resendCooldown.';
 
 export type ResendPurpose = 'activation' | 'verify-email' | 'password-reset';
-
-export type ResendResult = 'sent' | 'rate-limited' | 'failed';
 
 function storageKey(purpose: ResendPurpose, email: string) {
   return `${STORAGE_PREFIX}${purpose}:${email.trim().toLowerCase()}`;
@@ -20,13 +17,23 @@ function readUntil(key: string): number {
   }
 }
 
-function writeUntil(key: string, until: number): boolean {
+function writeWait(key: string, seconds: number): number {
+  const until = seconds > 0 ? Date.now() + seconds * 1000 : 0;
   try {
-    localStorage.setItem(key, String(until));
-    return true;
+    if (until > 0) localStorage.setItem(key, String(until));
+    else localStorage.removeItem(key);
   } catch {
-    return false;
+    return until;
   }
+  return until;
+}
+
+export function saveResendWait(
+  purpose: ResendPurpose,
+  email: string,
+  seconds: number,
+) {
+  writeWait(storageKey(purpose, email), seconds);
 }
 
 export function useResendCooldown(purpose: ResendPurpose, email: string) {
@@ -49,21 +56,16 @@ export function useResendCooldown(purpose: ResendPurpose, email: string) {
   }, [until, now]);
 
   const send = useCallback(
-    async (
-      attempt: () => Promise<ResendResult>,
-    ): Promise<ResendResult | null> => {
-      if (inFlight.current || readUntil(key) > Date.now()) return null;
+    async (attempt: () => Promise<number | null>): Promise<void> => {
+      if (inFlight.current || readUntil(key) > Date.now()) return;
       inFlight.current = true;
       setBusy(true);
       try {
-        const result = await attempt();
-        if (result !== 'failed') {
-          const next = Date.now() + RESEND_COOLDOWN_MS;
-          writeUntil(key, next);
-          setUntil(next);
+        const seconds = await attempt();
+        if (seconds !== null) {
+          setUntil(writeWait(key, seconds));
           setNow(Date.now());
         }
-        return result;
       } finally {
         inFlight.current = false;
         setBusy(false);

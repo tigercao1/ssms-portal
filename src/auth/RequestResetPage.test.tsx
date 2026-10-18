@@ -29,7 +29,7 @@ describe('RequestResetPage', () => {
       ),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /^Resend in \d+s$/ }),
+      screen.getByRole('button', { name: /^Resend in (60|59)s$/ }),
     ).toBeDisabled();
     expect(auth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
 
@@ -47,10 +47,15 @@ describe('RequestResetPage', () => {
     ).toBeEnabled();
   });
 
-  it('asks the user to wait and counts down when Supabase rate-limits', async () => {
+  it('counts down from the wait Supabase reports when it rate-limits', async () => {
     auth.resetPasswordForEmail.mockResolvedValue({
       data: {},
-      error: { status: 429, code: 'over_email_send_rate_limit' },
+      error: {
+        status: 429,
+        code: 'over_email_send_rate_limit',
+        message:
+          'For security purposes, you can only request this after 42 seconds.',
+      },
     });
 
     await requestReset('jane@example.com');
@@ -61,8 +66,30 @@ describe('RequestResetPage', () => {
       ),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /^Resend in \d+s$/ }),
+      screen.getByRole('button', { name: /^Resend in (42|41)s$/ }),
     ).toBeDisabled();
+  });
+
+  it('asks the user to wait without a countdown when Supabase gives no wait', async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({
+      data: {},
+      error: {
+        status: 429,
+        code: 'over_email_send_rate_limit',
+        message: 'email rate limit exceeded',
+      },
+    });
+
+    await requestReset('jane@example.com');
+
+    expect(
+      await screen.findByText(
+        'Too many emails were requested. Please wait a minute and try again.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Send reset link' }),
+    ).toBeEnabled();
   });
 
   it.each([

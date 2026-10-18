@@ -5,7 +5,11 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Field, Input } from '@/components';
 import { AuthLayout } from './AuthLayout';
 import { track } from '@/lib/analytics';
-import { isRateLimited } from './authErrors';
+import {
+  SUPABASE_EMAIL_INTERVAL_SECONDS,
+  isRateLimited,
+  rateLimitWaitSeconds,
+} from './authErrors';
 import { ResendButton } from './ResendButton';
 import { useResendCooldown } from './useResendCooldown';
 
@@ -27,15 +31,15 @@ export function RequestResetPage() {
       );
       if (err && isRateLimited(err)) {
         setError(t.auth.rateLimited);
-        return 'rate-limited';
+        return rateLimitWaitSeconds(err);
       }
       if (err) {
         setError(t.auth.genericError);
-        return 'failed';
+        return null;
       }
       track('password_reset_requested');
       setSent(true);
-      return 'sent';
+      return SUPABASE_EMAIL_INTERVAL_SECONDS;
     });
   }
 

@@ -7,3 +7,10 @@ export function isRateLimited(err: AuthError) {
 export function isUnreachable(err: AuthError) {
   return err.name === 'AuthRetryableFetchError' || (err.status ?? 0) >= 500;
 }
+
+export const SUPABASE_EMAIL_INTERVAL_SECONDS = 60;
+
+export function rateLimitWaitSeconds(err: AuthError): number | null {
+  const match = /after (\d+) seconds?/i.exec(err.message);
+  return match ? Number(match[1]) : null;
+}

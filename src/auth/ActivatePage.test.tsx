@@ -36,9 +36,11 @@ function captureRedeem(response: () => Response) {
   return bodies;
 }
 
+const accepted = (retryAfterSeconds = 60) =>
+  HttpResponse.json({ status: 'accepted', retryAfterSeconds }, { status: 202 });
+
 function captureResend(
-  response: () => Response | Promise<Response> = () =>
-    new HttpResponse(null, { status: 202 }),
+  response: () => Response | Promise<Response> = () => accepted(),
 ) {
   const bodies: unknown[] = [];
   server.use(
@@ -234,24 +236,47 @@ describe('ActivatePage', () => {
   });
 
   describe('resend cooldown', () => {
-    function renderExpired() {
+    function renderExpired(retryAfterSeconds = 0) {
       captureRedeem(() =>
-        HttpResponse.json({ email: 'jane@example.com' }, { status: 410 }),
+        HttpResponse.json(
+          { email: 'jane@example.com', retryAfterSeconds },
+          { status: 410 },
+        ),
       );
       renderActivate('/activate?t=old');
     }
 
-    async function openExpired() {
-      renderExpired();
+    async function openExpired(retryAfterSeconds = 0) {
+      renderExpired(retryAfterSeconds);
       return screen.findByRole('button', { name: 'Send me a new link' });
     }
 
-    it('sends one request for a burst of taps, then counts down', async () => {
+    it('opens with the countdown the server reports already running', async () => {
+      const resent = captureResend();
+      renderExpired(42);
+      const countdown = await screen.findByRole('button', {
+        name: /^Resend in (42|41)s$/,
+      });
+      expect(countdown).toBeDisabled();
+      fireEvent.click(countdown);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(resent).toHaveLength(0);
+    });
+
+    it('opens ready to send when the server reports no wait, even over an old saved one', async () => {
+      localStorage.setItem(
+        'ssms.resendCooldown.activation:jane@example.com',
+        String(Date.now() + 30_000),
+      );
+      expect(await openExpired(0)).toBeEnabled();
+    });
+
+    it('sends one request for a burst of taps, then counts down from the server value', async () => {
       let release = () => {};
       const answered = new Promise<void>((resolve) => (release = resolve));
       const resent = captureResend(async () => {
         await answered;
-        return new HttpResponse(null, { status: 202 });
+        return accepted(37);
       });
       const button = await openExpired();
 
@@ -260,7 +285,7 @@ describe('ActivatePage', () => {
       release();
 
       const countdown = await screen.findByRole('button', {
-        name: /^Resend in (60|59)s$/,
+        name: /^Resend in (37|36)s$/,
       });
       expect(countdown).toBeDisabled();
       fireEvent.click(countdown);
@@ -268,25 +293,59 @@ describe('ActivatePage', () => {
       expect(resent).toHaveLength(1);
     });
 
-    it('keeps counting down after a reload', async () => {
-      captureResend();
+    it('starts no countdown when the response carries no wait', async () => {
+      const resent = captureResend(
+        () => new HttpResponse(null, { status: 202 }),
+      );
+      await userEvent.click(await openExpired());
+      await screen.findByText(/a new activation link is on its way/);
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Send me a new link' }),
+      );
+      await waitFor(() => expect(resent).toHaveLength(2));
+    });
+
+    it('keeps the server countdown after a reload onto a replaced link', async () => {
+      captureResend(() => accepted(60));
       await userEvent.click(await openExpired());
       await screen.findByRole('button', { name: /^Resend in \d+s$/ });
 
       cleanup();
-      renderExpired();
+      captureRedeem(() =>
+        HttpResponse.json({ message: 'Not found' }, { status: 404 }),
+      );
+      renderActivate('/activate?t=old');
+      await userEvent.type(
+        await screen.findByLabelText(/Email/),
+        'Jane@example.com',
+      );
       expect(
-        await screen.findByRole('button', { name: /^Resend in \d+s$/ }),
+        screen.getByRole('button', { name: /^Resend in (60|59|58)s$/ }),
       ).toBeDisabled();
     });
 
-    it('starts the countdown when the API says too many requests', async () => {
+    it('takes the server countdown over the saved one after a reload', async () => {
+      captureResend(() => accepted(60));
+      await userEvent.click(await openExpired());
+      await screen.findByRole('button', { name: /^Resend in \d+s$/ });
+
+      cleanup();
+      renderExpired(12);
+      expect(
+        await screen.findByRole('button', { name: /^Resend in (12|11)s$/ }),
+      ).toBeDisabled();
+    });
+
+    it('counts down from the wait the API sends with too many requests', async () => {
       captureResend(() =>
-        HttpResponse.json({ message: 'Too Many Requests' }, { status: 429 }),
+        HttpResponse.json(
+          { message: 'Too Many Requests', retryAfterSeconds: 3_000 },
+          { status: 429 },
+        ),
       );
       await userEvent.click(await openExpired());
       expect(
-        await screen.findByRole('button', { name: /^Resend in \d+s$/ }),
+        await screen.findByRole('button', { name: 'Resend in 50 min' }),
       ).toBeDisabled();
     });
 
@@ -302,12 +361,8 @@ describe('ActivatePage', () => {
       await waitFor(() => expect(resent).toHaveLength(2));
     });
 
-    it('re-enables the button once the minute is up', async () => {
-      localStorage.setItem(
-        'ssms.resendCooldown.activation:jane@example.com',
-        String(Date.now() + 1_200),
-      );
-      renderExpired();
+    it('re-enables the button once the wait is up', async () => {
+      renderExpired(2);
       expect(
         await screen.findByRole('button', { name: /^Resend in [12]s$/ }),
       ).toBeDisabled();
@@ -329,6 +384,14 @@ describe('ActivatePage', () => {
       );
       expect(
         await screen.findByRole('button', { name: /^\d+ 秒后可重新发送$/ }),
+      ).toBeDisabled();
+    });
+
+    it('shows a long wait in minutes in Chinese', async () => {
+      localStorage.setItem('ssms.locale', 'zh-CN');
+      renderExpired(150);
+      expect(
+        await screen.findByRole('button', { name: '3 分钟后可重新发送' }),
       ).toBeDisabled();
     });
   });

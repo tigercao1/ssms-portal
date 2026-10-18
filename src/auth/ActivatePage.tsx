@@ -11,10 +11,14 @@ import { ApiError } from '@/lib/api';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input, Spinner } from '@/components';
 import { ResendButton } from './ResendButton';
-import { useResendCooldown } from './useResendCooldown';
+import { saveResendWait, useResendCooldown } from './useResendCooldown';
 import { AuthLayout } from './AuthLayout';
 import { useSession } from './SessionProvider';
-import { redeemActivation, resendActivation } from './activationApi';
+import {
+  redeemActivation,
+  resendActivation,
+  retryAfterSeconds,
+} from './activationApi';
 import { track } from '@/lib/analytics';
 
 type Phase =
@@ -56,7 +60,11 @@ export function ActivatePage() {
         (err.status === 410 || err.status === 404)
       ) {
         track('activation_failed', { reason: 'expired' });
-        setPhase({ kind: 'expired', email: emailFromBody(err.body) });
+        const expiredEmail = emailFromBody(err.body);
+        const wait = retryAfterSeconds(err.body);
+        if (expiredEmail && wait !== null)
+          saveResendWait('activation', expiredEmail, wait);
+        setPhase({ kind: 'expired', email: expiredEmail });
       } else {
         track('activation_failed', { reason: 'redeem_error' });
         setPhase({
@@ -142,16 +150,16 @@ function ExpiredLink({ initialEmail }: { initialEmail: string }) {
     await cooldown.send(async () => {
       setError(null);
       try {
-        await resendActivation(trimmed);
+        const accepted = await resendActivation(trimmed);
         setSent(true);
-        return 'sent';
+        return retryAfterSeconds(accepted);
       } catch (err) {
         if (err instanceof ApiError && err.status === 429) {
           setError(t.activation.resendRateLimited);
-          return 'rate-limited';
+          return retryAfterSeconds(err.body);
         }
         setError(t.auth.genericError);
-        return 'failed';
+        return null;
       }
     });
   }

@@ -17,9 +17,14 @@ export function ResendButton({
   const t = useT();
   return (
     <Button {...rest} loading={busy} disabled={disabled || secondsLeft > 0}>
-      {secondsLeft > 0
-        ? t.auth.resendIn.replace('{seconds}', String(secondsLeft))
-        : children}
+      {secondsLeft > 60
+        ? t.auth.resendInMinutes.replace(
+            '{minutes}',
+            String(Math.ceil(secondsLeft / 60)),
+          )
+        : secondsLeft > 0
+          ? t.auth.resendIn.replace('{seconds}', String(secondsLeft))
+          : children}
     </Button>
   );
 }
