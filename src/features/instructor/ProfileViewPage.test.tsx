@@ -569,7 +569,7 @@ describe('ProfileViewPage go-live', () => {
     expect(pillColor(pill)).toBe('var(--status-pending)');
     expect(
       card.getByText(
-        '1 of 3 done · 1 awaiting review. Finish the rest to go live on ssnow.club.',
+        '1 of 3 done · 1 awaiting review. Finish the rest to go live on the SSnow official website.',
       ),
     ).toBeInTheDocument();
     expect(
@@ -595,7 +595,7 @@ describe('ProfileViewPage go-live', () => {
     const card = await findCard();
     expect(
       await card.findByText(
-        '1 of 2 done. Finish the rest to go live on ssnow.club.',
+        '1 of 2 done. Finish the rest to go live on the SSnow official website.',
       ),
     ).toBeInTheDocument();
     expect(card.getByText('Required items pending')).toBeInTheDocument();
@@ -662,7 +662,9 @@ describe('ProfileViewPage go-live', () => {
     ).toBeInTheDocument();
     expect(card.getByText('Required items pending')).toBeInTheDocument();
     expect(
-      card.getByText('2 of 2 done. Finish the rest to go live on ssnow.club.'),
+      card.getByText(
+        '2 of 2 done. Finish the rest to go live on the SSnow official website.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -690,7 +692,9 @@ describe('ProfileViewPage go-live', () => {
     expect(
       await screen.findByText('Your profile is live.'),
     ).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'View it on ssnow.club ↗' });
+    const link = screen.getByRole('link', {
+      name: 'View it on the SSnow official website ↗',
+    });
     expect(link).toHaveAttribute('href', liveUrl);
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
@@ -718,7 +722,7 @@ describe('ProfileViewPage go-live', () => {
     renderWithProviders(<ProfileViewPage />);
     expect(await screen.findByText('您的资料已上线。')).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: '在 ssnow.club 查看 ↗' }),
+      screen.getByRole('link', { name: '在 SSnow 官网查看 ↗' }),
     ).toHaveAttribute('href', liveUrl);
     expect(screen.getByText('已上线')).toBeInTheDocument();
     expect(await (await findCard()).findByText('全部完成')).toBeInTheDocument();
@@ -809,7 +813,7 @@ describe('ProfileViewPage go-live', () => {
     expect(await card.findByText('有待完成事项')).toBeInTheDocument();
     expect(
       card.getByText(
-        '已完成 1 / 3 · 1 项待审核。完成其余事项即可在 ssnow.club 上线。',
+        '已完成 1 / 3 · 1 项待审核。完成其余事项即可在 SSnow 官网上线。',
       ),
     ).toBeInTheDocument();
     expect(
@@ -863,7 +867,9 @@ describe('ProfileViewPage go-live', () => {
     const pill = await card.findByText('Required items pending');
     expect(pillColor(pill)).toBe('var(--status-pending)');
     expect(
-      card.getByText('Complete your profile to go live on ssnow.club.'),
+      card.getByText(
+        'Complete your profile to go live on the SSnow official website.',
+      ),
     ).toBeInTheDocument();
     expect(
       card.getByText('Your profile also needs: main photo and bio.'),
@@ -890,7 +896,7 @@ describe('ProfileViewPage go-live', () => {
     const card = await findCard();
     expect(await card.findByText('有待完成事项')).toBeInTheDocument();
     expect(
-      card.getByText('完善您的资料即可在 ssnow.club 上线。'),
+      card.getByText('完善您的资料即可在 SSnow 官网上线。'),
     ).toBeInTheDocument();
     expect(
       card.getByText('您的资料还需要：主照片和简介。'),
