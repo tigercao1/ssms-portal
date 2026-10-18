@@ -788,7 +788,7 @@ describe('InstructorDocumentsSection — go-live certification status', () => {
           approvalStatus="approved"
           certifications={[{ org: 'csia', track: 'regular', level: 3 }]}
         />
-        <ShopifyInstructorPanel instructorId="inst-1" />
+        <ShopifyInstructorPanel instructorId="inst-1" publishedAt={null} />
       </>,
       { staleTime: 60_000 },
     );

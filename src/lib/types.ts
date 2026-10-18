@@ -151,6 +151,7 @@ export interface AdminInstructorRecord {
   isActive: boolean;
   calendarConnected: boolean;
   displayOrder?: number | null;
+  publishedAt: string | null;
   insertedAt: string;
   updatedAt: string;
 }
@@ -425,7 +426,8 @@ export type GoLiveMissingItem =
       assignmentId: string;
       titleEn: string;
       titleZh: string | null;
-    };
+    }
+  | { group: 'review' };
 
 export type CertVerificationStatus =
   | 'verified'
