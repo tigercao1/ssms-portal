@@ -7,7 +7,7 @@ const TONES: Record<Tone, string> = {
   info: 'border-l-navy bg-navy-tint text-navy',
   pending: 'border-l-status-pending bg-status-pending/10 text-ink',
   approved: 'border-l-status-approved bg-status-approved/10 text-ink',
-  live: 'border-l-status-live bg-[color-mix(in_srgb,var(--status-live)_8%,white)] text-ink',
+  live: 'border-l-status-live bg-status-live/10 text-ink',
   rejected: 'border-l-status-rejected bg-red-tint text-ink',
   error: 'border-l-status-rejected bg-red-tint text-ink',
 };
