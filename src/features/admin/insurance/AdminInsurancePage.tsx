@@ -27,7 +27,11 @@ import {
   RequestStatusPill,
   studentNames,
 } from '@/features/insurance/RecordStatus';
-import { LessonTree, treeLessonOf } from '@/features/insurance/LessonTree';
+import {
+  LessonTree,
+  treeLessonOf,
+  useInsuranceText,
+} from '@/features/insurance/LessonTree';
 import { CAP_CENTS, dollars } from '@/features/insurance/money';
 import { useToast } from '@/features/insurance/Toast';
 import type {
@@ -66,6 +70,7 @@ interface ActionTarget {
   id: string;
   no: string;
   summary: string;
+  request?: { no: string; lessons: number };
 }
 
 type Dialog =
@@ -208,6 +213,7 @@ export function AdminInsurancePage() {
         </h2>
         <RecordsTable
           query={records}
+          requests={requests.data?.requests ?? []}
           waiting={seasons.isLoading}
           page={page}
           onPage={setPage}
@@ -242,13 +248,9 @@ export function AdminInsurancePage() {
           target={dialog.target}
           title={s.voidTitle.replace('{recordNo}', dialog.target.no)}
           summary={dialog.target.summary}
-          body={
-            dialog.target.kind === 'request' ? s.requestVoidBody : s.voidBody
-          }
+          body={wholeRequest(dialog.target) ? s.requestVoidBody : s.voidBody}
           confirm={
-            dialog.target.kind === 'request'
-              ? s.requestVoidConfirm
-              : s.voidConfirm
+            wholeRequest(dialog.target) ? s.requestVoidConfirm : s.voidConfirm
           }
           onClose={() => setDialog(null)}
           onDone={() => {
@@ -515,14 +517,37 @@ function SummaryRow({
   );
 }
 
+function wholeRequest(target: Pick<ActionTarget, 'kind' | 'request'>) {
+  return target.kind === 'request' || Boolean(target.request);
+}
+
+function WholeRequestNote({
+  target,
+}: {
+  target: Pick<ActionTarget, 'request'>;
+}) {
+  const f = useInsuranceText();
+  const s = useT().adminInsurance;
+  if (!target.request) return null;
+  return (
+    <p data-testid="whole-request" className="text-sm font-semibold text-navy">
+      {s.wholeRequestNote
+        .replace('{requestNo}', target.request.no)
+        .replace('{lessons}', f.lessons(target.request.lessons))}
+    </p>
+  );
+}
+
 function RecordsTable({
   query,
+  requests,
   waiting,
   page,
   onPage,
   onAction,
 }: {
   query: ReturnType<typeof useInsuranceRecords>;
+  requests: AdminInsuranceRequest[];
   waiting: boolean;
   page: number;
   onPage: (page: number) => void;
@@ -603,7 +628,17 @@ function RecordsTable({
                   >
                     {dollars(r.amountCents)}
                   </td>
-                  <td className={cn(td, 'font-mono text-xs')}>{r.recordNo}</td>
+                  <td className={cn(td, 'font-mono text-xs')}>
+                    {r.recordNo}
+                    {r.requestNo && (
+                      <span
+                        data-testid="part-of-request"
+                        className="block font-body text-xs text-slate"
+                      >
+                        {s.partOfRequest.replace('{requestNo}', r.requestNo)}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-2.5 py-2.5">
                     <RecordStatusCell record={r} />
                     {r.paymentStatus === 'paid' && r.paidOn && (
@@ -641,6 +676,18 @@ function RecordsTable({
                           id: r.id,
                           no: r.recordNo,
                           summary: recordSummary(r, locale),
+                          ...(r.requestId &&
+                            r.requestNo && {
+                              request: {
+                                no: r.requestNo,
+                                lessons:
+                                  requests.find((x) => x.id === r.requestId)
+                                    ?.lessonCount ??
+                                  rows.filter(
+                                    (x) => x.requestId === r.requestId,
+                                  ).length,
+                              },
+                            }),
                         }}
                         onAction={onAction}
                       />
@@ -923,9 +970,7 @@ function requestSummary(request: AdminInsuranceRequest, locale: Locale) {
 }
 
 function actionErrorText(error: unknown, t: ReturnType<typeof useT>) {
-  return errorCodeOf(error) === 'part_of_request'
-    ? t.adminInsurance.partOfRequest
-    : errorText(error, t.errors.generic);
+  return errorText(error, t.errors.generic);
 }
 
 function recordSummary(record: AdminInsuranceRecord, locale: Locale) {
@@ -992,6 +1037,7 @@ function MarkPaidDialog({
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <p className="text-sm text-slate">{target.summary}</p>
+        <WholeRequestNote target={target} />
         <Field label={s.paidOnLabel} required>
           {(p) => (
             <Input
@@ -1064,10 +1110,9 @@ function MarkUnpaidDialog({
     >
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-slate">{target.summary}</p>
+        <WholeRequestNote target={target} />
         <p>
-          {target.kind === 'request'
-            ? s.requestMarkUnpaidBody
-            : s.markUnpaidBody}
+          {wholeRequest(target) ? s.requestMarkUnpaidBody : s.markUnpaidBody}
         </p>
         {markUnpaid.isError && (
           <Banner tone="error">{actionErrorText(markUnpaid.error, t)}</Banner>
@@ -1208,7 +1253,7 @@ function VoidDialog({
   onClose,
   onDone,
 }: {
-  target: Pick<ActionTarget, 'kind' | 'id'>;
+  target: Pick<ActionTarget, 'kind' | 'id' | 'request'>;
   title: string;
   summary: string;
   body: string;
@@ -1261,6 +1306,7 @@ function VoidDialog({
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <p className="text-sm text-slate">{summary}</p>
+        <WholeRequestNote target={target} />
         <p className="text-sm">{body}</p>
         <Field
           label={s.voidReason}

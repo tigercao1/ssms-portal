@@ -15,6 +15,8 @@ import {
   myInsurance,
   onboardingInsurance,
   paidRequest,
+  SEASON_2025,
+  SEASON_2027,
   unpaidRequest,
   withRequests,
   type InsuranceMockState,
@@ -799,7 +801,7 @@ describe('InsurancePage draft editing', () => {
     ).toEqual([
       'Lesson 1: no date',
       'Lesson 1: student 1 has no name',
-      "Lesson 2: the date isn't in the 2026/27 season",
+      'Lesson 2: no insurance season covers this date',
       'Lesson 2: add at least one student',
     ]);
     await waitFor(() =>
@@ -964,6 +966,16 @@ describe('InsurancePage draft editing', () => {
       400,
       'All the lessons in one request must be in the same season.',
     ],
+    [
+      { code: 'mixed_seasons', lessonIndex: 0, seasonKey: '2027/28' },
+      400,
+      'Lesson 1: all the lessons in one request must be in the same season (2027/28)',
+    ],
+    [
+      { code: 'location_conflict', lessonIndex: 0 },
+      400,
+      'Lesson 1: choose a ski area or type another one, not both',
+    ],
     [{ code: 'too_many_lessons' }, 400, 'A request holds up to 10 lessons.'],
     [{ code: 'locked' }, 403, 'Only approved instructors can insure lessons.'],
   ])('explains a %o response', async (body, status, message) => {
@@ -1010,6 +1022,106 @@ describe('InsurancePage draft editing', () => {
     expect(screen.getByTestId('new-request')).toHaveTextContent(
       'New insurance request',
     );
+  });
+});
+
+describe('InsurancePage seasons', () => {
+  function serveSeasons() {
+    state = createInsuranceState(withRequests, {
+      '2025/26': myInsurance({
+        season: SEASON_2025,
+        owedCents: 39000,
+        unpaidCents: 39000,
+      }),
+      '2027/28': myInsurance({ season: SEASON_2027 }),
+    });
+    server.use(
+      ...insuranceHandlers(state),
+      http.get(`${API}/reference/teaching-locations`, () =>
+        HttpResponse.json(LOCATIONS),
+      ),
+    );
+  }
+
+  it("insures a previous-season lesson against that season's totals", async () => {
+    serveSeasons();
+    const { user } = await renderPage({ route: '/insurance/new' });
+    await addLesson(user, {
+      date: '2026-02-14',
+      hours: 2,
+      students: [['Anna', true]],
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('cap-total')).toHaveTextContent(
+        'Season total $390 / $400',
+      ),
+    );
+    expect(state.seasonQueries).toContain('2025/26');
+    expect(screen.getByTestId('season-badge')).toHaveTextContent('2025/26');
+    expect(within(cards()[0]!).getByTestId('lesson-price')).toHaveTextContent(
+      'List $20 · $10 after cap',
+    );
+    expect(screen.queryByTestId('lesson-error')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Review & submit' }));
+    await user.click(screen.getByRole('button', { name: 'Submit · $10 due' }));
+    await waitFor(() => expect(path()).toBe('/insurance'));
+    expect(state.posts[0]!.lessons[0]!.lessonDate).toBe('2026-02-14');
+    expect(state.seasons['2025/26']!.requests[0]!.seasonKey).toBe('2025/26');
+  });
+
+  it("insures a next-season lesson against that season's totals", async () => {
+    serveSeasons();
+    const { user } = await renderPage({ route: '/insurance/new' });
+    await addLesson(user, { date: '2027-12-26', students: [['Anna', true]] });
+    await waitFor(() =>
+      expect(screen.getByTestId('cap-total')).toHaveTextContent(
+        'Season total $0 / $400',
+      ),
+    );
+    expect(state.seasonQueries).toContain('2027/28');
+    expect(screen.getByTestId('draft-preview')).toHaveTextContent(
+      'This request +$10 → $10',
+    );
+    await user.click(screen.getByRole('button', { name: 'Review & submit' }));
+    expect(path()).toBe('/insurance/new/review');
+  });
+
+  it('blocks a request whose lessons span two seasons, naming the lesson', async () => {
+    serveSeasons();
+    const { user } = await renderPage({
+      route: '/insurance/new',
+      locale: 'zh-CN',
+    });
+    await addLesson(
+      user,
+      { date: '2026-12-26', students: [['Anna', true]] },
+      false,
+    );
+    await addLesson(
+      user,
+      { date: '2027-12-26', students: [['Ben', true]] },
+      false,
+    );
+    expect(within(cards()[1]!).getByTestId('lesson-error')).toHaveTextContent(
+      '第 2 节：同一份投保里的课程需在同一雪季（2026/27）',
+    );
+    expect(
+      within(cards()[0]!).queryByTestId('lesson-error'),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '核对并提交' }));
+    expect(path()).toBe('/insurance/new');
+    expect(state.posts).toHaveLength(0);
+  });
+
+  it('flags a date in no season on that lesson', async () => {
+    serveSeasons();
+    const { user } = await renderPage({ route: '/insurance/new' });
+    await addLesson(user, { date: '2027-07-01', students: [['Anna', true]] });
+    expect(within(cards()[0]!).getByTestId('lesson-error')).toHaveTextContent(
+      'Lesson 1: no insurance season covers this date',
+    );
+    await user.click(screen.getByRole('button', { name: 'Review & submit' }));
+    expect(path()).toBe('/insurance/new');
   });
 });
 

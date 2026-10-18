@@ -107,7 +107,7 @@ export function DraftEditor({
   const f = useInsuranceText();
   const s = f.s;
   const full = draft.lessons.length >= MAX_LESSONS;
-  const shown = draft.showErrors ? issues : [];
+  const shown = draft.showErrors ? issues : issues.filter((x) => x.live);
 
   function addLesson() {
     if (full) return;

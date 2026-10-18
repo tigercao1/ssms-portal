@@ -109,6 +109,8 @@ export interface GrantSeasonPassBody {
 }
 
 export interface AdminInsuranceRecord extends InsuranceRecord {
+  requestId: string | null;
+  requestNo: string | null;
   instructorId: string;
   instructorName: string | null;
   instructorNameZh: string | null;

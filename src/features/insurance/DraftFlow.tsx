@@ -14,11 +14,18 @@ import type { Messages } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { errorText } from '@/features/admin/payroll/payrollFormat';
-import { errorCodeOf, errorIndexesOf, useSubmitRequest } from './api';
+import { useSeasons } from '@/features/reference/api';
+import {
+  errorCodeOf,
+  errorIndexesOf,
+  useSeasonInsurance,
+  useSubmitRequest,
+} from './api';
 import {
   draftBody,
   MAX_LESSONS,
   newDraft,
+  requestSeason,
   validateDraft,
   type InsuranceDraft,
 } from './draft';
@@ -26,7 +33,7 @@ import { DraftEditor, jumpToIssue, useLocationName } from './DraftEditor';
 import { LessonTree, useInsuranceText } from './LessonTree';
 import { dollars, fill, priceLessons } from './money';
 import { ProgressCard } from './ProgressCard';
-import type { MyInsurance } from './types';
+import type { InsuranceSeason, MyInsurance } from './types';
 
 export type DraftMode = 'edit' | 'review';
 
@@ -42,25 +49,39 @@ export const REVIEW_PATH = '/insurance/new/review';
 
 export function useDraftQuote(draft: InsuranceDraft | null, data: MyInsurance) {
   const t = useT();
+  const seasons = useSeasons();
+  const known = useMemo<InsuranceSeason[]>(
+    () => seasons.data ?? (data.season ? [data.season] : []),
+    [seasons.data, data.season],
+  );
+  const lessons = useMemo(() => draft?.lessons ?? [], [draft]);
+  const season = requestSeason(lessons, known);
+  const otherSeason = Boolean(season && season.key !== data.season?.key);
+  const seasonInsurance = useSeasonInsurance(season?.key ?? null, otherSeason);
+  const totals = otherSeason ? (seasonInsurance.data ?? null) : data;
+  const pending = seasons.isPending || totals === null;
   return useMemo(() => {
-    const lessons = draft?.lessons ?? [];
+    const base = totals ?? data;
     const priced = priceLessons(
       lessons.map((l) => ({
         durationHours: l.durationHours,
         studentCount: l.students.length,
       })),
       {
-        owedCents: data.owedCents,
-        capCents: data.capCents,
-        seasonPass: data.coverage === 'season_pass',
+        owedCents: base.owedCents,
+        capCents: base.capCents,
+        seasonPass: base.coverage === 'season_pass',
       },
     );
     return {
+      season,
+      totals: base,
+      pending,
       priced,
       total: priced.reduce((sum, p) => sum + p.amountCents, 0),
-      issues: validateDraft({ lessons }, data.season, t),
+      issues: validateDraft({ lessons }, known, t),
     };
-  }, [draft, data, t]);
+  }, [lessons, known, season, totals, data, pending, t]);
 }
 
 function submitErrorText(
@@ -88,7 +109,18 @@ function submitErrorText(
           fill(s.errNoSeason, { n: lessonIndex + 1 }),
         )
       : [s.noSeason];
-  if (code === 'mixed_seasons') return [s.errMixedSeasons];
+  if (code === 'mixed_seasons') {
+    const key = ((error as ApiError).body as { seasonKey?: unknown }).seasonKey;
+    return indexes.length > 0 && typeof key === 'string'
+      ? indexes.map(({ lessonIndex }) =>
+          fill(s.errOtherSeason, { n: lessonIndex + 1, key }),
+        )
+      : [s.errMixedSeasons];
+  }
+  if (code === 'location_conflict' && indexes.length > 0)
+    return indexes.map(({ lessonIndex }) =>
+      fill(s.errLocationConflict, { n: lessonIndex + 1 }),
+    );
   if (code === 'too_many_lessons')
     return [fill(s.maxLessons, { max: MAX_LESSONS })];
   if (error instanceof ApiError && error.status === 403)
@@ -122,7 +154,10 @@ export function DraftFlow({
   const navigate = useNavigate();
   const empty = useMemo(newDraft, []);
   const draft = state.draft ?? empty;
-  const { priced, total, issues } = useDraftQuote(draft, data);
+  const { season, totals, pending, priced, total, issues } = useDraftQuote(
+    draft,
+    data,
+  );
   const submit = useSubmitRequest();
   const placeOf = useLocationName();
   const [confirming, setConfirming] = useState(false);
@@ -130,7 +165,8 @@ export function DraftFlow({
   const typingTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(typingTimer.current), []);
   const count = draft.lessons.length;
-  const seasonPass = data.coverage === 'season_pass';
+  const seasonPass = totals.coverage === 'season_pass';
+  const seasonKey = season?.key ?? data.season?.key ?? null;
 
   const sent = useRef(false);
 
@@ -139,7 +175,7 @@ export function DraftFlow({
     return <Navigate to={EDIT_PATH} replace />;
 
   function attemptReview() {
-    if (count === 0) return;
+    if (count === 0 || pending) return;
     if (issues.length > 0) {
       state.update((d) => ({ ...d, showErrors: true }));
       jumpToIssue(issues[0]!, draft, state.update);
@@ -149,7 +185,7 @@ export function DraftFlow({
   }
 
   function send() {
-    if (submit.isPending) return;
+    if (submit.isPending || pending) return;
     submit.mutate(draftBody(draft), {
       onSuccess: (request) => {
         sent.current = true;
@@ -183,7 +219,7 @@ export function DraftFlow({
 
   const editBody = (
     <>
-      <ProgressCard data={data} draftCents={total} />
+      <ProgressCard data={totals} draftCents={total} />
       <p className="my-2.5 text-[12.5px] font-semibold text-status-approved">
         ✓ {fill(s.draftSaved, { time: savedTime(draft.savedAt) })}
         <span className="font-normal text-slate">{s.draftSavedNote}</span>
@@ -201,7 +237,7 @@ export function DraftFlow({
 
   const reviewBody = (
     <>
-      <ProgressCard data={data} draftCents={total} />
+      <ProgressCard data={totals} draftCents={total} />
       <Card className="mt-3 p-4 sm:p-5">
         <p className="mb-3.5 text-[13px] text-slate">{s.reviewIntro}</p>
         <div data-testid="review-tree">
@@ -259,11 +295,11 @@ export function DraftFlow({
       </p>
       <div className="ml-auto flex flex-wrap gap-2">
         {mode === 'edit' ? (
-          <Button disabled={count === 0} onClick={attemptReview}>
+          <Button disabled={count === 0 || pending} onClick={attemptReview}>
             {s.review}
           </Button>
         ) : (
-          <Button loading={submit.isPending} onClick={send}>
+          <Button loading={submit.isPending} disabled={pending} onClick={send}>
             {fill(s.submit, { amount: dollars(total) })}
           </Button>
         )}
@@ -296,7 +332,7 @@ export function DraftFlow({
         {children}
         <Drawer
           title={mode === 'edit' ? s.newRequest : s.reviewTitle}
-          season={data.season?.key ?? null}
+          season={seasonKey}
           onClose={requestClose}
           closeLabel={t.common.close}
           blocked={confirming}
@@ -343,7 +379,7 @@ export function DraftFlow({
       </div>
       <h1 className="mb-3.5 flex flex-wrap items-center gap-2.5 text-[28px] leading-tight">
         {mode === 'edit' ? s.newRequest : s.reviewTitle}
-        <SeasonPill season={data.season?.key ?? null} />
+        <SeasonPill season={seasonKey} />
       </h1>
       {mode === 'edit' ? editBody : reviewBody}
       <div

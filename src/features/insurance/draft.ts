@@ -39,6 +39,7 @@ export interface DraftIssue {
   studentId?: string;
   field: IssueField;
   message: string;
+  live?: boolean;
 }
 
 const newId = () => crypto.randomUUID();
@@ -82,26 +83,54 @@ export function inSeason(date: string, season: InsuranceSeason) {
   return date >= season.startsOn && date <= season.endsOn;
 }
 
+export function seasonOfDate<S extends InsuranceSeason>(
+  date: string,
+  seasons: readonly S[],
+): S | null {
+  return date ? (seasons.find((x) => inSeason(date, x)) ?? null) : null;
+}
+
+export function requestSeason<S extends InsuranceSeason>(
+  lessons: readonly Pick<DraftLesson, 'lessonDate'>[],
+  seasons: readonly S[],
+): S | null {
+  for (const lesson of lessons) {
+    const season = seasonOfDate(lesson.lessonDate, seasons);
+    if (season) return season;
+  }
+  return null;
+}
+
 export function validateDraft(
   draft: Pick<InsuranceDraft, 'lessons'>,
-  season: InsuranceSeason | null,
+  seasons: readonly InsuranceSeason[],
   t: Messages,
 ): DraftIssue[] {
   const s = t.insurance;
   const issues: DraftIssue[] = [];
+  const season = requestSeason(draft.lessons, seasons);
   draft.lessons.forEach((lesson, i) => {
     const n = i + 1;
+    const lessonSeason = seasonOfDate(lesson.lessonDate, seasons);
     if (!lesson.lessonDate)
       issues.push({
         lessonId: lesson.id,
         field: 'date',
         message: fill(s.errDate, { n }),
       });
-    else if (season && !inSeason(lesson.lessonDate, season))
+    else if (!lessonSeason)
       issues.push({
         lessonId: lesson.id,
         field: 'date',
-        message: fill(s.errOutOfSeason, { n, season: season.key }),
+        message: fill(s.errNoSeason, { n }),
+        live: true,
+      });
+    else if (season && lessonSeason.key !== season.key)
+      issues.push({
+        lessonId: lesson.id,
+        field: 'date',
+        message: fill(s.errOtherSeason, { n, key: season.key }),
+        live: true,
       });
     if (lesson.students.length === 0)
       issues.push({

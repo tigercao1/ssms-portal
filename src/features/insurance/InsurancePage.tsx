@@ -179,7 +179,7 @@ function ListView({
   const f = useInsuranceText();
   const s = f.s;
   const navigate = useNavigate();
-  const { total } = useDraftQuote(state.draft, data);
+  const quote = useDraftQuote(state.draft, data);
   const [confirming, setConfirming] = useState(false);
   const draftLessons = state.draft?.lessons.length ?? 0;
   const hasDraft = draftLessons > 0;
@@ -198,7 +198,14 @@ function ListView({
         }
       />
       {!canCreate && <Banner tone="pending">{s.noSeason}</Banner>}
-      <ProgressCard data={data} draftCents={hasDraft ? total : null} />
+      <ProgressCard
+        data={data}
+        draftCents={
+          hasDraft && (!quote.season || quote.season.key === data.season?.key)
+            ? quote.total
+            : null
+        }
+      />
       {hasDraft && canCreate && !editing && (
         <Card className="flex flex-wrap items-center justify-between gap-2.5 border-l-4 border-l-status-pending p-4">
           <span data-testid="draft-banner" className="text-sm">

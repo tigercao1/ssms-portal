@@ -1539,13 +1539,14 @@ export interface Messages {
     submittedToast: string;
     errorsTitle: string;
     errDate: string;
-    errOutOfSeason: string;
+    errOtherSeason: string;
     errStudents: string;
     errName: string;
     errWaiver: string;
     errWaiverNoName: string;
     errNoSeason: string;
     errMixedSeasons: string;
+    errLocationConflict: string;
     lockedSubmit: string;
     capPartial: string;
     capFree: string;
@@ -1660,6 +1661,7 @@ export interface Messages {
     requestMarkUnpaidBody: string;
     requestVoidConfirm: string;
     partOfRequest: string;
+    wholeRequestNote: string;
     requestsPagerLabel: string;
     pagerLabel: string;
     pagerShowing: string;

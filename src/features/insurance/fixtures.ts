@@ -14,11 +14,25 @@ import type {
 
 const API = 'http://localhost:3000';
 
+export const SEASON_2025 = {
+  key: '2025/26',
+  startsOn: '2025-11-01',
+  endsOn: '2026-04-30',
+};
+
 export const SEASON_2026 = {
   key: '2026/27',
   startsOn: '2026-11-01',
   endsOn: '2027-04-30',
 };
+
+export const SEASON_2027 = {
+  key: '2027/28',
+  startsOn: '2027-11-01',
+  endsOn: '2028-04-30',
+};
+
+export const SEASONS = [SEASON_2027, SEASON_2026, SEASON_2025];
 
 export function insuranceRecord(
   overrides: Partial<InsuranceRecord> = {},
@@ -82,12 +96,13 @@ function lessonRecord(
   paymentStatus: InsurancePaymentStatus,
   covered: 'season_pass' | null,
   createdAt: string,
+  seasonKey: string,
 ): InsuranceRecord {
   return {
     id: `${requestId}-l${index + 1}`,
     recordNo: `${requestId}-l${index + 1}`,
     kind: 'lesson',
-    seasonKey: SEASON_2026.key,
+    seasonKey,
     lessonDate: body.lessonDate,
     durationHours: body.durationHours,
     locationId: body.locationId ?? null,
@@ -121,6 +136,7 @@ export function buildRequest(
     paymentStatus,
     owedCents = 0,
     seasonPass = false,
+    seasonKey = SEASON_2026.key,
   }: {
     id: string;
     requestNo: string;
@@ -128,6 +144,7 @@ export function buildRequest(
     paymentStatus?: InsurancePaymentStatus;
     owedCents?: number;
     seasonPass?: boolean;
+    seasonKey?: string;
   },
   lessons: RequestLessonBody[],
 ): InsuranceRequest {
@@ -143,7 +160,7 @@ export function buildRequest(
   return {
     id,
     requestNo,
-    seasonKey: SEASON_2026.key,
+    seasonKey,
     paymentStatus: status,
     totalCents,
     lessonCount: lessons.length,
@@ -159,6 +176,7 @@ export function buildRequest(
         status,
         seasonPass ? 'season_pass' : null,
         createdAt,
+        seasonKey,
       ),
     ),
   };
@@ -235,28 +253,60 @@ export const onboardingInsurance = myInsurance({
 
 export interface InsuranceMockState {
   data: MyInsurance;
+  seasons: Record<string, MyInsurance>;
+  seasonQueries: string[];
   posts: SubmitRequestBody[];
   byKey: Record<string, InsuranceRequest>;
   nextNo: number;
 }
 
-export function createInsuranceState(data: MyInsurance): InsuranceMockState {
-  return { data: structuredClone(data), posts: [], byKey: {}, nextNo: 12 };
+export function createInsuranceState(
+  data: MyInsurance,
+  seasons: Record<string, MyInsurance> = {},
+): InsuranceMockState {
+  return {
+    data: structuredClone(data),
+    seasons: structuredClone(seasons),
+    seasonQueries: [],
+    posts: [],
+    byKey: {},
+    nextNo: 12,
+  };
+}
+
+function seasonData(state: InsuranceMockState, key: string): MyInsurance {
+  if (state.data.season?.key === key) return state.data;
+  const season = SEASONS.find((x) => x.key === key)!;
+  state.seasons[key] ??= myInsurance({
+    locked: state.data.locked,
+    lockReason: state.data.lockReason,
+    season,
+  });
+  return state.seasons[key];
 }
 
 export function insuranceHandlers(state: InsuranceMockState) {
   return [
-    http.get(`${API}/me/insurance`, () => HttpResponse.json(state.data)),
+    http.get(`${API}/me/insurance`, ({ request }) => {
+      const key = new URL(request.url).searchParams.get('season');
+      if (!key) return HttpResponse.json(state.data);
+      state.seasonQueries.push(key);
+      if (!SEASONS.some((x) => x.key === key))
+        return HttpResponse.json({ code: 'unknown_season' }, { status: 400 });
+      return HttpResponse.json(seasonData(state, key));
+    }),
     http.post(`${API}/me/insurance/requests`, async ({ request }) => {
       const body = (await request.json()) as SubmitRequestBody;
       state.posts.push(body);
-      const d = state.data;
-      if (d.locked)
+      if (state.data.locked)
         return HttpResponse.json({ code: 'locked' }, { status: 403 });
       const repeat = state.byKey[body.idempotencyKey];
       if (repeat) return HttpResponse.json(repeat, { status: 200 });
       if (body.lessons.length < 1 || body.lessons.length > 10)
-        return HttpResponse.json({ code: 'too_many_lessons' }, { status: 400 });
+        return HttpResponse.json(
+          { code: 'too_many_lessons', maxLessons: 10 },
+          { status: 400 },
+        );
       const unconfirmed = body.lessons.flatMap((l, lessonIndex) =>
         l.students.flatMap((s, studentIndex) =>
           s.waiverConfirmed ? [] : [{ lessonIndex, studentIndex }],
@@ -267,17 +317,33 @@ export function insuranceHandlers(state: InsuranceMockState) {
           { code: 'waiver_unconfirmed', indexes: unconfirmed },
           { status: 400 },
         );
-      const outside = body.lessons.findIndex(
-        (l) =>
-          !d.season ||
-          l.lessonDate < d.season.startsOn ||
-          l.lessonDate > d.season.endsOn,
+      const conflict = body.lessons.findIndex(
+        (l) => l.locationId && l.locationOther,
       );
+      if (conflict >= 0)
+        return HttpResponse.json(
+          { code: 'location_conflict', lessonIndex: conflict },
+          { status: 400 },
+        );
+      const lessonSeasons = body.lessons.map((l) =>
+        SEASONS.find(
+          (x) => l.lessonDate >= x.startsOn && l.lessonDate <= x.endsOn,
+        ),
+      );
+      const outside = lessonSeasons.findIndex((x) => !x);
       if (outside >= 0)
         return HttpResponse.json(
           { code: 'no_season', lessonIndex: outside },
           { status: 400 },
         );
+      const seasonKey = lessonSeasons[0]!.key;
+      const mixed = lessonSeasons.findIndex((x) => x!.key !== seasonKey);
+      if (mixed >= 0)
+        return HttpResponse.json(
+          { code: 'mixed_seasons', lessonIndex: mixed, seasonKey },
+          { status: 400 },
+        );
+      const d = seasonData(state, seasonKey);
       const no = String(state.nextNo++).padStart(4, '0');
       const created = buildRequest(
         {
@@ -286,6 +352,7 @@ export function insuranceHandlers(state: InsuranceMockState) {
           createdAt: '2026-10-18T15:30:00Z',
           owedCents: d.owedCents,
           seasonPass: d.coverage === 'season_pass',
+          seasonKey,
         },
         body.lessons,
       );
@@ -393,6 +460,8 @@ export function adminRecord(
 ): AdminInsuranceRecord {
   return {
     ...insuranceRecord(),
+    requestId: null,
+    requestNo: null,
     instructorId: 'inst-1',
     instructorName: 'Jane Snow',
     instructorNameZh: '简雪',

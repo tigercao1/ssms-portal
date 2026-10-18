@@ -792,21 +792,92 @@ describe('AdminInsurancePage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('points to the request when a lesson inside it is acted on directly', async () => {
-    server.use(
-      http.post(`${API}/admin/insurance/records/:id/mark-paid`, () =>
-        HttpResponse.json({ code: 'part_of_request' }, { status: 409 }),
-      ),
-    );
+  it('labels lessons that belong to a request and warns that their actions update the whole request', async () => {
+    records = [
+      adminRecord({
+        id: 'req-2-l1',
+        recordNo: 'INS-20261014-0021',
+        requestId: 'req-2',
+        requestNo: 'INS-20261014-0011',
+        paymentStatus: 'unpaid',
+        paidOn: null,
+      }),
+      ...records,
+    ];
     const user = await renderPage();
-    await recordAction(user, 'INS-20261219-0002', 'Mark paid');
-    const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
+    const row = await screen.findByRole('row', {
+      name: /INS-20261014-0021/,
+    });
+    expect(within(row).getByTestId('part-of-request')).toHaveTextContent(
+      'Part of INS-20261014-0011',
+    );
     expect(
-      await within(dialog).findByText(
-        "This lesson is part of an insurance request. Use the request's actions above.",
-      ),
+      within(recordRow('INS-20261219-0002')).queryByTestId('part-of-request'),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(requestsState.queries.length).toBeGreaterThan(0),
+    );
+
+    await recordAction(user, 'INS-20261014-0021', 'Mark paid');
+    let dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByTestId('whole-request')).toHaveTextContent(
+      'This updates the whole request INS-20261014-0011 (3 lessons).',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(actions.at(-1)).toMatchObject({
+      id: 'req-2-l1',
+      action: 'mark-paid',
+    });
+
+    await recordAction(user, 'INS-20261014-0021', 'Void');
+    dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByTestId('whole-request')).toHaveTextContent(
+      'This updates the whole request INS-20261014-0011 (3 lessons).',
+    );
+    expect(dialog).toHaveTextContent('Every lesson in this request is voided');
+    expect(
+      within(dialog).getByRole('button', { name: 'Void request' }),
     ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await recordAction(user, 'INS-20261219-0002', 'Void');
+    expect(
+      within(screen.getByRole('dialog')).queryByTestId('whole-request'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('labels request lessons and the whole-request warning in Chinese', async () => {
+    records = [
+      adminRecord({
+        id: 'req-2-l1',
+        recordNo: 'INS-20261014-0021',
+        requestId: 'req-2',
+        requestNo: 'INS-20261014-0011',
+        paymentStatus: 'paid',
+      }),
+    ];
+    const user = await renderPage('zh-CN');
+    const row = await screen.findByRole('row', {
+      name: /INS-20261014-0021/,
+    });
+    expect(within(row).getByTestId('part-of-request')).toHaveTextContent(
+      '属于 INS-20261014-0011',
+    );
+    await waitFor(() =>
+      expect(requestsState.queries.length).toBeGreaterThan(0),
+    );
+    await recordAction(
+      user,
+      'INS-20261014-0021',
+      '标记未付',
+      'INS-20261014-0021 的操作',
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByTestId('whole-request'),
+    ).toHaveTextContent('这会更新整份投保 INS-20261014-0011（3 节课）');
   });
 
   it('applies the instructor and status filters to requests', async () => {
