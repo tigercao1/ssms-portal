@@ -377,7 +377,7 @@ describe('AppShell instructor nav', () => {
     ).toHaveAttribute('href', '/lessons');
     expect(
       screen.getByRole('link', {
-        name: 'Private lesson insurance Locked until you finish onboarding',
+        name: 'Lesson insurance Locked until you finish onboarding',
       }),
     ).toHaveAttribute('href', '/insurance');
     expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveAttribute(
@@ -396,7 +396,7 @@ describe('AppShell instructor nav', () => {
     ).toHaveAttribute('href', '/lessons');
     expect(
       screen.getByRole('link', {
-        name: '私课保险登记 完成入职资料后解锁',
+        name: '私课投保 完成入职资料后解锁',
       }),
     ).toHaveAttribute('href', '/insurance');
   });
