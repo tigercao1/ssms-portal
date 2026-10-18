@@ -54,7 +54,6 @@ export function setSession(session: Session | null) {
   listeners.forEach((l) => l(session ? 'SIGNED_IN' : 'SIGNED_OUT', session));
 }
 
-/** Replaces the stored session without notifying listeners, like another tab writing storage. */
 export function setStoredSession(session: Session | null) {
   current = session;
 }
