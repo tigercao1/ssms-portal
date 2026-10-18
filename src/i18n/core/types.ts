@@ -211,13 +211,6 @@ export interface Messages {
     notLivePill: string;
     liveTitle: string;
     liveLink: string;
-    readyTitle: string;
-    readyBody: string;
-    missingTitleOne: string;
-    missingTitle: string;
-    groupProfile: string;
-    groupCertification: string;
-    groupOnboarding: string;
     fieldDisplayNameEn: string;
     fieldBio: string;
     fieldPhoto: string;
@@ -225,9 +218,6 @@ export interface Messages {
     fieldLanguages: string;
     fieldCourseLevels: string;
     noneVerified: string;
-    actionAdd: string;
-    actionView: string;
-    actionOpen: string;
     certVerified: string;
     certVerifiedNoDate: string;
     certPending: string;
@@ -1312,6 +1302,7 @@ export interface Messages {
     title: string;
     seasonTitle: string;
     progress: string;
+    progressInReview: string;
     allDone: string;
     empty: string;
     loadFailed: string;
@@ -1343,6 +1334,15 @@ export interface Messages {
     cardTitle: string;
     cardBody: string;
     cardAllDone: string;
+    cardPillToDo: string;
+    cardPillInReview: string;
+    cardPillGoingLive: string;
+    cardToDoBody: string;
+    cardInReviewBody: string;
+    cardGoingLiveBody: string;
+    cardEmptyToDoBody: string;
+    cardProfileGaps: string;
+    cardGapCertification: string;
     cardOpen: string;
     backToChecklist: string;
     readAck: string;
