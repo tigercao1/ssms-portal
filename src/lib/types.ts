@@ -5,6 +5,11 @@
  */
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type ApprovalLockReason =
+  | 'deactivated'
+  | 'rejected'
+  | 'pending_approval';
+export type InstructorLockReason = ApprovalLockReason | 'onboarding_incomplete';
 export type PreferredLanguage = 'en' | 'zh-CN';
 export type CertOrg = 'csia' | 'casi';
 export type CertTrack = 'regular' | 'park' | 'carving';

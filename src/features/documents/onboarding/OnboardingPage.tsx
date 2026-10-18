@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Banner, Button, Card, Spinner } from '@/components';
+import { Banner, Button, Card, Spinner, StatusBanner } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { localizeField } from '@/i18n/core/localize';
@@ -17,7 +17,7 @@ import { CertUploadSheet } from './CertUploadSheet';
 import { ProgressBar } from './ProgressBar';
 import { StatePill, type PillTone } from './StatePill';
 import { checklistProgress, isItemDone, useMyChecklist } from './queries';
-import { LockedBanner, LockedEmpty, LockedPreviewList } from './Locked';
+import { LockedEmpty, LockedPreviewList } from './Locked';
 
 const CERT_TONE: Record<CertState, PillTone> = {
   missing: 'muted',
@@ -245,12 +245,12 @@ export function OnboardingPage() {
       <div className="flex flex-col gap-6">
         <h1 className="text-3xl">{t.onboarding.title}</h1>
         {data.lockReason === 'rejected' || data.lockReason === 'deactivated' ? (
-          <LockedBanner reason={data.lockReason} />
+          <StatusBanner surface="onboarding" reason={data.lockReason} />
         ) : data.items.length === 0 ? (
           <LockedEmpty />
         ) : (
           <>
-            <LockedBanner reason="pending_approval" />
+            <StatusBanner surface="onboarding" reason="pending_approval" />
             <LockedPreviewList items={data.items} />
           </>
         )}

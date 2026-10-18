@@ -11,6 +11,7 @@ import {
   onboardingLessons,
   pendingLessons,
   rejectedLessons,
+  deactivatedLessons,
 } from './fixtures';
 import type { MyLessonsResponse } from './types';
 
@@ -383,6 +384,43 @@ describe('LessonsPayPage states', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Upcoming lessons')).toBeNull();
+  });
+
+  it('shows a deactivated instructor their past lessons read-only, without upcoming', async () => {
+    serve(deactivatedLessons);
+    renderPage();
+    const banner = (
+      await screen.findByText('Your profile is deactivated')
+    ).closest('[role="status"]');
+    expect(banner).toHaveTextContent(
+      "You can't be booked for new lessons while deactivated. Your past lessons and pay are below.",
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Past lessons' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Upcoming lessons')).toBeNull();
+    expect(screen.queryByText('Your profile was not approved')).toBeNull();
+  });
+
+  it('says a deactivated instructor has no history yet', async () => {
+    serve({ ...deactivatedLessons, periods: [] });
+    renderPage();
+    expect(
+      await screen.findByText('No past lessons or pay yet.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the deactivated banner in Chinese', async () => {
+    serve(deactivatedLessons);
+    renderPage('zh-CN');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '你的资料已下线下线期间无法被安排新的课程。你过去的课程和工资见下方。',
+      ),
+    );
+    expect(
+      screen.getByRole('heading', { name: '已上的课' }),
+    ).toBeInTheDocument();
   });
 
   it('says so when a rejected instructor has no history', async () => {

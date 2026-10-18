@@ -1,6 +1,13 @@
 import { Link } from 'react-router-dom';
 import { useT } from '@/i18n/core/I18nProvider';
-import { Banner, Button, Card, Spinner, StatusPill } from '@/components';
+import {
+  Banner,
+  Button,
+  Card,
+  Spinner,
+  StatusBanner,
+  StatusPill,
+} from '@/components';
 import { useMyGoLive, useMyProfile } from './api';
 import { GoLiveBanner, LivePill } from './goLive';
 import { ProfileSummary } from './ProfileSummary';
@@ -9,14 +16,13 @@ import { CalendarStatusCard } from './CalendarStatusCard';
 import { OnboardingCard } from '@/features/documents/onboarding/OnboardingCard';
 import type { InstructorProfile } from '@/lib/types';
 
-function statusBanner(profile: InstructorProfile, t: ReturnType<typeof useT>) {
-  if (profile.approvalStatus === 'approved' && !profile.isActive)
-    return <Banner tone="info">{t.profile.inactiveBanner}</Banner>;
+function profileStatus(profile: InstructorProfile) {
+  if (!profile.isActive) return 'deactivated';
   switch (profile.approvalStatus) {
     case 'rejected':
-      return <Banner tone="rejected">{t.profile.rejectedBanner}</Banner>;
+      return 'rejected';
     default:
-      return <Banner tone="pending">{t.profile.pendingBanner}</Banner>;
+      return 'pending_approval';
   }
 }
 
@@ -61,9 +67,11 @@ export function ProfileViewPage() {
         </Link>
       </div>
 
-      {goLiveEnabled
-        ? readiness && <GoLiveBanner readiness={readiness} />
-        : statusBanner(profile, t)}
+      {goLiveEnabled ? (
+        readiness && <GoLiveBanner readiness={readiness} />
+      ) : (
+        <StatusBanner surface="profile" reason={profileStatus(profile)} />
+      )}
       <PreferredLanguageCard profile={profile} />
       <OnboardingCard />
       <CalendarStatusCard enabled={profile.approvalStatus === 'approved'} />

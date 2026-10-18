@@ -449,6 +449,53 @@ describe('ProfileViewPage Google Calendar', () => {
   });
 });
 
+describe('ProfileViewPage status banner', () => {
+  const profileWith = (overrides: Partial<InstructorProfile>) =>
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, ...overrides }),
+      ),
+    );
+
+  afterEach(() => localStorage.clear());
+
+  it.each([
+    [
+      { approvalStatus: 'pending', isActive: true },
+      'Your profile is pending review. You can keep editing — it goes live once an admin approves it.',
+    ],
+    [
+      { approvalStatus: 'rejected', isActive: true },
+      'Your profile was not approved. Update it and an admin can review again.',
+    ],
+    [
+      { approvalStatus: 'approved', isActive: false },
+      'Your profile is deactivated and hidden from the public directory.',
+    ],
+    [
+      { approvalStatus: 'rejected', isActive: false },
+      'Your profile is deactivated and hidden from the public directory.',
+    ],
+  ] as const)('says %o in the status banner', async (status, text) => {
+    profileWith(status);
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText(text, { selector: '[role="status"] p' }),
+    ).toBeInTheDocument();
+  });
+
+  it('says a profile is deactivated in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    profileWith({ approvalStatus: 'approved', isActive: false });
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('您的资料已下线，不会在公开目录中显示。', {
+        selector: '[role="status"] p',
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('ProfileViewPage go-live', () => {
   function serveGoLive(
     profileOverrides: Partial<InstructorProfile>,

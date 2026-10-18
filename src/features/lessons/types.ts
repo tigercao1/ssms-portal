@@ -1,9 +1,6 @@
-import type { RateUnit } from '@/lib/types';
+import type { InstructorLockReason, RateUnit } from '@/lib/types';
 
-export type LessonsLockReason =
-  | 'pending_approval'
-  | 'rejected'
-  | 'onboarding_incomplete';
+export type LessonsLockReason = InstructorLockReason;
 
 export interface MyLesson {
   classId: string;

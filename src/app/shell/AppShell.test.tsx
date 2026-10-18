@@ -289,11 +289,11 @@ describe('AppShell instructor nav', () => {
     ).toHaveAttribute('href', '/onboarding');
   });
 
-  it('keeps the lock on Onboarding for a rejected instructor', async () => {
+  it('keeps the lock on Onboarding for a rejected instructor and says why', async () => {
     renderInstructorShell('rejected');
     expect(
       await screen.findByRole('link', {
-        name: 'Onboarding Locked until your profile is approved',
+        name: "Onboarding Locked because your profile wasn't approved",
       }),
     ).toBeInTheDocument();
   });
@@ -326,7 +326,7 @@ describe('AppShell instructor nav', () => {
   it('shows Lessons & pay without a lock for a rejected instructor', async () => {
     renderInstructorShell('rejected');
     await screen.findByRole('link', {
-      name: 'Onboarding Locked until your profile is approved',
+      name: "Onboarding Locked because your profile wasn't approved",
     });
     const lessons = screen.getByRole('link', { name: 'Lessons & pay' });
     expect(lessons).toHaveAttribute('href', '/lessons');
@@ -355,7 +355,7 @@ describe('AppShell instructor nav', () => {
     renderInstructorShell('rejected');
     expect(
       await screen.findByRole('link', {
-        name: 'Private lesson insurance Locked until your profile is approved',
+        name: "Private lesson insurance Locked because your profile wasn't approved",
       }),
     ).toHaveAttribute('href', '/insurance');
   });
@@ -389,6 +389,42 @@ describe('AppShell instructor nav', () => {
         name: '课程与工资 完成入职资料后解锁',
       }),
     ).toHaveAttribute('href', '/lessons');
+  });
+
+  it('locks Onboarding and insurance for a deactivated instructor but leaves past lessons and pay open', async () => {
+    renderInstructorShell('approved', { ...ONBOARDED, meIsActive: false });
+    expect(
+      await screen.findByRole('link', {
+        name: 'Onboarding Locked because your profile is deactivated',
+      }),
+    ).toHaveAttribute('href', '/onboarding');
+    expect(
+      screen.getByRole('link', {
+        name: 'Private lesson insurance Locked because your profile is deactivated',
+      }),
+    ).toHaveAttribute('href', '/insurance');
+    expect(
+      screen.getByRole('link', { name: 'Lessons & pay' }).querySelector('svg'),
+    ).toBeNull();
+  });
+
+  it('says why a deactivated instructor is locked in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderInstructorShell('approved', { ...ONBOARDED, meIsActive: false });
+    expect(
+      await screen.findByRole('link', {
+        name: '私课保险登记 资料已下线，已锁定',
+      }),
+    ).toHaveAttribute('href', '/insurance');
+  });
+
+  it('locks insurance with Lessons & pay until onboarding is complete', async () => {
+    renderInstructorShell('approved', {});
+    expect(
+      await screen.findByRole('link', {
+        name: 'Private lesson insurance Locked until you finish onboarding',
+      }),
+    ).toHaveAttribute('href', '/insurance');
   });
 
   it('shows a plain Onboarding link once approved', async () => {

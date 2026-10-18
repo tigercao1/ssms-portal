@@ -118,8 +118,10 @@ export interface Messages {
     adminArea: string;
     openMenu: string;
     closeMenu: string;
-    onboardingLocked: string;
-    lessonsLockedOnboarding: string;
+    lockedPending: string;
+    lockedRejected: string;
+    lockedDeactivated: string;
+    lockedOnboarding: string;
   };
   status: {
     pending: string;
@@ -1299,6 +1301,8 @@ export interface Messages {
     pendingEmpty: string;
     rejectedTitle: string;
     rejectedBody: string;
+    deactivatedTitle: string;
+    deactivatedBody: string;
     onboardingTitle: string;
     onboardingBody: string;
     onboardingOpen: string;
@@ -1530,6 +1534,11 @@ export interface Messages {
     pendingBody: string;
     rejectedTitle: string;
     rejectedBody: string;
+    deactivatedTitle: string;
+    deactivatedBody: string;
+    onboardingTitle: string;
+    onboardingBody: string;
+    onboardingOpen: string;
     lockedEmpty: string;
   };
   adminInsurance: {

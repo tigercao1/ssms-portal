@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Banner, Button, Card, Spinner } from '@/components';
+import { Banner, Button, Card, Spinner, StatusBanner } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import type { Locale } from '@/i18n/core/types';
@@ -23,7 +23,7 @@ import { SignerDocument } from '../signer/SignerDocument';
 import { clearSigningDraft, signingDraftKey } from '../signer/signingDraft';
 import { useSourceRecovery } from '../pdf/presignedSource';
 import { useCompleteMyDocument, useMyDocument } from './queries';
-import { LockedBanner, lockReasonOf } from './Locked';
+import { lockReasonOf } from './Locked';
 
 function BackLink({ compact = false }: { compact?: boolean }) {
   const t = useT();
@@ -162,7 +162,7 @@ export function OnboardingDocumentPage() {
     return (
       <div className="flex flex-col gap-4">
         <BackLink />
-        <LockedBanner reason={lockReason} />
+        <StatusBanner surface="onboarding" reason={lockReason} />
       </div>
     );
   if (doc.isError || !doc.data)

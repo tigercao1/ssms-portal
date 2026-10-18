@@ -1,14 +1,11 @@
-import type { CertOrg, CertTrack } from '@/lib/types';
+import type { ApprovalLockReason, CertOrg, CertTrack } from '@/lib/types';
 
 export type TemplateKind = 'sign' | 'read';
 export type TemplateAudience = 'instructor' | 'customer';
 export type TemplateStatus = 'draft' | 'live' | 'retired';
 export type DocumentLanguage = 'en' | 'zh';
 export type TemplateAssignTo = 'all' | 'selected';
-export type ChecklistLockReason =
-  | 'pending_approval'
-  | 'rejected'
-  | 'deactivated';
+export type ChecklistLockReason = ApprovalLockReason;
 export type FieldType =
   | 'signature'
   | 'initials'
