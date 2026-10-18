@@ -5,7 +5,6 @@ const STORAGE_PREFIX = 'ssms.resendCooldown.';
 
 export type ResendPurpose = 'activation' | 'verify-email' | 'password-reset';
 
-/** What a send attempt reports back: whether to start the cooldown. */
 export type ResendResult = 'sent' | 'rate-limited' | 'failed';
 
 function storageKey(purpose: ResendPurpose, email: string) {
@@ -30,12 +29,6 @@ function writeUntil(key: string, until: number): boolean {
   }
 }
 
-/**
- * One-minute cooldown between resend emails for a purpose and address,
- * persisted in localStorage so a reload or a second tab keeps counting.
- * `send` ignores taps while a send is in flight or the cooldown runs, and
- * starts the cooldown after a send or a rate-limit answer.
- */
 export function useResendCooldown(purpose: ResendPurpose, email: string) {
   const key = storageKey(purpose, email);
   const [until, setUntil] = useState(() => readUntil(key));

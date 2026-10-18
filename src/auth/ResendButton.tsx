@@ -7,7 +7,6 @@ interface ResendButtonProps extends ComponentProps<typeof Button> {
   secondsLeft: number;
 }
 
-/** A resend button that shows "Resend in 59s" and stays disabled while cooling down. */
 export function ResendButton({
   busy,
   secondsLeft,
