@@ -237,8 +237,7 @@ export interface Messages {
   settings: {
     title: string;
     languageLabel: string;
-    emailLanguageLabel: string;
-    emailLanguageHint: string;
+    preferredLanguageHint: string;
     account: string;
     signedInAs: string;
   };

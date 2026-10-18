@@ -250,8 +250,7 @@ export const en: Messages = {
   settings: {
     title: 'Settings',
     languageLabel: 'Preferred language',
-    emailLanguageLabel: 'Email language',
-    emailLanguageHint: 'Language for emails from SSMS. To change the website language, use the language switch in the header.',
+    preferredLanguageHint: 'Used for emails from SSMS and as the starting language for your bio. To change the website language, use the language switch in the header.',
     account: 'Account',
     signedInAs: 'Signed in as',
   },

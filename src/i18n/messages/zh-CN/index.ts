@@ -236,8 +236,7 @@ export const zhCN: Messages = {
   settings: {
     title: '设置',
     languageLabel: '首选语言',
-    emailLanguageLabel: '邮件语言',
-    emailLanguageHint: 'SSMS 发送邮件所用的语言。如需切换网站语言，请使用页面顶部的语言切换。',
+    preferredLanguageHint: '用于 SSMS 发送的邮件，也是填写简介时的默认语言。如需切换网站语言，请使用页面顶部的语言切换。',
     account: '账户',
     signedInAs: '当前登录',
   },
