@@ -158,7 +158,9 @@ describe('ProfileViewPage reference names', () => {
     );
     renderWithProviders(<ProfileViewPage />);
     expect(await screen.findByText('惠斯勒')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(
+      screen.getByText('English', { selector: ':not(option)' }),
+    ).toBeInTheDocument();
   });
 });
 
