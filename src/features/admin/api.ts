@@ -14,6 +14,7 @@ import type {
   CurrentUserRole,
   DeletedReferenceRecord,
   ExtraPhotoSlot,
+  GoLiveReadiness,
   InstructorProfile,
   ReferenceRecord,
   ReferenceUsage,
@@ -31,6 +32,8 @@ const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
 const detailKey = (id: string) => ['admin', 'instructor', id] as const;
 const profileKey = (id: string) =>
   ['admin', 'instructor', id, 'profile'] as const;
+export const adminGoLiveKey = (id: string) =>
+  ['admin', 'instructor', id, 'go-live'] as const;
 const roleKey = (authUserId: string) => ['admin', 'user-role', authUserId] as const;
 
 /** W2.7 — list instructors with optional status/active filters. */
@@ -116,6 +119,14 @@ export function useAdminInstructorProfile(id: string) {
   return useQuery({
     queryKey: profileKey(id),
     queryFn: () => api<InstructorProfile>(`/admin/instructors/${id}/profile`),
+  });
+}
+
+export function useAdminGoLive(id: string) {
+  return useQuery({
+    queryKey: adminGoLiveKey(id),
+    queryFn: () => api<GoLiveReadiness>(`/admin/instructors/${id}/go-live`),
+    refetchOnWindowFocus: 'always',
   });
 }
 

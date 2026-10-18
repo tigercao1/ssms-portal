@@ -17,6 +17,7 @@ import { isCertContentType, prepareCertFile } from './certFile';
 import { PRESIGNED_URL_FRESH_MS } from '../pdf/presignedSource';
 import { track } from '@/lib/analytics';
 import { MY_LESSONS_KEY } from '@/features/lessons/api';
+import { MY_GO_LIVE_KEY } from '@/features/instructor/api';
 
 export function useMyChecklist({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
@@ -49,6 +50,7 @@ export function useCompleteMyDocument(assignmentId: string) {
       return Promise.all([
         qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
         qc.invalidateQueries({ queryKey: MY_LESSONS_KEY }),
+        qc.invalidateQueries({ queryKey: MY_GO_LIVE_KEY }),
       ]);
     },
   });
@@ -91,6 +93,7 @@ export function useUploadCertification() {
       return Promise.all([
         qc.invalidateQueries({ queryKey: documentsKeys.myChecklist }),
         qc.invalidateQueries({ queryKey: MY_LESSONS_KEY }),
+        qc.invalidateQueries({ queryKey: MY_GO_LIVE_KEY }),
       ]);
     },
   });

@@ -7,6 +7,7 @@ import type {
   BioDraft,
   BioDraftMode,
   ExtraPhotoSlot,
+  GoLiveReadiness,
   InstructorProfile,
   MyCalendarStatus,
   PhotoSlot,
@@ -17,6 +18,7 @@ import { resizeImage } from '@/lib/resizeImage';
 import { track } from '@/lib/analytics';
 
 const PROFILE_KEY = ['me', 'instructor'] as const;
+export const MY_GO_LIVE_KEY = ['me', 'go-live'] as const;
 
 /** W2.1 — fetch (auto-creating) the caller's profile. */
 export function useMyProfile() {
@@ -35,6 +37,21 @@ export function useMyCalendarStatus(enabled: boolean) {
   });
 }
 
+export const GO_LIVE_POLL_MS = 10_000;
+
+export function useMyGoLive(enabled: boolean) {
+  return useQuery({
+    queryKey: MY_GO_LIVE_KEY,
+    queryFn: () => api<GoLiveReadiness>('/me/go-live'),
+    enabled,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.ready && !data.live ? GO_LIVE_POLL_MS : false;
+    },
+  });
+}
+
 /** W2.2 — patch the caller's profile. */
 export function useUpdateProfile() {
   const qc = useQueryClient();
@@ -43,6 +60,7 @@ export function useUpdateProfile() {
       api<InstructorProfile>('/me/instructor', { method: 'PATCH', body }),
     onSuccess: (profile) => {
       qc.setQueryData(PROFILE_KEY, profile);
+      void qc.invalidateQueries({ queryKey: MY_GO_LIVE_KEY });
       track('profile_saved');
     },
   });
@@ -173,6 +191,7 @@ export function useUploadAvatar() {
     mutationFn: (file: File) => uploadAvatar(file, '/me/instructor/photo'),
     onSuccess: (profile) => {
       qc.setQueryData(PROFILE_KEY, profile);
+      void qc.invalidateQueries({ queryKey: MY_GO_LIVE_KEY });
       track('photo_uploaded', { slot: 'avatar' });
     },
   });

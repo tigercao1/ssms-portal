@@ -22,6 +22,8 @@
   --status-approved: #2f7d6b;
   --status-rejected: var(--red);
   --status-inactive: var(--slate);
+  --status-live: #1e9e5a;
+  --status-live-ink: #146c3e;
 
   /* Typography */
   --font-display: 'Fraunces', Georgia, serif;

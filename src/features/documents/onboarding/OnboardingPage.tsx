@@ -74,7 +74,7 @@ function Row({
       <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0 sm:flex-1">
           <p className="font-medium text-ink">{title}</p>
-          <p className="text-xs text-slate">{subtitle}</p>
+          {subtitle && <p className="text-xs text-slate">{subtitle}</p>}
           {children}
         </div>
         {pill}
@@ -88,8 +88,6 @@ function DocumentRow({ item }: { item: DocumentChecklistItem }) {
   const t = useT();
   const { locale } = useLocale();
   const title = localizeField(item.titleEn, item.titleZh, locale);
-  const kind =
-    item.kind === 'read' ? t.onboarding.kindRead : t.onboarding.kindSign;
   const status =
     item.status === 'completed'
       ? t.onboarding.statusCompleted
@@ -111,7 +109,6 @@ function DocumentRow({ item }: { item: DocumentChecklistItem }) {
           ? t.onboarding.actionRead
           : t.onboarding.actionSign;
   const subtitle = [
-    kind,
     !item.required ? t.onboarding.optional : null,
     item.dueAt && item.status !== 'completed'
       ? t.onboarding.dueBy.replace('{date}', formatDate(item.dueAt, locale))
