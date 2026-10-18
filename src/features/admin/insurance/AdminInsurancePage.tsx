@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 import {
   Banner,
   Button,
@@ -24,12 +24,19 @@ import { SeasonSelect } from '@/features/reference/SeasonSelect';
 import {
   durationText,
   RecordStatusCell,
+  RequestStatusPill,
   studentNames,
-} from '@/features/insurance/InsuranceRecords';
+} from '@/features/insurance/RecordStatus';
+import {
+  LessonTree,
+  treeLessonOf,
+  useInsuranceText,
+} from '@/features/insurance/LessonTree';
 import { CAP_CENTS, dollars } from '@/features/insurance/money';
 import { useToast } from '@/features/insurance/Toast';
 import type {
   AdminInsuranceRecord,
+  AdminInsuranceRequest,
   AdminInsuranceSummary,
   InsurancePaymentStatus,
   SeasonCoverage,
@@ -39,10 +46,15 @@ import { errorText, formatDay } from '../payroll/payrollFormat';
 import {
   useGrantSeasonPass,
   useInsuranceRecords,
+  useInsuranceRequests,
   useInsuranceSummary,
   useMarkPaid,
+  useMarkRequestPaid,
+  useMarkRequestUnpaid,
   useMarkUnpaid,
+  useRequestLessonCount,
   useVoidRecord,
+  useVoidRequest,
 } from './insuranceApi';
 
 export const INSURANCE_PAGE_SIZE = 25;
@@ -54,8 +66,22 @@ const STATUSES: InsurancePaymentStatus[] = [
   'voided',
 ];
 
+interface ActionTarget {
+  kind: 'record' | 'request';
+  id: string;
+  no: string;
+  summary: string;
+  request?: {
+    id: string;
+    no: string;
+    season: string;
+    instructorId: string;
+    lessons: number | null;
+  };
+}
+
 type Dialog =
-  | { kind: 'paid' | 'unpaid' | 'void'; record: AdminInsuranceRecord }
+  | { kind: 'paid' | 'unpaid' | 'void'; target: ActionTarget }
   | { kind: 'grant' | 'removePass'; row: AdminInsuranceSummary }
   | null;
 
@@ -69,21 +95,28 @@ export function AdminInsurancePage() {
   const [instructorId, setInstructorId] = useState('');
   const [status, setStatus] = useState<InsurancePaymentStatus | ''>('');
   const [page, setPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
   const [dialog, setDialog] = useState<Dialog>(null);
   const { toast, showToast } = useToast();
   const summary = useInsuranceSummary(season);
-  const records = useInsuranceRecords({
+  const filter = {
     season,
     instructorId: instructorId || undefined,
     paymentStatus: status || undefined,
-    page,
     limit: INSURANCE_PAGE_SIZE,
-  });
+  };
+  const records = useInsuranceRecords({ ...filter, page });
+  const requests = useInsuranceRequests({ ...filter, page: requestPage });
+
+  function resetPages() {
+    setPage(1);
+    setRequestPage(1);
+  }
 
   function changeSeason(key: string) {
     setPickedSeason(key);
     setInstructorId('');
-    setPage(1);
+    resetPages();
   }
 
   return (
@@ -110,19 +143,22 @@ export function AdminInsurancePage() {
         waiting={seasons.isLoading}
         onPick={(id) => {
           setInstructorId(id);
-          setPage(1);
+          resetPages();
         }}
         onAction={setDialog}
       />
 
       <section
-        aria-labelledby="insurance-records"
+        aria-labelledby="insurance-requests"
         className="flex flex-col gap-3"
       >
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 id="insurance-records" className="text-xl">
-            {s.recordsTitle}
-          </h2>
+          <div className="flex max-w-xl flex-col gap-1">
+            <h2 id="insurance-requests" className="text-xl">
+              {s.requestsTitle}
+            </h2>
+            <p className="text-sm text-slate">{s.requestsIntro}</p>
+          </div>
           <div className="flex flex-wrap gap-3">
             <Field label={s.filterInstructor}>
               {(p) => (
@@ -132,7 +168,7 @@ export function AdminInsurancePage() {
                   value={instructorId}
                   onChange={(e) => {
                     setInstructorId(e.target.value);
-                    setPage(1);
+                    resetPages();
                   }}
                 >
                   <option value="">{s.filterInstructorAll}</option>
@@ -152,7 +188,7 @@ export function AdminInsurancePage() {
                   value={status}
                   onChange={(e) => {
                     setStatus(e.target.value as InsurancePaymentStatus | '');
-                    setPage(1);
+                    resetPages();
                   }}
                 >
                   <option value="">{s.filterStatusAll}</option>
@@ -166,8 +202,25 @@ export function AdminInsurancePage() {
             </Field>
           </div>
         </div>
+        <RequestsTable
+          query={requests}
+          waiting={seasons.isLoading}
+          page={requestPage}
+          onPage={setRequestPage}
+          onAction={setDialog}
+        />
+      </section>
+
+      <section
+        aria-labelledby="insurance-records"
+        className="flex flex-col gap-3"
+      >
+        <h2 id="insurance-records" className="text-xl">
+          {s.recordsTitle}
+        </h2>
         <RecordsTable
           query={records}
+          requests={requests.data?.requests ?? []}
           waiting={seasons.isLoading}
           page={page}
           onPage={setPage}
@@ -177,35 +230,39 @@ export function AdminInsurancePage() {
 
       {dialog?.kind === 'paid' && (
         <MarkPaidDialog
-          record={dialog.record}
+          target={dialog.target}
           onClose={() => setDialog(null)}
-          onDone={(r) => {
+          onDone={() => {
             setDialog(null);
-            showToast(s.markPaidToast.replace('{recordNo}', r.recordNo));
+            showToast(s.markPaidToast.replace('{recordNo}', dialog.target.no));
           }}
         />
       )}
       {dialog?.kind === 'unpaid' && (
         <MarkUnpaidDialog
-          record={dialog.record}
+          target={dialog.target}
           onClose={() => setDialog(null)}
-          onDone={(r) => {
+          onDone={() => {
             setDialog(null);
-            showToast(s.markUnpaidToast.replace('{recordNo}', r.recordNo));
+            showToast(
+              s.markUnpaidToast.replace('{recordNo}', dialog.target.no),
+            );
           }}
         />
       )}
       {dialog?.kind === 'void' && (
         <VoidDialog
-          recordId={dialog.record.id}
-          title={s.voidTitle.replace('{recordNo}', dialog.record.recordNo)}
-          summary={recordSummary(dialog.record, locale)}
-          body={s.voidBody}
-          confirm={s.voidConfirm}
+          target={dialog.target}
+          title={s.voidTitle.replace('{recordNo}', dialog.target.no)}
+          summary={dialog.target.summary}
+          body={wholeRequest(dialog.target) ? s.requestVoidBody : s.voidBody}
+          confirm={
+            wholeRequest(dialog.target) ? s.requestVoidConfirm : s.voidConfirm
+          }
           onClose={() => setDialog(null)}
-          onDone={(r) => {
+          onDone={() => {
             setDialog(null);
-            showToast(s.voidToast.replace('{recordNo}', r.recordNo));
+            showToast(s.voidToast.replace('{recordNo}', dialog.target.no));
           }}
         />
       )}
@@ -226,7 +283,7 @@ export function AdminInsurancePage() {
       )}
       {dialog?.kind === 'removePass' && dialog.row.seasonPassRecordId && (
         <VoidDialog
-          recordId={dialog.row.seasonPassRecordId}
+          target={{ kind: 'record', id: dialog.row.seasonPassRecordId }}
           title={s.removePassTitle.replace(
             '{name}',
             rowLabel(dialog.row, locale),
@@ -467,14 +524,64 @@ function SummaryRow({
   );
 }
 
+function wholeRequest(target: Pick<ActionTarget, 'kind' | 'request'>) {
+  return target.kind === 'request' || Boolean(target.request);
+}
+
+function useWholeRequest(target: Pick<ActionTarget, 'request'>) {
+  const request = target.request;
+  const lookup = useRequestLessonCount(
+    request && request.lessons === null
+      ? {
+          id: request.id,
+          season: request.season,
+          instructorId: request.instructorId,
+        }
+      : null,
+  );
+  if (!request) return null;
+  if (request.lessons !== null)
+    return { no: request.no, lessons: request.lessons, loading: false };
+  return {
+    no: request.no,
+    lessons: lookup.data ?? null,
+    loading: lookup.isPending,
+  };
+}
+
+type WholeRequest = ReturnType<typeof useWholeRequest>;
+
+function WholeRequestNote({ whole }: { whole: WholeRequest }) {
+  const f = useInsuranceText();
+  const s = useT().adminInsurance;
+  if (!whole) return null;
+  return (
+    <p data-testid="whole-request" className="text-sm font-semibold text-navy">
+      {whole.loading ? (
+        <span data-testid="whole-request-loading">
+          <Spinner />
+        </span>
+      ) : whole.lessons === null ? (
+        s.wholeRequestNoteNoCount.replace('{requestNo}', whole.no)
+      ) : (
+        s.wholeRequestNote
+          .replace('{requestNo}', whole.no)
+          .replace('{lessons}', f.lessons(whole.lessons))
+      )}
+    </p>
+  );
+}
+
 function RecordsTable({
   query,
+  requests,
   waiting,
   page,
   onPage,
   onAction,
 }: {
   query: ReturnType<typeof useInsuranceRecords>;
+  requests: AdminInsuranceRequest[];
   waiting: boolean;
   page: number;
   onPage: (page: number) => void;
@@ -555,7 +662,17 @@ function RecordsTable({
                   >
                     {dollars(r.amountCents)}
                   </td>
-                  <td className={cn(td, 'font-mono text-xs')}>{r.recordNo}</td>
+                  <td className={cn(td, 'font-mono text-xs')}>
+                    {r.recordNo}
+                    {r.requestNo && (
+                      <span
+                        data-testid="part-of-request"
+                        className="block font-body text-xs text-slate"
+                      >
+                        {s.partOfRequest.replace('{requestNo}', r.requestNo)}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-2.5 py-2.5">
                     <RecordStatusCell record={r} />
                     {r.paymentStatus === 'paid' && r.paidOn && (
@@ -585,43 +702,28 @@ function RecordsTable({
                   </td>
                   <td className={td}>
                     <div className="flex justify-end">
-                      <RowActions
+                      <PaymentActions
                         label={s.actionsFor.replace('{recordNo}', r.recordNo)}
-                        items={[
-                          ...(r.paymentStatus === 'unpaid'
-                            ? [
-                                {
-                                  key: 'paid',
-                                  label: s.markPaid,
-                                  onSelect: () =>
-                                    onAction({ kind: 'paid', record: r }),
-                                },
-                              ]
-                            : []),
-                          ...(r.paymentStatus === 'paid'
-                            ? [
-                                {
-                                  key: 'unpaid',
-                                  label: s.markUnpaid,
-                                  variant: 'ghost' as const,
-                                  onSelect: () =>
-                                    onAction({ kind: 'unpaid', record: r }),
-                                },
-                              ]
-                            : []),
-                          ...(r.paymentStatus !== 'voided'
-                            ? [
-                                {
-                                  key: 'void',
-                                  label: s.void,
-                                  variant: 'ghost' as const,
-                                  destructive: true,
-                                  onSelect: () =>
-                                    onAction({ kind: 'void', record: r }),
-                                },
-                              ]
-                            : []),
-                        ]}
+                        status={r.paymentStatus}
+                        target={{
+                          kind: 'record',
+                          id: r.id,
+                          no: r.recordNo,
+                          summary: recordSummary(r, locale),
+                          ...(r.requestId &&
+                            r.requestNo && {
+                              request: {
+                                id: r.requestId,
+                                no: r.requestNo,
+                                season: r.seasonKey,
+                                instructorId: r.instructorId,
+                                lessons:
+                                  requests.find((x) => x.id === r.requestId)
+                                    ?.lessonCount ?? null,
+                              },
+                            }),
+                        }}
+                        onAction={onAction}
                       />
                     </div>
                   </td>
@@ -651,6 +753,260 @@ function RecordsTable({
   );
 }
 
+function PaymentActions({
+  label,
+  status,
+  target,
+  onAction,
+}: {
+  label: string;
+  status: InsurancePaymentStatus;
+  target: ActionTarget;
+  onAction: (dialog: Dialog) => void;
+}) {
+  const t = useT();
+  const s = t.adminInsurance;
+  return (
+    <RowActions
+      label={label}
+      items={[
+        ...(status === 'unpaid'
+          ? [
+              {
+                key: 'paid',
+                label: s.markPaid,
+                onSelect: () => onAction({ kind: 'paid', target }),
+              },
+            ]
+          : []),
+        ...(status === 'paid'
+          ? [
+              {
+                key: 'unpaid',
+                label: s.markUnpaid,
+                variant: 'ghost' as const,
+                onSelect: () => onAction({ kind: 'unpaid', target }),
+              },
+            ]
+          : []),
+        ...(status !== 'voided'
+          ? [
+              {
+                key: 'void',
+                label: s.void,
+                variant: 'ghost' as const,
+                destructive: true,
+                onSelect: () => onAction({ kind: 'void', target }),
+              },
+            ]
+          : []),
+      ]}
+    />
+  );
+}
+
+function RequestsTable({
+  query,
+  waiting,
+  page,
+  onPage,
+  onAction,
+}: {
+  query: ReturnType<typeof useInsuranceRequests>;
+  waiting: boolean;
+  page: number;
+  onPage: (page: number) => void;
+  onAction: (dialog: Dialog) => void;
+}) {
+  const t = useT();
+  const s = t.adminInsurance;
+  const { locale } = useLocale();
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const th = 'whitespace-nowrap px-2.5 py-2 font-medium';
+  const td = 'whitespace-nowrap px-2.5 py-2.5';
+  const rows = query.data?.requests ?? [];
+
+  if (query.isLoading || waiting)
+    return (
+      <Card className="flex justify-center py-10">
+        <Spinner />
+      </Card>
+    );
+  if (query.isError)
+    return <Banner tone="error">{errorText(query.error, s.loadFailed)}</Banner>;
+
+  return (
+    <Card className="p-0">
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-slate">{s.requestsEmpty}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table
+            aria-label={s.requestsTitle}
+            className="w-full min-w-[52rem] text-sm"
+          >
+            <thead>
+              <tr className="border-b border-grey/60 text-left text-xs uppercase tracking-wide text-slate">
+                <th className={th}>{s.colRequestNo}</th>
+                <th className={th}>{s.colInstructor}</th>
+                <th className={cn(th, 'text-right')}>{s.colLessons}</th>
+                <th className={cn(th, 'text-right')}>{s.colStudents}</th>
+                <th className={cn(th, 'text-right')}>{s.colAmount}</th>
+                <th className={th}>{s.colStatus}</th>
+                <th className={th}>{s.colSubmitted}</th>
+                <th className={cn(th, 'text-right')}>{s.colActions}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const expanded = Boolean(open[r.id]);
+                return (
+                  <Fragment key={r.id}>
+                    <tr className="border-b border-grey/40 last:border-0">
+                      <td className={td}>
+                        <button
+                          type="button"
+                          aria-expanded={expanded}
+                          aria-label={s.showLessons.replace(
+                            '{requestNo}',
+                            r.requestNo,
+                          )}
+                          onClick={() =>
+                            setOpen((o) => ({ ...o, [r.id]: !o[r.id] }))
+                          }
+                          className="inline-flex items-center gap-1.5 font-mono text-xs text-navy hover:underline"
+                        >
+                          <span
+                            aria-hidden
+                            className={cn(
+                              'inline-block text-base text-slate transition-transform',
+                              expanded && 'rotate-90',
+                            )}
+                          >
+                            ›
+                          </span>
+                          {r.requestNo}
+                        </button>
+                      </td>
+                      <td className={td}>
+                        <InstructorName
+                          row={{
+                            name: r.instructorName,
+                            nameZh: r.instructorNameZh,
+                            email: r.instructorEmail,
+                          }}
+                        />
+                      </td>
+                      <td className={cn(td, 'text-right tabular-nums')}>
+                        {r.lessonCount}
+                      </td>
+                      <td className={cn(td, 'text-right tabular-nums')}>
+                        {r.studentCount}
+                      </td>
+                      <td
+                        className={cn(
+                          td,
+                          'text-right tabular-nums',
+                          r.paymentStatus === 'voided' &&
+                            'text-slate line-through',
+                        )}
+                      >
+                        {dollars(r.totalCents)}
+                      </td>
+                      <td className="px-2.5 py-2.5">
+                        <RequestStatusPill request={r} />
+                        {r.paymentStatus === 'paid' && r.paidOn && (
+                          <span className="block text-xs text-slate">
+                            {s.paidOnNote.replace(
+                              '{date}',
+                              formatDay(r.paidOn, locale),
+                            )}
+                          </span>
+                        )}
+                        {r.paymentStatus === 'paid' && r.paidNote && (
+                          <span className="block max-w-[14rem] truncate text-xs text-slate">
+                            {r.paidNote}
+                          </span>
+                        )}
+                        {r.paymentStatus === 'voided' && r.voidedReason && (
+                          <span className="block max-w-[14rem] text-xs text-slate">
+                            {s.voidedNote.replace('{reason}', r.voidedReason)}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={cn(td, 'text-slate')}
+                        title={formatDateTime(r.createdAt, locale)}
+                      >
+                        {formatDate(r.createdAt, locale)}
+                      </td>
+                      <td className={td}>
+                        <div className="flex justify-end">
+                          <PaymentActions
+                            label={s.actionsFor.replace(
+                              '{recordNo}',
+                              r.requestNo,
+                            )}
+                            status={r.paymentStatus}
+                            target={{
+                              kind: 'request',
+                              id: r.id,
+                              no: r.requestNo,
+                              summary: requestSummary(r, locale),
+                            }}
+                            onAction={onAction}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                    {expanded && (
+                      <tr className="border-b border-grey/40 bg-sunken/50">
+                        <td colSpan={8} className="px-4 pb-1 pt-3">
+                          <LessonTree lessons={r.lessons.map(treeLessonOf)} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Pager
+        className="border-t border-grey/60"
+        page={page}
+        shownPage={page}
+        pageSize={INSURANCE_PAGE_SIZE}
+        count={rows.length}
+        total={query.data?.total ?? 0}
+        busy={query.isFetching}
+        onPage={onPage}
+        text={{
+          label: s.requestsPagerLabel,
+          showing: s.pagerShowing,
+          previous: t.admin.prevPage,
+          next: t.admin.nextPage,
+        }}
+      />
+    </Card>
+  );
+}
+
+function requestSummary(request: AdminInsuranceRequest, locale: Locale) {
+  const name = instructorLabel(
+    request.instructorName,
+    request.instructorNameZh,
+    request.instructorEmail,
+    locale,
+  );
+  return `${name} · ${dollars(request.totalCents)}`;
+}
+
+function actionErrorText(error: unknown, t: ReturnType<typeof useT>) {
+  return errorText(error, t.errors.generic);
+}
+
 function recordSummary(record: AdminInsuranceRecord, locale: Locale) {
   const name = instructorLabel(
     record.instructorName,
@@ -662,36 +1018,39 @@ function recordSummary(record: AdminInsuranceRecord, locale: Locale) {
 }
 
 function MarkPaidDialog({
-  record,
+  target,
   onClose,
   onDone,
 }: {
-  record: AdminInsuranceRecord;
+  target: ActionTarget;
   onClose: () => void;
-  onDone: (record: AdminInsuranceRecord) => void;
+  onDone: () => void;
 }) {
   const t = useT();
   const s = t.adminInsurance;
-  const { locale } = useLocale();
-  const markPaid = useMarkPaid();
+  const recordAction = useMarkPaid();
+  const requestAction = useMarkRequestPaid();
+  const markPaid = target.kind === 'request' ? requestAction : recordAction;
+  const whole = useWholeRequest(target);
+  const counting = Boolean(whole?.loading);
   const [paidOn, setPaidOn] = useState(() => todayIso());
   const [note, setNote] = useState('');
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (!paidOn || markPaid.isPending) return;
+    if (!paidOn || counting || markPaid.isPending) return;
     markPaid.mutate(
       {
-        id: record.id,
+        id: target.id,
         body: { paidOn, ...(note.trim() && { note: note.trim() }) },
       },
-      { onSuccess: onDone },
+      { onSuccess: () => onDone() },
     );
   }
 
   return (
     <Modal
-      title={s.markPaidTitle.replace('{recordNo}', record.recordNo)}
+      title={s.markPaidTitle.replace('{recordNo}', target.no)}
       onClose={onClose}
       footer={
         <>
@@ -704,7 +1063,7 @@ function MarkPaidDialog({
           </Button>
           <Button
             loading={markPaid.isPending}
-            disabled={!paidOn}
+            disabled={!paidOn || counting}
             onClick={() => submit()}
           >
             {s.markPaidConfirm}
@@ -713,7 +1072,8 @@ function MarkPaidDialog({
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">{recordSummary(record, locale)}</p>
+        <p className="text-sm text-slate">{target.summary}</p>
+        <WholeRequestNote whole={whole} />
         <Field label={s.paidOnLabel} required>
           {(p) => (
             <Input
@@ -736,9 +1096,7 @@ function MarkPaidDialog({
           )}
         </Field>
         {markPaid.isError && (
-          <Banner tone="error">
-            {errorText(markPaid.error, t.errors.generic)}
-          </Banner>
+          <Banner tone="error">{actionErrorText(markPaid.error, t)}</Banner>
         )}
       </form>
     </Modal>
@@ -746,21 +1104,23 @@ function MarkPaidDialog({
 }
 
 function MarkUnpaidDialog({
-  record,
+  target,
   onClose,
   onDone,
 }: {
-  record: AdminInsuranceRecord;
+  target: ActionTarget;
   onClose: () => void;
-  onDone: (record: AdminInsuranceRecord) => void;
+  onDone: () => void;
 }) {
   const t = useT();
   const s = t.adminInsurance;
-  const { locale } = useLocale();
-  const markUnpaid = useMarkUnpaid();
+  const recordAction = useMarkUnpaid();
+  const requestAction = useMarkRequestUnpaid();
+  const markUnpaid = target.kind === 'request' ? requestAction : recordAction;
+  const whole = useWholeRequest(target);
   return (
     <Modal
-      title={s.markUnpaidTitle.replace('{recordNo}', record.recordNo)}
+      title={s.markUnpaidTitle.replace('{recordNo}', target.no)}
       onClose={onClose}
       footer={
         <>
@@ -773,8 +1133,12 @@ function MarkUnpaidDialog({
           </Button>
           <Button
             loading={markUnpaid.isPending}
+            disabled={Boolean(whole?.loading)}
             onClick={() =>
-              markUnpaid.mutate({ id: record.id }, { onSuccess: onDone })
+              markUnpaid.mutate(
+                { id: target.id },
+                { onSuccess: () => onDone() },
+              )
             }
           >
             {s.markUnpaidConfirm}
@@ -783,12 +1147,13 @@ function MarkUnpaidDialog({
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <p className="text-slate">{recordSummary(record, locale)}</p>
-        <p>{s.markUnpaidBody}</p>
+        <p className="text-slate">{target.summary}</p>
+        <WholeRequestNote whole={whole} />
+        <p>
+          {wholeRequest(target) ? s.requestMarkUnpaidBody : s.markUnpaidBody}
+        </p>
         {markUnpaid.isError && (
-          <Banner tone="error">
-            {errorText(markUnpaid.error, t.errors.generic)}
-          </Banner>
+          <Banner tone="error">{actionErrorText(markUnpaid.error, t)}</Banner>
         )}
       </div>
     </Modal>
@@ -918,7 +1283,7 @@ function GrantSeasonPassDialog({
 }
 
 function VoidDialog({
-  recordId,
+  target,
   title,
   summary,
   body,
@@ -926,17 +1291,21 @@ function VoidDialog({
   onClose,
   onDone,
 }: {
-  recordId: string;
+  target: Pick<ActionTarget, 'kind' | 'id' | 'request'>;
   title: string;
   summary: string;
   body: string;
   confirm: string;
   onClose: () => void;
-  onDone: (record: AdminInsuranceRecord) => void;
+  onDone: () => void;
 }) {
   const t = useT();
   const s = t.adminInsurance;
-  const voidRecord = useVoidRecord();
+  const recordAction = useVoidRecord();
+  const requestAction = useVoidRequest();
+  const voidRecord = target.kind === 'request' ? requestAction : recordAction;
+  const whole = useWholeRequest(target);
+  const counting = Boolean(whole?.loading);
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const missing = !reason.trim();
@@ -944,10 +1313,10 @@ function VoidDialog({
   function submit(e?: FormEvent) {
     e?.preventDefault();
     setTouched(true);
-    if (missing || voidRecord.isPending) return;
+    if (missing || counting || voidRecord.isPending) return;
     voidRecord.mutate(
-      { id: recordId, body: { reason: reason.trim() } },
-      { onSuccess: onDone },
+      { id: target.id, body: { reason: reason.trim() } },
+      { onSuccess: () => onDone() },
     );
   }
 
@@ -967,7 +1336,7 @@ function VoidDialog({
           <Button
             variant="danger"
             loading={voidRecord.isPending}
-            disabled={touched && missing}
+            disabled={(touched && missing) || counting}
             onClick={() => submit()}
           >
             {confirm}
@@ -977,6 +1346,7 @@ function VoidDialog({
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <p className="text-sm text-slate">{summary}</p>
+        <WholeRequestNote whole={whole} />
         <p className="text-sm">{body}</p>
         <Field
           label={s.voidReason}
@@ -994,9 +1364,7 @@ function VoidDialog({
           )}
         </Field>
         {voidRecord.isError && (
-          <Banner tone="error">
-            {errorText(voidRecord.error, t.errors.generic)}
-          </Banner>
+          <Banner tone="error">{actionErrorText(voidRecord.error, t)}</Banner>
         )}
       </form>
     </Modal>

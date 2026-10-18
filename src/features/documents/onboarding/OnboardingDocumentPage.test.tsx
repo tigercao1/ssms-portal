@@ -880,13 +880,11 @@ describe('OnboardingDocumentPage — last item', () => {
       { route: '/insurance', staleTime: 60_000 },
     );
     expect(
-      await screen.findByText(
-        'Finish onboarding to use private lesson insurance',
-      ),
+      await screen.findByText('Finish onboarding to insure private lessons'),
     ).toBeInTheDocument();
     expect(
       await screen.findByRole('link', {
-        name: 'Private lesson insurance Locked until you finish onboarding',
+        name: 'Lesson insurance Locked until you finish onboarding',
       }),
     ).toBeInTheDocument();
 
@@ -901,14 +899,16 @@ describe('OnboardingDocumentPage — last item', () => {
     await screen.findByRole('heading', { name: 'Marked as read' });
 
     const insurance = await screen.findByRole('link', {
-      name: 'Private lesson insurance',
+      name: 'Lesson insurance',
     });
     await user.click(insurance);
     expect(
-      await screen.findByRole('heading', { name: 'Register a lesson' }),
+      (
+        await screen.findAllByRole('button', { name: 'New insurance request' })
+      )[0],
     ).toBeInTheDocument();
     expect(
-      screen.queryByText('Finish onboarding to use private lesson insurance'),
+      screen.queryByText('Finish onboarding to insure private lessons'),
     ).toBeNull();
   });
 });

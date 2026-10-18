@@ -1,20 +1,38 @@
 import { http, HttpResponse } from 'msw';
-import { CAP_CENTS, listCents } from './money';
+import { CAP_CENTS, priceLessons } from './money';
 import type {
   AdminInsuranceRecord,
+  AdminInsuranceRequest,
   AdminInsuranceSummary,
+  InsurancePaymentStatus,
   InsuranceRecord,
+  InsuranceRequest,
   MyInsurance,
-  RegisterLessonBody,
+  RequestLessonBody,
+  SubmitRequestBody,
 } from './types';
 
 const API = 'http://localhost:3000';
+
+export const SEASON_2025 = {
+  key: '2025/26',
+  startsOn: '2025-11-01',
+  endsOn: '2026-04-30',
+};
 
 export const SEASON_2026 = {
   key: '2026/27',
   startsOn: '2026-11-01',
   endsOn: '2027-04-30',
 };
+
+export const SEASON_2027 = {
+  key: '2027/28',
+  startsOn: '2027-11-01',
+  endsOn: '2028-04-30',
+};
+
+export const SEASONS = [SEASON_2027, SEASON_2026, SEASON_2025];
 
 export function insuranceRecord(
   overrides: Partial<InsuranceRecord> = {},
@@ -55,48 +73,177 @@ export function myInsurance(overrides: Partial<MyInsurance> = {}): MyInsurance {
     unpaidCents: 0,
     coverage: 'none',
     records: [],
+    requests: [],
     ...overrides,
   };
 }
 
-export const historyRecords: InsuranceRecord[] = [
-  insuranceRecord({
-    id: 'rec-3',
-    recordNo: 'INS-20261219-0002',
-    lessonDate: '2026-12-19',
-    durationHours: 1,
-    students: [{ name: 'Leo Chen', waiverConfirmed: true }],
-    studentCount: 1,
-    listCents: 1000,
-    amountCents: 1000,
-    paymentStatus: 'unpaid',
-    paidOn: null,
-    createdAt: '2026-12-18T20:05:00Z',
-  }),
-  insuranceRecord(),
-  insuranceRecord({
-    id: 'rec-2',
-    recordNo: 'INS-20261205-0001',
-    lessonDate: '2026-12-05',
-    durationHours: 1,
-    locationId: null,
-    locationName: null,
-    locationOther: 'Mont Tremblant',
-    students: [{ name: 'Sam Park', waiverConfirmed: true }],
-    studentCount: 1,
-    listCents: 1000,
-    amountCents: 1000,
-    paymentStatus: 'voided',
-    paidOn: null,
-    createdAt: '2026-12-04T18:00:00Z',
-  }),
+export const LOCATIONS = [
+  { id: 'l1', key: 'loc.msl', name: 'Mount St. Louis Moonstone', nameZh: null },
+  { id: 'l2', key: 'loc.blue', name: 'Blue Mountain', nameZh: null },
+  { id: 'l3', key: 'loc.horseshoe', name: 'Horseshoe Resort', nameZh: null },
 ];
 
-export const withHistory = myInsurance({
-  owedCents: 5000,
-  paidCents: 4000,
-  unpaidCents: 1000,
-  records: historyRecords,
+function locationName(id: string | undefined) {
+  return LOCATIONS.find((l) => l.id === id)?.name ?? null;
+}
+
+function lessonRecord(
+  requestId: string,
+  index: number,
+  body: RequestLessonBody,
+  price: { listCents: number; amountCents: number },
+  paymentStatus: InsurancePaymentStatus,
+  covered: 'season_pass' | null,
+  createdAt: string,
+  seasonKey: string,
+): InsuranceRecord {
+  return {
+    id: `${requestId}-l${index + 1}`,
+    recordNo: `${requestId}-l${index + 1}`,
+    kind: 'lesson',
+    seasonKey,
+    lessonDate: body.lessonDate,
+    durationHours: body.durationHours,
+    locationId: body.locationId ?? null,
+    locationName: locationName(body.locationId),
+    locationOther: body.locationOther ?? null,
+    students: body.students,
+    studentCount: body.students.length,
+    listCents: price.listCents,
+    amountCents: price.amountCents,
+    coverage: covered
+      ? covered
+      : price.amountCents === price.listCents
+        ? 'per_lesson'
+        : price.amountCents > 0
+          ? 'cap_top_up'
+          : 'capped',
+    paymentStatus:
+      paymentStatus === 'voided' || price.amountCents > 0
+        ? paymentStatus
+        : 'not_required',
+    paidOn: null,
+    createdAt,
+  };
+}
+
+export function buildRequest(
+  {
+    id,
+    requestNo,
+    createdAt,
+    paymentStatus,
+    owedCents = 0,
+    seasonPass = false,
+    seasonKey = SEASON_2026.key,
+  }: {
+    id: string;
+    requestNo: string;
+    createdAt: string;
+    paymentStatus?: InsurancePaymentStatus;
+    owedCents?: number;
+    seasonPass?: boolean;
+    seasonKey?: string;
+  },
+  lessons: RequestLessonBody[],
+): InsuranceRequest {
+  const priced = priceLessons(
+    lessons.map((l) => ({
+      durationHours: l.durationHours,
+      studentCount: l.students.length,
+    })),
+    { owedCents, capCents: CAP_CENTS, seasonPass },
+  );
+  const totalCents = priced.reduce((sum, p) => sum + p.amountCents, 0);
+  const status = paymentStatus ?? (totalCents > 0 ? 'unpaid' : 'not_required');
+  return {
+    id,
+    requestNo,
+    seasonKey,
+    paymentStatus: status,
+    totalCents,
+    lessonCount: lessons.length,
+    studentCount: lessons.reduce((sum, l) => sum + l.students.length, 0),
+    createdAt,
+    paidOn: status === 'paid' ? createdAt.slice(0, 10) : null,
+    lessons: lessons.map((l, i) =>
+      lessonRecord(
+        id,
+        i,
+        l,
+        priced[i]!,
+        status,
+        seasonPass ? 'season_pass' : null,
+        createdAt,
+        seasonKey,
+      ),
+    ),
+  };
+}
+
+const signed = (names: string[]) =>
+  names.map((name) => ({ name, waiverConfirmed: true }));
+const FAMILY = ['Kevin Xu', 'Amy Xu', 'Daniel Wu', 'Sophie Wu'];
+const GROUP = ['Emma Liu', 'Jason Wang', 'Chloe Zhang', 'Ryan Chen'];
+
+export const paidRequest = buildRequest(
+  {
+    id: 'req-1',
+    requestNo: 'INS-20261006-0004',
+    createdAt: '2026-10-06T15:00:00Z',
+    paymentStatus: 'paid',
+  },
+  [
+    {
+      lessonDate: '2026-12-12',
+      durationHours: 2,
+      locationId: 'l1',
+      students: signed(FAMILY),
+    },
+    {
+      lessonDate: '2026-12-13',
+      durationHours: 2,
+      locationId: 'l1',
+      students: signed([...FAMILY, 'Lucas He']),
+    },
+  ],
+);
+
+export const unpaidRequest = buildRequest(
+  {
+    id: 'req-2',
+    requestNo: 'INS-20261014-0011',
+    createdAt: '2026-10-14T15:00:00Z',
+    owedCents: paidRequest.totalCents,
+  },
+  [
+    {
+      lessonDate: '2026-12-19',
+      durationHours: 2,
+      locationId: 'l2',
+      students: signed(GROUP),
+    },
+    {
+      lessonDate: '2026-12-20',
+      durationHours: 2,
+      locationId: 'l2',
+      students: signed(GROUP),
+    },
+    {
+      lessonDate: '2026-12-27',
+      durationHours: 1,
+      locationId: 'l3',
+      students: signed(['Olivia Zhao', 'Ethan Li', 'Mia Sun']),
+    },
+  ],
+);
+
+export const withRequests = myInsurance({
+  owedCents: 35000,
+  paidCents: 16000,
+  unpaidCents: 19000,
+  requests: [unpaidRequest, paidRequest],
 });
 
 export const onboardingInsurance = myInsurance({
@@ -104,124 +251,212 @@ export const onboardingInsurance = myInsurance({
   lockReason: 'onboarding_incomplete',
 });
 
-export const SEASON_2025 = {
-  key: '2025/26',
-  startsOn: '2025-11-01',
-  endsOn: '2026-04-30',
-};
-
 export interface InsuranceMockState {
   data: MyInsurance;
-  otherSeasons: Record<string, MyInsurance>;
-  seasonGets: string[];
-  posts: RegisterLessonBody[];
+  seasons: Record<string, MyInsurance>;
+  seasonQueries: string[];
+  posts: SubmitRequestBody[];
+  byKey: Record<string, InsuranceRequest>;
   nextNo: number;
 }
 
 export function createInsuranceState(
   data: MyInsurance,
-  otherSeasons: MyInsurance[] = [],
+  seasons: Record<string, MyInsurance> = {},
 ): InsuranceMockState {
   return {
     data: structuredClone(data),
-    otherSeasons: Object.fromEntries(
-      otherSeasons.map((o) => [o.season!.key, structuredClone(o)]),
-    ),
-    seasonGets: [],
+    seasons: structuredClone(seasons),
+    seasonQueries: [],
     posts: [],
-    nextNo: 1,
+    byKey: {},
+    nextNo: 12,
   };
 }
 
-function overviewFor(state: InsuranceMockState, lessonDate: string) {
-  return (
-    Object.values(state.otherSeasons).find(
-      (o) =>
-        o.season &&
-        lessonDate >= o.season.startsOn &&
-        lessonDate <= o.season.endsOn,
-    ) ?? state.data
-  );
-}
-
-function addRecord(d: MyInsurance, record: InsuranceRecord) {
-  d.records = [record, ...d.records];
-  d.owedCents += record.amountCents;
-  if (record.paymentStatus === 'unpaid') d.unpaidCents += record.amountCents;
-  if (d.owedCents >= d.capCents)
-    d.coverage = d.coverage === 'season_pass' ? 'season_pass' : 'capped';
-}
-
-function recordNo(state: InsuranceMockState) {
-  return `INS-20261015-${String(state.nextNo++).padStart(4, '0')}`;
+function seasonData(state: InsuranceMockState, key: string): MyInsurance {
+  if (state.data.season?.key === key) return state.data;
+  const season = SEASONS.find((x) => x.key === key)!;
+  state.seasons[key] ??= myInsurance({
+    locked: state.data.locked,
+    lockReason: state.data.lockReason,
+    season,
+  });
+  return state.seasons[key];
 }
 
 export function insuranceHandlers(state: InsuranceMockState) {
   return [
     http.get(`${API}/me/insurance`, ({ request }) => {
-      const season = new URL(request.url).searchParams.get('season');
-      if (!season || season === state.data.season?.key)
-        return HttpResponse.json(state.data);
-      state.seasonGets.push(season);
-      return HttpResponse.json(
-        state.otherSeasons[season] ??
-          myInsurance({ season: { ...SEASON_2026, key: season } }),
-      );
+      const key = new URL(request.url).searchParams.get('season');
+      if (!key) return HttpResponse.json(state.data);
+      state.seasonQueries.push(key);
+      if (!SEASONS.some((x) => x.key === key))
+        return HttpResponse.json({ code: 'unknown_season' }, { status: 400 });
+      return HttpResponse.json(seasonData(state, key));
     }),
-    http.post(`${API}/me/insurance/records`, async ({ request }) => {
-      const body = (await request.json()) as RegisterLessonBody;
+    http.post(`${API}/me/insurance/requests`, async ({ request }) => {
+      const body = (await request.json()) as SubmitRequestBody;
       state.posts.push(body);
       if (state.data.locked)
+        return HttpResponse.json({ code: 'locked' }, { status: 403 });
+      const repeat = state.byKey[body.idempotencyKey];
+      if (repeat) return HttpResponse.json(repeat, { status: 200 });
+      if (body.lessons.length < 1 || body.lessons.length > 10)
         return HttpResponse.json(
-          { message: 'Forbidden', reason: state.data.lockReason },
-          { status: 403 },
+          { code: 'too_many_lessons', maxLessons: 10 },
+          { status: 400 },
         );
-      const d = overviewFor(state, body.lessonDate);
-      const list = listCents(body.durationHours, body.students.length);
-      const base = {
-        id: `new-${state.nextNo}`,
-        kind: 'lesson' as const,
-        seasonKey: d.season?.key ?? '',
-        lessonDate: body.lessonDate,
-        durationHours: body.durationHours,
-        locationId: body.locationId ?? null,
-        locationName: body.locationId ? 'Whistler' : null,
-        locationOther: body.locationOther ?? null,
-        students: body.students,
-        studentCount: body.students.length,
-        listCents: list,
-        paidOn: null,
-        createdAt: '2026-10-15T14:00:00Z',
-      };
-      let record: InsuranceRecord;
-      if (d.owedCents >= d.capCents) {
-        record = {
-          ...base,
-          recordNo: recordNo(state),
-          amountCents: 0,
-          coverage: d.coverage === 'season_pass' ? 'season_pass' : 'capped',
-          paymentStatus: 'not_required',
-        };
-      } else if (d.owedCents + list >= d.capCents) {
-        record = {
-          ...base,
-          recordNo: recordNo(state),
-          amountCents: d.capCents - d.owedCents,
-          coverage: 'cap_top_up',
-          paymentStatus: 'unpaid',
-        };
-      } else {
-        record = {
-          ...base,
-          recordNo: recordNo(state),
-          amountCents: list,
-          coverage: 'per_lesson',
-          paymentStatus: 'unpaid',
-        };
+      const unconfirmed = body.lessons.flatMap((l, lessonIndex) =>
+        l.students.flatMap((s, studentIndex) =>
+          s.waiverConfirmed ? [] : [{ lessonIndex, studentIndex }],
+        ),
+      );
+      if (unconfirmed.length > 0)
+        return HttpResponse.json(
+          { code: 'waiver_unconfirmed', indexes: unconfirmed },
+          { status: 400 },
+        );
+      const conflict = body.lessons.findIndex(
+        (l) => l.locationId && l.locationOther,
+      );
+      if (conflict >= 0)
+        return HttpResponse.json(
+          { code: 'location_conflict', lessonIndex: conflict },
+          { status: 400 },
+        );
+      const lessonSeasons = body.lessons.map((l) =>
+        SEASONS.find(
+          (x) => l.lessonDate >= x.startsOn && l.lessonDate <= x.endsOn,
+        ),
+      );
+      const outside = lessonSeasons.findIndex((x) => !x);
+      if (outside >= 0)
+        return HttpResponse.json(
+          { code: 'no_season', lessonIndex: outside },
+          { status: 400 },
+        );
+      const seasonKey = lessonSeasons[0]!.key;
+      const mixed = lessonSeasons.findIndex((x) => x!.key !== seasonKey);
+      if (mixed >= 0)
+        return HttpResponse.json(
+          { code: 'mixed_seasons', lessonIndex: mixed, seasonKey },
+          { status: 400 },
+        );
+      const d = seasonData(state, seasonKey);
+      const no = String(state.nextNo++).padStart(4, '0');
+      const created = buildRequest(
+        {
+          id: `req-new-${no}`,
+          requestNo: `INS-20261018-${no}`,
+          createdAt: '2026-10-18T15:30:00Z',
+          owedCents: d.owedCents,
+          seasonPass: d.coverage === 'season_pass',
+          seasonKey,
+        },
+        body.lessons,
+      );
+      state.byKey[body.idempotencyKey] = created;
+      d.requests = [created, ...d.requests];
+      if (d.coverage !== 'season_pass') {
+        d.owedCents += created.totalCents;
+        d.unpaidCents += created.totalCents;
+        if (d.owedCents >= d.capCents) d.coverage = 'capped';
       }
-      addRecord(d, record);
-      return HttpResponse.json(record, { status: 201 });
+      return HttpResponse.json(created, { status: 201 });
     }),
+  ];
+}
+
+export function adminRequest(
+  request: InsuranceRequest,
+  overrides: Partial<AdminInsuranceRequest> = {},
+): AdminInsuranceRequest {
+  return {
+    ...structuredClone(request),
+    instructorId: 'inst-1',
+    instructorName: 'Jane Snow',
+    instructorNameZh: '简雪',
+    instructorEmail: 'jane@example.com',
+    paidNote: null,
+    voidedAt: null,
+    voidedReason: null,
+    ...overrides,
+  };
+}
+
+export const adminRequests: AdminInsuranceRequest[] = [
+  adminRequest(unpaidRequest),
+  adminRequest(paidRequest, { paidNote: 'e-transfer #8812' }),
+];
+
+export interface AdminRequestsState {
+  requests: AdminInsuranceRequest[];
+  queries: URLSearchParams[];
+  actions: { id: string; action: string; body: unknown }[];
+}
+
+export function createAdminRequestsState(
+  requests: AdminInsuranceRequest[] = adminRequests,
+): AdminRequestsState {
+  return { requests: structuredClone(requests), queries: [], actions: [] };
+}
+
+export function adminRequestHandlers(state: AdminRequestsState) {
+  return [
+    http.get(`${API}/admin/insurance/requests`, ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      state.queries.push(params);
+      const rows = state.requests.filter(
+        (r) =>
+          (!params.get('instructorId') ||
+            r.instructorId === params.get('instructorId')) &&
+          (!params.get('paymentStatus') ||
+            r.paymentStatus === params.get('paymentStatus')),
+      );
+      const limit = Number(params.get('limit') ?? rows.length);
+      const offset = (Number(params.get('page') ?? 1) - 1) * limit;
+      return HttpResponse.json({
+        requests: rows.slice(offset, offset + limit),
+        total: rows.length,
+      });
+    }),
+    http.post(
+      `${API}/admin/insurance/requests/:id/:action`,
+      async ({ request, params }) => {
+        const id = String(params.id);
+        const action = String(params.action);
+        const body = (await request.json()) as {
+          paidOn?: string;
+          note?: string;
+          reason?: string;
+        };
+        state.actions.push({ id, action, body });
+        const r = state.requests.find((x) => x.id === id);
+        if (!r)
+          return HttpResponse.json({ code: 'not_found' }, { status: 404 });
+        const status: InsurancePaymentStatus =
+          action === 'mark-paid'
+            ? 'paid'
+            : action === 'mark-unpaid'
+              ? 'unpaid'
+              : 'voided';
+        r.paymentStatus = status;
+        r.paidOn = status === 'paid' ? (body.paidOn ?? null) : null;
+        r.paidNote = status === 'paid' ? (body.note ?? null) : null;
+        if (status === 'voided') {
+          r.voidedAt = '2026-10-18T16:00:00Z';
+          r.voidedReason = body.reason ?? null;
+        }
+        r.lessons = r.lessons.map((l) => ({
+          ...l,
+          paymentStatus:
+            l.amountCents > 0 || status === 'voided' ? status : l.paymentStatus,
+          paidOn: r.paidOn,
+        }));
+        return HttpResponse.json(r);
+      },
+    ),
   ];
 }
 
@@ -230,6 +465,8 @@ export function adminRecord(
 ): AdminInsuranceRecord {
   return {
     ...insuranceRecord(),
+    requestId: null,
+    requestNo: null,
     instructorId: 'inst-1',
     instructorName: 'Jane Snow',
     instructorNameZh: '简雪',

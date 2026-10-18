@@ -1,24 +1,51 @@
-import { useRef } from 'react';
-import { Banner, Button, Card, Spinner } from '@/components';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Banner, Button, Card, Modal, Spinner } from '@/components';
+import { useSession } from '@/auth/SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import {
   LockIcon,
   OnboardingIncompleteLocked,
 } from '@/features/documents/onboarding/Locked';
+import { SeasonSelect } from '@/features/reference/SeasonSelect';
 import { useMyInsurance } from './api';
-import { InsuranceRecords } from './InsuranceRecords';
-import { dollars } from './money';
+import { useInsuranceDraft } from './draft';
 import {
-  RegisterLessonCard,
-  type RegisterLessonHandle,
-} from './RegisterLessonCard';
+  DraftFlow,
+  EDIT_PATH,
+  LIST_PATH,
+  REVIEW_PATH,
+  SeasonPill,
+  useDraftQuote,
+  type DraftMode,
+  type DraftState,
+} from './DraftFlow';
+import { useIsDesktop } from './layout';
+import { useInsuranceText } from './LessonTree';
+import { fill } from './money';
+import { ProgressCard } from './ProgressCard';
+import { RequestList } from './RequestList';
 import { useToast } from './Toast';
 import type { InsuranceLockReason, MyInsurance } from './types';
 
+interface ListLocationState {
+  submitted?: { id: string; no: string };
+}
+
 export function InsurancePage() {
   const t = useT();
-  const { data, isLoading, isError, refetch } = useMyInsurance();
+  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  const { data, isLoading, isError, refetch } = useMyInsurance(
+    searchParams.get('season'),
+  );
+  const mode: DraftMode | null =
+    pathname === REVIEW_PATH
+      ? 'review'
+      : pathname === EDIT_PATH
+        ? 'edit'
+        : null;
 
   if (isLoading)
     return (
@@ -40,122 +67,222 @@ export function InsurancePage() {
         </Button>
       </Card>
     );
-
-  return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <div className="min-w-0 max-w-2xl">
-          <h1 className="text-3xl">{t.insurance.title}</h1>
-          <p className="mt-1 text-sm text-slate">{t.insurance.headerCopy}</p>
-        </div>
-        {data.season && (
-          <p className="sm:text-right">
-            <span className="block text-xs text-slate">
-              {t.insurance.seasonBadgeLabel}
-            </span>
-            <span
-              data-testid="season-badge"
-              className="text-lg font-semibold tabular-nums text-navy"
-            >
-              {data.season.key}
-            </span>
-          </p>
+  if (data.locked)
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader data={data} />
+        {data.lockReason === 'onboarding_incomplete' ? (
+          <OnboardingIncompleteLocked
+            title={t.insurance.onboardingTitle}
+            body={t.insurance.onboardingBody}
+            linkLabel={t.insurance.onboardingOpen}
+          />
+        ) : (
+          <LockedInsurance reason={data.lockReason ?? 'pending_approval'} />
         )}
-      </header>
-      {data.locked && data.lockReason === 'onboarding_incomplete' ? (
-        <OnboardingIncompleteLocked
-          title={t.insurance.onboardingTitle}
-          body={t.insurance.onboardingBody}
-          linkLabel={t.insurance.onboardingOpen}
-        />
-      ) : data.locked ? (
-        <LockedInsurance reason={data.lockReason ?? 'pending_approval'} />
-      ) : (
-        <InsuranceBody data={data} />
-      )}
-    </div>
+      </div>
+    );
+  return <InsuranceBody data={data} mode={mode} />;
+}
+
+function PageHeader({
+  data,
+  action,
+  onSeason,
+}: {
+  data: MyInsurance;
+  action?: ReactNode;
+  onSeason?: (key: string) => void;
+}) {
+  const t = useT();
+  return (
+    <header>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="flex flex-wrap items-center gap-2.5 text-[28px] leading-tight">
+          {t.insurance.title}
+          {!onSeason && <SeasonPill season={data.season?.key ?? null} />}
+        </h1>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onSeason && (
+            <SeasonSelect
+              data-testid="season-select"
+              aria-label={t.seasons.colKey}
+              className="w-44"
+              value={data.season?.key ?? ''}
+              onChange={onSeason}
+            />
+          )}
+          {action}
+        </div>
+      </div>
+      <p className="mt-2.5 max-w-2xl text-[14.5px] text-slate">
+        {t.insurance.headerCopy}
+      </p>
+    </header>
   );
 }
 
-function InsuranceBody({ data }: { data: MyInsurance }) {
-  const formRef = useRef<RegisterLessonHandle>(null);
-  const { toast, showToast } = useToast();
+function InsuranceBody({
+  data,
+  mode,
+}: {
+  data: MyInsurance;
+  mode: DraftMode | null;
+}) {
+  const { user } = useSession();
+  const state = useInsuranceDraft(user?.id ?? 'anonymous');
+  const desktop = useIsDesktop();
+  const { toast, showToast } = useToast({ topOnPhones: true });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const s = useT().insurance;
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const submitted = (location.state as ListLocationState | null)?.submitted;
+
+  useEffect(() => {
+    if (!submitted) return;
+    setHighlightId(submitted.id);
+    showToast(fill(s.submittedToast, { no: submitted.no }));
+    navigate(
+      { pathname: LIST_PATH, search: location.search },
+      { replace: true, state: null },
+    );
+  }, [submitted, showToast, navigate, location.search, s.submittedToast]);
+
+  const canCreate = data.season !== null;
+  const list = (
+    <ListView
+      data={data}
+      state={state}
+      editing={mode !== null}
+      canCreate={canCreate}
+      highlightId={highlightId}
+      onToast={showToast}
+    />
+  );
+
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <RegisterLessonCard
-          ref={formRef}
-          season={data.season}
-          coverage={data.coverage}
-          owedCents={data.owedCents}
-          capCents={data.capCents}
+      {mode && canCreate ? (
+        <DraftFlow
+          data={data}
+          mode={mode}
+          desktop={desktop}
+          state={state}
           onToast={showToast}
-        />
-        <div className="flex min-w-0 flex-col gap-4">
-          <CapProgress data={data} />
-          <PaymentNote />
-        </div>
-      </div>
-      <InsuranceRecords
-        records={data.records}
-        onRegisterFirst={() => formRef.current?.focus()}
-      />
+        >
+          {list}
+        </DraftFlow>
+      ) : (
+        list
+      )}
       {toast}
     </>
   );
 }
 
-function CapProgress({ data }: { data: MyInsurance }) {
-  const t = useT();
-  const s = t.insurance;
-  const atCap = data.owedCents >= data.capCents;
-  const pct = Math.min(100, (data.owedCents / data.capCents) * 100);
-  return (
-    <Card className="flex flex-col gap-3 p-5">
-      <h2 className="text-lg">{s.progressTitle}</h2>
-      <p data-testid="cap-total" className="text-sm text-ink">
-        {s.progressTotal
-          .replace('{amount}', dollars(data.owedCents))
-          .replace('{cap}', dollars(data.capCents))}
-      </p>
-      <div
-        role="progressbar"
-        aria-label={s.progressTitle}
-        aria-valuemin={0}
-        aria-valuemax={data.capCents / 100}
-        aria-valuenow={Math.min(data.owedCents, data.capCents) / 100}
-        className="h-2.5 overflow-hidden rounded-full bg-sunken"
-      >
-        <div
-          className="h-full rounded-full bg-red transition-[width]"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p data-testid="cap-status" className="text-sm text-slate">
-        {data.coverage === 'season_pass'
-          ? s.coveredSeasonPass
-          : atCap
-            ? s.progressAtCap
-            : s.progressRemaining.replace(
-                '{amount}',
-                dollars(data.capCents - data.owedCents),
-              )}
-      </p>
-      {data.unpaidCents > 0 && (
-        <p className="text-xs text-status-pending">
-          {s.progressUnpaid.replace('{amount}', dollars(data.unpaidCents))}
-        </p>
-      )}
-    </Card>
-  );
-}
+function ListView({
+  data,
+  state,
+  editing,
+  canCreate,
+  highlightId,
+  onToast,
+}: {
+  data: MyInsurance;
+  state: DraftState;
+  editing: boolean;
+  canCreate: boolean;
+  highlightId: string | null;
+  onToast: (message: string) => void;
+}) {
+  const f = useInsuranceText();
+  const s = f.s;
+  const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
+  const { search } = useLocation();
+  const quote = useDraftQuote(state.draft, data);
+  const [confirming, setConfirming] = useState(false);
+  const draftLessons = state.draft?.lessons.length ?? 0;
+  const hasDraft = draftLessons > 0;
+  const openDraft = () => navigate({ pathname: EDIT_PATH, search });
 
-function PaymentNote() {
-  const t = useT();
   return (
-    <p className="rounded-md border border-dashed border-grey bg-surface px-4 py-3 text-xs text-slate">
-      {t.insurance.paymentNote}
-    </p>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        data={data}
+        onSeason={(key) => setSearchParams({ season: key })}
+        action={
+          canCreate ? (
+            <Button data-testid="new-request" onClick={openDraft}>
+              {hasDraft ? s.resumeDraft : s.newRequest}
+            </Button>
+          ) : null
+        }
+      />
+      {!canCreate && <Banner tone="pending">{s.noSeason}</Banner>}
+      <ProgressCard
+        data={data}
+        draftCents={
+          hasDraft && (!quote.season || quote.season.key === data.season?.key)
+            ? quote.total
+            : null
+        }
+      />
+      {hasDraft && canCreate && !editing && (
+        <Card className="flex flex-wrap items-center justify-between gap-2.5 border-l-4 border-l-status-pending p-4">
+          <span data-testid="draft-banner" className="text-sm">
+            {fill(s.draftBanner, { lessons: f.lessons(draftLessons) })}
+          </span>
+          <span className="flex gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red"
+              onClick={() => setConfirming(true)}
+            >
+              {s.discard}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={openDraft}>
+              {s.keepEditing}
+            </Button>
+          </span>
+        </Card>
+      )}
+      <RequestList
+        requests={data.requests ?? []}
+        records={data.records}
+        highlightId={highlightId}
+        canCreate={canCreate}
+        onNew={openDraft}
+      />
+      {confirming && (
+        <Modal
+          title={s.discardTitle}
+          onClose={() => setConfirming(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setConfirming(false)}>
+                {s.keepEditing}
+              </Button>
+              <Button
+                onClick={() => {
+                  setConfirming(false);
+                  state.discard();
+                  onToast(s.discarded);
+                }}
+              >
+                {s.discard}
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-slate">
+            {fill(s.discardBody, { lessons: f.lessons(draftLessons) })}
+          </p>
+        </Modal>
+      )}
+    </div>
   );
 }
 

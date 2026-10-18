@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { en } from '@/i18n/messages/en';
 import { zhCN } from '@/i18n/messages/zh-CN';
-import { dollars, listCents, recordStatus } from './money';
+import {
+  dollars,
+  fill,
+  listCents,
+  priceLessons,
+  recordStatus,
+  requestStatus,
+} from './money';
+import { insuranceRecord } from './fixtures';
 import type {
   InsuranceCoverage,
   InsuranceKind,
@@ -15,6 +23,76 @@ describe('listCents', () => {
     expect(listCents(2, 4)).toBe(8000);
     expect(listCents(2, 5)).toBe(8000);
     expect(listCents(1, 12)).toBe(4000);
+    expect(listCents(2, 0)).toBe(0);
+  });
+});
+
+describe('priceLessons', () => {
+  const cap = { capCents: 40000, seasonPass: false };
+  const lessons = [
+    { durationHours: 2, studentCount: 2 },
+    { durationHours: 1, studentCount: 5 },
+    { durationHours: 1, studentCount: 1 },
+  ];
+
+  it('prices lessons in order and charges the crossing lesson the remainder', () => {
+    expect(priceLessons(lessons, { ...cap, owedCents: 35000 })).toEqual([
+      { listCents: 4000, amountCents: 4000 },
+      { listCents: 4000, amountCents: 1000 },
+      { listCents: 1000, amountCents: 0 },
+    ]);
+  });
+
+  it('charges list prices below the cap and nothing once capped', () => {
+    expect(
+      priceLessons(lessons, { ...cap, owedCents: 0 }).map((p) => p.amountCents),
+    ).toEqual([4000, 4000, 1000]);
+    expect(
+      priceLessons(lessons, { ...cap, owedCents: 41000 }).map(
+        (p) => p.amountCents,
+      ),
+    ).toEqual([0, 0, 0]);
+  });
+
+  it('makes every lesson free with a season pass', () => {
+    expect(
+      priceLessons(lessons, { ...cap, owedCents: 0, seasonPass: true }).map(
+        (p) => p.amountCents,
+      ),
+    ).toEqual([0, 0, 0]);
+  });
+});
+
+describe('fill', () => {
+  it('replaces every named placeholder and keeps unknown ones', () => {
+    expect(fill('{a} + {a} = {b} {c}', { a: 1, b: '2' })).toBe('1 + 1 = 2 {c}');
+  });
+});
+
+describe('requestStatus', () => {
+  const lesson = insuranceRecord();
+  it.each([
+    ['unpaid', '待付款', 'warn'],
+    ['paid', '已支付', 'done'],
+    ['not_required', '封顶后免费', 'info'],
+    ['voided', '已作废', 'muted'],
+  ] as const)('%s → %s', (paymentStatus, label, tone) => {
+    expect(requestStatus({ paymentStatus, lessons: [lesson] }, zhCN)).toEqual({
+      label,
+      tone,
+    });
+  });
+
+  it('calls a free season-pass request a season pass', () => {
+    expect(
+      requestStatus(
+        {
+          paymentStatus: 'not_required',
+          lessons: [{ ...lesson, coverage: 'season_pass' }],
+        },
+        en,
+      ).label,
+    ).toBe('Season pass');
   });
 });
 
