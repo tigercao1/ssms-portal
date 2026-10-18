@@ -1,9 +1,17 @@
 import { Link } from 'react-router-dom';
 import { Card } from '@/components';
-import { useT } from '@/i18n/core/I18nProvider';
+import { useLocale, useT } from '@/i18n/core/I18nProvider';
+import type { Messages } from '@/i18n/core/types';
+import type { GoLiveReadiness } from '@/lib/types';
+import { profileGapsText } from '@/features/instructor/goLive';
 import type { MyChecklist } from '../api';
-import { ProgressBar } from './ProgressBar';
-import { checklistProgress, useMyChecklist } from './queries';
+import { ProgressBar, progressText } from './ProgressBar';
+import { StatePill, type PillTone } from './StatePill';
+import {
+  checklistProgress,
+  useMyChecklist,
+  type ChecklistProgress,
+} from './queries';
 import { LockIcon, lockText } from './Locked';
 
 function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
@@ -44,32 +52,85 @@ function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
   );
 }
 
-/** Profile-page summary of the onboarding checklist ("x of y done"), or its locked preview. */
-export function OnboardingCard() {
+type CardStatus = { tone: PillTone; pill: string; body: string };
+
+function cardStatus(
+  readiness: GoLiveReadiness,
+  progress: ChecklistProgress,
+  progressLabel: string,
+  t: Messages,
+): CardStatus {
+  if (readiness.live)
+    return {
+      tone: 'done',
+      pill: t.onboarding.cardAllDone,
+      body: t.onboarding.cardBody,
+    };
+  if (readiness.ready)
+    return {
+      tone: 'info',
+      pill: t.onboarding.cardPillGoingLive,
+      body: t.onboarding.cardGoingLiveBody,
+    };
+  const { done, inReview, total } = progress;
+  const hasProfileGaps = readiness.missing.some((m) => m.group === 'profile');
+  if (inReview > 0 && done + inReview === total && !hasProfileGaps)
+    return {
+      tone: 'warn',
+      pill: t.onboarding.cardPillInReview,
+      body: t.onboarding.cardInReviewBody,
+    };
+  return {
+    tone: 'warn',
+    pill: t.onboarding.cardPillToDo,
+    body: t.onboarding.cardToDoBody.replace('{progress}', progressLabel),
+  };
+}
+
+const LINK_CLASS =
+  'self-start text-sm font-medium text-navy underline underline-offset-4 hover:text-red';
+
+/** Profile-page summary of the onboarding checklist and go-live status, or its locked preview. */
+export function OnboardingCard({ readiness }: { readiness?: GoLiveReadiness }) {
   const t = useT();
+  const { locale } = useLocale();
   const { data } = useMyChecklist();
   if (!data) return null;
   if (data.locked) return <LockedOnboardingCard checklist={data} />;
   if (data.items.length === 0) return null;
-  const { done, total } = checklistProgress(data.items);
-  const progress = t.onboarding.progress
-    .replace('{done}', String(done))
-    .replace('{total}', String(total));
-  const allDone = done === total;
+  const counts = checklistProgress(data.items);
+  const progress = progressText(counts, t);
+  const status = readiness && cardStatus(readiness, counts, progress, t);
+  const profileGaps =
+    readiness && profileGapsText(readiness.missing, t, locale);
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-xl">{t.onboarding.cardTitle}</h2>
-        <span className="text-sm font-medium text-navy">
-          {allDone ? t.onboarding.cardAllDone : progress}
-        </span>
+        {status ? (
+          <StatePill tone={status.tone} label={status.pill} />
+        ) : (
+          <span className="text-sm font-medium text-navy">
+            {counts.done === counts.total ? t.onboarding.cardAllDone : progress}
+          </span>
+        )}
       </div>
-      <ProgressBar done={done} total={total} label={progress} />
-      <p className="text-sm text-slate">{t.onboarding.cardBody}</p>
-      <Link
-        to="/onboarding"
-        className="self-start text-sm font-medium text-navy underline underline-offset-4 hover:text-red"
-      >
+      <ProgressBar progress={counts} label={progress} />
+      <p className="text-sm text-slate">
+        {status ? status.body : t.onboarding.cardBody}
+      </p>
+      {profileGaps && (
+        <p className="text-sm text-slate">
+          {profileGaps}{' '}
+          <Link
+            to="/profile/edit"
+            className={`${LINK_CLASS} whitespace-nowrap`}
+          >
+            {t.profile.editProfile}
+          </Link>
+        </p>
+      )}
+      <Link to="/onboarding" className={LINK_CLASS}>
         {t.onboarding.cardOpen}
       </Link>
     </Card>

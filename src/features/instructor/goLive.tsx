@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Banner, DotPill, type StatusMeta } from '@/components';
@@ -58,92 +57,42 @@ export function missingItemKey(item: GoLiveMissingItem): string {
   }
 }
 
-export function missingCountText(n: number, t: Messages): string {
-  return n === 1
-    ? t.goLive.missingTitleOne
-    : t.goLive.missingTitle.replace('{n}', String(n));
-}
-
-function missingItemLink(item: GoLiveMissingItem, t: Messages) {
-  switch (item.group) {
-    case 'profile':
-      return { to: '/profile/edit', label: t.goLive.actionAdd };
-    case 'certification':
-      return { to: '/onboarding', label: t.goLive.actionView };
-    case 'onboarding':
-      return {
-        to: `/onboarding/${item.assignmentId}`,
-        label: t.goLive.actionOpen,
-      };
-  }
-}
-
-function groupLabel(item: GoLiveMissingItem, t: Messages): string {
-  if (item.group === 'profile') return t.goLive.groupProfile;
-  if (item.group === 'certification') return t.goLive.groupCertification;
-  return t.goLive.groupOnboarding;
+export function profileGapsText(
+  missing: readonly GoLiveMissingItem[],
+  t: Messages,
+  locale: Locale,
+): string | null {
+  const labels = missing.flatMap((item) => {
+    if (item.group !== 'profile') return [];
+    const label = t.goLive[FIELD_LABEL[item.field]];
+    return [
+      locale === 'en'
+        ? label.replace(/^(?!English\b)[A-Z]/, (c) => c.toLowerCase())
+        : label,
+    ];
+  });
+  if (labels.length === 0) return null;
+  const fields = new Intl.ListFormat(locale, { type: 'conjunction' }).format(
+    labels,
+  );
+  return t.onboarding.cardProfileGaps.replace('{fields}', fields);
 }
 
 export function GoLiveBanner({ readiness }: { readiness: GoLiveReadiness }) {
   const t = useT();
-  const { locale } = useLocale();
-
-  if (readiness.live) {
-    return (
-      <Banner tone="live" title={t.goLive.liveTitle}>
-        {readiness.liveUrl && (
-          <a
-            href={readiness.liveUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-navy underline underline-offset-2"
-          >
-            {t.goLive.liveLink} ↗
-          </a>
-        )}
-      </Banner>
-    );
-  }
-
-  if (readiness.ready) {
-    return (
-      <Banner tone="info" title={t.goLive.readyTitle}>
-        {t.goLive.readyBody}
-      </Banner>
-    );
-  }
-
+  if (!readiness.live) return null;
   return (
-    <Banner
-      tone="pending"
-      title={missingCountText(readiness.missing.length, t)}
-    >
-      <ul className="mt-2 flex flex-col gap-1.5">
-        {readiness.missing.map((item) => {
-          const label = missingItemLabel(item, t, locale);
-          const link = missingItemLink(item, t);
-          return (
-            <li
-              key={missingItemKey(item)}
-              className="flex items-center justify-between gap-3 rounded-md bg-surface px-3 py-2"
-            >
-              <span>
-                <span className="mr-2 text-xs uppercase tracking-wide text-slate">
-                  {groupLabel(item, t)}
-                </span>
-                {label}
-              </span>
-              <Link
-                to={link.to}
-                aria-label={`${link.label}: ${label}`}
-                className="whitespace-nowrap text-sm font-semibold text-navy underline-offset-2 hover:underline"
-              >
-                {link.label} →
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <Banner tone="live" title={t.goLive.liveTitle}>
+      {readiness.liveUrl && (
+        <a
+          href={readiness.liveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-navy underline underline-offset-2"
+        >
+          {t.goLive.liveLink} ↗
+        </a>
+      )}
     </Banner>
   );
 }

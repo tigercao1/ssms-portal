@@ -65,7 +65,7 @@ export function ProfileViewPage() {
         ? readiness && <GoLiveBanner readiness={readiness} />
         : statusBanner(profile, t)}
       <PreferredLanguageCard profile={profile} />
-      <OnboardingCard />
+      <OnboardingCard readiness={readiness} />
       <CalendarStatusCard enabled={profile.approvalStatus === 'approved'} />
       <ProfileSummary
         profile={profile}
