@@ -42,6 +42,8 @@ export const auth = {
   signInWithOtp: vi.fn(),
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
+  resend: vi.fn(),
+  resetPasswordForEmail: vi.fn(),
   signOut: vi.fn(async () => {
     setSession(null);
     return { error: null };
@@ -64,6 +66,8 @@ export function resetAuth() {
   auth.signInWithOtp.mockReset();
   auth.signInWithPassword.mockReset();
   auth.signUp.mockReset();
+  auth.resend.mockReset();
+  auth.resetPasswordForEmail.mockReset();
 }
 
 export const supabase = { auth };

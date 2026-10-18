@@ -10,15 +10,21 @@ import { supabase } from '@/lib/supabase';
 import { ApiError } from '@/lib/api';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input, Spinner } from '@/components';
+import { ResendButton } from './ResendButton';
+import { useResendCooldown, type ResendWait } from './useResendCooldown';
 import { AuthLayout } from './AuthLayout';
 import { useSession } from './SessionProvider';
-import { redeemActivation, resendActivation } from './activationApi';
+import {
+  redeemActivation,
+  resendActivation,
+  retryAfterSeconds,
+} from './activationApi';
 import { track } from '@/lib/analytics';
 
 type Phase =
   | { kind: 'verifying' }
   | { kind: 'verified'; email: string }
-  | { kind: 'expired'; email: string }
+  | { kind: 'expired'; email: string; wait: ResendWait | null }
   | { kind: 'error'; network: boolean };
 
 function emailFromBody(body: unknown): string {
@@ -38,7 +44,7 @@ export function ActivatePage() {
   const [params] = useSearchParams();
   const token = params.get('t') ?? '';
   const [phase, setPhase] = useState<Phase>(
-    token ? { kind: 'verifying' } : { kind: 'expired', email: '' },
+    token ? { kind: 'verifying' } : { kind: 'expired', email: '', wait: null },
   );
   const started = useRef<string | null>(null);
 
@@ -54,7 +60,16 @@ export function ActivatePage() {
         (err.status === 410 || err.status === 404)
       ) {
         track('activation_failed', { reason: 'expired' });
-        setPhase({ kind: 'expired', email: emailFromBody(err.body) });
+        const expiredEmail = emailFromBody(err.body);
+        const seconds = retryAfterSeconds(err.body);
+        setPhase({
+          kind: 'expired',
+          email: expiredEmail,
+          wait:
+            expiredEmail && seconds !== null
+              ? { email: expiredEmail, seconds }
+              : null,
+        });
       } else {
         track('activation_failed', { reason: 'redeem_error' });
         setPhase({
@@ -90,7 +105,7 @@ export function ActivatePage() {
   }, [phase, sessionEmail, navigate]);
 
   if (phase.kind === 'expired')
-    return <ExpiredLink initialEmail={phase.email} />;
+    return <ExpiredLink initialEmail={phase.email} serverWait={phase.wait} />;
 
   if (phase.kind === 'error')
     return (
@@ -126,31 +141,38 @@ export function ActivatePage() {
   );
 }
 
-function ExpiredLink({ initialEmail }: { initialEmail: string }) {
+function ExpiredLink({
+  initialEmail,
+  serverWait,
+}: {
+  initialEmail: string;
+  serverWait: ResendWait | null;
+}) {
   const t = useT();
   const [email, setEmail] = useState(initialEmail);
-  const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cooldown = useResendCooldown('activation', email, serverWait);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) return;
-    setError(null);
-    setBusy(true);
-    try {
-      await resendActivation(trimmed);
-      setSent(true);
-    } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 429
-          ? t.activation.resendRateLimited
-          : t.auth.genericError,
-      );
-    } finally {
-      setBusy(false);
-    }
+    await cooldown.send(async () => {
+      setError(null);
+      try {
+        const accepted = await resendActivation(trimmed);
+        setSent(true);
+        return retryAfterSeconds(accepted);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 429) {
+          setError(t.activation.resendRateLimited);
+          return retryAfterSeconds(err.body);
+        }
+        setError(t.auth.genericError);
+        return null;
+      }
+    });
   }
 
   return (
@@ -172,9 +194,14 @@ function ExpiredLink({ initialEmail }: { initialEmail: string }) {
             />
           )}
         </Field>
-        <Button type="submit" loading={busy} className="w-full">
+        <ResendButton
+          type="submit"
+          busy={cooldown.busy}
+          secondsLeft={cooldown.secondsLeft}
+          className="w-full"
+        >
           {t.activation.resendButton}
-        </Button>
+        </ResendButton>
         <Link
           to="/login"
           className="text-center text-sm text-navy hover:underline"
