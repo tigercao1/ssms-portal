@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { ShopifyInstructorPanel } from './ShopifyInstructorPanel';
 import { renderWithProviders } from '@/test/render';
 import {
+  fakeGoLive,
   fakeShopifyInstructorSync,
   fakeShopifySyncStatus,
   server,
 } from '@/test/msw';
-import type { ShopifyInstructorSync, ShopifySyncStatus } from '@/lib/types';
+import type {
+  GoLiveReadiness,
+  ShopifyInstructorSync,
+  ShopifySyncStatus,
+} from '@/lib/types';
 
 const API = 'http://localhost:3000';
 
@@ -189,5 +194,78 @@ describe('ShopifyInstructorPanel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Instructor not found',
     );
+  });
+});
+
+describe('ShopifyInstructorPanel go-live check', () => {
+  function serveGoLive(goLive: Partial<GoLiveReadiness> = {}) {
+    const ids: string[] = [];
+    server.use(
+      http.get(`${API}/admin/instructors/:id/go-live`, ({ params }) => {
+        ids.push(String(params.id));
+        return HttpResponse.json({ ...fakeGoLive, ...goLive });
+      }),
+    );
+    return ids;
+  }
+
+  it('counts and lists what is missing', async () => {
+    serve();
+    const ids = serveGoLive();
+    renderPanel();
+    expect(await screen.findByText('Go-live check')).toBeInTheDocument();
+    expect(screen.getByText('3 missing')).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: '3 missing' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      'Main photo',
+      'No verified certification yet',
+      'Independent contractor agreement',
+    ]);
+    expect(ids).toEqual(['inst-1']);
+  });
+
+  it('says Ready when nothing is missing', async () => {
+    serve();
+    serveGoLive({ ready: true, missing: [] });
+    renderPanel();
+    expect(await screen.findByText('Go-live check')).toBeInTheDocument();
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.queryByText(/missing/)).not.toBeInTheDocument();
+  });
+
+  it('explains that a pending or deactivated instructor cannot go live', async () => {
+    serve();
+    serveGoLive({ ready: false, missing: [] });
+    renderPanel();
+    expect(
+      await screen.findByText('Not approved or deactivated'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the check for an instructor never synced to Shopify', async () => {
+    server.use(
+      http.get(`${API}/admin/shopify-sync/instructors/:id`, () =>
+        HttpResponse.json({ message: 'Not found' }, { status: 404 }),
+      ),
+    );
+    serveGoLive();
+    renderPanel();
+    expect(await screen.findByText('3 missing')).toBeInTheDocument();
+    expect(screen.getByText('Not synced yet')).toBeInTheDocument();
+  });
+
+  it('shows the check in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serve();
+    serveGoLive();
+    renderPanel();
+    expect(await screen.findByText('上线检查')).toBeInTheDocument();
+    expect(screen.getByText('缺少 3 项')).toBeInTheDocument();
+    expect(screen.getByText('主照片')).toBeInTheDocument();
+    expect(screen.getByText('独立承包人协议')).toBeInTheDocument();
   });
 });

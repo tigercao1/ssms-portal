@@ -2,13 +2,18 @@ import { useState } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { formatDate } from '@/lib/date';
-import { trackLabel } from '@/features/instructor/certLabels';
+import {
+  certificationLabel,
+  trackLabel,
+} from '@/features/instructor/certLabels';
+import { CertVerificationPill } from '@/features/instructor/goLive';
 import { currentSeasonKey, useSeasons } from '@/features/reference/api';
 import type {
   ApprovalStatus,
   CertOrg,
   CertTrack,
   Certification,
+  GoLiveCertification,
 } from '@/lib/types';
 import {
   Banner,
@@ -85,11 +90,13 @@ export function InstructorDocumentsSection({
   instructorName,
   approvalStatus,
   certifications,
+  certStatuses,
 }: {
   instructorId: string;
   instructorName: string;
   approvalStatus: ApprovalStatus;
   certifications: Pick<Certification, 'org' | 'track' | 'level'>[];
+  certStatuses?: readonly GoLiveCertification[];
 }) {
   const t = useT();
   const docs = useInstructorDocuments(instructorId);
@@ -123,6 +130,7 @@ export function InstructorDocumentsSection({
             instructorId={instructorId}
             uploads={docs.data.certificationUploads}
             certifications={certifications}
+            certStatuses={certStatuses}
           />
         </>
       )}
@@ -444,10 +452,12 @@ function CertificationsCard({
   instructorId,
   uploads,
   certifications,
+  certStatuses,
 }: {
   instructorId: string;
   uploads: CertUpload[];
   certifications: Pick<Certification, 'org' | 'track' | 'level'>[];
+  certStatuses?: readonly GoLiveCertification[];
 }) {
   const t = useT();
   const [showHistory, setShowHistory] = useState(false);
@@ -466,6 +476,22 @@ function CertificationsCard({
   return (
     <Card className="flex flex-col gap-4">
       <h2 className="text-lg">{t.documents.certsTitle}</h2>
+      {certStatuses && certStatuses.length > 0 && (
+        <ul
+          aria-label={t.profile.certifications}
+          className="flex flex-col gap-2"
+        >
+          {certStatuses.map((c) => (
+            <li
+              key={`${c.org}:${c.track}:${c.level}`}
+              className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink"
+            >
+              <span>{certificationLabel({ ...c, isPartial: false }, t)}</span>
+              <CertVerificationPill cert={c} />
+            </li>
+          ))}
+        </ul>
+      )}
       {missing.length > 0 && (
         <Banner tone="pending" title={t.documents.certsMissingTitle}>
           {missing
