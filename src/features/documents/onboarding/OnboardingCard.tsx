@@ -74,19 +74,7 @@ function cardStatus(
     };
   const { done, inReview, total } = progress;
   const hasProfileGaps = readiness.missing.some((m) => m.group === 'profile');
-  const onlyReviewMissing =
-    readiness.missing.length > 0 &&
-    readiness.missing.every((m) => m.group === 'review');
-  if (onlyReviewMissing)
-    return {
-      tone: 'warn',
-      pill: t.onboarding.cardPillInReview,
-      body:
-        inReview > 0
-          ? t.onboarding.cardInReviewBody
-          : t.onboarding.cardProfileReviewBody,
-    };
-  if (done + inReview === total && !hasProfileGaps && inReview > 0)
+  if (inReview > 0 && done + inReview === total && !hasProfileGaps)
     return {
       tone: 'warn',
       pill: t.onboarding.cardPillInReview,

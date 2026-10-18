@@ -43,8 +43,6 @@ export function missingItemLabel(
       return t.goLive.noneVerified;
     case 'onboarding':
       return localizeField(item.titleEn, item.titleZh, locale);
-    case 'review':
-      return t.goLive.notPublished;
   }
 }
 
@@ -56,8 +54,6 @@ export function missingItemKey(item: GoLiveMissingItem): string {
       return `certification:${item.reason}`;
     case 'onboarding':
       return `onboarding:${item.assignmentId}`;
-    case 'review':
-      return 'review';
   }
 }
 

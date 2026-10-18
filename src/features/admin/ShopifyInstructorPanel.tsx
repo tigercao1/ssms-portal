@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Card, Spinner } from '@/components';
 import { ApiError } from '@/lib/api';
-import { formatDate, formatDateTime } from '@/lib/date';
+import { formatDateTime } from '@/lib/date';
 import type { Messages } from '@/i18n/core/types';
 import type { GoLiveReadiness, ShopifyEntryStatus } from '@/lib/types';
 import {
@@ -11,7 +11,7 @@ import {
   useShopifyInstructorSync,
   useShopifySyncStatus,
 } from './shopifySyncApi';
-import { useAdminGoLive, useSetPublication } from './api';
+import { useAdminGoLive } from './api';
 import { missingItemKey, missingItemLabel } from '@/features/instructor/goLive';
 
 function statusText(status: ShopifyEntryStatus | null, t: Messages) {
@@ -27,10 +27,8 @@ function statusText(status: ShopifyEntryStatus | null, t: Messages) {
 
 export function ShopifyInstructorPanel({
   instructorId,
-  publishedAt,
 }: {
   instructorId: string;
-  publishedAt: string | null;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -116,77 +114,7 @@ export function ShopifyInstructorPanel({
           {t.shopifySync.openPreview} ↗
         </a>
       )}
-      <PublicationAction
-        instructorId={instructorId}
-        publishedAt={publishedAt}
-      />
     </Card>
-  );
-}
-
-function PublicationAction({
-  instructorId,
-  publishedAt,
-}: {
-  instructorId: string;
-  publishedAt: string | null;
-}) {
-  const t = useT();
-  const { locale } = useLocale();
-  const publication = useSetPublication(instructorId);
-  const [confirming, setConfirming] = useState(false);
-  const published = publishedAt !== null;
-
-  return (
-    <div className="flex flex-col gap-2 border-t border-grey/40 pt-3">
-      <dl className="text-sm">
-        <Row label={t.admin.colWebsite}>
-          {published ? (
-            <span className="text-status-approved">
-              {t.admin.publishedOn.replace(
-                '{date}',
-                formatDate(publishedAt, locale),
-              )}
-            </span>
-          ) : (
-            <span className="text-slate">{t.admin.notPublished}</span>
-          )}
-        </Row>
-      </dl>
-      {!published ? (
-        <Button
-          loading={publication.isPending}
-          onClick={() => publication.mutate(true)}
-        >
-          {t.admin.publish}
-        </Button>
-      ) : confirming ? (
-        <>
-          <p className="text-sm text-navy">{t.admin.unpublishConfirm}</p>
-          <div className="flex gap-2">
-            <Button
-              variant="danger"
-              loading={publication.isPending}
-              onClick={() =>
-                publication.mutate(false, {
-                  onSuccess: () => setConfirming(false),
-                })
-              }
-            >
-              {t.admin.confirm}
-            </Button>
-            <Button variant="ghost" onClick={() => setConfirming(false)}>
-              {t.common.cancel}
-            </Button>
-          </div>
-        </>
-      ) : (
-        <Button variant="danger" onClick={() => setConfirming(true)}>
-          {t.admin.unpublish}
-        </Button>
-      )}
-      {publication.isError && <Banner tone="error">{t.errors.generic}</Banner>}
-    </div>
   );
 }
 

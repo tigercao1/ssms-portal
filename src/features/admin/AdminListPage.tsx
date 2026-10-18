@@ -34,7 +34,6 @@ interface ListUpdate {
   status?: ApprovalStatus | null;
   active?: boolean | null;
   calendar?: boolean | null;
-  published?: boolean | null;
   page?: number;
 }
 
@@ -65,7 +64,6 @@ export function AdminListPage() {
   const status = statusFrom(params);
   const active = booleanFrom(params, 'active');
   const calendarConnected = booleanFrom(params, 'calendar');
-  const published = booleanFrom(params, 'published');
   const page = pageFrom(params);
   const [draft, setDraft] = useState(q);
   const committed = useRef(q);
@@ -74,7 +72,6 @@ export function AdminListPage() {
     status,
     active,
     calendarConnected,
-    published,
     page,
   });
   const instructors = results.data?.instructors ?? [];
@@ -103,10 +100,6 @@ export function AdminListPage() {
           set(
             'calendar',
             next.calendar == null ? next.calendar : String(next.calendar),
-          );
-          set(
-            'published',
-            next.published == null ? next.published : String(next.published),
           );
           if (next.page !== undefined) {
             if (next.page > 1) out.set('page', String(next.page));
@@ -218,23 +211,6 @@ export function AdminListPage() {
             <option value="false">{t.admin.calendarNotConnected}</option>
           </Select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate">
-          {t.admin.colWebsite}
-          <Select
-            className="sm:w-44"
-            value={published === undefined ? '' : String(published)}
-            onChange={(e) =>
-              update({
-                published:
-                  e.target.value === '' ? null : e.target.value === 'true',
-              })
-            }
-          >
-            <option value="">{t.admin.all}</option>
-            <option value="true">{t.admin.published}</option>
-            <option value="false">{t.admin.notPublished}</option>
-          </Select>
-        </label>
       </div>
 
       {results.isLoading ? (
@@ -275,9 +251,6 @@ export function AdminListPage() {
                       {t.admin.colCalendar}
                     </th>
                     <th className="px-4 py-3 font-medium">
-                      {t.admin.colWebsite}
-                    </th>
-                    <th className="px-4 py-3 font-medium">
                       {t.admin.colApplied}
                     </th>
                   </tr>
@@ -308,9 +281,6 @@ export function AdminListPage() {
                       </td>
                       <td className="px-4 py-3">
                         <CalendarStatus connected={row.calendarConnected} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <WebsiteStatus published={row.publishedAt !== null} />
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-slate">
                         {formatDate(row.insertedAt, locale)}
@@ -344,10 +314,6 @@ export function AdminListPage() {
                     <div className="flex items-center gap-2 text-xs text-slate">
                       {t.admin.colCalendar}
                       <CalendarStatus connected={row.calendarConnected} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate">
-                      {t.admin.colWebsite}
-                      <WebsiteStatus published={row.publishedAt !== null} />
                     </div>
                     <span className="font-mono text-xs text-slate">
                       {formatDate(row.insertedAt, locale)}
@@ -399,23 +365,6 @@ function CalendarStatus({ connected }: { connected: boolean }) {
       color="var(--status-pending)"
       textClass="text-status-pending"
       label={t.admin.calendarNotConnected}
-    />
-  );
-}
-
-function WebsiteStatus({ published }: { published: boolean }) {
-  const t = useT();
-  return published ? (
-    <DotPill
-      color="var(--status-approved)"
-      textClass="text-status-approved"
-      label={t.admin.published}
-    />
-  ) : (
-    <DotPill
-      color="var(--status-inactive)"
-      textClass="text-status-inactive"
-      label={t.admin.notPublished}
     />
   );
 }
