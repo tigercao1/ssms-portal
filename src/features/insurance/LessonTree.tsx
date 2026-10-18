@@ -147,7 +147,9 @@ export function LessonTree({
                     aria-hidden
                     className="absolute left-0 top-[13px] w-3 border-t-2 border-t-grey/40"
                   />
-                  <span className="break-words">{st.name}</span>
+                  <span data-private className="break-words">
+                    {st.name}
+                  </span>
                   {st.waiverConfirmed && (
                     <span className="text-xs font-semibold text-status-approved">
                       {f.s.waiverTick}

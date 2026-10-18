@@ -23,6 +23,7 @@ import {
 } from './fixtures';
 import { DRAFT_KEY_PREFIX, MAX_LESSONS } from './draft';
 import type { MyInsurance } from './types';
+import { expectMaskedInReplay } from '@/test/replayPrivacy';
 
 vi.mock('@/auth/SessionProvider', () => ({
   useSession: () => ({ user: { id: 'auth-1' } }),
@@ -239,7 +240,7 @@ describe('InsurancePage list', () => {
       'Mount St. Louis Moonstone · 5 students',
     );
     expect(within(lessons[1]!).getAllByTestId('tree-student')).toHaveLength(5);
-    expect(within(lessons[1]!).getByText('Lucas He')).toBeInTheDocument();
+    expectMaskedInReplay(within(lessons[1]!).getByText('Lucas He'));
     await user.click(toggle);
     expect(within(entry).queryByTestId('tree-lesson')).not.toBeInTheDocument();
   });
@@ -466,6 +467,11 @@ describe('InsurancePage on phones', () => {
     await user.click(screen.getByRole('button', { name: 'Review & submit' }));
     const alert = screen.getByTestId('error-box');
     expect(alert).toHaveTextContent("Can't submit yet. Fix these first:");
+    expectMaskedInReplay(
+      within(alert).getByRole('button', {
+        name: "Lesson 2: Leo hasn't confirmed the waiver",
+      }),
+    );
     expect(
       within(alert).getByRole('button', {
         name: "Lesson 2: Leo hasn't confirmed the waiver",
