@@ -6,8 +6,8 @@ import { zhCN } from '@/i18n/messages/zh-CN';
 describe('statusMeta', () => {
   it.each([
     ['pending', true, 'Pending', '待审核'],
-    ['approved', true, 'Active', '已上线'],
-    ['approved', false, 'Inactive', '已下线'],
+    ['approved', true, 'Approved', '已通过'],
+    ['approved', false, 'Inactive', '已停用'],
     ['rejected', true, 'Rejected', '已拒绝'],
   ] as const)(
     'labels %s (active=%s) as %s / %s',

@@ -286,7 +286,9 @@ describe('AdminDetailPage actions', () => {
       expect(approvalBodies).toEqual([{ approvalStatus: 'approved' }]),
     );
     expect(
-      await screen.findByText('Active', { selector: '.text-status-approved' }),
+      await screen.findByText('Approved', {
+        selector: '.text-status-approved',
+      }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Re-approve' }),

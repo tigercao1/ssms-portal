@@ -55,14 +55,13 @@ describe('StatusBanner', () => {
     renderWithProviders(
       <>
         <StatusBanner surface="profile" reason="pending_approval" />
-        <StatusBanner surface="profile" reason="approved" />
         <StatusBanner surface="profile" reason="rejected" />
         <StatusBanner surface="profile" reason="deactivated" />
         <StatusBanner surface="lessons" reason="onboarding_incomplete" />
       </>,
     );
     const looks = screen.getAllByRole('status').map(look);
-    expect(new Set(looks.map((l) => l.tone)).size).toBe(5);
-    expect(new Set(looks.map((l) => l.icon)).size).toBe(5);
+    expect(new Set(looks.map((l) => l.tone)).size).toBe(4);
+    expect(new Set(looks.map((l) => l.icon)).size).toBe(4);
   });
 });

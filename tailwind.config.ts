@@ -24,6 +24,8 @@ export default {
         'status-approved': 'var(--status-approved)',
         'status-rejected': 'var(--status-rejected)',
         'status-inactive': 'var(--status-inactive)',
+        'status-live': 'var(--status-live)',
+        'status-live-ink': 'var(--status-live-ink)',
       },
       fontFamily: {
         display: 'var(--font-display)',

@@ -29,7 +29,7 @@ export function statusMeta(
   switch (status) {
     case 'approved':
       return {
-        label: t.status.active,
+        label: t.status.approved,
         color: 'var(--status-approved)',
         textClass: 'text-status-approved',
       };

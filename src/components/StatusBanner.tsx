@@ -3,13 +3,13 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import type { ApprovalLockReason, InstructorLockReason } from '@/lib/types';
 
-export type StatusReason = InstructorLockReason | 'approved';
+export type StatusReason = InstructorLockReason;
 
 export interface SurfaceReasons {
   onboarding: ApprovalLockReason;
   insurance: InstructorLockReason;
   lessons: InstructorLockReason;
-  profile: ApprovalLockReason | 'approved';
+  profile: ApprovalLockReason;
 }
 
 export type StatusSurface = keyof SurfaceReasons;
@@ -45,7 +45,6 @@ const COPY: {
   }),
   profile: (t) => ({
     pending_approval: [null, t.profile.pendingBanner],
-    approved: [null, t.profile.approvedBanner],
     rejected: [null, t.profile.rejectedBanner],
     deactivated: [null, t.profile.inactiveBanner],
   }),
@@ -73,10 +72,6 @@ const TONES: Record<StatusReason, { border: string; icon: string }> = {
     icon: 'text-status-inactive',
   },
   onboarding_incomplete: { border: 'border-l-navy', icon: 'text-navy' },
-  approved: {
-    border: 'border-l-status-approved',
-    icon: 'text-status-approved',
-  },
 };
 
 function Glyph({
@@ -131,7 +126,6 @@ const GLYPHS: Record<StatusReason, ReactNode> = {
       <path d="M9 9h6M9 13h6M9 17h3" />
     </>
   ),
-  approved: <path d="M5 12.5l4.5 4.5L19 7.5" />,
 };
 
 export function StatusIcon({

@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { Link, Route, Routes } from 'react-router-dom';
 import { OnboardingDocumentPage } from './OnboardingDocumentPage';
 import { renderWithProviders } from '@/test/render';
-import { fakeProfile, server } from '@/test/msw';
+import { fakeGoLive, fakeProfile, server } from '@/test/msw';
 import type { CompleteRequest } from '../api';
 import { LangSwitch } from '@/components/LangSwitch';
 import { fakeAssignment, fakeField, fakeTranslation } from '../api/fixtures';
@@ -21,6 +21,7 @@ import { LessonsPayPage } from '@/features/lessons/LessonsPayPage';
 import { fullLessons, onboardingLessons } from '@/features/lessons/fixtures';
 import { InsurancePage } from '@/features/insurance/InsurancePage';
 import { myInsurance } from '@/features/insurance/fixtures';
+import { ProfileViewPage } from '@/features/instructor/ProfileViewPage';
 
 vi.mock('../pdf/PdfPages', async () => {
   const m = await import('../testing/fakePdfPages');
@@ -865,6 +866,73 @@ describe('OnboardingDocumentPage — last item', () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByText('Finish onboarding to register private lessons'),
+    ).toBeNull();
+  });
+});
+
+describe('OnboardingDocumentPage — go-live banner', () => {
+  it('drops a completed document from the profile banner without a reload', async () => {
+    const handbookDone = () =>
+      state.assignments.some(
+        (a) => a.id === 'asg-read' && a.status === 'completed',
+      );
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({
+          ...fakeProfile,
+          approvalStatus: 'approved',
+          isActive: true,
+        }),
+      ),
+      http.get(`${API}/me/go-live`, () =>
+        HttpResponse.json(
+          handbookDone()
+            ? { ...fakeGoLive, ready: true, missing: [] }
+            : {
+                ...fakeGoLive,
+                missing: [
+                  {
+                    group: 'onboarding',
+                    assignmentId: 'asg-read',
+                    titleEn: 'Instructor handbook',
+                    titleZh: '教练手册',
+                  },
+                ],
+              },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/profile" element={<ProfileViewPage />} />
+          <Route
+            path="/onboarding/:assignmentId"
+            element={<OnboardingDocumentPage />}
+          />
+        </Route>
+      </Routes>,
+      { route: '/profile', staleTime: 60_000 },
+    );
+
+    await user.click(
+      await screen.findByRole('link', { name: 'Open: Instructor handbook' }),
+    );
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: 'I have read and understood this document',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await screen.findByRole('heading', { name: 'Marked as read' });
+
+    await user.click(screen.getByRole('link', { name: 'My profile' }));
+    expect(
+      await screen.findByText('All set: your profile is going live.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Open: Instructor handbook' }),
     ).toBeNull();
   });
 });

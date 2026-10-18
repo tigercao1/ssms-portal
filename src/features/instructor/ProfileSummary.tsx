@@ -2,8 +2,13 @@ import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { Card } from '@/components';
 import { TranslatedByBadge } from '@/features/translation/TranslatedByBadge';
-import type { InstructorProfile, RefItem } from '@/lib/types';
+import type {
+  GoLiveCertification,
+  InstructorProfile,
+  RefItem,
+} from '@/lib/types';
 import { certificationLabel } from './certLabels';
+import { CertVerificationPill, findCertStatus } from './goLive';
 
 function Avatar({ url, name }: { url: string | null; name: string }) {
   if (url) {
@@ -58,7 +63,13 @@ function Section({
 }
 
 /** Read-only profile presentation (W2.1; reused by admin detail W2.8). */
-export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
+export function ProfileSummary({
+  profile,
+  certStatuses,
+}: {
+  profile: InstructorProfile;
+  certStatuses?: readonly GoLiveCertification[];
+}) {
   const t = useT();
   const { locale } = useLocale();
   const name = localizeField(profile.displayNameEn, profile.displayNameZh, locale);
@@ -122,12 +133,19 @@ export function ProfileSummary({ profile }: { profile: InstructorProfile }) {
           {profile.certifications.length === 0 ? (
             <span className="text-sm text-slate">{t.profile.noneYet}</span>
           ) : (
-            <ul className="flex flex-col gap-1">
-              {profile.certifications.map((c, i) => (
-                <li key={i} className="text-sm text-ink">
-                  {certificationLabel(c, t)}
-                </li>
-              ))}
+            <ul className="flex flex-col gap-2">
+              {profile.certifications.map((c, i) => {
+                const status = findCertStatus(certStatuses, c);
+                return (
+                  <li
+                    key={i}
+                    className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink"
+                  >
+                    <span>{certificationLabel(c, t)}</span>
+                    {status && <CertVerificationPill cert={status} />}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Section>
