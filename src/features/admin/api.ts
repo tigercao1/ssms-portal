@@ -26,6 +26,7 @@ import type {
 export interface AdminListFilter {
   status?: ApprovalStatus;
   active?: boolean;
+  published?: boolean;
 }
 
 const listKey = (f: AdminListFilter) => ['admin', 'instructors', f] as const;
@@ -44,6 +45,8 @@ export function useAdminInstructors(filter: AdminListFilter) {
       const qs = new URLSearchParams();
       if (filter.status) qs.set('status', filter.status);
       if (filter.active !== undefined) qs.set('active', String(filter.active));
+      if (filter.published !== undefined)
+        qs.set('published', String(filter.published));
       const suffix = qs.toString() ? `?${qs}` : '';
       return api<AdminInstructorRecord[]>(`/admin/instructors${suffix}`);
     },
@@ -70,6 +73,7 @@ export function useAdminInstructorPage({
   status,
   active,
   calendarConnected,
+  published,
   page,
 }: AdminInstructorPageQuery) {
   return useQuery({
@@ -77,7 +81,7 @@ export function useAdminInstructorPage({
       'admin',
       'instructors',
       'page',
-      { q, status, active, calendarConnected, page },
+      { q, status, active, calendarConnected, published, page },
     ] as const,
     queryFn: async (): Promise<AdminInstructorPage> => {
       const qs = new URLSearchParams({
@@ -89,6 +93,7 @@ export function useAdminInstructorPage({
       if (active !== undefined) qs.set('active', String(active));
       if (calendarConnected !== undefined)
         qs.set('calendarConnected', String(calendarConnected));
+      if (published !== undefined) qs.set('published', String(published));
       const { data, headers } = await apiWithHeaders<AdminInstructorRecord[]>(
         `/admin/instructors?${qs.toString()}`,
       );
@@ -174,6 +179,23 @@ export function useSetActivation(id: string) {
         body: { isActive },
       }),
     onSuccess: sync,
+  });
+}
+
+export function useSetPublication(id: string) {
+  const qc = useQueryClient();
+  const sync = useInvalidate(id);
+  return useMutation({
+    mutationFn: (published: boolean) =>
+      api<AdminInstructorRecord>(`/admin/instructors/${id}/publication`, {
+        method: 'PATCH',
+        body: { published },
+      }),
+    onSuccess: (record) => {
+      sync(record);
+      void qc.invalidateQueries({ queryKey: adminGoLiveKey(id) });
+      void qc.invalidateQueries({ queryKey: ['admin', 'shopify-sync'] });
+    },
   });
 }
 

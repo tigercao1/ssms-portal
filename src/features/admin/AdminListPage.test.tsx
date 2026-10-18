@@ -17,8 +17,8 @@ describe('AdminListPage (W2.7)', () => {
     // since CSS isn't applied, so the name/email appear twice.
     expect((await screen.findAllByText('Jane Snow')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('jane@example.com').length).toBeGreaterThan(0);
-    // all three filter dropdowns render
-    expect(screen.getAllByRole('combobox')).toHaveLength(3);
+    // all four filter dropdowns render
+    expect(screen.getAllByRole('combobox')).toHaveLength(4);
     expect(screen.getByText('Online')).toBeInTheDocument();
   });
 });
@@ -28,6 +28,7 @@ interface ListRequest {
   status: string | null;
   active: string | null;
   calendarConnected: string | null;
+  published: string | null;
   page: string | null;
   limit: string | null;
 }
@@ -49,6 +50,7 @@ function serveInstructors(
         status: params.get('status'),
         active: params.get('active'),
         calendarConnected: params.get('calendarConnected'),
+        published: params.get('published'),
         page: params.get('page'),
         limit: params.get('limit'),
       });
@@ -102,12 +104,18 @@ function renderPage(route = '/') {
 
 const location = () => screen.getByTestId('location').textContent;
 const filters = () =>
-  screen.getAllByRole('combobox') as [HTMLElement, HTMLElement, HTMLElement];
+  screen.getAllByRole('combobox') as [
+    HTMLElement,
+    HTMLElement,
+    HTMLElement,
+    HTMLElement,
+  ];
 const request = (overrides: Partial<ListRequest> = {}): ListRequest => ({
   q: null,
   status: null,
   active: null,
   calendarConnected: null,
+  published: null,
   page: '1',
   limit: '50',
   ...overrides,
@@ -240,6 +248,94 @@ describe('AdminListPage calendar status', () => {
         .getAllByRole('option')
         .map((o) => o.textContent),
     ).toEqual(['全部', '已连接', '未连接']);
+  });
+});
+
+describe('AdminListPage website status', () => {
+  const published: AdminInstructorRecord = {
+    ...lee,
+    isActive: true,
+    publishedAt: '2026-10-18T16:00:00Z',
+  };
+
+  it('shows whether each instructor is published in the table and the cards', async () => {
+    serveInstructors([jane, published]);
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    expect(
+      within(table).getByRole('columnheader', { name: 'Website' }),
+    ).toBeInTheDocument();
+    const janeRow = within(table).getByRole('row', { name: /Jane Snow/ });
+    const leeRow = within(table).getByRole('row', { name: /Lee Ridge/ });
+    expect(within(janeRow).getByText('Not published')).toBeInTheDocument();
+    expect(within(leeRow).getByText('Published')).toBeInTheDocument();
+    expect(
+      screen.getAllByText('Published', { selector: '.text-status-approved' }),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText('Not published', {
+        selector: '.text-status-inactive',
+      }),
+    ).toHaveLength(2);
+  });
+
+  it('filters by website status with published= and keeps it in the URL', async () => {
+    serveInstructors([jane, published]);
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText('Showing 1–2 of 2')).toBeInTheDocument();
+
+    const website = screen.getByRole('combobox', { name: 'Website' });
+    expect(
+      within(website)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['All', 'Published', 'Not published']);
+
+    await user.selectOptions(website, 'true');
+    expect(await screen.findByText('Showing 1–1 of 1')).toBeInTheDocument();
+    expect(screen.getAllByText('Lee Ridge').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Jane Snow')).not.toBeInTheDocument();
+    expect(location()).toBe('?published=true');
+    expect(requests.at(-1)).toEqual(request({ published: 'true' }));
+
+    await user.selectOptions(website, 'false');
+    await waitFor(() => expect(location()).toBe('?published=false'));
+    expect(requests.at(-1)).toEqual(request({ published: 'false' }));
+
+    await user.selectOptions(website, '');
+    expect(await screen.findByText('Showing 1–2 of 2')).toBeInTheDocument();
+    expect(location()).toBe('');
+    expect(requests.at(-1)).toEqual(request());
+  });
+
+  it('preselects the website filter from the URL', async () => {
+    serveInstructors([jane, published]);
+    renderPage('/?published=false');
+
+    expect(await screen.findByText('Showing 1–1 of 1')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Website' })).toHaveValue(
+      'false',
+    );
+    expect(requests).toEqual([request({ published: 'false' })]);
+  });
+
+  it('shows the website filter and status in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveInstructors([jane, published]);
+    renderPage();
+
+    const website = await screen.findByRole('combobox', { name: '官网' });
+    expect(
+      within(website)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['全部', '已发布', '未发布']);
+    expect(
+      await screen.findAllByText('未发布', { ignore: 'option' }),
+    ).toHaveLength(2);
+    expect(screen.getAllByText('已发布', { ignore: 'option' })).toHaveLength(2);
   });
 });
 

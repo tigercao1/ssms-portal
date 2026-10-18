@@ -68,6 +68,7 @@ export const fakeAdminList: AdminInstructorRecord[] = [
     approvalStatus: 'pending',
     isActive: true,
     calendarConnected: false,
+    publishedAt: null,
     insertedAt: '2026-01-02T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
   },
@@ -268,6 +269,7 @@ export function listAdminInstructors(
   const status = params.get('status');
   const active = params.get('active');
   const calendarConnected = params.get('calendarConnected');
+  const published = params.get('published');
   const tokens = (params.get('q') ?? '')
     .toLowerCase()
     .split(/\s+/)
@@ -281,6 +283,7 @@ export function listAdminInstructors(
       (active === null || String(r.isActive) === active) &&
       (calendarConnected === null ||
         String(r.calendarConnected) === calendarConnected) &&
+      (published === null || String(r.publishedAt !== null) === published) &&
       tokens.every((token) => haystack.includes(token))
     );
   });
@@ -359,6 +362,16 @@ export const handlers = [
   }),
   http.get(`${API}/admin/instructors/:id`, () =>
     HttpResponse.json(fakeAdminList[0]),
+  ),
+  http.patch(
+    `${API}/admin/instructors/:id/publication`,
+    async ({ request }) => {
+      const { published } = (await request.json()) as { published: boolean };
+      return HttpResponse.json({
+        ...fakeAdminList[0],
+        publishedAt: published ? '2026-10-18T16:00:00Z' : null,
+      });
+    },
   ),
   http.get(`${API}/reference/seasons`, () => HttpResponse.json(fakeSeasons)),
   http.get(`${API}/reference/:slug`, () => HttpResponse.json(refs)),
