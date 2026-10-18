@@ -205,7 +205,7 @@ export const zhCN: Messages = {
     slotRemovePhoto: '移除照片',
   },
   bio: {
-    composeHint: '可以用英文、中文或两种语言填写。留空的语言会在保存时自动机器翻译。',
+    composeHint: '用一种语言填写简介，保存时会自动翻译成另一种语言。',
     actionsHint: '可选：“AI 润色”会优化措辞并翻译，保存前可查看两个版本。',
     refine: 'AI 润色',
     notTranslated: '简介已保存，但另一种语言暂时无法翻译。稍后可点击“更新翻译”补上。',
@@ -227,6 +227,10 @@ export const zhCN: Messages = {
     clear: '清空',
     stale: '可能已过时',
     staleHint: '另一种语言的版本更新于此之后。',
+    writingIn: '填写语言',
+    looksLikeZh: '内容看起来是中文。',
+    looksLikeEn: '内容看起来是英文。',
+    switchTo: '切换为{lang}',
     updateTranslation: '更新翻译',
   },
   settings: {
