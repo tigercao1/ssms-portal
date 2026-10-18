@@ -74,7 +74,7 @@ export function SeasonsPanel() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-public>
                 {(seasons.data ?? []).map((s, i) => (
                   <Fragment key={s.key}>
                     <tr

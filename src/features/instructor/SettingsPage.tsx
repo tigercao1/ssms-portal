@@ -13,7 +13,9 @@ export function SettingsPage() {
       <Card className="flex flex-col gap-1">
         <h2 className="text-lg">{t.settings.account}</h2>
         <p className="text-sm text-slate">{t.settings.signedInAs}</p>
-        <p className="font-mono text-sm text-ink">{user?.email}</p>
+        <p data-private className="font-mono text-sm text-ink">
+          {user?.email}
+        </p>
       </Card>
     </div>
   );

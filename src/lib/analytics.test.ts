@@ -54,7 +54,7 @@ describe('analytics', () => {
         mask_all_element_attributes: true,
         session_recording: expect.objectContaining({
           maskAllInputs: true,
-          maskTextSelector: '*',
+          maskTextSelector: expect.stringContaining('[data-private]'),
           blockSelector: expect.stringContaining('canvas'),
           captureCanvas: { recordCanvas: false },
         }),

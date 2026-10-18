@@ -66,7 +66,7 @@ export function AdminDashboard() {
                 to={`/admin/instructors/${row.id}`}
                 className="flex items-center justify-between px-4 py-3 hover:bg-sunken"
               >
-                <span className="font-medium text-navy">
+                <span data-private className="font-medium text-navy">
                   {localizeField(row.displayNameEn, row.displayNameZh, locale) ||
                     row.email}
                 </span>

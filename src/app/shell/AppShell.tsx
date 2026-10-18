@@ -206,7 +206,10 @@ export function AppShell() {
           <div className="ml-auto flex items-center gap-4">
             <LangSwitch />
             {user?.email && (
-              <span className="hidden font-mono text-xs text-slate sm:inline">
+              <span
+                data-private
+                className="hidden font-mono text-xs text-slate sm:inline"
+              >
                 {user.email}
               </span>
             )}

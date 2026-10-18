@@ -113,7 +113,7 @@ export function AvailabilityGrid({
           {t.booking.noInstructorsBody}
         </EmptyState>
       ) : instructors.length === 0 ? (
-        <p className="text-sm text-slate">
+        <p data-private className="text-sm text-slate">
           {t.booking.instructorSearchEmpty.replace('{q}', query.trim())}
         </p>
       ) : (
@@ -249,7 +249,7 @@ export function AvailabilityGrid({
           <h3 className="text-sm font-medium text-navy">
             {t.booking.unavailableTitle}
           </h3>
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul data-private className="flex flex-col gap-1 text-sm">
             {unavailable.map((u) => (
               <li key={u.instructorId} className="text-ink">
                 {localizeField(u.displayNameEn, u.displayNameZh, locale) ||

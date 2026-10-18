@@ -134,6 +134,7 @@ export function PhotoPicker({
     >
       {url ? (
         <img
+          data-private
           src={url}
           alt={slotLabel ? `${name} — ${slotLabel}` : name}
           className="h-16 w-16 rounded-lg object-cover"

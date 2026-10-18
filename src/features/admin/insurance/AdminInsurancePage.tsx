@@ -1072,7 +1072,9 @@ function MarkPaidDialog({
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">{target.summary}</p>
+        <p data-private className="text-sm text-slate">
+          {target.summary}
+        </p>
         <WholeRequestNote whole={whole} />
         <Field label={s.paidOnLabel} required>
           {(p) => (
@@ -1147,7 +1149,9 @@ function MarkUnpaidDialog({
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <p className="text-slate">{target.summary}</p>
+        <p data-private className="text-slate">
+          {target.summary}
+        </p>
         <WholeRequestNote whole={whole} />
         <p>
           {wholeRequest(target) ? s.requestMarkUnpaidBody : s.markUnpaidBody}
@@ -1213,6 +1217,7 @@ function GrantSeasonPassDialog({
   return (
     <Modal
       title={s.grantTitle.replace('{name}', name)}
+      privateTitle
       onClose={onClose}
       footer={
         <>
@@ -1323,6 +1328,7 @@ function VoidDialog({
   return (
     <Modal
       title={title}
+      privateTitle
       onClose={onClose}
       footer={
         <>
@@ -1345,7 +1351,9 @@ function VoidDialog({
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">{summary}</p>
+        <p data-private className="text-sm text-slate">
+          {summary}
+        </p>
         <WholeRequestNote whole={whole} />
         <p className="text-sm">{body}</p>
         <Field

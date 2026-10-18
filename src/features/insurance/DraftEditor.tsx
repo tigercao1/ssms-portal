@@ -175,6 +175,7 @@ export function DraftEditor({
               key={i}
               type="button"
               onClick={() => jumpToIssue(issue, draft, update)}
+              data-private
               className="block min-h-10 w-full py-1 text-left text-sm font-semibold text-red underline"
             >
               {issue.message}

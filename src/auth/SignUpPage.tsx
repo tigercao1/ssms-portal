@@ -68,7 +68,9 @@ export function SignUpPage() {
       <AuthLayout>
         <h2 className="text-3xl">{t.auth.signUpDone}</h2>
         <p className="mt-2 text-slate">{t.auth.signUpDoneBody}</p>
-        <p className="mt-1 font-mono text-sm text-ink">{email}</p>
+        <p data-private className="mt-1 font-mono text-sm text-ink">
+          {email}
+        </p>
         <Link
           to="/login"
           className="mt-8 inline-block text-sm text-navy hover:underline"

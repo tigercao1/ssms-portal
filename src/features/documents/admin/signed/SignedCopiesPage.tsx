@@ -481,7 +481,10 @@ function AssignmentCards({ rows, isSign, selected, onToggle }: RowsProps) {
   const s = t.signedCopies;
   const { locale } = useLocale();
   return (
-    <ul className="flex flex-col divide-y divide-grey/40 sm:hidden">
+    <ul
+      data-private
+      className="flex flex-col divide-y divide-grey/40 sm:hidden"
+    >
       {rows.map((row) => {
         const name = instructorName(row, t);
         return (

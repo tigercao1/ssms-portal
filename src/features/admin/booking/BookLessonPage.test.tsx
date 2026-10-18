@@ -18,6 +18,7 @@ import type {
   CreateBookingInput,
   LastClass,
 } from './types';
+import { expectMaskedInReplay } from '@/test/replayPrivacy';
 
 const API = 'http://localhost:3000';
 
@@ -511,9 +512,9 @@ describe('BookLessonPage', () => {
     await pickLily(user);
     await user.click(screen.getByRole('button', { name: 'Same as last time' }));
 
-    expect(
+    expectMaskedInReplay(
       await screen.findByText(/Last lesson: Private 1h with Jane Snow/),
-    ).toBeInTheDocument();
+    );
     expect(screen.getByLabelText('Date')).toHaveValue('2026-12-12');
     expect(screen.getByLabelText('Lesson type')).toHaveValue('lt1');
     expect(

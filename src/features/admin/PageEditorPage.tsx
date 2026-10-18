@@ -372,7 +372,9 @@ function ContentCard({ page }: { page: PublicPage }) {
       {uploadError && <Banner tone="error">{uploadError}</Banner>}
       {uploaded && (
         <Banner tone="approved">
-          {t.pages.uploaded.replace('{name}', uploaded)}
+          <span data-private>
+            {t.pages.uploaded.replace('{name}', uploaded)}
+          </span>
         </Banner>
       )}
     </Card>

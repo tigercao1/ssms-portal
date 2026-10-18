@@ -32,7 +32,7 @@ export function PayrollAdjustments({
       {detail.adjustments.length === 0 ? (
         <p className="text-sm text-slate">{t.payroll.adjustmentsEmpty}</p>
       ) : (
-        <ul className="divide-y divide-grey/40 text-sm">
+        <ul data-private className="divide-y divide-grey/40 text-sm">
           {detail.adjustments.map((adjustment) => (
             <li
               key={adjustment.id}

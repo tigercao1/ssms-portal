@@ -63,7 +63,7 @@ export function AdminDetailPage() {
         <StatusPill status={rec.approvalStatus} isActive={rec.isActive} />
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div data-private className="flex flex-col gap-1">
         <h1 className="text-2xl">{name}</h1>
         <p className="font-mono text-xs text-slate">{rec.email}</p>
       </div>

@@ -280,7 +280,9 @@ export function DraftFlow({
         <div className="mt-3">
           <Banner tone="error">
             {submitErrorText(submit.error, draft, t).map((line, i) => (
-              <p key={i}>{line}</p>
+              <p key={i} data-private>
+                {line}
+              </p>
             ))}
           </Banner>
         </div>

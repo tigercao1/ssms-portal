@@ -319,7 +319,9 @@ function RecentImports({
               )}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-ink">{i.filename}</p>
+                <p data-private className="truncate text-sm text-ink">
+                  {i.filename}
+                </p>
                 <p className="text-xs text-slate">
                   {formatSchoolDateTime(i.createdAt, locale)}
                   {i.counts.total !== undefined &&
@@ -428,7 +430,7 @@ function SummaryCard({ detail }: { detail: ClassImportDetail }) {
         <h2 className="text-lg">{t.classImport.summaryTitle}</h2>
         <StatusChip status={record.status} />
         <span className="min-w-0 truncate text-sm text-slate">
-          {record.filename} ·{' '}
+          <span data-private>{record.filename}</span> ·{' '}
           {fill(t.classImport.rowsCount, { count: summary.total })}
         </span>
       </div>

@@ -57,7 +57,7 @@ export function AssignToInstructorDialog({
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">
+        <p data-private className="text-sm text-slate">
           {t.documents.assignDocumentIntro
             .replace('{name}', instructorName)
             .replace('{season}', season)}

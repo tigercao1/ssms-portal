@@ -83,7 +83,11 @@ export function SyncIssuesBanner() {
           )}
         </p>
         {open && (
-          <ul id="calendar-sync-issues" className="flex flex-col gap-1">
+          <ul
+            data-private
+            id="calendar-sync-issues"
+            className="flex flex-col gap-1"
+          >
             {classes.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-2">
                 <span>

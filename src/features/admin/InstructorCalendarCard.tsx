@@ -363,6 +363,7 @@ function CalendarPicker({
                   </p>
                 ) : (
                   <ul
+                    data-private
                     id={listId}
                     role="listbox"
                     aria-label={t.instructorCalendar.pickLabel}
