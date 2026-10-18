@@ -14,14 +14,19 @@ import type {
   DocumentChecklistItem,
 } from '../api';
 import { CertUploadSheet } from './CertUploadSheet';
-import { ProgressBar } from './ProgressBar';
+import { ProgressBar, progressText } from './ProgressBar';
 import { StatePill, type PillTone } from './StatePill';
-import { checklistProgress, isItemDone, useMyChecklist } from './queries';
+import {
+  checklistProgress,
+  isItemDone,
+  isItemInReview,
+  useMyChecklist,
+} from './queries';
 import { LockedBanner, LockedEmpty, LockedPreviewList } from './Locked';
 
 const CERT_TONE: Record<CertState, PillTone> = {
   missing: 'muted',
-  pending: 'info',
+  pending: 'warn',
   valid: 'done',
   expiring: 'warn',
   expired: 'bad',
@@ -45,15 +50,17 @@ export function certStateLabel(state: CertState, t: Messages): string {
   }
 }
 
+type RowMarker = 'done' | 'review' | 'todo';
+
 function Row({
-  done,
+  marker,
   title,
   subtitle,
   pill,
   action,
   children,
 }: {
-  done: boolean;
+  marker: RowMarker;
   title: string;
   subtitle: string;
   pill: ReactNode;
@@ -66,10 +73,12 @@ function Row({
         aria-hidden
         className={cn(
           'grid h-6 w-6 flex-none place-items-center rounded-full border-2 text-xs text-white',
-          done ? 'border-status-approved bg-status-approved' : 'border-grey',
+          marker === 'done' && 'border-status-approved bg-status-approved',
+          marker === 'review' && 'border-status-pending',
+          marker === 'todo' && 'border-grey',
         )}
       >
-        {done ? '✓' : ''}
+        {marker === 'done' ? '✓' : ''}
       </span>
       <div className="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
         <div className="min-w-0 sm:flex-1">
@@ -119,7 +128,7 @@ function DocumentRow({ item }: { item: DocumentChecklistItem }) {
 
   return (
     <Row
-      done={item.status === 'completed'}
+      marker={item.status === 'completed' ? 'done' : 'todo'}
       title={title}
       subtitle={subtitle}
       pill={<StatePill tone={tone} label={status} />}
@@ -158,7 +167,9 @@ function CertRow({
   const canReplace = item.state === 'expiring';
   return (
     <Row
-      done={isItemDone(item)}
+      marker={
+        isItemDone(item) ? 'done' : isItemInReview(item) ? 'review' : 'todo'
+      }
       title={label}
       subtitle={
         item.validUntil
@@ -267,10 +278,9 @@ export function OnboardingPage() {
   const certs = items.filter(
     (i): i is CertificationChecklistItem => i.type === 'certification',
   );
-  const { done, total } = checklistProgress(items);
-  const progress = t.onboarding.progress
-    .replace('{done}', String(done))
-    .replace('{total}', String(total));
+  const counts = checklistProgress(items);
+  const { done, total } = counts;
+  const progress = progressText(counts, t);
 
   return (
     <div className="flex flex-col gap-6">
@@ -283,7 +293,7 @@ export function OnboardingPage() {
       <Card className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-navy">{progress}</p>
-          <ProgressBar done={done} total={total} label={progress} />
+          <ProgressBar progress={counts} label={progress} />
           {total > 0 && done === total && (
             <p className="text-sm text-slate">{t.onboarding.allDone}</p>
           )}

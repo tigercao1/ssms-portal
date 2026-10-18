@@ -49,7 +49,8 @@ export const zhCN: Messages = {
     signingUp: '正在创建账户…',
     passwordHint: '至少 6 个字符。',
     signUpDone: '请查收邮箱',
-    signUpDoneBody: '我们已发送验证链接以确认您的邮箱。点击后即可登录并完善资料。',
+    signUpDoneBody:
+      '我们已发送验证链接以确认您的邮箱。点击后即可登录并完善资料。',
     emailInUse: '该邮箱已注册账户，请尝试登录。',
     verifyTitle: '验证您的邮箱',
     verifyBody: '我们已向您的邮箱发送验证链接。确认后即可登录。',
@@ -73,6 +74,8 @@ export const zhCN: Messages = {
     magicLinkSentBody:
       '如果该邮箱已注册账户，登录链接已发送至您的邮箱。点击链接即可登录，无需密码。',
     rateLimited: '邮件发送过于频繁，请稍等一分钟后再试。',
+    resendIn: '{seconds} 秒后可重新发送',
+    resendInMinutes: '{minutes} 分钟后可重新发送',
   },
   activation: {
     verifyingTitle: '正在激活您的账户…',
@@ -151,8 +154,10 @@ export const zhCN: Messages = {
     calendarTitle: 'Google 日历',
     calendarConnected: '已连接',
     calendarNotConnected: '未连接',
-    calendarConnectedBody: '您的 Google 日历已连接，您被安排的课程会显示在日历中。',
-    calendarNotConnectedBody: '您的 Google 日历尚未连接，被安排的课程不会显示在日历中。请按照指南完成连接。',
+    calendarConnectedBody:
+      '您的 Google 日历已连接，您被安排的课程会显示在日历中。',
+    calendarNotConnectedBody:
+      '您的 Google 日历尚未连接，被安排的课程不会显示在日历中。请按照指南完成连接。',
     calendarGuide: '如何连接日历',
     editTitle: '编辑资料',
     identitySection: '身份信息',
@@ -207,14 +212,7 @@ export const zhCN: Messages = {
     livePill: '已上线',
     notLivePill: '未上线',
     liveTitle: '您的资料已上线。',
-    liveLink: '在 ssnow.club 查看',
-    readyTitle: '资料已齐全，正在上线中。',
-    readyBody: '通常几分钟内完成。',
-    missingTitleOne: '您的资料已通过审核。还差 1 项即可在 ssnow.club 上线',
-    missingTitle: '您的资料已通过审核。还差 {n} 项即可在 ssnow.club 上线',
-    groupProfile: '资料',
-    groupCertification: '认证',
-    groupOnboarding: '入职',
+    liveLink: '在 SSnow 官网查看',
     fieldDisplayNameEn: '英文显示名',
     fieldBio: '简介',
     fieldPhoto: '主照片',
@@ -222,12 +220,9 @@ export const zhCN: Messages = {
     fieldLanguages: '授课语言',
     fieldCourseLevels: '可授课级别',
     noneVerified: '暂无已验证的认证',
-    actionAdd: '添加',
-    actionView: '查看',
-    actionOpen: '打开',
     certVerified: '已验证 · 有效期至 {date}',
     certVerifiedNoDate: '已验证',
-    certPending: '等待验证',
+    certPending: '待审核',
     certRejected: '证明未通过',
     certExpired: '证明已过期',
     certNoProof: '未上传证明',
@@ -241,8 +236,10 @@ export const zhCN: Messages = {
     composeHint: '用一种语言填写简介，保存时会自动翻译成另一种语言。',
     actionsHint: '可选：“AI 润色”会优化措辞并翻译，保存前可查看两个版本。',
     refine: 'AI 润色',
-    notTranslated: '简介已保存，但另一种语言暂时无法翻译。稍后可点击“更新翻译”补上。',
-    notCleared: '另一种语言暂时无法翻译，因此此简介未被清空。请稍后再试，或点击“取消”保留原文。',
+    notTranslated:
+      '简介已保存，但另一种语言暂时无法翻译。稍后可点击“更新翻译”补上。',
+    notCleared:
+      '另一种语言暂时无法翻译，因此此简介未被清空。请稍后再试，或点击“取消”保留原文。',
     remaining: '今日剩余 {n}/{limit} 次',
     limitReached: '今日 {limit} 次 AI 请求已用完，请在 {time} 之后再试。',
     limitReachedNoTime: '今日 {limit} 次 AI 请求已用完。',
@@ -269,7 +266,8 @@ export const zhCN: Messages = {
   settings: {
     title: '设置',
     languageLabel: '首选语言',
-    preferredLanguageHint: '用于 SSMS 发送的邮件，也是填写简介时的默认语言。如需切换网站语言，请使用页面顶部的语言切换。',
+    preferredLanguageHint:
+      '用于 SSMS 发送的邮件，也是填写简介时的默认语言。如需切换网站语言，请使用页面顶部的语言切换。',
     account: '账户',
     signedInAs: '当前登录',
   },
@@ -305,10 +303,12 @@ export const zhCN: Messages = {
     reject: '拒绝',
     rejectReason: '原因（可选）',
     reapprove: '重新通过',
-    reapproveConfirm: '确定重新通过该教练？系统会发邮件通知教练，并开放入职资料。',
+    reapproveConfirm:
+      '确定重新通过该教练？系统会发邮件通知教练，并开放入职资料。',
     takeOffline: '下线',
     putOnline: '重新上线',
-    takeOfflineConfirm: '确定下线该教练？其资料将不在公开目录中显示，并会通过邮件通知教练。',
+    takeOfflineConfirm:
+      '确定下线该教练？其资料将不在公开目录中显示，并会通过邮件通知教练。',
     putOnlineConfirm: '确定重新上线该教练？其资料将重新在公开目录中显示。',
     confirm: '确认',
     roleSection: '角色',
@@ -347,7 +347,8 @@ export const zhCN: Messages = {
     editReplacesHint: '此内容为机器翻译。编辑后将替换机器翻译。',
     nameZhLabel: '中文名称',
     addNameHint: '任填一种名称，另一种将自动翻译。',
-    englishNameRequired: '需要填写英文名称（翻译暂不可用）。请填写英文名称后重试。',
+    englishNameRequired:
+      '需要填写英文名称（翻译暂不可用）。请填写英文名称后重试。',
   },
   shopifySync: {
     title: 'Shopify 同步',
@@ -357,13 +358,16 @@ export const zhCN: Messages = {
     enableTitle: '开启 Shopify 同步？',
     enableBody: '已审核且在线的教练将发布到 Shopify 预览列表。',
     disableTitle: '关闭 Shopify 同步？',
-    disableBody: '同步将在下一次运行时停止。队列中的更改会保留，重新开启后继续推送。',
+    disableBody:
+      '同步将在下一次运行时停止。队列中的更改会保留，重新开启后继续推送。',
     turnOn: '开启',
     turnOff: '关闭',
     masterSwitchOff: '总开关已关闭',
-    masterSwitchOffBody: '服务器总开关已关闭，即使开启同步也不会向 Shopify 发送任何内容。',
+    masterSwitchOffBody:
+      '服务器总开关已关闭，即使开启同步也不会向 Shopify 发送任何内容。',
     notConfigured: 'Shopify 未配置',
-    notConfiguredBody: '服务器缺少 Shopify 配置，即使开启同步也不会向 Shopify 发送任何内容。',
+    notConfiguredBody:
+      '服务器缺少 Shopify 配置，即使开启同步也不会向 Shopify 发送任何内容。',
     onButBlocked: '已开启，但未运行',
     lastRun: '上次运行',
     lastSuccess: '上次成功',
@@ -397,15 +401,18 @@ export const zhCN: Messages = {
   },
   google: {
     title: 'Google 日历',
-    intro: '连接 SSNOW 的 Google 账号，让 SSMS 读取教练的空闲时间并把课程加入他们的日历。',
+    intro:
+      '连接 SSNOW 的 Google 账号，让 SSMS 读取教练的空闲时间并把课程加入他们的日历。',
     connectionTitle: '连接',
     connected: '已连接',
     notConnected: '未连接',
-    notConnectedBody: '连接之前，所有 Google 功能都处于关闭状态。请使用 admin@ssnow.club 登录，并同意所有请求的权限。',
+    notConnectedBody:
+      '连接之前，所有 Google 功能都处于关闭状态。请使用 admin@ssnow.club 登录，并同意所有请求的权限。',
     connect: '连接 Google',
     disconnect: '断开连接',
     disconnectTitle: '断开 Google 日历？',
-    disconnectBody: 'SSMS 将失去对该 Google 账号的访问权限，在管理员重新连接之前不再读取空闲时间或写入日程。',
+    disconnectBody:
+      'SSMS 将失去对该 Google 账号的访问权限，在管理员重新连接之前不再读取空闲时间或写入日程。',
     disconnectConfirm: '断开连接',
     disconnected: '已断开 Google 日历。',
     account: '账号',
@@ -419,9 +426,11 @@ export const zhCN: Messages = {
     returnErrorTitle: '未能连接 Google 日历',
     returnErrorUnknown: 'Google 返回了错误（{code}）。请重新连接。',
     calendarsTitle: '日历',
-    calendarsIntro: '与已连接账号共享的日历。SSMS 只能在拥有“编辑者”或“所有者”权限的日历中添加日程。',
+    calendarsIntro:
+      '与已连接账号共享的日历。SSMS 只能在拥有“编辑者”或“所有者”权限的日历中添加日程。',
     calendarsEmpty: '还没有日历共享给这个账号。',
-    readOnlySummary: '有 {count} 个日历共享时没有编辑权限。请让教练以“更改活动”权限共享。',
+    readOnlySummary:
+      '有 {count} 个日历共享时没有编辑权限。请让教练以“更改活动”权限共享。',
     colName: '名称',
     colId: '日历 ID',
     colAccess: '权限',
@@ -439,7 +448,8 @@ export const zhCN: Messages = {
       missing_scopes: '请接受所有日历权限后重试。',
       invalid_state: '连接链接已过期或无效。请重新连接。',
       token_exchange_failed: 'Google 未能完成登录。请重新连接。',
-      no_refresh_token: 'Google 未返回离线授权。请在 Google 账号设置中移除此应用后重新连接。',
+      no_refresh_token:
+        'Google 未返回离线授权。请在 Google 账号设置中移除此应用后重新连接。',
       not_configured: '服务器未配置 Google。',
       oauth_error: 'Google 登录时报告了错误。请重新连接。',
       missing_code: 'Google 未返回授权码。请重新连接。',
@@ -463,7 +473,8 @@ export const zhCN: Messages = {
     titleInvalid: '请输入不超过 200 个字符的标题。',
     slugLabel: '链接名',
     slugHint: '仅限小写字母、数字和连字符。用于公开链接，创建后无法修改。',
-    slugInvalid: '请使用小写字母和数字，单词之间用单个连字符分隔（最多 80 个字符）。',
+    slugInvalid:
+      '请使用小写字母和数字，单词之间用单个连字符分隔（最多 80 个字符）。',
     slugTaken: '该链接名已被使用。',
     create: '创建页面',
     backToList: '全部页面',
@@ -541,7 +552,8 @@ export const zhCN: Messages = {
   },
   lessonTypes: {
     title: '课程类型',
-    intro: '管理员预约的课程类型。每种类型有各自的费率（按小时或按天），特价课是单独的类型。',
+    intro:
+      '管理员预约的课程类型。每种类型有各自的费率（按小时或按天），特价课是单独的类型。',
     colNameEn: '英文名称',
     colNameZh: '中文名称',
     colGroupSize: '人数',
@@ -595,12 +607,14 @@ export const zhCN: Messages = {
     currencyInvalid: '请使用 3 位字母代码，例如 CAD。',
     dateRequired: '请选择生效日期。',
     rangeInvalid: '截止日期不能早于生效日期。',
-    rateOverlap: '该费率与同一课程类型、同一教练的另一条费率时间重叠。请修改日期，或先结束另一条费率。',
+    rateOverlap:
+      '该费率与同一课程类型、同一教练的另一条费率时间重叠。请修改日期，或先结束另一条费率。',
     instructorFixed: '如需更换教练，请新增一条费率。',
   },
   customers: {
     title: '客户',
-    intro: '客户来自 Shopify。可以搜索这里保存的客户、从 Shopify 同步，或在 Shopify 中创建新客户。',
+    intro:
+      '客户来自 Shopify。可以搜索这里保存的客户、从 Shopify 同步，或在 Shopify 中创建新客户。',
     searchLabel: '按姓名、邮箱或电话搜索',
     search: '搜索',
     colName: '姓名',
@@ -649,7 +663,8 @@ export const zhCN: Messages = {
   },
   documents: {
     title: '入职资料',
-    intro: '教练需要阅读或签署的入职资料。上传原始 PDF，放置签署人需要填写的字段，然后发布。',
+    intro:
+      '教练需要阅读或签署的入职资料。上传原始 PDF，放置签署人需要填写的字段，然后发布。',
     empty: '暂无资料',
     emptyBody: '在下方新建，然后上传 PDF。',
     colTitle: '标题',
@@ -678,7 +693,8 @@ export const zhCN: Messages = {
     assignFor: '分配 {title}',
     assignEllipsis: '分配…',
     uploaded: '已上传 {title} 的 PDF（{pages}）。',
-    uploadedFieldsCleared: '已上传 {title} 的 PDF（{pages}）。页面尺寸已改变，原有字段已清除，请重新放置。',
+    uploadedFieldsCleared:
+      '已上传 {title} 的 PDF（{pages}）。页面尺寸已改变，原有字段已清除，请重新放置。',
     uploadNotPdf: '请选择 PDF 文件。',
     uploadTooLarge: 'PDF 不能超过 {mb} MB。',
     uploadFailed: '上传失败：{reason}',
@@ -702,7 +718,8 @@ export const zhCN: Messages = {
     searchInstructors: '搜索教练',
     pickedCount: '已选 {n} 人',
     pickAtLeastOne: '请至少选择一位教练。',
-    assignResult: '已分配给 {created} 人。{skipped} 人本雪季已有此资料，已跳过。',
+    assignResult:
+      '已分配给 {created} 人。{skipped} 人本雪季已有此资料，已跳过。',
     unsaved: '有未保存的更改',
     previewAsSigner: '以签署人视角预览',
     backToEditing: '返回编辑',
@@ -783,8 +800,10 @@ export const zhCN: Messages = {
     templateStatusRetired: '已停用',
     audienceAll: '所有教练',
     audienceSelected: '指定教练',
-    audienceAllDetail: '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已签署',
-    audienceAllDetailRead: '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已确认阅读',
+    audienceAllDetail:
+      '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已签署',
+    audienceAllDetailRead:
+      '已分配 {assigned}/{approved} 位已审核教练 · {done} 人已确认阅读',
     audienceSelectedDetail: '{n} 位教练',
     publish: '发布',
     republish: '重新发布',
@@ -794,7 +813,8 @@ export const zhCN: Messages = {
     retireFor: '停用 {title}',
     publishNeedsPdf: '发布前请先上传 PDF。',
     publishNeedsField: '发布前请至少放置一个字段。',
-    lockedSigned: '已有教练完成此资料，PDF 和字段不能再修改。如需修改，请停用后发布新的资料。',
+    lockedSigned:
+      '已有教练完成此资料，PDF 和字段不能再修改。如需修改，请停用后发布新的资料。',
     publishTitle: '发布“{title}”',
     publishIntro: '发布后教练即可查看并签署。',
     publishWho: '发给谁',
@@ -849,7 +869,8 @@ export const zhCN: Messages = {
     sourceLanguageHint: '设置后可以添加另一种语言的版本。',
     sourceLanguageLocked: '要更改，请先删除另一种语言的版本。',
     otherLanguageTitle: '另一种语言版本',
-    otherLanguageIntro: '使用{language}界面的教练会看到这个 PDF，而不是主版本。',
+    otherLanguageIntro:
+      '使用{language}界面的教练会看到这个 PDF，而不是主版本。',
     otherLanguageMissing: '还没有{language} PDF。',
     otherLanguageReady: '{language} PDF · {pages} · {fields}',
     otherLanguageNeedsFields: '发布前请在{language}版本上至少放置一个字段。',
@@ -871,7 +892,8 @@ export const zhCN: Messages = {
     back: '全部资料',
     subtitle: '已签副本',
     subtitleRead: '确认记录',
-    intro: '此资料分配给的所有人，以及谁在何时签署。可下载单份，或将多份导出为 ZIP 发给雪场。',
+    intro:
+      '此资料分配给的所有人，以及谁在何时签署。可下载单份，或将多份导出为 ZIP 发给雪场。',
     introRead: '此资料分配给的所有人，以及谁已确认阅读。',
     seasonLabel: '雪季',
     allSeasons: '全部雪季',
@@ -905,7 +927,8 @@ export const zhCN: Messages = {
     prevPage: '上一页',
     nextPage: '下一页',
     exportTitle: '导出已签副本',
-    exportBody: '将已签 PDF 打包为一个 ZIP，附 manifest.csv。导出在后台进行，下载链接保留 24 小时。',
+    exportBody:
+      '将已签 PDF 打包为一个 ZIP，附 manifest.csv。导出在后台进行，下载链接保留 24 小时。',
     exportScopeSeason: '雪季：{season}。',
     exportScopeAllSeasons: '全部雪季。',
     exportSelected: '导出所选（{n}）',
@@ -948,7 +971,8 @@ export const zhCN: Messages = {
     readOnlyTag: '只读',
     readOnlyWarning: '只读，SSMS 无法添加课程',
     clear: '清除',
-    notConnected: '尚未连接 Google 日历，无法列出日历。请先连接，或手动填写日历 ID。',
+    notConnected:
+      '尚未连接 Google 日历，无法列出日历。请先连接，或手动填写日历 ID。',
     googleError: '无法从 Google 加载日历。请检查连接，或手动填写日历 ID。',
     settingsLink: '打开 设置 → Google 日历',
     manualLabel: 'Google 日历 ID',
@@ -957,9 +981,11 @@ export const zhCN: Messages = {
   },
   classImport: {
     title: '导入历史',
-    intro: '从 Digital Appointments 导出的 CSV 导入过往预约。提交之前不会生成任何课程，也不会创建 Google 日历事件。',
+    intro:
+      '从 Digital Appointments 导出的 CSV 导入过往预约。提交之前不会生成任何课程，也不会创建 Google 日历事件。',
     uploadTitle: '上传 CSV',
-    uploadBody: '从 Digital Appointments 导出预约，然后上传 CSV 文件（最大 5 MB）。',
+    uploadBody:
+      '从 Digital Appointments 导出预约，然后上传 CSV 文件（最大 5 MB）。',
     fileLabel: 'CSV 文件',
     upload: '上传',
     uploadFailed: '上传失败',
@@ -982,7 +1008,8 @@ export const zhCN: Messages = {
     countDuplicate: '重复行',
     countAlreadyImported: '已导入过',
     mappingTitle: '活动名称 → 课程类型',
-    mappingBody: 'CSV 中的每个活动名称对应一种课程类型。映射会被保存，以后的导入会继续使用。',
+    mappingBody:
+      'CSV 中的每个活动名称对应一种课程类型。映射会被保存，以后的导入会继续使用。',
     colEventName: '活动名称',
     colRows: '行数',
     colLessonType: '课程类型',
@@ -1036,7 +1063,8 @@ export const zhCN: Messages = {
     commit: '导入 {count} 节课',
     commitConfirm: '现在导入 {count} 节课？',
     confirm: '确认',
-    commitDone: '已导入 {created} 节课，其中 {participants} 节有客户。{already} 节此前已导入，跳过 {skipped} 行。',
+    commitDone:
+      '已导入 {created} 节课，其中 {participants} 节有客户。{already} 节此前已导入，跳过 {skipped} 行。',
     commitFailed: '提交失败',
     discard: '丢弃草稿',
     discardConfirm: '丢弃此草稿？丢弃后将无法提交。',
@@ -1048,7 +1076,8 @@ export const zhCN: Messages = {
   },
   payroll: {
     title: '工资结算',
-    intro: '每两周结算一次：除已取消外的所有课程均计酬，按课程日期生效的课时费计算。',
+    intro:
+      '每两周结算一次：除已取消外的所有课程均计酬，按课程日期生效的课时费计算。',
     previous: '上一周期',
     next: '下一周期',
     current: '当前周期',
@@ -1063,7 +1092,8 @@ export const zhCN: Messages = {
     lessonsCount: '{n} 节课',
     hoursCount: '{n} 小时',
     needsRateTitle: '{n} 节课缺少课时费',
-    needsRateBody: '在课程设置了课程类型且该日期有课时费之前，这些课程按 0 计算。',
+    needsRateBody:
+      '在课程设置了课程类型且该日期有课时费之前，这些课程按 0 计算。',
     fixInClasses: '打开课程',
     openPayRates: '打开课时费',
     colInstructor: '教练',
@@ -1106,7 +1136,8 @@ export const zhCN: Messages = {
     adjustmentsLocked: '重新打开周期后才能修改调整。',
     finalize: '结算周期',
     finalizeTitle: '确认结算该周期？',
-    finalizeBody: '费率和金额将被冻结。之后对课程或课时费的修改不会影响该周期，除非重新打开。',
+    finalizeBody:
+      '费率和金额将被冻结。之后对课程或课时费的修改不会影响该周期，除非重新打开。',
     finalizeNeedsRate: '{n} 节课没有课时费，将按 0 支付。',
     acceptZeroRate: '按 0 结算这些课程',
     finalizeConfirm: '结算',
@@ -1129,7 +1160,8 @@ export const zhCN: Messages = {
   },
   booking: {
     title: '预约课程',
-    intro: '先选择客户和课程类型，再选择空闲时段。时间均为多伦多时间。预约会写入教练的 Google 日历，不会邀请客户。',
+    intro:
+      '先选择客户和课程类型，再选择空闲时段。时间均为多伦多时间。预约会写入教练的 Google 日历，不会邀请客户。',
     customerStep: '客户',
     customerSearch: '查找客户',
     customerSearchHint: '姓名、邮箱或电话，至少输入 2 个字符。',
@@ -1197,7 +1229,8 @@ export const zhCN: Messages = {
     sourceSsms: '其他课程',
     googleFailedTitle: '无法检查 Google 日历',
     googleFailed: '没有保存任何内容。Google 返回：{code}。',
-    pastBody: '补录已经上过的课程，用于记录和工资计算。只有在勾选时才会写入 Google 日历。',
+    pastBody:
+      '补录已经上过的课程，用于记录和工资计算。只有在勾选时才会写入 Google 日历。',
     startTime: '开始时间',
     pastMustBePast: '该时间在将来，请使用“按空闲时段预约”。',
     instructor: '教练',
@@ -1292,14 +1325,16 @@ export const zhCN: Messages = {
     showPeriod: '显示 {dates} 的课程',
     hidePeriod: '隐藏 {dates} 的课程',
     emptyTitle: '暂无预约课程',
-    emptyBody: '学校为你安排课程后，课程的日期、地点和你的工资会显示在这里。工资每两周结算一次，已结算的周期会列在“已上的课”下面。',
+    emptyBody:
+      '学校为你安排课程后，课程的日期、地点和你的工资会显示在这里。工资每两周结算一次，已结算的周期会列在“已上的课”下面。',
     pendingTitle: '你的资料正在审核中',
     pendingBody: '审核通过后即可查看课程和工资。',
     pendingEmpty: '暂时没有内容。只有通过审核的教练才能被安排课程。',
     rejectedTitle: '你的资料未通过审核',
     rejectedBody: '你无法被安排新的课程。你过去的课程和工资见下方。',
     onboardingTitle: '完成入职资料后即可查看课程和工资',
-    onboardingBody: '入职清单上所有必填的文件和证书都完成后，即可查看课程和工资。',
+    onboardingBody:
+      '入职清单上所有必填的文件和证书都完成后，即可查看课程和工资。',
     onboardingOpen: '前往入职资料',
   },
   onboarding: {
@@ -1309,6 +1344,7 @@ export const zhCN: Messages = {
     title: '入职资料',
     seasonTitle: '入职资料 · {season} 雪季',
     progress: '已完成 {done} / {total}',
+    progressInReview: '已完成 {done} / {total} · {n} 项待审核',
     allDone: '所有必填项均已完成。',
     empty: '目前没有待办事项。',
     loadFailed: '无法加载入职清单。',
@@ -1331,7 +1367,7 @@ export const zhCN: Messages = {
     actionReupload: '重新上传',
     certMissing: '未上传',
     certPending: '待审核',
-    certValid: '有效',
+    certValid: '已验证',
     certExpiring: '即将过期',
     certExpired: '已过期',
     certRejected: '已驳回',
@@ -1340,6 +1376,15 @@ export const zhCN: Messages = {
     cardTitle: '入职资料',
     cardBody: '需阅读和签署的文件，以及需上传的证书。',
     cardAllDone: '全部完成',
+    cardPillToDo: '有待完成事项',
+    cardPillInReview: '待审核',
+    cardPillGoingLive: '上线中',
+    cardToDoBody: '{progress}。完成其余事项即可在 SSnow 官网上线。',
+    cardInReviewBody: '我们正在审核您的证书，通过后即可上线。',
+    cardGoingLiveBody: '通常几分钟内完成。',
+    cardEmptyToDoBody: '完善您的资料即可在 SSnow 官网上线。',
+    cardProfileGaps: '您的资料还需要：{fields}。',
+    cardGapCertification: '证书',
     cardOpen: '前往入职资料',
     backToChecklist: '返回清单',
     readAck: '我已阅读并理解本文件',
@@ -1378,7 +1423,8 @@ export const zhCN: Messages = {
     rejectedTitle: '您的资料未通过审核',
     rejectedBody: '如有疑问，请联系 SSnow。',
     deactivatedTitle: '您的资料已下线',
-    deactivatedBody: '下线期间无法签署文件或上传证书。过往课程和工资仍可在“课程与工资”中查看。',
+    deactivatedBody:
+      '下线期间无法签署文件或上传证书。过往课程和工资仍可在“课程与工资”中查看。',
   },
   signer: {
     signatureTitle: '您的签名',
@@ -1426,7 +1472,8 @@ export const zhCN: Messages = {
   },
   seasons: {
     tab: '雪季',
-    intro: '入职资料和邀请都按雪季归档。当前雪季是包含今天的雪季；如果没有，则是下一个开始的雪季。',
+    intro:
+      '入职资料和邀请都按雪季归档。当前雪季是包含今天的雪季；如果没有，则是下一个开始的雪季。',
     loading: '正在加载雪季…',
     none: '暂无雪季',
     currentOption: '{key}（当前）',
@@ -1455,7 +1502,8 @@ export const zhCN: Messages = {
   insurance: {
     title: '私课保险登记',
     loadFailed: '无法加载你的私课保险。',
-    headerCopy: '私课上课前，请先登记课程并支付保险。保险 $10/小时/学生，同一雪季累计 $400 封顶。',
+    headerCopy:
+      '私课上课前，请先登记课程并支付保险。保险 $10/小时/学生，同一雪季累计 $400 封顶。',
     seasonBadgeLabel: '保险季',
     formTitle: '登记一节课',
     formIntro: '填写课程信息，学生可随时添加或删除。',
@@ -1497,15 +1545,18 @@ export const zhCN: Messages = {
     waiverRequired: '请确认每位学生的 waiver 已签署',
     noSeason: '没有雪季包含这一天，请检查上课日期。',
     lockedSubmit: '只有通过审核的教练才能登记课程。',
-    ruleNote: '请在上课前完成登记；未登记的课程不在保险覆盖范围内。每位学生每雪季只需签一次 waiver。整季保险用户每次课前仍需登记学生名单（免费）。',
+    ruleNote:
+      '请在上课前完成登记；未登记的课程不在保险覆盖范围内。每位学生每雪季只需签一次 waiver。整季保险用户每次课前仍需登记学生名单（免费）。',
     registeredToast: '已登记 {recordNo} · 应付 {amount}',
     registeredFreeToast: '已登记 {recordNo} · 免费',
     progressTitle: '本季封顶进度',
     progressTotal: '本季累计 {amount} / {cap}',
-    progressRemaining: '还差 {amount} 达到整季封顶。达到后，后续课程仍需登记，费用为 $0。',
+    progressRemaining:
+      '还差 {amount} 达到整季封顶。达到后，后续课程仍需登记，费用为 $0。',
     progressAtCap: '本季保险已封顶，后续登记免费',
     progressUnpaid: '其中待付款 {amount}',
-    paymentNote: '保险费通过电子转账线下支付，管理员确认收款后状态会更新为已支付。',
+    paymentNote:
+      '保险费通过电子转账线下支付，管理员确认收款后状态会更新为已支付。',
     recordsTitle: '我的登记记录',
     recordsEmpty: '还没有登记记录',
     registerFirst: '登记第一节课',
@@ -1584,14 +1635,16 @@ export const zhCN: Messages = {
     markUnpaidConfirm: '标记未付',
     markUnpaidToast: '{recordNo} 已标记为未付。',
     voidTitle: '作废 {recordNo}？',
-    voidBody: '作废后，该记录不再计入教练的 $400 封顶。之后的记录金额不变。此操作无法撤销。',
+    voidBody:
+      '作废后，该记录不再计入教练的 $400 封顶。之后的记录金额不变。此操作无法撤销。',
     voidReason: '原因',
     voidReasonRequired: '请填写原因。',
     voidConfirm: '作废记录',
     voidToast: '{recordNo} 已作废。',
     grantPass: '设为整季保险',
     grantTitle: '为 {name} 设为整季保险',
-    grantBody: '{season} 雪季已累计 {owed}。设为整季保险后，本季之后的登记全部免费。',
+    grantBody:
+      '{season} 雪季已累计 {owed}。设为整季保险后，本季之后的登记全部免费。',
     grantAmount: '整季保险金额（$400 − {owed}）',
     grantNoteHint: '选填。教练看不到备注。',
     grantMarkPaid: '现在标记为已付',
@@ -1602,7 +1655,8 @@ export const zhCN: Messages = {
     grantNotApproved: '只有通过审核的教练才能设为整季保险。',
     removePass: '取消整季',
     removePassTitle: '取消 {name} 的整季保险？',
-    removePassBody: '整季保险记录将被作废，不再计入 $400 封顶，之后的登记会重新按次收费。此操作无法撤销。',
+    removePassBody:
+      '整季保险记录将被作废，不再计入 $400 封顶，之后的登记会重新按次收费。此操作无法撤销。',
     removePassConfirm: '取消整季',
     removePassToast: '已取消 {name} 的整季保险。',
     pagerLabel: '记录分页',

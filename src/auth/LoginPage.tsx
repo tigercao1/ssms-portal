@@ -1,19 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input } from '@/components';
 import { AuthLayout } from './AuthLayout';
 import { track } from '@/lib/analytics';
-
-function isRateLimited(err: AuthError) {
-  return err.status === 429 || Boolean(err.code?.startsWith('over_'));
-}
-
-function isUnreachable(err: AuthError) {
-  return err.name === 'AuthRetryableFetchError' || (err.status ?? 0) >= 500;
-}
+import { isRateLimited, isUnreachable } from './authErrors';
 
 /** Email/password or magic-link sign-in via Supabase. */
 export function LoginPage() {

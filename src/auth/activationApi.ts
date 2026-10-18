@@ -14,9 +14,22 @@ export function redeemActivation(token: string) {
   });
 }
 
+export interface ResendAccepted {
+  status: 'accepted';
+  retryAfterSeconds: number;
+}
+
+export function retryAfterSeconds(body: unknown): number | null {
+  const seconds = (body as { retryAfterSeconds?: unknown } | undefined)
+    ?.retryAfterSeconds;
+  return typeof seconds === 'number' && Number.isFinite(seconds)
+    ? Math.max(0, seconds)
+    : null;
+}
+
 /** Asks the API to email a fresh activation link. Always 202. Public. */
 export function resendActivation(email: string) {
-  return api<void>('/activation/resend', {
+  return api<ResendAccepted>('/activation/resend', {
     method: 'POST',
     body: { email },
     anonymous: true,

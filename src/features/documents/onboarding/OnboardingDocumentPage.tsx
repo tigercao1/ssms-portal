@@ -21,7 +21,8 @@ import { DocumentLanguageSwitch } from '../signer/DocumentLanguageSwitch';
 import { ReadDocument } from '../signer/ReadDocument';
 import { SignerDocument } from '../signer/SignerDocument';
 import { clearSigningDraft, signingDraftKey } from '../signer/signingDraft';
-import { useSourceRecovery } from '../pdf/presignedSource';
+import { PdfPages } from '../pdf/PdfPages';
+import { useSourceRecovery, type SourceRecovery } from '../pdf/presignedSource';
 import { useCompleteMyDocument, useMyDocument } from './queries';
 import { LockedBanner, lockReasonOf } from './Locked';
 
@@ -83,18 +84,33 @@ function DownloadSigned({ assignmentId }: { assignmentId: string }) {
 function CompletedView({
   kind,
   assignment,
+  sourceUrl,
+  sourceRecovery,
 }: {
   kind: TemplateKind;
   assignment: Assignment;
+  sourceUrl: string | null;
+  sourceRecovery: SourceRecovery;
 }) {
   const t = useT();
   if (kind === 'read')
     return (
-      <Card className="flex flex-col gap-3">
-        <h2 className="text-xl">{t.onboarding.readDoneTitle}</h2>
-        <p className="text-sm text-slate">{t.onboarding.readDoneBody}</p>
-        <BackLink />
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card className="flex flex-col gap-3">
+          <h2 className="text-xl">{t.onboarding.readDoneTitle}</h2>
+          <p className="text-sm text-slate">{t.onboarding.readDoneBody}</p>
+          <BackLink />
+        </Card>
+        {sourceUrl && (
+          <div className="rounded-lg bg-sunken p-2 sm:p-4">
+            <PdfPages
+              source={sourceUrl}
+              onLoad={sourceRecovery.onLoad}
+              onError={sourceRecovery.onError}
+            />
+          </div>
+        )}
+      </div>
     );
   return (
     <Card className="flex flex-col gap-3">
@@ -209,18 +225,19 @@ export function OnboardingDocumentPage() {
         <BackLink />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-3xl">{title}</h1>
-          {!done && availableLanguages.length > 1 && (
-            <DocumentLanguageSwitch
-              languages={availableLanguages}
-              value={language}
-              label={t.onboarding.documentLanguage}
-              labels={{
-                zh: t.onboarding.documentLanguageZh,
-                en: t.onboarding.documentLanguageEn,
-              }}
-              onChange={choose}
-            />
-          )}
+          {(!done || template.kind === 'read') &&
+            availableLanguages.length > 1 && (
+              <DocumentLanguageSwitch
+                languages={availableLanguages}
+                value={language}
+                label={t.onboarding.documentLanguage}
+                labels={{
+                  zh: t.onboarding.documentLanguageZh,
+                  en: t.onboarding.documentLanguageEn,
+                }}
+                onChange={choose}
+              />
+            )}
         </div>
         {!done && template.descriptionEn && (
           <p className="text-sm text-slate">
@@ -233,7 +250,12 @@ export function OnboardingDocumentPage() {
         )}
       </div>
       {done ? (
-        <CompletedView kind={template.kind} assignment={done} />
+        <CompletedView
+          kind={template.kind}
+          assignment={done}
+          sourceUrl={sourceUrl}
+          sourceRecovery={sourceRecovery}
+        />
       ) : !sourceUrl ? (
         <Card className="flex flex-col gap-3">
           <Banner tone="error">{t.onboarding.sourceUnavailable}</Banner>

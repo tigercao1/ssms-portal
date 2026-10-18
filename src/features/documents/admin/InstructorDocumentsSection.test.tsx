@@ -761,7 +761,7 @@ describe('InstructorDocumentsSection — go-live certification status', () => {
         .getAllByRole('listitem')
         .map((li) => li.textContent),
     ).toEqual([
-      'CSIA Level 3Verification pending',
+      'CSIA Level 3Awaiting review',
       'CASI Level 2Verified · until Jun 30, 2027',
       'CASI Park Level 1Re-verification needed',
     ]);
