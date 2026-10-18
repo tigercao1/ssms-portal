@@ -229,7 +229,6 @@ export interface Messages {
     checkReady: string;
     checkMissing: string;
     checkNotEligible: string;
-    notPublished: string;
   };
   bio: {
     composeHint: string;
@@ -284,13 +283,6 @@ export interface Messages {
     colActive: string;
     colApplied: string;
     colCalendar: string;
-    colWebsite: string;
-    published: string;
-    notPublished: string;
-    publishedOn: string;
-    publish: string;
-    unpublish: string;
-    unpublishConfirm: string;
     calendarConnected: string;
     calendarNotConnected: string;
     noInstructors: string;
@@ -1347,7 +1339,6 @@ export interface Messages {
     cardPillGoingLive: string;
     cardToDoBody: string;
     cardInReviewBody: string;
-    cardProfileReviewBody: string;
     cardGoingLiveBody: string;
     cardEmptyToDoBody: string;
     cardProfileGaps: string;

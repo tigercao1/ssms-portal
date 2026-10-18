@@ -145,10 +145,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
       <DisplayOrderCard rec={rec} />
       <InstructorCalendarCard instructorId={rec.id} />
       <RoleCard authUserId={rec.authUserId} />
-      <ShopifyInstructorPanel
-        instructorId={rec.id}
-        publishedAt={rec.publishedAt}
-      />
+      <ShopifyInstructorPanel instructorId={rec.id} />
     </div>
   );
 }

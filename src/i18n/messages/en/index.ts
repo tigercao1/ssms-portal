@@ -243,7 +243,6 @@ export const en: Messages = {
     checkReady: 'Ready',
     checkMissing: '{n} missing',
     checkNotEligible: 'Not approved or deactivated',
-    notPublished: 'Not published yet',
   },
   bio: {
     composeHint:
@@ -305,14 +304,6 @@ export const en: Messages = {
     colActive: 'Online',
     colApplied: 'Applied',
     colCalendar: 'Calendar',
-    colWebsite: 'Website',
-    published: 'Published',
-    notPublished: 'Not published',
-    publishedOn: 'Published {date}',
-    publish: 'Publish to website',
-    unpublish: 'Unpublish',
-    unpublishConfirm:
-      'Unpublish this instructor? Their profile comes off the SSnow official website.',
     calendarConnected: 'Connected',
     calendarNotConnected: 'Not connected',
     noInstructors: 'No instructors match these filters.',
@@ -1459,8 +1450,6 @@ export const en: Messages = {
     cardPillGoingLive: 'Going live',
     cardToDoBody: '{progress}. Finish the rest to go live on the SSnow official website.',
     cardInReviewBody: "We're checking your certification. You'll go live once it's approved.",
-    cardProfileReviewBody:
-      "SSnow is reviewing your profile. You'll go live on the SSnow official website once it's approved.",
     cardGoingLiveBody: 'Usually within a few minutes.',
     cardEmptyToDoBody: 'Complete your profile to go live on the SSnow official website.',
     cardProfileGaps: 'Your profile also needs: {fields}.',
