@@ -97,6 +97,38 @@ describe('PhotoUploader', () => {
     ).toBeInTheDocument();
   });
 
+  it('retries the same photo after a failed upload', async () => {
+    let puts = 0;
+    server.use(
+      http.post(`${API}/me/instructor/photo/signed-upload-url`, () =>
+        HttpResponse.json({
+          uploadUrl: 'http://storage.test/upload',
+          token: 'tok',
+          publicUrl: 'http://storage.test/photo.png',
+          path: 'inst-1/photo.png',
+        }),
+      ),
+      http.put('http://storage.test/upload', () => {
+        puts += 1;
+        return HttpResponse.text('bucket full', { status: 413 });
+      }),
+    );
+    const { container } = renderWithProviders(
+      <PhotoUploader profile={fakeProfile} />,
+    );
+    const input = container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    const photo = new File(['abcd'], 'me.png', { type: 'image/png' });
+
+    await userEvent.upload(input, photo);
+    await screen.findByText(/Storage upload failed \(413\)/);
+    expect(input.value).toBe('');
+    await userEvent.upload(input, photo);
+
+    await vi.waitFor(() => expect(puts).toBe(2));
+  });
+
   it('opens the photo picker from a label for the file input, not a scripted click', async () => {
     const scripted = vi.spyOn(HTMLInputElement.prototype, 'click');
     renderWithProviders(<PhotoUploader profile={fakeProfile} />);
@@ -203,7 +235,10 @@ describe('MorePhotosUploader', () => {
       http.post(
         `${API}/me/instructor/photo/signed-upload-url`,
         async ({ request }) => {
-          bodies.push({ route: 'signed-upload-url', body: await request.json() });
+          bodies.push({
+            route: 'signed-upload-url',
+            body: await request.json(),
+          });
           return HttpResponse.json({
             uploadUrl: 'http://storage.test/upload',
             token: 'tok',
@@ -238,9 +273,7 @@ describe('MorePhotosUploader', () => {
     ).toBeInTheDocument();
     for (const name of ['Photo 2', 'Photo 3']) {
       const group = screen.getByRole('group', { name });
-      expect(
-        within(group).getByLabelText('Upload photo'),
-      ).toBeInTheDocument();
+      expect(within(group).getByLabelText('Upload photo')).toBeInTheDocument();
       expect(
         within(group).queryByRole('button', { name: 'Remove photo' }),
       ).not.toBeInTheDocument();
@@ -288,9 +321,7 @@ describe('MorePhotosUploader', () => {
       'src',
       'http://storage.test/p3.png',
     );
-    expect(
-      within(group).getByLabelText('Replace photo'),
-    ).toBeInTheDocument();
+    expect(within(group).getByLabelText('Replace photo')).toBeInTheDocument();
     await userEvent.click(
       within(group).getByRole('button', { name: 'Remove photo' }),
     );
@@ -325,11 +356,11 @@ describe('MorePhotosUploader', () => {
         profile={{ ...fakeProfile, photo2Url: 'http://storage.test/p2.png' }}
       />,
     );
-    expect(screen.getByRole('heading', { name: '更多照片' })).toBeInTheDocument();
-    const photo2 = screen.getByRole('group', { name: '照片 2' });
     expect(
-      within(photo2).getByLabelText('更换照片'),
+      screen.getByRole('heading', { name: '更多照片' }),
     ).toBeInTheDocument();
+    const photo2 = screen.getByRole('group', { name: '照片 2' });
+    expect(within(photo2).getByLabelText('更换照片')).toBeInTheDocument();
     expect(
       within(photo2).getByRole('button', { name: '移除照片' }),
     ).toBeInTheDocument();

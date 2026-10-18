@@ -9,11 +9,7 @@ import {
   useUploadPhoto,
   validateAvatarType,
 } from './api';
-import type {
-  ExtraPhotoSlot,
-  InstructorProfile,
-  PhotoSlot,
-} from '@/lib/types';
+import type { ExtraPhotoSlot, InstructorProfile, PhotoSlot } from '@/lib/types';
 
 type PhotoSubject = Pick<
   InstructorProfile,
@@ -74,7 +70,11 @@ function MyPhotoSlot({
   );
 }
 
-export function MorePhotosUploader({ profile }: { profile: InstructorProfile }) {
+export function MorePhotosUploader({
+  profile,
+}: {
+  profile: InstructorProfile;
+}) {
   return (
     <MorePhotos>
       {EXTRA_PHOTO_SLOTS.map((slot) => (
@@ -104,7 +104,9 @@ export function PhotoPicker({
       ? t.profile.slotReplacePhoto
       : t.profile.slotUploadPhoto
     : t.profile.uploadPhoto;
-  const removeLabel = slotLabel ? t.profile.slotRemovePhoto : t.profile.removePhoto;
+  const removeLabel = slotLabel
+    ? t.profile.slotRemovePhoto
+    : t.profile.removePhoto;
   const { locale } = useLocale();
   const [error, setError] = useState<string | null>(null);
 
@@ -152,7 +154,10 @@ export function PhotoPicker({
           variant="secondary"
           size="sm"
           loading={upload.isPending}
-          onChange={(e) => pick(e.target.files?.[0])}
+          onChange={(e) => {
+            pick(e.target.files?.[0]);
+            e.target.value = '';
+          }}
         >
           {upload.isPending ? t.profile.uploading : uploadLabel}
         </FileButton>
