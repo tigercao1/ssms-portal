@@ -180,14 +180,10 @@ describe('DocumentsListPage', () => {
       within(row('Liability waiver')).getByText('Selected'),
     ).toBeInTheDocument();
     expect(
-      within(row('Code of conduct')).getByText(
-        '1 of 2 approved assigned · 1 signed',
-      ),
+      within(row('Code of conduct')).getByText('1 signed'),
     ).toBeInTheDocument();
     expect(
-      within(row('Instructor handbook')).getByText(
-        '1 of 2 approved assigned · 1 acknowledged',
-      ),
+      within(row('Instructor handbook')).getByText('1 acknowledged'),
     ).toBeInTheDocument();
     expect(
       within(row('Liability waiver')).getByText('1 instructors'),
@@ -302,10 +298,11 @@ describe('DocumentsListPage', () => {
       ).toBeInTheDocument(),
     );
     expect(
-      within(row('Uniform policy')).getByText(
-        '2 of 2 approved assigned · 0 signed',
-      ),
+      within(row('Uniform policy')).getByText('0 signed'),
     ).toBeInTheDocument();
+    expect(
+      within(row('Uniform policy')).queryByText(/approved instructors have/),
+    ).not.toBeInTheDocument();
   });
 
   it('publishes for selected instructors and a different season', async () => {
@@ -510,9 +507,7 @@ describe('DocumentsListPage', () => {
       { id: 'tpl-waiver', body: { assignTo: 'all' } },
     ]);
     expect(
-      await within(row('Liability waiver')).findByText(
-        '2 of 2 approved assigned · 0 signed',
-      ),
+      await within(row('Liability waiver')).findByText('0 signed'),
     ).toBeInTheDocument();
     expect(
       within(row('Liability waiver')).getByText('All instructors'),
@@ -866,8 +861,9 @@ describe('DocumentsListPage', () => {
     const conduct = screen.getByText('行为准则').closest('tr') as HTMLElement;
     expect(within(conduct).getByText('已发布')).toBeInTheDocument();
     expect(
-      within(conduct).getByText('已分配 1/2 位已审核教练 · 1 人已签署'),
+      within(conduct).getByText('2 位已审核教练中有 1 位收到此文档'),
     ).toBeInTheDocument();
+    expect(within(conduct).getByText('1 人已签署')).toBeInTheDocument();
     expect(screen.getByText('1 位教练')).toBeInTheDocument();
   });
 
@@ -1061,10 +1057,73 @@ describe('DocumentsListPage', () => {
     renderWithProviders(<DocumentsListPage />);
     await screen.findByText('Code of conduct');
     expect(
-      within(row('Code of conduct')).getByText(
-        '2 of 2 approved assigned · 1 signed',
-      ),
+      within(row('Code of conduct')).getByText('1 signed'),
     ).toBeInTheDocument();
+    expect(
+      within(row('Code of conduct')).queryByText(/approved instructors have/),
+    ).not.toBeInTheDocument();
+  });
+
+  describe('all-instructors assignment count', () => {
+    function assignEveryoneTheConductDocument() {
+      state.assignments.push(
+        fakeAssignment({
+          id: 'asg-conduct-li',
+          templateId: 'tpl-conduct',
+          subjectId: 'inst-2',
+        }),
+      );
+    }
+
+    it('hides the count when every approved instructor has the document', async () => {
+      assignEveryoneTheConductDocument();
+      renderWithProviders(<DocumentsListPage />);
+      await screen.findByText('Code of conduct');
+      const conduct = within(row('Code of conduct'));
+      expect(conduct.getByText('All instructors')).toBeInTheDocument();
+      expect(conduct.getByRole('link', { name: '1 signed' })).toHaveAttribute(
+        'href',
+        '/admin/documents/tpl-conduct/signed',
+      );
+      expect(conduct.queryByText(/of 2/)).not.toBeInTheDocument();
+    });
+
+    it('warns when an approved instructor is missing the document', async () => {
+      renderWithProviders(<DocumentsListPage />);
+      await screen.findByText('Code of conduct');
+      const conduct = within(row('Code of conduct'));
+      expect(
+        conduct.getByText('1 of 2 approved instructors have this document'),
+      ).toBeInTheDocument();
+      expect(
+        conduct.getByRole('link', { name: '1 signed' }),
+      ).toBeInTheDocument();
+      expect(conduct.queryByRole('button', { name: /assign/i })).toBeNull();
+    });
+
+    it('warns again after an admin archives one instructor’s copy', async () => {
+      assignEveryoneTheConductDocument();
+      state.assignments.find((a) => a.id === 'asg-conduct-li')!.status =
+        'archived';
+      renderWithProviders(<DocumentsListPage />);
+      await screen.findByText('Code of conduct');
+      expect(
+        within(row('Code of conduct')).getByText(
+          '1 of 2 approved instructors have this document',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('keeps the instructor count for a selected-instructors document', async () => {
+      renderWithProviders(<DocumentsListPage />);
+      await screen.findByText('Liability waiver');
+      const waiver = within(row('Liability waiver'));
+      expect(waiver.getByText('Selected')).toBeInTheDocument();
+      expect(
+        waiver.getByRole('link', { name: '1 instructors' }),
+      ).toHaveAttribute('href', '/admin/documents/tpl-waiver/signed');
+      expect(waiver.queryByText(/approved instructors have/)).toBeNull();
+    });
   });
 
   it('assigns a selected document for a season and refreshes its count', async () => {
