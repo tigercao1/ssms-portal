@@ -11,7 +11,7 @@ import { ApiError } from '@/lib/api';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input, Spinner } from '@/components';
 import { ResendButton } from './ResendButton';
-import { saveResendWait, useResendCooldown } from './useResendCooldown';
+import { useResendCooldown, type ResendWait } from './useResendCooldown';
 import { AuthLayout } from './AuthLayout';
 import { useSession } from './SessionProvider';
 import {
@@ -24,7 +24,7 @@ import { track } from '@/lib/analytics';
 type Phase =
   | { kind: 'verifying' }
   | { kind: 'verified'; email: string }
-  | { kind: 'expired'; email: string }
+  | { kind: 'expired'; email: string; wait: ResendWait | null }
   | { kind: 'error'; network: boolean };
 
 function emailFromBody(body: unknown): string {
@@ -44,7 +44,7 @@ export function ActivatePage() {
   const [params] = useSearchParams();
   const token = params.get('t') ?? '';
   const [phase, setPhase] = useState<Phase>(
-    token ? { kind: 'verifying' } : { kind: 'expired', email: '' },
+    token ? { kind: 'verifying' } : { kind: 'expired', email: '', wait: null },
   );
   const started = useRef<string | null>(null);
 
@@ -61,10 +61,15 @@ export function ActivatePage() {
       ) {
         track('activation_failed', { reason: 'expired' });
         const expiredEmail = emailFromBody(err.body);
-        const wait = retryAfterSeconds(err.body);
-        if (expiredEmail && wait !== null)
-          saveResendWait('activation', expiredEmail, wait);
-        setPhase({ kind: 'expired', email: expiredEmail });
+        const seconds = retryAfterSeconds(err.body);
+        setPhase({
+          kind: 'expired',
+          email: expiredEmail,
+          wait:
+            expiredEmail && seconds !== null
+              ? { email: expiredEmail, seconds }
+              : null,
+        });
       } else {
         track('activation_failed', { reason: 'redeem_error' });
         setPhase({
@@ -100,7 +105,7 @@ export function ActivatePage() {
   }, [phase, sessionEmail, navigate]);
 
   if (phase.kind === 'expired')
-    return <ExpiredLink initialEmail={phase.email} />;
+    return <ExpiredLink initialEmail={phase.email} serverWait={phase.wait} />;
 
   if (phase.kind === 'error')
     return (
@@ -136,12 +141,18 @@ export function ActivatePage() {
   );
 }
 
-function ExpiredLink({ initialEmail }: { initialEmail: string }) {
+function ExpiredLink({
+  initialEmail,
+  serverWait,
+}: {
+  initialEmail: string;
+  serverWait: ResendWait | null;
+}) {
   const t = useT();
   const [email, setEmail] = useState(initialEmail);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const cooldown = useResendCooldown('activation', email);
+  const cooldown = useResendCooldown('activation', email, serverWait);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

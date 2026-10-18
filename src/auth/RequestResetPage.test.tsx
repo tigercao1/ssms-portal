@@ -18,7 +18,7 @@ async function requestReset(email: string) {
 describe('RequestResetPage', () => {
   beforeEach(() => resetAuth());
 
-  it('sends one reset email, then counts down for that address after a reload', async () => {
+  it('sends a reset email without starting a countdown of its own', async () => {
     auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null });
 
     await requestReset('jane@example.com');
@@ -29,9 +29,34 @@ describe('RequestResetPage', () => {
       ),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /^Resend in (60|59)s$/ }),
-    ).toBeDisabled();
+      screen.getByRole('button', { name: 'Send reset link' }),
+    ).toBeEnabled();
     expect(auth.resetPasswordForEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts down from the wait Supabase reports on a tap inside its window, for that address only', async () => {
+    auth.resetPasswordForEmail.mockResolvedValueOnce({ data: {}, error: null });
+    auth.resetPasswordForEmail.mockResolvedValueOnce({
+      data: {},
+      error: {
+        status: 429,
+        code: 'over_email_send_rate_limit',
+        message:
+          'For security purposes, you can only request this after 53 seconds.',
+      },
+    });
+
+    await requestReset('jane@example.com');
+    await screen.findByText(
+      'If that email exists, a reset link is on its way.',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Send reset link' }),
+    );
+    expect(
+      await screen.findByRole('button', { name: /^Resend in (53|52)s$/ }),
+    ).toBeDisabled();
+    expect(auth.resetPasswordForEmail).toHaveBeenCalledTimes(2);
 
     cleanup();
     renderWithProviders(<RequestResetPage />);

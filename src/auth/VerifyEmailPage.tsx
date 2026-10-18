@@ -5,11 +5,7 @@ import { useSession } from './SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner } from '@/components';
 import { AuthLayout } from './AuthLayout';
-import {
-  SUPABASE_EMAIL_INTERVAL_SECONDS,
-  isRateLimited,
-  rateLimitWaitSeconds,
-} from './authErrors';
+import { isRateLimited, rateLimitWaitSeconds } from './authErrors';
 import { ResendButton } from './ResendButton';
 import { useResendCooldown } from './useResendCooldown';
 
@@ -39,7 +35,7 @@ export function VerifyEmailPage() {
         return null;
       }
       setSent(true);
-      return SUPABASE_EMAIL_INTERVAL_SECONDS;
+      return null;
     });
   }
 

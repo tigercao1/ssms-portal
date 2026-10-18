@@ -23,20 +23,44 @@ describe('VerifyEmailPage', () => {
     setSession(fakeSession('jane@example.com'));
   });
 
-  it('resends once, then counts down even after a reload', async () => {
+  it('resends without starting a countdown of its own', async () => {
     auth.resend.mockResolvedValue({ data: {}, error: null });
 
     await userEvent.click(await renderPage());
 
     expect(await screen.findByText('Sent — check your inbox.')).toBeVisible();
     expect(
-      screen.getByRole('button', { name: /^Resend in (60|59)s$/ }),
-    ).toBeDisabled();
+      screen.getByRole('button', { name: 'Resend verification email' }),
+    ).toBeEnabled();
     expect(auth.resend).toHaveBeenCalledTimes(1);
     expect(auth.resend).toHaveBeenCalledWith({
       type: 'signup',
       email: 'jane@example.com',
     });
+  });
+
+  it('counts down from the wait Supabase reports on a tap inside its window, even after a reload', async () => {
+    auth.resend.mockResolvedValueOnce({ data: {}, error: null });
+    auth.resend.mockResolvedValueOnce({
+      data: {},
+      error: {
+        status: 429,
+        code: 'over_email_send_rate_limit',
+        message:
+          'For security purposes, you can only request this after 53 seconds.',
+      },
+    });
+
+    await userEvent.click(await renderPage());
+    await screen.findByText('Sent — check your inbox.');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Resend verification email' }),
+    );
+
+    expect(
+      await screen.findByRole('button', { name: /^Resend in (53|52)s$/ }),
+    ).toBeDisabled();
+    expect(auth.resend).toHaveBeenCalledTimes(2);
 
     cleanup();
     renderWithProviders(

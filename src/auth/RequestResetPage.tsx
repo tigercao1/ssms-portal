@@ -5,11 +5,7 @@ import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Field, Input } from '@/components';
 import { AuthLayout } from './AuthLayout';
 import { track } from '@/lib/analytics';
-import {
-  SUPABASE_EMAIL_INTERVAL_SECONDS,
-  isRateLimited,
-  rateLimitWaitSeconds,
-} from './authErrors';
+import { isRateLimited, rateLimitWaitSeconds } from './authErrors';
 import { ResendButton } from './ResendButton';
 import { useResendCooldown } from './useResendCooldown';
 
@@ -39,7 +35,7 @@ export function RequestResetPage() {
       }
       track('password_reset_requested');
       setSent(true);
-      return SUPABASE_EMAIL_INTERVAL_SECONDS;
+      return null;
     });
   }
 

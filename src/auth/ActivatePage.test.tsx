@@ -349,6 +349,89 @@ describe('ActivatePage', () => {
       ).toBeDisabled();
     });
 
+    it('counts down in minutes when the first tap on a ready page hits the hourly limit', async () => {
+      const resent = captureResend(() =>
+        HttpResponse.json(
+          {
+            statusCode: 429,
+            message: 'ThrottlerException: Too Many Requests',
+            retryAfterSeconds: 3_600,
+          },
+          { status: 429 },
+        ),
+      );
+      const button = await openExpired(0);
+      expect(button).toBeEnabled();
+
+      await userEvent.click(button);
+
+      expect(
+        await screen.findByRole('button', { name: 'Resend in 60 min' }),
+      ).toBeDisabled();
+      expect(screen.getByText(/You’ve requested too many links/)).toBeVisible();
+      expect(resent).toHaveLength(1);
+    });
+
+    describe('when the browser refuses to store the countdown', () => {
+      beforeEach(() => {
+        const denied = (key: string) => {
+          if (key.startsWith('ssms.resendCooldown.'))
+            throw new DOMException('denied', 'SecurityError');
+        };
+        const { getItem, setItem, removeItem } = Storage.prototype;
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
+          this: Storage,
+          key,
+        ) {
+          denied(key);
+          return getItem.call(this, key);
+        });
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+          this: Storage,
+          key,
+          value,
+        ) {
+          denied(key);
+          setItem.call(this, key, value);
+        });
+        vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (
+          this: Storage,
+          key,
+        ) {
+          denied(key);
+          removeItem.call(this, key);
+        });
+        return () => vi.restoreAllMocks();
+      });
+
+      it('still opens with the countdown the server reports', async () => {
+        const resent = captureResend();
+        renderExpired(42);
+        const countdown = await screen.findByRole('button', {
+          name: /^Resend in (42|41)s$/,
+        });
+        expect(countdown).toBeDisabled();
+        fireEvent.submit(countdown.closest('form')!);
+        await new Promise((r) => setTimeout(r, 50));
+        expect(resent).toHaveLength(0);
+      });
+
+      it('sends once and refuses further attempts while the server wait runs', async () => {
+        const resent = captureResend(() => accepted(60));
+        const button = await openExpired(0);
+        await userEvent.click(button);
+
+        const countdown = await screen.findByRole('button', {
+          name: /^Resend in (60|59)s$/,
+        });
+        expect(countdown).toBeDisabled();
+        fireEvent.submit(countdown.closest('form')!);
+        fireEvent.submit(countdown.closest('form')!);
+        await new Promise((r) => setTimeout(r, 50));
+        expect(resent).toHaveLength(1);
+      });
+    });
+
     it('lets the user retry straight away after a server error', async () => {
       const resent = captureResend(() =>
         HttpResponse.json({ message: 'Boom' }, { status: 500 }),

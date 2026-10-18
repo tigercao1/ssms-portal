@@ -4,6 +4,11 @@ const STORAGE_PREFIX = 'ssms.resendCooldown.';
 
 export type ResendPurpose = 'activation' | 'verify-email' | 'password-reset';
 
+export interface ResendWait {
+  email: string;
+  seconds: number;
+}
+
 function storageKey(purpose: ResendPurpose, email: string) {
   return `${STORAGE_PREFIX}${purpose}:${email.trim().toLowerCase()}`;
 }
@@ -28,23 +33,35 @@ function writeWait(key: string, seconds: number): number {
   return until;
 }
 
-export function saveResendWait(
+export function useResendCooldown(
   purpose: ResendPurpose,
   email: string,
-  seconds: number,
+  serverWait: ResendWait | null = null,
 ) {
-  writeWait(storageKey(purpose, email), seconds);
-}
-
-export function useResendCooldown(purpose: ResendPurpose, email: string) {
   const key = storageKey(purpose, email);
-  const [until, setUntil] = useState(() => readUntil(key));
+  const [deadlines] = useState(() => {
+    const known = new Map<string, number>();
+    if (serverWait) {
+      const serverKey = storageKey(purpose, serverWait.email);
+      known.set(serverKey, writeWait(serverKey, serverWait.seconds));
+    }
+    return known;
+  });
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
 
+  const deadlineFor = useCallback(
+    (k: string) => {
+      if (!deadlines.has(k)) deadlines.set(k, readUntil(k));
+      return deadlines.get(k) ?? 0;
+    },
+    [deadlines],
+  );
+
+  const until = deadlineFor(key);
+
   useEffect(() => {
-    setUntil(readUntil(key));
     setNow(Date.now());
   }, [key]);
 
@@ -57,21 +74,19 @@ export function useResendCooldown(purpose: ResendPurpose, email: string) {
 
   const send = useCallback(
     async (attempt: () => Promise<number | null>): Promise<void> => {
-      if (inFlight.current || readUntil(key) > Date.now()) return;
+      if (inFlight.current || deadlineFor(key) > Date.now()) return;
       inFlight.current = true;
       setBusy(true);
       try {
         const seconds = await attempt();
-        if (seconds !== null) {
-          setUntil(writeWait(key, seconds));
-          setNow(Date.now());
-        }
+        if (seconds !== null) deadlines.set(key, writeWait(key, seconds));
       } finally {
         inFlight.current = false;
         setBusy(false);
+        setNow(Date.now());
       }
     },
-    [key],
+    [key, deadlines, deadlineFor],
   );
 
   const secondsLeft = Math.max(0, Math.ceil((until - now) / 1000));
