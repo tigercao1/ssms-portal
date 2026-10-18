@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Card, Spinner, StatusPill } from '@/components';
-import { useMyProfile } from './api';
+import { useMyGoLive, useMyProfile } from './api';
+import { GoLiveBanner, LivePill } from './goLive';
 import { ProfileSummary } from './ProfileSummary';
 import { PreferredLanguageCard } from './PreferredLanguageCard';
 import { CalendarStatusCard } from './CalendarStatusCard';
@@ -12,8 +13,6 @@ function statusBanner(profile: InstructorProfile, t: ReturnType<typeof useT>) {
   if (profile.approvalStatus === 'approved' && !profile.isActive)
     return <Banner tone="info">{t.profile.inactiveBanner}</Banner>;
   switch (profile.approvalStatus) {
-    case 'approved':
-      return <Banner tone="approved">{t.profile.approvedBanner}</Banner>;
     case 'rejected':
       return <Banner tone="rejected">{t.profile.rejectedBanner}</Banner>;
     default:
@@ -25,6 +24,11 @@ function statusBanner(profile: InstructorProfile, t: ReturnType<typeof useT>) {
 export function ProfileViewPage() {
   const t = useT();
   const { data: profile, isLoading, isError } = useMyProfile();
+  const goLiveEnabled = Boolean(
+    profile && profile.approvalStatus === 'approved' && profile.isActive,
+  );
+  const goLive = useMyGoLive(Boolean(profile));
+  const readiness = goLiveEnabled ? goLive.data : undefined;
 
   if (isLoading)
     return (
@@ -48,17 +52,23 @@ export function ProfileViewPage() {
             status={profile.approvalStatus}
             isActive={profile.isActive}
           />
+          {readiness && <LivePill live={readiness.live} />}
         </div>
         <Link to="/profile/edit">
           <Button>{t.profile.editProfile}</Button>
         </Link>
       </div>
 
-      {statusBanner(profile, t)}
+      {goLiveEnabled
+        ? readiness && <GoLiveBanner readiness={readiness} />
+        : statusBanner(profile, t)}
       <PreferredLanguageCard profile={profile} />
       <OnboardingCard />
       <CalendarStatusCard enabled={profile.approvalStatus === 'approved'} />
-      <ProfileSummary profile={profile} />
+      <ProfileSummary
+        profile={profile}
+        certStatuses={goLive.data?.certifications}
+      />
     </div>
   );
 }

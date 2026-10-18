@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
+import { adminGoLiveKey } from '@/features/admin/api';
 import {
   archiveAssignment,
   changeTemplateAudience,
@@ -250,9 +251,12 @@ export function useInstructorDocuments(instructorId: string) {
 function useInstructorDocumentsInvalidate(instructorId: string) {
   const qc = useQueryClient();
   return () =>
-    qc.invalidateQueries({
-      queryKey: documentsKeys.instructorDocuments(instructorId),
-    });
+    Promise.all([
+      qc.invalidateQueries({
+        queryKey: documentsKeys.instructorDocuments(instructorId),
+      }),
+      qc.invalidateQueries({ queryKey: adminGoLiveKey(instructorId) }),
+    ]);
 }
 
 export function useRemindAssignment(instructorId: string) {

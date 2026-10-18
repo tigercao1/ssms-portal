@@ -14,6 +14,7 @@ import {
   Textarea,
 } from '@/components';
 import {
+  useAdminGoLive,
   useAdminInstructor,
   useAdminInstructorProfile,
   useAdminUserRole,
@@ -35,6 +36,7 @@ export function AdminDetailPage() {
   const { locale } = useLocale();
   const { data: rec, isLoading } = useAdminInstructor(id);
   const profile = useAdminInstructorProfile(id);
+  const goLive = useAdminGoLive(id);
 
   if (isLoading || profile.isLoading)
     return (
@@ -82,6 +84,7 @@ export function AdminDetailPage() {
         instructorName={name}
         approvalStatus={rec.approvalStatus}
         certifications={profile.data?.certifications ?? []}
+        certStatuses={goLive.data?.certifications}
       />
     </div>
   );
