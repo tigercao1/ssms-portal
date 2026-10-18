@@ -1412,7 +1412,7 @@ export const en: Messages = {
       "You can't be booked for new lessons. Your past lessons and pay are below.",
     onboardingTitle: 'Finish onboarding to see your lessons and pay',
     onboardingBody:
-      'Lessons and pay open once every required document and certification on your onboarding checklist is done.',
+      'Lessons and pay open once every required document on your onboarding checklist is done and your certifications are approved.',
     onboardingOpen: 'Go to onboarding',
   },
   onboarding: {
@@ -1695,7 +1695,7 @@ export const en: Messages = {
     lockedEmpty: 'Only approved instructors can insure private lessons.',
     onboardingTitle: 'Finish onboarding to insure private lessons',
     onboardingBody:
-      'Lesson insurance opens once every required document and certification on your onboarding checklist is done.',
+      'Lesson insurance opens once every required document on your onboarding checklist is done and your certifications are approved.',
     onboardingOpen: 'Go to onboarding',
   },
   adminInsurance: {
