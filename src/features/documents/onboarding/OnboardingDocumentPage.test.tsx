@@ -735,6 +735,43 @@ describe('OnboardingDocumentPage — read', () => {
     expect(completeBody).toEqual({ acknowledged: true });
   });
 
+  it('keeps the document on screen after it is marked as read', async () => {
+    const user = userEvent.setup();
+    renderAt('asg-read');
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: 'I have read and understood this document',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Marked as read' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-pages')).toHaveAttribute(
+      'data-source',
+      'https://storage.mock/templates/tpl-handbook/source.pdf',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Done' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a document read earlier when it is opened again', async () => {
+    renderAt('asg-handbook');
+    expect(
+      await screen.findByRole('heading', { name: 'Marked as read' }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-pages')).toHaveAttribute(
+      'data-source',
+      'https://storage.mock/templates/tpl-handbook/source.pdf',
+    );
+    expect(
+      screen.queryByRole('checkbox', {
+        name: 'I have read and understood this document',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it('renders the read view in Chinese', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     renderAt('asg-read');
