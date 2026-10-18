@@ -368,20 +368,25 @@ describe('AppShell instructor nav', () => {
     await waitFor(() => expect(link.querySelector('svg')).toBeNull());
   });
 
-  it('locks Lessons & pay for an approved instructor until onboarding is complete', async () => {
+  it('locks Lessons & pay and insurance for an approved instructor until onboarding is complete', async () => {
     renderInstructorShell('approved', {});
     expect(
       await screen.findByRole('link', {
         name: 'Lessons & pay Locked until you finish onboarding',
       }),
     ).toHaveAttribute('href', '/lessons');
+    expect(
+      screen.getByRole('link', {
+        name: 'Private lesson insurance Locked until you finish onboarding',
+      }),
+    ).toHaveAttribute('href', '/insurance');
     expect(screen.getByRole('link', { name: 'Onboarding' })).toHaveAttribute(
       'href',
       '/onboarding',
     );
   });
 
-  it('says why Lessons & pay is locked in Chinese', async () => {
+  it('says why Lessons & pay and insurance are locked in Chinese', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     renderInstructorShell('approved', {});
     expect(
@@ -389,6 +394,11 @@ describe('AppShell instructor nav', () => {
         name: '课程与工资 完成入职资料后解锁',
       }),
     ).toHaveAttribute('href', '/lessons');
+    expect(
+      screen.getByRole('link', {
+        name: '私课保险登记 完成入职资料后解锁',
+      }),
+    ).toHaveAttribute('href', '/insurance');
   });
 
   it('shows a plain Onboarding link once approved', async () => {

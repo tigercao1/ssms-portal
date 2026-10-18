@@ -7,6 +7,8 @@ import { LangSwitch } from '@/components/LangSwitch';
 import { cn } from '@/lib/cn';
 import { useMyChecklist } from '@/features/documents/onboarding/queries';
 import { LockIcon } from '@/features/documents/onboarding/Locked';
+import type { MyChecklist } from '@/features/documents/api';
+import type { Messages } from '@/i18n/core/types';
 
 interface NavItem {
   to: string;
@@ -14,6 +16,21 @@ interface NavItem {
   end?: boolean;
   locked?: boolean;
   lockedLabel?: string;
+}
+
+function lockedUntilOnboarded(
+  checklist: MyChecklist | undefined,
+  t: Messages,
+): Pick<NavItem, 'locked' | 'lockedLabel'> {
+  const onboardingIncomplete =
+    checklist?.locked === false && checklist.complete === false;
+  return {
+    locked:
+      checklist?.lockReason === 'pending_approval' || onboardingIncomplete,
+    lockedLabel: onboardingIncomplete
+      ? t.nav.onboardingIncompleteLocked
+      : undefined,
+  };
 }
 
 /** App shell (W1.7): navy contour sidebar + topbar; role-aware nav; responsive. */
@@ -26,8 +43,7 @@ export function AppShell() {
   const wasOpen = useRef(false);
   const { pathname } = useLocation();
   const checklist = useMyChecklist({ enabled: !isAdmin });
-  const onboardingIncomplete =
-    checklist.data?.locked === false && checklist.data.complete === false;
+  const onboardingLock = lockedUntilOnboarded(checklist.data, t);
 
   useEffect(() => {
     setOpen(false);
@@ -80,18 +96,10 @@ export function AppShell() {
         {
           to: '/insurance',
           label: t.nav.insurance,
-          locked: checklist.data?.locked ?? false,
+          ...onboardingLock,
+          locked: onboardingLock.locked || (checklist.data?.locked ?? false),
         },
-        {
-          to: '/lessons',
-          label: t.nav.lessonsPay,
-          locked:
-            checklist.data?.lockReason === 'pending_approval' ||
-            onboardingIncomplete,
-          lockedLabel: onboardingIncomplete
-            ? t.nav.lessonsLockedOnboarding
-            : undefined,
-        },
+        { to: '/lessons', label: t.nav.lessonsPay, ...onboardingLock },
         { to: '/settings', label: t.nav.settings },
       ];
 

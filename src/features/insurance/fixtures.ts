@@ -99,6 +99,11 @@ export const withHistory = myInsurance({
   records: historyRecords,
 });
 
+export const onboardingInsurance = myInsurance({
+  locked: true,
+  lockReason: 'onboarding_incomplete',
+});
+
 export const SEASON_2025 = {
   key: '2025/26',
   startsOn: '2025-11-01',
@@ -166,6 +171,11 @@ export function insuranceHandlers(state: InsuranceMockState) {
     http.post(`${API}/me/insurance/records`, async ({ request }) => {
       const body = (await request.json()) as RegisterLessonBody;
       state.posts.push(body);
+      if (state.data.locked)
+        return HttpResponse.json(
+          { message: 'Forbidden', reason: state.data.lockReason },
+          { status: 403 },
+        );
       const d = overviewFor(state, body.lessonDate);
       const list = listCents(body.durationHours, body.students.length);
       const base = {

@@ -121,7 +121,7 @@ export interface Messages {
     openMenu: string;
     closeMenu: string;
     onboardingLocked: string;
-    lessonsLockedOnboarding: string;
+    onboardingIncompleteLocked: string;
   };
   status: {
     pending: string;
@@ -1542,6 +1542,9 @@ export interface Messages {
     rejectedTitle: string;
     rejectedBody: string;
     lockedEmpty: string;
+    onboardingTitle: string;
+    onboardingBody: string;
+    onboardingOpen: string;
   };
   adminInsurance: {
     title: string;

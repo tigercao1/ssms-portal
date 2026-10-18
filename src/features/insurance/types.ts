@@ -1,4 +1,7 @@
-export type InsuranceLockReason = 'pending_approval' | 'rejected';
+export type InsuranceLockReason =
+  | 'pending_approval'
+  | 'rejected'
+  | 'onboarding_incomplete';
 export type InsuranceKind = 'lesson' | 'season_pass';
 export type InsuranceCoverage =
   | 'per_lesson'

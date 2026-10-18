@@ -122,7 +122,7 @@ export const zhCN: Messages = {
     openMenu: '打开菜单',
     closeMenu: '关闭菜单',
     onboardingLocked: '资料审核通过后解锁',
-    lessonsLockedOnboarding: '完成入职资料后解锁',
+    onboardingIncompleteLocked: '完成入职资料后解锁',
   },
   status: {
     pending: '待审核',
@@ -1590,6 +1590,10 @@ export const zhCN: Messages = {
     rejectedTitle: '你的资料未通过审核',
     rejectedBody: '你无法登记私课保险。如有疑问，请联系 SSnow。',
     lockedEmpty: '只有通过审核的教练才能登记私课保险。',
+    onboardingTitle: '完成入职资料后即可登记私课保险',
+    onboardingBody:
+      '入职清单上所有必填的文件和证书都完成后，即可登记私课保险。',
+    onboardingOpen: '前往入职资料',
   },
   adminInsurance: {
     title: '私课保险',

@@ -10,6 +10,7 @@ import {
   insuranceHandlers,
   insuranceRecord,
   myInsurance,
+  onboardingInsurance,
   SEASON_2025,
   withHistory,
   type InsuranceMockState,
@@ -674,6 +675,42 @@ describe('InsurancePage records and states', () => {
       screen.getByText('你无法登记私课保险。如有疑问，请联系 SSnow。'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /登记/ })).toBeNull();
+  });
+
+  it('asks an approved instructor to finish onboarding and links to it', async () => {
+    serve(onboardingInsurance);
+    await renderPage();
+    const banner = screen
+      .getByText('Finish onboarding to use private lesson insurance')
+      .closest('[role="status"]');
+    expect(banner).toHaveTextContent(
+      'Private lesson insurance opens once every required document and certification on your onboarding checklist is done.',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Go to onboarding' }),
+    ).toHaveAttribute('href', '/onboarding');
+    expect(
+      screen.queryByRole('button', { name: /^Register( ·| for free|$)/ }),
+    ).toBeNull();
+    expect(screen.queryByText('My registrations')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your profile is being reviewed')).toBeNull();
+  });
+
+  it('asks to finish onboarding in Chinese', async () => {
+    serve(onboardingInsurance);
+    await renderPage('zh-CN');
+    expect(
+      screen.getByText('完成入职资料后即可登记私课保险'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '入职清单上所有必填的文件和证书都完成后，即可登记私课保险。',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '前往入职资料' })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    );
   });
 
   it('shows a load error with retry', async () => {

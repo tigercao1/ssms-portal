@@ -19,6 +19,11 @@ import { fakePdf } from '../testing/fakePdfPages';
 import { AppShell } from '@/app/shell/AppShell';
 import { LessonsPayPage } from '@/features/lessons/LessonsPayPage';
 import { fullLessons, onboardingLessons } from '@/features/lessons/fixtures';
+import { InsurancePage } from '@/features/insurance/InsurancePage';
+import {
+  myInsurance,
+  onboardingInsurance,
+} from '@/features/insurance/fixtures';
 import { ProfileViewPage } from '@/features/instructor/ProfileViewPage';
 
 vi.mock('../pdf/PdfPages', async () => {
@@ -840,6 +845,70 @@ describe('OnboardingDocumentPage — last item', () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByText('Finish onboarding to see your lessons and pay'),
+    ).toBeNull();
+  });
+
+  it('unlocks private lesson insurance without a reload once the last required item is done', async () => {
+    state.assignments = state.assignments.filter(
+      (a) => a.status === 'completed' || a.id === 'asg-read',
+    );
+    state.meCerts = [];
+    server.use(
+      http.get(`${API}/me/insurance`, () =>
+        HttpResponse.json(
+          state.assignments.every((a) => a.status === 'completed')
+            ? myInsurance()
+            : onboardingInsurance,
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/insurance" element={<InsurancePage />} />
+          <Route
+            path="/onboarding"
+            element={<Link to="/onboarding/asg-read">Open handbook</Link>}
+          />
+          <Route
+            path="/onboarding/:assignmentId"
+            element={<OnboardingDocumentPage />}
+          />
+        </Route>
+      </Routes>,
+      { route: '/insurance', staleTime: 60_000 },
+    );
+    expect(
+      await screen.findByText(
+        'Finish onboarding to use private lesson insurance',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', {
+        name: 'Private lesson insurance Locked until you finish onboarding',
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Go to onboarding' }));
+    await user.click(screen.getByRole('link', { name: 'Open handbook' }));
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: 'I have read and understood this document',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await screen.findByRole('heading', { name: 'Marked as read' });
+
+    const insurance = await screen.findByRole('link', {
+      name: 'Private lesson insurance',
+    });
+    await user.click(insurance);
+    expect(
+      await screen.findByRole('heading', { name: 'Register a lesson' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Finish onboarding to use private lesson insurance'),
     ).toBeNull();
   });
 });
