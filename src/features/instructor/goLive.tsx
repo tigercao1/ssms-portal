@@ -61,8 +61,15 @@ export function profileGapsText(
   missing: readonly GoLiveMissingItem[],
   t: Messages,
   locale: Locale,
+  { includeCertification = false }: { includeCertification?: boolean } = {},
 ): string | null {
   const labels = missing.flatMap((item) => {
+    if (
+      includeCertification &&
+      item.group === 'certification' &&
+      item.reason === 'none_verified'
+    )
+      return [t.onboarding.cardGapCertification];
     if (item.group !== 'profile') return [];
     const label = t.goLive[FIELD_LABEL[item.field]];
     return [

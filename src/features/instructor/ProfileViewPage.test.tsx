@@ -838,6 +838,162 @@ describe('ProfileViewPage go-live', () => {
     ).toBeInTheDocument();
   });
 
+  it('puts the onboarding card above the preferred language card', async () => {
+    serveGoLive(approvedActive);
+    serveChecklist(toDoItems);
+    renderWithProviders(<ProfileViewPage />);
+    const heading = await screen.findByRole('heading', { name: 'Onboarding' });
+    const language = screen.getByText('Preferred language');
+    expect(
+      heading.compareDocumentPosition(language) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('shows the go-live status and profile gaps when the checklist is empty', async () => {
+    serveGoLive(approvedActive, {
+      missing: [
+        { group: 'profile', field: 'photo' },
+        { group: 'profile', field: 'bio' },
+      ],
+    });
+    serveChecklist([]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    const pill = await card.findByText('Required items pending');
+    expect(pillColor(pill)).toBe('var(--status-pending)');
+    expect(
+      card.getByText('Complete your profile to go live on ssnow.club.'),
+    ).toBeInTheDocument();
+    expect(
+      card.getByText('Your profile also needs: main photo and bio.'),
+    ).toBeInTheDocument();
+    expect(card.getByRole('link', { name: 'Edit profile' })).toHaveAttribute(
+      'href',
+      '/profile/edit',
+    );
+    expect(card.queryByRole('progressbar')).toBeNull();
+    expect(card.queryByText(/of \d+ done/)).toBeNull();
+    expect(card.queryByRole('link', { name: 'Go to onboarding' })).toBeNull();
+  });
+
+  it('shows the empty-checklist status and profile gaps in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive(approvedActive, {
+      missing: [
+        { group: 'profile', field: 'photo' },
+        { group: 'profile', field: 'bio' },
+      ],
+    });
+    serveChecklist([]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    expect(await card.findByText('有待完成事项')).toBeInTheDocument();
+    expect(
+      card.getByText('完善您的资料即可在 ssnow.club 上线。'),
+    ).toBeInTheDocument();
+    expect(
+      card.getByText('您的资料还需要：主照片和简介。'),
+    ).toBeInTheDocument();
+    expect(card.getByRole('link', { name: '编辑资料' })).toHaveAttribute(
+      'href',
+      '/profile/edit',
+    );
+    expect(card.queryByRole('progressbar')).toBeNull();
+    expect(card.queryByRole('link', { name: '前往入职资料' })).toBeNull();
+  });
+
+  it('asks for a certification when the checklist is empty and none is verified', async () => {
+    serveGoLive(approvedActive, {
+      missing: [
+        { group: 'profile', field: 'photo' },
+        { group: 'certification', reason: 'none_verified' },
+      ],
+    });
+    serveChecklist([]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    expect(
+      await card.findByText(
+        'Your profile also needs: main photo and a certification.',
+      ),
+    ).toBeInTheDocument();
+    expect(card.getByText('Required items pending')).toBeInTheDocument();
+  });
+
+  it('asks for a certification in Chinese when the checklist is empty', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive(approvedActive, {
+      missing: [{ group: 'certification', reason: 'none_verified' }],
+    });
+    serveChecklist([]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    expect(await card.findByText('您的资料还需要：证书。')).toBeInTheDocument();
+  });
+
+  it('shows "Going live" for an empty checklist', async () => {
+    serveGoLive(approvedActive, { ready: true, missing: [] });
+    serveChecklist([]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    const pill = await card.findByText('Going live');
+    expect(pillColor(pill)).toBe('var(--navy)');
+    expect(card.getByText('Usually within a few minutes.')).toBeInTheDocument();
+    expect(card.queryByText(/Complete your profile/)).toBeNull();
+    expect(card.queryByText(/Your profile also needs/)).toBeNull();
+    expect(card.queryByRole('progressbar')).toBeNull();
+    expect(card.queryByRole('link', { name: 'Go to onboarding' })).toBeNull();
+  });
+
+  it('shows "All done" for a live instructor with an empty checklist', async () => {
+    serveGoLive(approvedActive, {
+      live: true,
+      ready: true,
+      liveUrl,
+      missing: [],
+    });
+    serveChecklist([]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    const pill = await card.findByText('All done');
+    expect(pillColor(pill)).toBe('var(--status-approved)');
+    expect(
+      card.getByText(
+        'Documents to read and sign, and certifications to upload.',
+      ),
+    ).toBeInTheDocument();
+    expect(card.queryByRole('progressbar')).toBeNull();
+    expect(card.queryByRole('link', { name: 'Go to onboarding' })).toBeNull();
+  });
+
+  it('hides the card for an empty checklist when go-live has not loaded', async () => {
+    let checklistServed = false;
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, ...approvedActive }),
+      ),
+      http.get(`${API}/me/go-live`, () =>
+        HttpResponse.json({ message: 'boom' }, { status: 500 }),
+      ),
+      http.get(`${API}/me/documents`, () => {
+        checklistServed = true;
+        return HttpResponse.json({
+          season: '2026/27',
+          locked: false,
+          lockReason: null,
+          complete: false,
+          items: [],
+        } satisfies MyChecklist);
+      }),
+    );
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('Preferred language')).toBeInTheDocument();
+    await waitFor(() => expect(checklistServed).toBe(true));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(screen.queryByRole('heading', { name: 'Onboarding' })).toBeNull();
+  });
+
   it('shows the plain progress count when go-live has not loaded', async () => {
     server.use(
       http.get(`${API}/me/instructor`, () =>

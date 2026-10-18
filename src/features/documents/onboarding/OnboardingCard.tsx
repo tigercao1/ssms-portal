@@ -57,7 +57,7 @@ type CardStatus = { tone: PillTone; pill: string; body: string };
 function cardStatus(
   readiness: GoLiveReadiness,
   progress: ChecklistProgress,
-  progressLabel: string,
+  toDoBody: string,
   t: Messages,
 ): CardStatus {
   if (readiness.live)
@@ -83,7 +83,7 @@ function cardStatus(
   return {
     tone: 'warn',
     pill: t.onboarding.cardPillToDo,
-    body: t.onboarding.cardToDoBody.replace('{progress}', progressLabel),
+    body: toDoBody,
   };
 }
 
@@ -97,12 +97,19 @@ export function OnboardingCard({ readiness }: { readiness?: GoLiveReadiness }) {
   const { data } = useMyChecklist();
   if (!data) return null;
   if (data.locked) return <LockedOnboardingCard checklist={data} />;
-  if (data.items.length === 0) return null;
+  const empty = data.items.length === 0;
+  if (empty && !readiness) return null;
   const counts = checklistProgress(data.items);
   const progress = progressText(counts, t);
-  const status = readiness && cardStatus(readiness, counts, progress, t);
+  const toDoBody = empty
+    ? t.onboarding.cardEmptyToDoBody
+    : t.onboarding.cardToDoBody.replace('{progress}', progress);
+  const status = readiness && cardStatus(readiness, counts, toDoBody, t);
   const profileGaps =
-    readiness && profileGapsText(readiness.missing, t, locale);
+    readiness &&
+    profileGapsText(readiness.missing, t, locale, {
+      includeCertification: empty,
+    });
   return (
     <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -115,7 +122,7 @@ export function OnboardingCard({ readiness }: { readiness?: GoLiveReadiness }) {
           </span>
         )}
       </div>
-      <ProgressBar progress={counts} label={progress} />
+      {!empty && <ProgressBar progress={counts} label={progress} />}
       <p className="text-sm text-slate">
         {status ? status.body : t.onboarding.cardBody}
       </p>
@@ -130,9 +137,11 @@ export function OnboardingCard({ readiness }: { readiness?: GoLiveReadiness }) {
           </Link>
         </p>
       )}
-      <Link to="/onboarding" className={LINK_CLASS}>
-        {t.onboarding.cardOpen}
-      </Link>
+      {!empty && (
+        <Link to="/onboarding" className={LINK_CLASS}>
+          {t.onboarding.cardOpen}
+        </Link>
+      )}
     </Card>
   );
 }

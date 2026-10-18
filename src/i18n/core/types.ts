@@ -1338,7 +1338,9 @@ export interface Messages {
     cardToDoBody: string;
     cardInReviewBody: string;
     cardGoingLiveBody: string;
+    cardEmptyToDoBody: string;
     cardProfileGaps: string;
+    cardGapCertification: string;
     cardOpen: string;
     backToChecklist: string;
     readAck: string;
