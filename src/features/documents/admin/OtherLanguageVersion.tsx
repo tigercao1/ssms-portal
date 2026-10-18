@@ -1,7 +1,7 @@
-import { useId, useRef } from 'react';
+import { useId } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
-import { Banner, Button, Spinner } from '@/components';
+import { Banner, Button, FileButton, Spinner } from '@/components';
 import type {
   ConfirmedTemplate,
   DocumentLanguage,
@@ -44,7 +44,6 @@ export function OtherLanguageVersion({
   const template = useTemplate(row.id);
   const upload = useUploadTemplateSource();
   const remove = useDeleteTranslation();
-  const fileRef = useRef<HTMLInputElement>(null);
   const headingId = useId();
   const language = otherLanguageOf(sourceLanguage);
   const name = languageName(language, t);
@@ -84,7 +83,6 @@ export function OtherLanguageVersion({
           }),
       },
     );
-    if (fileRef.current) fileRef.current.value = '';
   }
 
   function onRemove() {
@@ -143,29 +141,24 @@ export function OtherLanguageVersion({
             <p className="text-xs text-slate">{t.documents.lockedSigned}</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              className="sr-only"
-              tabIndex={-1}
-              aria-label={fill(t.documents.uploadOtherLanguageFor)}
-              disabled={locked}
-              onChange={(e) => onFile(e.target.files?.[0])}
-            />
-            <Button
+            <FileButton
               size="sm"
               variant="ghost"
+              accept="application/pdf,.pdf"
+              aria-label={fill(t.documents.uploadOtherLanguageFor)}
               loading={upload.isPending}
               disabled={locked}
-              onClick={() => fileRef.current?.click()}
+              onChange={(e) => {
+                onFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
             >
               {fill(
                 hasPdf
                   ? t.documents.replaceOtherLanguage
                   : t.documents.uploadOtherLanguage,
               )}
-            </Button>
+            </FileButton>
             {hasPdf && !(row.kind === 'sign' && locked) && (
               <Link
                 to={`/admin/documents/${row.id}/edit?language=${language}`}

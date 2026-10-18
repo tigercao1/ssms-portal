@@ -1,4 +1,4 @@
-import { Fragment, useId, useRef, useState } from 'react';
+import { Fragment, useId, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   EmptyState,
+  FileButton,
   Spinner,
   Toggle,
   type ActionsMenuItem,
@@ -276,9 +277,7 @@ function useSourceUpload(
   const t = useT();
   const { locale } = useLocale();
   const upload = useUploadTemplateSource();
-  const fileRef = useRef<HTMLInputElement>(null);
   const title = templateTitle(row, locale);
-  const locked = row.hasCompletedAssignments;
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -305,24 +304,18 @@ function useSourceUpload(
           }),
       },
     );
-    if (fileRef.current) fileRef.current.value = '';
   }
 
   return {
     pending: upload.isPending,
-    pick: () => fileRef.current?.click(),
-    input: (
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="sr-only"
-        tabIndex={-1}
-        aria-label={t.documents.uploadFor.replace('{title}', title)}
-        disabled={locked}
-        onChange={(e) => onFile(e.target.files?.[0])}
-      />
-    ),
+    file: {
+      accept: 'application/pdf,.pdf',
+      inputLabel: t.documents.uploadFor.replace('{title}', title),
+      onChange: (e: ChangeEvent<HTMLInputElement>) => {
+        onFile(e.target.files?.[0]);
+        e.target.value = '';
+      },
+    },
   };
 }
 
@@ -341,7 +334,7 @@ function sourceItems(
     loading: source.pending,
     disabled: locked,
     description: reason,
-    onSelect: source.pick,
+    file: source.file,
   };
   if (!hasPdf) return [upload];
   if (row.kind === 'sign' && locked)
@@ -385,18 +378,19 @@ function SourceActions({
 
   return (
     <>
-      {source.input}
       <span title={locked ? t.documents.lockedSigned : undefined}>
-        <Button
+        <FileButton
           size="sm"
           variant="ghost"
+          accept={source.file.accept}
+          aria-label={source.file.inputLabel}
+          aria-describedby={describedBy}
           loading={source.pending}
           disabled={locked}
-          aria-describedby={describedBy}
-          onClick={source.pick}
+          onChange={source.file.onChange}
         >
           {hasPdf ? t.documents.replacePdf : t.documents.uploadPdf}
-        </Button>
+        </FileButton>
       </span>
       {hasPdf && row.kind === 'sign' && locked ? (
         <span title={t.documents.lockedSigned}>
@@ -585,7 +579,6 @@ function TemplateRow({
       </td>
       <td className="px-2 py-2 xl:px-3">
         <div className="flex items-center justify-end gap-1">
-          {row.status === 'draft' && source.input}
           {row.status === 'draft' && (
             <span title={blocker ?? undefined}>
               <Button

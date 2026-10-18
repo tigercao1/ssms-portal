@@ -116,6 +116,11 @@ async function chooseAction(user: User, title: string, name: string) {
   await user.click(within(menu).getByRole('menuitem', { name }));
 }
 
+async function menuUploadInput(user: User, title: string) {
+  const menu = await openActions(user, title);
+  return within(menu).getByLabelText(`Upload PDF for ${title}`);
+}
+
 async function actionNames(user: User, title: string) {
   const menu = await openActions(user, title);
   const names = within(menu)
@@ -845,7 +850,10 @@ describe('DocumentsListPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
     const editor = await openEdit(user, 'Code of conduct');
-    const replace = within(editor).getByRole('button', { name: 'Replace PDF' });
+    const replace = within(editor).getByLabelText(
+      'Upload PDF for Code of conduct',
+    );
+    expect(within(editor).getByText('Replace PDF')).toBeInTheDocument();
     expect(replace).toBeDisabled();
     const reason =
       "Someone has completed this document, so its PDF and fields can't change. Retire it and publish a new one.";
@@ -854,9 +862,6 @@ describe('DocumentsListPage', () => {
       within(editor).getByRole('button', { name: 'Place fields' }),
     ).toBeDisabled();
     expect(within(editor).getByText(reason)).toBeInTheDocument();
-    expect(
-      within(editor).getByLabelText('Upload PDF for Code of conduct'),
-    ).toBeDisabled();
   });
 
   it('shows status and audience counts in Chinese', async () => {
@@ -871,13 +876,20 @@ describe('DocumentsListPage', () => {
     expect(screen.getByText('1 位教练')).toBeInTheDocument();
   });
 
-  it('opens the file picker from the row menu and returns focus to it', async () => {
+  it('picks a PDF from the row menu item label and returns focus to the menu button', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
-    const click = vi.spyOn(input, 'click');
-    await chooseAction(user, 'Uniform policy', 'Upload PDF');
-    expect(click).toHaveBeenCalledTimes(1);
+    const menu = await openActions(user, 'Uniform policy');
+    const item = within(menu).getByRole('menuitem', { name: 'Upload PDF' });
+    const input = within(item).getByLabelText('Upload PDF for Uniform policy');
+    expect(item.tagName).toBe('LABEL');
+    expect(input).toHaveAttribute('type', 'file');
+    expect(input).toHaveClass('sr-only');
+    await user.upload(
+      input,
+      new File(['%PDF'], 'c.pdf', { type: 'application/pdf' }),
+    );
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'More actions for Uniform policy' }),
     ).toHaveFocus();
@@ -965,7 +977,7 @@ describe('DocumentsListPage', () => {
   it('uploads a PDF through the presigned URL then confirms', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
+    const input = await menuUploadInput(user, 'Uniform policy');
     const pdfBytes = buildSamplePdf([{ width: 612, height: 792 }]);
     const file = new File([pdfBytes], 'policy.pdf', {
       type: 'application/pdf',
@@ -1015,12 +1027,14 @@ describe('DocumentsListPage', () => {
   it('rejects non-PDF and oversize files before uploading', async () => {
     const user = userEvent.setup({ applyAccept: false });
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
-    await user.upload(input, new File(['x'], 'a.png', { type: 'image/png' }));
+    await user.upload(
+      await menuUploadInput(user, 'Uniform policy'),
+      new File(['x'], 'a.png', { type: 'image/png' }),
+    );
     expect(await screen.findByText('Choose a PDF file.')).toBeInTheDocument();
     const big = new File(['x'], 'big.pdf', { type: 'application/pdf' });
     Object.defineProperty(big, 'size', { value: 21 * 1024 * 1024 });
-    await user.upload(input, big);
+    await user.upload(await menuUploadInput(user, 'Uniform policy'), big);
     expect(
       await screen.findByText('The PDF must be 20 MB or smaller.'),
     ).toBeInTheDocument();
@@ -1035,9 +1049,8 @@ describe('DocumentsListPage', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<DocumentsListPage />);
-    const input = await screen.findByLabelText('Upload PDF for Uniform policy');
     await user.upload(
-      input,
+      await menuUploadInput(user, 'Uniform policy'),
       new File(['%PDF'], 'c.pdf', { type: 'application/pdf' }),
     );
     expect(
@@ -1271,8 +1284,11 @@ describe('DocumentsListPage — language versions', () => {
       ),
     ).toBeInTheDocument();
 
+    expect(within(section).getByText('Replace English PDF')).toBeInTheDocument();
     expect(
-      within(section).getByRole('button', { name: 'Replace English PDF' }),
+      within(section).getByLabelText(
+        'Upload the English PDF for Liability waiver',
+      ),
     ).toBeEnabled();
     await user.click(
       within(section).getByRole('button', { name: 'Remove English version' }),
@@ -1306,8 +1322,11 @@ describe('DocumentsListPage — language versions', () => {
         name: 'Remove Chinese version',
       }),
     ).toBeDisabled();
+    expect(within(section).getByText('Replace Chinese PDF')).toBeInTheDocument();
     expect(
-      within(section).getByRole('button', { name: 'Replace Chinese PDF' }),
+      within(section).getByLabelText(
+        'Upload the Chinese PDF for Code of conduct',
+      ),
     ).toBeDisabled();
     expect(
       within(section).queryByRole('link', { name: 'Place Chinese fields' }),
@@ -1368,7 +1387,7 @@ describe('DocumentsListPage — language versions', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      await within(section).findByRole('button', { name: '上传英文 PDF' }),
+      await within(section).findByText('上传英文 PDF'),
     ).toBeInTheDocument();
     expect(screen.getAllByLabelText('主 PDF 语言')[0]).toHaveValue('zh');
   });

@@ -11,6 +11,7 @@ export const Select = forwardRef<
       className={cn(
         'h-11 w-full rounded-md border border-grey bg-surface px-3 text-ink',
         'focus:border-navy focus:outline-none',
+        '[@media(pointer:coarse)]:text-base',
         className,
       )}
       {...rest}

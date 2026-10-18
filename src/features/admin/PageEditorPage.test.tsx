@@ -135,7 +135,8 @@ describe('PageEditorPage upload', () => {
     expect(
       await screen.findByTitle('Preview of Winter guide'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Replace HTML' })).toBeEnabled();
+    expect(screen.getByText('Replace HTML')).toBeInTheDocument();
+    expect(screen.getByLabelText('HTML file to upload')).toBeEnabled();
     expect(
       screen.getByText(`Draft size: ${HTML.length} B`),
     ).toBeInTheDocument();

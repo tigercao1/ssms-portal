@@ -1,19 +1,15 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
-import { Banner, Button } from '@/components';
+import { Banner, Button, FileButton } from '@/components';
 import {
   useRemovePhoto,
   useUploadAvatar,
   useUploadPhoto,
   validateAvatarType,
 } from './api';
-import type {
-  ExtraPhotoSlot,
-  InstructorProfile,
-  PhotoSlot,
-} from '@/lib/types';
+import type { ExtraPhotoSlot, InstructorProfile, PhotoSlot } from '@/lib/types';
 
 type PhotoSubject = Pick<
   InstructorProfile,
@@ -74,7 +70,11 @@ function MyPhotoSlot({
   );
 }
 
-export function MorePhotosUploader({ profile }: { profile: InstructorProfile }) {
+export function MorePhotosUploader({
+  profile,
+}: {
+  profile: InstructorProfile;
+}) {
   return (
     <MorePhotos>
       {EXTRA_PHOTO_SLOTS.map((slot) => (
@@ -104,9 +104,10 @@ export function PhotoPicker({
       ? t.profile.slotReplacePhoto
       : t.profile.slotUploadPhoto
     : t.profile.uploadPhoto;
-  const removeLabel = slotLabel ? t.profile.slotRemovePhoto : t.profile.removePhoto;
+  const removeLabel = slotLabel
+    ? t.profile.slotRemovePhoto
+    : t.profile.removePhoto;
   const { locale } = useLocale();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   const name = localizeField(
@@ -148,22 +149,18 @@ export function PhotoPicker({
         {slotLabel && (
           <span className="text-sm font-medium text-navy">{slotLabel}</span>
         )}
-        <input
-          ref={inputRef}
-          type="file"
+        <FileButton
           accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(e) => pick(e.target.files?.[0])}
-        />
-        <Button
-          type="button"
           variant="secondary"
           size="sm"
           loading={upload.isPending}
-          onClick={() => inputRef.current?.click()}
+          onChange={(e) => {
+            pick(e.target.files?.[0]);
+            e.target.value = '';
+          }}
         >
           {upload.isPending ? t.profile.uploading : uploadLabel}
-        </Button>
+        </FileButton>
         {remove && url && (
           <Button
             type="button"

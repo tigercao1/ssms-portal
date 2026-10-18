@@ -11,6 +11,7 @@ export const Textarea = forwardRef<
       className={cn(
         'w-full rounded-md border border-grey bg-surface px-3 py-2 text-ink',
         'placeholder:text-grey focus:border-navy focus:outline-none',
+        '[@media(pointer:coarse)]:text-base',
         'aria-[invalid=true]:border-status-rejected',
         className,
       )}

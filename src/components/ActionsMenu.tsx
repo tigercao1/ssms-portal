@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type KeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -12,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import { Button } from './Button';
+import { FileButton } from './FileButton';
 
 /**
  * One entry in an {@link ActionsMenu}. Give it `onSelect` for an action or
@@ -25,6 +27,11 @@ export interface ActionsMenuItem {
   ariaLabel?: string;
   onSelect?: () => void;
   to?: string;
+  file?: {
+    accept: string;
+    inputLabel?: string;
+    onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  };
   disabled?: boolean;
   loading?: boolean;
   destructive?: boolean;
@@ -343,6 +350,31 @@ function MenuItem({
     className,
   } as const;
 
+  if (item.file && !inactive) {
+    const file = item.file;
+    return (
+      <label
+        role="menuitem"
+        aria-label={item.ariaLabel ?? item.label}
+        className={cn(className, 'cursor-pointer focus-within:bg-navy-tint')}
+      >
+        {content}
+        <input
+          ref={itemRef}
+          type="file"
+          tabIndex={-1}
+          className="sr-only"
+          accept={file.accept}
+          aria-label={file.inputLabel}
+          aria-describedby={shared['aria-describedby']}
+          onChange={(e) => {
+            file.onChange(e);
+            onSelect();
+          }}
+        />
+      </label>
+    );
+  }
   if (item.to && !inactive)
     return (
       <Link
@@ -419,6 +451,23 @@ export function RowActions({
       >
         {only.label}
       </Link>
+    );
+  if (only.file)
+    return (
+      <FileButton
+        id={id}
+        size="sm"
+        variant={only.variant ?? 'secondary'}
+        loading={only.loading}
+        disabled={only.disabled}
+        title={only.description}
+        accept={only.file.accept}
+        aria-label={only.file.inputLabel ?? only.ariaLabel}
+        className={className}
+        onChange={only.file.onChange}
+      >
+        {only.label}
+      </FileButton>
     );
   return (
     <Button

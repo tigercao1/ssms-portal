@@ -57,6 +57,39 @@ describe('ActionsMenu', () => {
     expect(trigger).toHaveFocus();
   });
 
+  it('renders a file item as a label for its file input and runs it once a file is chosen', async () => {
+    const onChange = vi.fn();
+    const scripted = vi.spyOn(HTMLInputElement.prototype, 'click');
+    const { user, trigger } = setup([
+      { key: 'edit', label: 'Edit', onSelect: edit },
+      {
+        key: 'upload',
+        label: 'Upload PDF',
+        file: { accept: 'application/pdf', inputLabel: 'PDF file', onChange },
+      },
+    ]);
+    await user.click(trigger);
+    const item = screen.getByRole('menuitem', { name: 'Upload PDF' });
+    const input = screen.getByLabelText('PDF file');
+    expect(item.tagName).toBe('LABEL');
+    expect(item).toContainElement(input);
+    expect(input).toHaveAttribute('type', 'file');
+    expect(input).toHaveAttribute('accept', 'application/pdf');
+    expect(input).toHaveClass('sr-only');
+
+    await user.keyboard('{ArrowDown}');
+    expect(input).toHaveFocus();
+
+    const file = new File(['%PDF'], 'a.pdf', { type: 'application/pdf' });
+    await user.upload(input, file);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0]![0].target.files[0]).toBe(file);
+    expect(scripted).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    scripted.mockRestore();
+  });
+
   it('opens from the keyboard and moves with arrows, Home, End and letters', async () => {
     remove.mockClear();
     const { user, trigger } = setup(basic);
@@ -250,6 +283,25 @@ describe('placeMenu', () => {
 });
 
 describe('RowActions', () => {
+  it('renders a lone file item as a file button', async () => {
+    const onChange = vi.fn();
+    renderWithProviders(
+      <RowActions
+        items={[
+          {
+            key: 'upload',
+            label: 'Upload PDF',
+            file: { accept: '.pdf', inputLabel: 'PDF file', onChange },
+          },
+        ]}
+      />,
+    );
+    const input = screen.getByLabelText('PDF file');
+    expect(input.closest('label')).toHaveTextContent('Upload PDF');
+    await userEvent.upload(input, new File(['%PDF'], 'a.pdf'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it('renders nothing, a plain button, or a menu', async () => {
     const user = userEvent.setup();
     const run = vi.fn();

@@ -1,9 +1,17 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/date';
-import { Banner, Button, Card, Field, Input, Spinner } from '@/components';
+import {
+  Banner,
+  Button,
+  Card,
+  Field,
+  FileButton,
+  Input,
+  Spinner,
+} from '@/components';
 import type { PublicPage } from '@/lib/types';
 import {
   useDeletePage,
@@ -303,7 +311,6 @@ function DetailsCard({ page }: { page: PublicPage }) {
 function ContentCard({ page }: { page: PublicPage }) {
   const t = useT();
   const upload = useUploadPageContent(page.id);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<string | null>(null);
 
@@ -350,23 +357,16 @@ function ContentCard({ page }: { page: PublicPage }) {
           </p>
         )}
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="text/html,.html,.htm"
-        aria-label={t.pages.fileInputLabel}
-        tabIndex={-1}
-        className="sr-only"
-        onChange={choose}
-      />
       <div>
-        <Button
+        <FileButton
           variant="secondary"
+          accept="text/html,.html,.htm"
+          aria-label={t.pages.fileInputLabel}
           loading={upload.isPending}
-          onClick={() => inputRef.current?.click()}
+          onChange={choose}
         >
           {page.hasContent ? t.pages.replaceFile : t.pages.uploadFile}
-        </Button>
+        </FileButton>
       </div>
       {fileError && <Banner tone="error">{fileError}</Banner>}
       {uploadError && <Banner tone="error">{uploadError}</Banner>}
