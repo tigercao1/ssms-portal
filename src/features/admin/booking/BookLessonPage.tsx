@@ -219,7 +219,7 @@ export function BookLessonPage() {
               <span className="text-sm text-slate">{t.booking.noHistory}</span>
             )}
             {lastResult?.last && (
-              <span className="text-sm text-slate">
+              <span data-private className="text-sm text-slate">
                 {t.booking.lastWas
                   .replace(
                     '{lesson}',

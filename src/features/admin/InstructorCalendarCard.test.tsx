@@ -11,6 +11,10 @@ import type {
   InstructorGoogleCalendar,
   InstructorGoogleCalendarInput,
 } from '@/lib/types';
+import {
+  expectAttributeMaskedInReplay,
+  expectMaskedInReplay,
+} from '@/test/replayPrivacy';
 
 const API = 'http://localhost:3000';
 
@@ -68,10 +72,30 @@ function serve({
     http.get(`${API}/admin/google/calendars`, ({ request }) => {
       calendarRequests.push(request.url);
       return HttpResponse.json([
-        { id: 'admin@ssnow.club', summary: 'SSNOW Admin', accessRole: 'owner', canWrite: true },
-        { id: 'li.wei@gmail.com', summary: 'Li Wei', accessRole: 'writer', canWrite: true },
-        { id: 'jane.snow@ssnow.club', summary: 'Jane Snow', accessRole: 'writer', canWrite: true },
-        { id: 'sam.ski@gmail.com', summary: 'Sam Ski', accessRole: 'reader', canWrite: false },
+        {
+          id: 'admin@ssnow.club',
+          summary: 'SSNOW Admin',
+          accessRole: 'owner',
+          canWrite: true,
+        },
+        {
+          id: 'li.wei@gmail.com',
+          summary: 'Li Wei',
+          accessRole: 'writer',
+          canWrite: true,
+        },
+        {
+          id: 'jane.snow@ssnow.club',
+          summary: 'Jane Snow',
+          accessRole: 'writer',
+          canWrite: true,
+        },
+        {
+          id: 'sam.ski@gmail.com',
+          summary: 'Sam Ski',
+          accessRole: 'reader',
+          canWrite: false,
+        },
       ]);
     }),
     http.get(`${API}/admin/instructors/:id/google-calendar`, () =>
@@ -140,6 +164,10 @@ describe('InstructorCalendarCard picker', () => {
       'Sam Ski (sam.ski@gmail.com) · read-only',
       'Li Wei (li.wei@gmail.com) · Linked to Li Wei',
     ]);
+    for (const option of screen.getAllByRole('option')) {
+      expectMaskedInReplay(option);
+      expectAttributeMaskedInReplay(option, 'id');
+    }
     expect(
       within(screen.getByRole('listbox'))
         .getAllByRole('group')
@@ -149,7 +177,9 @@ describe('InstructorCalendarCard picker', () => {
       screen.getByRole('option', { name: /Linked to Li Wei/ }),
     ).toHaveAttribute('aria-disabled', 'true');
 
-    await userEvent.click(screen.getByRole('option', { name: /Linked to Li Wei/ }));
+    await userEvent.click(
+      screen.getByRole('option', { name: /Linked to Li Wei/ }),
+    );
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     expect(input).toHaveValue('');
   });
@@ -260,9 +290,10 @@ describe('InstructorCalendarCard picker', () => {
     expect(save).toBeDisabled();
 
     await openPicker();
-    expect(
-      screen.getByRole('option', { name: /SSNOW Admin/ }),
-    ).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: /SSNOW Admin/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     await userEvent.click(screen.getByRole('option', { name: /Jane Snow/ }));
     await userEvent.click(save);
 
@@ -327,7 +358,9 @@ describe('InstructorCalendarCard picker', () => {
 
     await waitFor(() => expect(bodies).toEqual([{ googleCalendarId: null }]));
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Calendar' })).toHaveValue(''),
+      expect(screen.getByRole('combobox', { name: 'Calendar' })).toHaveValue(
+        '',
+      ),
     );
     expect(
       screen.queryByRole('button', { name: 'Clear' }),
@@ -453,7 +486,9 @@ describe('InstructorCalendarCard without Google', () => {
     );
     renderCard();
 
-    expect(await screen.findByText('Something went wrong.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Something went wrong.'),
+    ).toBeInTheDocument();
   });
 
   it('labels the picker in Chinese', async () => {
@@ -461,7 +496,9 @@ describe('InstructorCalendarCard without Google', () => {
     serve();
     renderCard();
 
-    await userEvent.click(await screen.findByRole('combobox', { name: '日历' }));
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: '日历' }),
+    );
     expect(
       screen.getByRole('option', { name: /已关联 Li Wei/ }),
     ).toHaveAttribute('aria-disabled', 'true');

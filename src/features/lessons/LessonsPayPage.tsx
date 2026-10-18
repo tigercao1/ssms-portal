@@ -346,6 +346,7 @@ function UpcomingSection({
                       )}
                     </td>
                     <td
+                      data-private
                       data-testid="upcoming-projected"
                       className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums"
                     >
@@ -397,7 +398,9 @@ function UpcomingSection({
             </ul>
             <div className="flex justify-between gap-3 rounded-lg bg-navy px-3 py-2.5 text-sm font-semibold text-white">
               <span>{projectedLabel}</span>
-              <span className="tabular-nums">{projectedAmount}</span>
+              <span data-private className="tabular-nums">
+                {projectedAmount}
+              </span>
             </div>
             {notCounted && <p className="text-xs text-slate">{notCounted}</p>}
           </div>

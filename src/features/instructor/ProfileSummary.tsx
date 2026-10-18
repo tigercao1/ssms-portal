@@ -23,7 +23,10 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
   }
   const initials = name.slice(0, 2).toUpperCase() || '–';
   return (
-    <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-navy font-display text-2xl text-white">
+    <div
+      data-private
+      className="flex h-20 w-20 items-center justify-center rounded-lg bg-navy font-display text-2xl text-white"
+    >
       {initials}
     </div>
   );

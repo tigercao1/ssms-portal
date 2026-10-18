@@ -430,7 +430,7 @@ function SummaryCard({ detail }: { detail: ClassImportDetail }) {
         <h2 className="text-lg">{t.classImport.summaryTitle}</h2>
         <StatusChip status={record.status} />
         <span className="min-w-0 truncate text-sm text-slate">
-          {record.filename} ·{' '}
+          <span data-private>{record.filename}</span> ·{' '}
           {fill(t.classImport.rowsCount, { count: summary.total })}
         </span>
       </div>

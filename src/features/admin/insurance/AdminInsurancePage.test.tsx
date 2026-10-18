@@ -21,6 +21,7 @@ import type {
 } from '@/features/insurance/types';
 import { AdminInsurancePage, INSURANCE_PAGE_SIZE } from './AdminInsurancePage';
 import { REQUEST_LOOKUP_LIMIT } from './insuranceApi';
+import { expectMaskedInReplay } from '@/test/replayPrivacy';
 
 const API = 'http://localhost:3000';
 
@@ -403,6 +404,7 @@ describe('AdminInsurancePage', () => {
       name: 'Mark INS-20261219-0002 paid',
     });
     expect(dialog).toHaveTextContent('Jane Snow · $40');
+    expectMaskedInReplay(within(dialog).getByText(/Jane Snow/));
     expect(within(dialog).getByLabelText(/Payment date/)).toHaveValue(
       '2026-12-20',
     );
@@ -436,6 +438,7 @@ describe('AdminInsurancePage', () => {
     const dialog = screen.getByRole('dialog', {
       name: 'Mark INS-20261212-0001 unpaid?',
     });
+    expectMaskedInReplay(within(dialog).getByText(/Jane Snow|@/));
     await user.click(
       within(dialog).getByRole('button', { name: 'Mark unpaid' }),
     );

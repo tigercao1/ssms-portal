@@ -1072,7 +1072,9 @@ function MarkPaidDialog({
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">{target.summary}</p>
+        <p data-private className="text-sm text-slate">
+          {target.summary}
+        </p>
         <WholeRequestNote whole={whole} />
         <Field label={s.paidOnLabel} required>
           {(p) => (
@@ -1147,7 +1149,9 @@ function MarkUnpaidDialog({
       }
     >
       <div className="flex flex-col gap-3 text-sm">
-        <p className="text-slate">{target.summary}</p>
+        <p data-private className="text-slate">
+          {target.summary}
+        </p>
         <WholeRequestNote whole={whole} />
         <p>
           {wholeRequest(target) ? s.requestMarkUnpaidBody : s.markUnpaidBody}

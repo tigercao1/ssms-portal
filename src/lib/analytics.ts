@@ -5,6 +5,8 @@ export type AnalyticsRole = 'admin' | 'instructor';
 
 const MASKED = '***';
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const IS_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const PRIVATE_TEXT_SELECTOR =
   '[data-private], tbody:not([data-public]), dd:not([data-public]), select';
@@ -50,6 +52,41 @@ const VISIBLE_ATTRIBUTES = new Set([
   'aria-modal',
 ]);
 
+const PRIVATE_SAFE_ATTRIBUTES = new Set([
+  'class',
+  'style',
+  'role',
+  'type',
+  'width',
+  'height',
+  'hidden',
+  'disabled',
+  'checked',
+  'colspan',
+  'rowspan',
+  'rr_width',
+  'rr_height',
+  'aria-hidden',
+]);
+const SAFE_SEGMENT = /^[a-z0-9._-]+$/;
+const STATIC_PREFIXES = ['/assets/', '/pdfjs/', '/src/', '/node_modules/'];
+const LAYOUT_LINK_RELS =
+  /\b(stylesheet|icon|preconnect|preload|modulepreload)\b/;
+
+export function sanitizePath(pathname: string): string {
+  if (STATIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)))
+    return pathname;
+  return pathname
+    .split('/')
+    .map((segment) =>
+      segment === '' || (SAFE_SEGMENT.test(segment) && !IS_UUID.test(segment))
+        ? segment
+        : ':id',
+    )
+    .join('/')
+    .replace(UUID, ':id');
+}
+
 function maskUrl(value: string): string {
   let url: URL;
   try {
@@ -58,7 +95,7 @@ function maskUrl(value: string): string {
     return MASKED;
   }
   if (url.origin !== window.location.origin) return MASKED;
-  return url.pathname.replace(UUID, ':id');
+  return sanitizePath(url.pathname);
 }
 
 export function maskReplayAttribute(
@@ -66,22 +103,26 @@ export function maskReplayAttribute(
   value: string,
   element?: Element,
 ): string {
-  const isPrivate = Boolean(element?.closest(PRIVATE_TEXT_SELECTOR));
-  if (name === 'href' || name === 'src') {
-    if (element?.tagName === 'LINK' && name === 'href') return value;
-    return isPrivate ? MASKED : maskUrl(value);
-  }
-  if (isPrivate && (name === 'placeholder' || name === 'data-testid'))
-    return MASKED;
+  if (element?.closest(PRIVATE_TEXT_SELECTOR))
+    return PRIVATE_SAFE_ATTRIBUTES.has(name) ? value : MASKED;
+  if (
+    element?.tagName === 'LINK' &&
+    LAYOUT_LINK_RELS.test(element.getAttribute('rel') ?? '')
+  )
+    return name === 'href' || VISIBLE_ATTRIBUTES.has(name) ? value : MASKED;
+  if (name === 'href' || name === 'src') return maskUrl(value);
   if (element instanceof SVGElement) return value;
   return VISIBLE_ATTRIBUTES.has(name) ? value : MASKED;
 }
 
 export function stripRequestUrl<T extends { name: string }>(request: T): T {
-  return {
-    ...request,
-    name: request.name.split(/[?#]/)[0]!.replace(UUID, ':id'),
-  };
+  let url: URL;
+  try {
+    url = new URL(request.name, window.location.origin);
+  } catch {
+    return { ...request, name: MASKED };
+  }
+  return { ...request, name: url.origin + sanitizePath(url.pathname) };
 }
 
 export const posthogConfig: Partial<PostHogConfig> = {

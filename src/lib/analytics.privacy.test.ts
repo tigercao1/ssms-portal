@@ -136,6 +136,37 @@ describe('PRIVATE_TEXT_SELECTOR', () => {
   });
 });
 
+describe('URL paths in replays', () => {
+  it('replaces path segments that could hold a name or email', () => {
+    const a = document.createElement('a');
+    expect(
+      maskReplayAttribute('href', '/admin/instructors/jane@example.com', a),
+    ).toBe('/admin/instructors/:id');
+    expect(
+      maskReplayAttribute('href', '/admin/instructors/Jane%20Doe', a),
+    ).toBe('/admin/instructors/:id');
+    expect(
+      stripRequestUrl({
+        name: 'https://api.example/admin/instructors/jane@example.com?q=1',
+      }).name,
+    ).toBe('https://api.example/admin/instructors/:id');
+  });
+
+  it('masks ids inside private containers', () => {
+    document.body.innerHTML =
+      '<ul data-private><li id="cal-jane@example.com">Jane</li></ul>';
+    const li = document.querySelector('li')!;
+    expect(maskReplayAttribute('id', li.id, li)).toBe('***');
+  });
+
+  it('keeps only layout links as-is', () => {
+    document.body.innerHTML =
+      '<link rel="alternate" href="https://x.example/jane@example.com">';
+    const link = document.querySelector('link')!;
+    expect(maskReplayAttribute('href', link.href, link)).toBe('***');
+  });
+});
+
 describe('stripRequestUrl', () => {
   it('drops query strings so presigned signatures never reach the replay', () => {
     expect(

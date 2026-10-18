@@ -201,7 +201,7 @@ function CertRow({
       }
     >
       {item.state === 'rejected' && item.reviewNote && (
-        <p className="mt-1 text-xs text-status-rejected">
+        <p data-private className="mt-1 text-xs text-status-rejected">
           {t.onboarding.reviewNote.replace('{note}', item.reviewNote)}
         </p>
       )}

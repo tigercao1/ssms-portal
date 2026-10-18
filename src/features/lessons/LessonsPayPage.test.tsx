@@ -13,6 +13,7 @@ import {
   rejectedLessons,
 } from './fixtures';
 import type { MyLessonsResponse } from './types';
+import { expectMaskedInReplay } from '@/test/replayPrivacy';
 
 const API = 'http://localhost:3000';
 
@@ -64,6 +65,7 @@ describe('LessonsPayPage upcoming lessons', () => {
     expect(rows[4]).toHaveTextContent(
       'Projected · 3 lessons(1 without a rate is not counted)$360.00',
     );
+    expectMaskedInReplay(screen.getByTestId('upcoming-projected'));
   });
 
   it('shows the upcoming lessons as cards with a total bar on a phone', async () => {
@@ -86,6 +88,8 @@ describe('LessonsPayPage upcoming lessons', () => {
     expect(list.parentElement).toHaveTextContent(
       'Projected · 3 lessons$360.00',
     );
+    expectMaskedInReplay(within(list.parentElement!).getByText('$360.00'));
+    for (const card of cards) expectMaskedInReplay(card);
   });
 
   it('says when nothing is upcoming but past periods exist', async () => {

@@ -310,7 +310,11 @@ function ClassRow({
             ))}
           </ul>
         )}
-        {item.notes && <p className="text-slate">{item.notes}</p>}
+        {item.notes && (
+          <p data-private className="text-slate">
+            {item.notes}
+          </p>
+        )}
       </div>
       <ClassActions item={item} />
     </div>

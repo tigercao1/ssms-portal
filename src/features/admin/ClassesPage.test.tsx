@@ -8,6 +8,7 @@ import { renderWithProviders } from '@/test/render';
 import { ClassesPage } from './ClassesPage';
 import { hideSyncToast } from './booking/syncToast';
 import type { AdminClass, AdminInstructorRecord } from '@/lib/types';
+import { expectMaskedInReplay } from '@/test/replayPrivacy';
 
 const API = 'http://localhost:3000';
 
@@ -140,6 +141,7 @@ describe('ClassesPage', () => {
     expect(
       within(list).getByText('Google said: 503:backendError'),
     ).toBeInTheDocument();
+    expectMaskedInReplay(within(list).getByText(/Jane Snow/));
     await user.click(screen.getByRole('button', { name: 'Hide list' }));
     expect(document.getElementById('calendar-sync-issues')).toBeNull();
 
@@ -253,6 +255,13 @@ describe('ClassesPage', () => {
       'max@example.com · No-show',
     );
     expect(first.getByText('Bring rental skis')).toBeInTheDocument();
+    for (const personal of [
+      ...first.getAllByText(/Jane Snow|Eddie Lee/),
+      first.getByText('Lily Chen'),
+      first.getByText(/max@example\.com/),
+      first.getByText('Bring rental skis'),
+    ])
+      expectMaskedInReplay(personal);
     expect(first.getByText('Private 2h')).toBeInTheDocument();
     expect(first.getByText('Promo 1-on-2 1h')).toBeInTheDocument();
     expect(first.getByText('· 60 min')).toBeInTheDocument();
