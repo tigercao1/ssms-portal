@@ -63,6 +63,37 @@ export function useInsuranceRequests(filter: AdminInsuranceFilter) {
   });
 }
 
+export const REQUEST_LOOKUP_LIMIT = 100;
+
+export function useRequestLessonCount(
+  request: { id: string; season: string; instructorId: string } | null,
+) {
+  return useQuery({
+    queryKey: [...insuranceKey, 'request-lessons', request] as const,
+    enabled: request !== null,
+    retry: false,
+    queryFn: async () => {
+      for (let page = 1; ; page++) {
+        const data = await api<AdminInsuranceRequestsPage>(
+          `/admin/insurance/requests?${recordsQuery({
+            season: request!.season,
+            instructorId: request!.instructorId,
+            page,
+            limit: REQUEST_LOOKUP_LIMIT,
+          })}`,
+        );
+        const match = data.requests.find((r) => r.id === request!.id);
+        if (match) return match.lessonCount;
+        if (
+          data.requests.length === 0 ||
+          page * REQUEST_LOOKUP_LIMIT >= data.total
+        )
+          return null;
+      }
+    },
+  });
+}
+
 function useRecordAction<TBody>(action: string) {
   const qc = useQueryClient();
   return useMutation({

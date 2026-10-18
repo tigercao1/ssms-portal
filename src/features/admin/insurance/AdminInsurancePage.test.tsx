@@ -7,9 +7,12 @@ import { renderWithProviders } from '@/test/render';
 import {
   adminRecord,
   adminRecords,
+  adminRequest,
   adminRequestHandlers,
   adminSummary,
+  buildRequest,
   createAdminRequestsState,
+  unpaidRequest,
   type AdminRequestsState,
 } from '@/features/insurance/fixtures';
 import type {
@@ -17,6 +20,7 @@ import type {
   AdminInsuranceSummary,
 } from '@/features/insurance/types';
 import { AdminInsurancePage, INSURANCE_PAGE_SIZE } from './AdminInsurancePage';
+import { REQUEST_LOOKUP_LIMIT } from './insuranceApi';
 
 const API = 'http://localhost:3000';
 
@@ -878,6 +882,139 @@ describe('AdminInsurancePage', () => {
     expect(
       within(screen.getByRole('dialog')).getByTestId('whole-request'),
     ).toHaveTextContent('这会更新整份投保 INS-20261014-0011（3 节课）');
+  });
+
+  describe('when the parent request is not on the loaded requests page', () => {
+    function offPageRequest() {
+      const big = adminRequest(
+        buildRequest(
+          {
+            id: 'req-big',
+            requestNo: 'INS-20261001-0010',
+            createdAt: '2026-10-01T15:00:00Z',
+          },
+          Array.from({ length: 10 }, (_, i) => ({
+            lessonDate: `2026-12-${String(i + 1).padStart(2, '0')}`,
+            durationHours: 1,
+            students: [{ name: `Student ${i + 1}`, waiverConfirmed: true }],
+          })),
+        ),
+      );
+      const filler = Array.from({ length: INSURANCE_PAGE_SIZE + 5 }, (_, i) =>
+        adminRequest(unpaidRequest, {
+          id: `req-fill-${i}`,
+          requestNo: `INS-20261015-${String(i + 100).padStart(4, '0')}`,
+        }),
+      );
+      requestsState = createAdminRequestsState([...filler, big]);
+      records = [
+        adminRecord({
+          id: 'req-big-l7',
+          recordNo: 'INS-20261001-0017',
+          requestId: 'req-big',
+          requestNo: 'INS-20261001-0010',
+          paymentStatus: 'unpaid',
+          paidOn: null,
+        }),
+      ];
+      total = 40;
+      server.use(...adminRequestHandlers(requestsState));
+    }
+
+    it('fetches the request before confirming and voids with its full lesson count', async () => {
+      offPageRequest();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      const lookups: URLSearchParams[] = [];
+      server.use(
+        http.get(`${API}/admin/insurance/requests`, async ({ request }) => {
+          const params = new URL(request.url).searchParams;
+          if (params.get('limit') !== String(REQUEST_LOOKUP_LIMIT))
+            return undefined;
+          lookups.push(params);
+          await gate;
+          return undefined;
+        }),
+        ...adminRequestHandlers(requestsState),
+      );
+      const user = await renderPage();
+      await screen.findByRole('row', { name: /INS-20261001-0017/ });
+      await waitFor(() =>
+        expect(requestsState.queries.length).toBeGreaterThan(0),
+      );
+      expect(
+        within(
+          screen.getByRole('table', { name: 'Insurance requests' }),
+        ).queryByText('INS-20261001-0010'),
+      ).not.toBeInTheDocument();
+
+      await recordAction(user, 'INS-20261001-0017', 'Void');
+      const dialog = screen.getByRole('dialog');
+      expect(
+        within(dialog).getByTestId('whole-request-loading'),
+      ).toBeInTheDocument();
+      const confirm = within(dialog).getByRole('button', {
+        name: 'Void request',
+      });
+      expect(confirm).toBeDisabled();
+      await waitFor(() => expect(lookups).toHaveLength(1));
+      expect(lookups[0]!.get('season')).toBe('2026/27');
+      expect(lookups[0]!.get('instructorId')).toBe('inst-1');
+
+      release();
+      await waitFor(() =>
+        expect(within(dialog).getByTestId('whole-request')).toHaveTextContent(
+          'This updates the whole request INS-20261001-0010 (10 lessons).',
+        ),
+      );
+      expect(confirm).toBeEnabled();
+      await user.type(within(dialog).getByLabelText(/Reason/), 'Duplicate');
+      await user.click(confirm);
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      );
+      expect(actions.at(-1)).toMatchObject({
+        id: 'req-big-l7',
+        action: 'void',
+      });
+    });
+
+    it('still warns about the whole request without a number when the request cannot be loaded', async () => {
+      offPageRequest();
+      server.use(
+        http.get(`${API}/admin/insurance/requests`, ({ request }) =>
+          new URL(request.url).searchParams.get('limit') ===
+          String(REQUEST_LOOKUP_LIMIT)
+            ? HttpResponse.json({ code: 'boom' }, { status: 500 })
+            : undefined,
+        ),
+        ...adminRequestHandlers(requestsState),
+      );
+      const user = await renderPage('zh-CN');
+      await screen.findByRole('row', { name: /INS-20261001-0017/ });
+      await recordAction(
+        user,
+        'INS-20261001-0017',
+        '标记已付',
+        'INS-20261001-0017 的操作',
+      );
+      const dialog = screen.getByRole('dialog');
+      await waitFor(() =>
+        expect(within(dialog).getByTestId('whole-request')).toHaveTextContent(
+          /^这会更新整份投保 INS-20261001-0010$/,
+        ),
+      );
+      const confirm = within(dialog).getByRole('button', { name: '标记已付' });
+      expect(confirm).toBeEnabled();
+      await user.click(confirm);
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      );
+      expect(actions.at(-1)).toMatchObject({
+        id: 'req-big-l7',
+        action: 'mark-paid',
+      });
+    });
   });
 
   it('applies the instructor and status filters to requests', async () => {

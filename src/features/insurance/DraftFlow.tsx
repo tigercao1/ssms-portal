@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Banner, Button, Card, Modal } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
@@ -152,6 +152,8 @@ export function DraftFlow({
   const f = useInsuranceText();
   const s = f.s;
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const to = (pathname: string) => ({ pathname, search });
   const empty = useMemo(newDraft, []);
   const draft = state.draft ?? empty;
   const { season, totals, pending, priced, total, issues } = useDraftQuote(
@@ -172,7 +174,7 @@ export function DraftFlow({
 
   if (sent.current) return <>{children}</>;
   if (mode === 'review' && (count === 0 || issues.length > 0))
-    return <Navigate to={EDIT_PATH} replace />;
+    return <Navigate to={to(EDIT_PATH)} replace />;
 
   function attemptReview() {
     if (count === 0 || pending) return;
@@ -181,7 +183,7 @@ export function DraftFlow({
       jumpToIssue(issues[0]!, draft, state.update);
       return;
     }
-    navigate(REVIEW_PATH);
+    navigate(to(REVIEW_PATH));
   }
 
   function send() {
@@ -189,9 +191,15 @@ export function DraftFlow({
     submit.mutate(draftBody(draft), {
       onSuccess: (request) => {
         sent.current = true;
-        navigate(LIST_PATH, {
-          state: { submitted: { id: request.id, no: request.requestNo } },
-        });
+        navigate(
+          {
+            pathname: LIST_PATH,
+            search: `?${new URLSearchParams({ season: request.seasonKey })}`,
+          },
+          {
+            state: { submitted: { id: request.id, no: request.requestNo } },
+          },
+        );
         state.discard();
       },
     });
@@ -201,14 +209,14 @@ export function DraftFlow({
     if (count > 0) setConfirming(true);
     else {
       state.discard();
-      navigate(LIST_PATH);
+      navigate(to(LIST_PATH));
     }
   }
 
   function discardDraft() {
     setConfirming(false);
     state.discard();
-    navigate(LIST_PATH);
+    navigate(to(LIST_PATH));
     onToast(s.discarded);
   }
 
@@ -342,7 +350,7 @@ export function DraftFlow({
                 variant="ghost"
                 size="sm"
                 className="-ml-2"
-                onClick={() => navigate(EDIT_PATH)}
+                onClick={() => navigate(to(EDIT_PATH))}
               >
                 ← {s.backToEdit}
               </Button>
@@ -372,7 +380,7 @@ export function DraftFlow({
       <div className="-ml-2 mb-1.5">
         <Button
           variant="ghost"
-          onClick={() => navigate(mode === 'edit' ? LIST_PATH : EDIT_PATH)}
+          onClick={() => navigate(to(mode === 'edit' ? LIST_PATH : EDIT_PATH))}
         >
           ← {mode === 'edit' ? s.backToList : s.backToEdit}
         </Button>

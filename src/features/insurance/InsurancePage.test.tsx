@@ -59,7 +59,13 @@ beforeEach(() => setDesktop(false));
 afterEach(() => vi.unstubAllGlobals());
 
 function Where() {
-  return <span data-testid="path">{useLocation().pathname}</span>;
+  const { pathname, search } = useLocation();
+  return (
+    <>
+      <span data-testid="path">{pathname}</span>
+      <span data-testid="search">{search}</span>
+    </>
+  );
 }
 
 async function renderPage({
@@ -85,6 +91,8 @@ async function renderPage({
 }
 
 const path = () => screen.getByTestId('path').textContent;
+const search = () =>
+  new URLSearchParams(screen.getByTestId('search').textContent ?? '');
 const cards = () => screen.getAllByTestId('lesson');
 
 interface LessonInput {
@@ -181,7 +189,9 @@ describe('InsurancePage list', () => {
         '教练自行售出的私人课程，学员签署俱乐部 waiver 后，可按 $10/小时/学员 的标准投保。保险费每雪季 $400 封顶，达到上限后不再收取。',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('season-badge')).toHaveTextContent('2026/27');
+    await waitFor(() =>
+      expect(screen.getByTestId('season-select')).toHaveValue('2026/27'),
+    );
     expect(screen.getByTestId('cap-total')).toHaveTextContent(
       '本季累计 $350 / $400',
     );
@@ -1025,6 +1035,26 @@ describe('InsurancePage draft editing', () => {
   });
 });
 
+async function expectSubmittedIn(season: string, no: string, total: string) {
+  await waitFor(() => expect(search().get('season')).toBe(season));
+  await waitFor(() =>
+    expect(screen.getByTestId('season-select')).toHaveValue(season),
+  );
+  const entries = await screen.findAllByTestId('entry');
+  const entry = entries.find(
+    (e) => within(e).getByTestId('entry-no').textContent === no,
+  )!;
+  expect(entry).toBeVisible();
+  expect(within(entry).getByText('New')).toBeInTheDocument();
+  expect(entry).toHaveClass('border-red');
+  expect(within(entry).getByTestId('entry-total')).toHaveTextContent(total);
+  expect(within(entry).getByTestId('request-status')).toHaveTextContent(
+    'Unpaid',
+  );
+  expect(within(entry).getAllByTestId('tree-lesson')).toHaveLength(1);
+  expect(screen.getByRole('status')).toHaveTextContent(`Submitted ${no}`);
+}
+
 describe('InsurancePage seasons', () => {
   function serveSeasons() {
     state = createInsuranceState(withRequests, {
@@ -1067,6 +1097,11 @@ describe('InsurancePage seasons', () => {
     await waitFor(() => expect(path()).toBe('/insurance'));
     expect(state.posts[0]!.lessons[0]!.lessonDate).toBe('2026-02-14');
     expect(state.seasons['2025/26']!.requests[0]!.seasonKey).toBe('2025/26');
+    await expectSubmittedIn('2025/26', 'INS-20261018-0012', '$10');
+    expect(screen.getByTestId('cap-total')).toHaveTextContent(
+      'Season total $400 / $400',
+    );
+    expect(screen.getByRole('status')).toHaveClass('top-4');
   });
 
   it("insures a next-season lesson against that season's totals", async () => {
@@ -1084,6 +1119,82 @@ describe('InsurancePage seasons', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Review & submit' }));
     expect(path()).toBe('/insurance/new/review');
+    await user.click(screen.getByRole('button', { name: 'Submit · $10 due' }));
+    await expectSubmittedIn('2027/28', 'INS-20261018-0012', '$10');
+    expect(screen.getByTestId('cap-total')).toHaveTextContent(
+      'Season total $10 / $400',
+    );
+  });
+
+  it('lands a desktop submission on its season with the entry highlighted', async () => {
+    setDesktop(true);
+    serveSeasons();
+    const { user } = await renderPage({
+      route: '/insurance/new',
+      locale: 'zh-CN',
+    });
+    await addLesson(
+      user,
+      { date: '2026-02-14', students: [['Anna', true]] },
+      false,
+    );
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('dialog')).getByTestId('cap-total'),
+      ).toHaveTextContent('本季累计 $390 / $400'),
+    );
+    await user.click(screen.getByRole('button', { name: '核对并提交' }));
+    await user.click(
+      screen.getByRole('button', { name: '提交投保 · 应付 $10' }),
+    );
+    await waitFor(() => expect(path()).toBe('/insurance'));
+    await waitFor(() => expect(search().get('season')).toBe('2025/26'));
+    const entry = (await screen.findAllByTestId('entry')).find(
+      (e) =>
+        within(e).getByTestId('entry-no').textContent === 'INS-20261018-0012',
+    )!;
+    expect(entry).toBeVisible();
+    expect(entry).toHaveClass('border-red');
+    expect(within(entry).getByText('新')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('INS-20261018-0012');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('switches the list, progress and statuses with the season selector', async () => {
+    serveSeasons();
+    state.seasons['2025/26']!.requests = [
+      buildRequest(
+        {
+          id: 'req-old',
+          requestNo: 'INS-20260214-0003',
+          createdAt: '2026-02-14T15:00:00Z',
+          owedCents: 39000,
+          seasonKey: '2025/26',
+        },
+        [
+          {
+            lessonDate: '2026-02-14',
+            durationHours: 1,
+            students: [{ name: 'Zoe', waiverConfirmed: true }],
+          },
+        ],
+      ),
+    ];
+    const { user } = await renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId('season-select')).toHaveValue('2026/27'),
+    );
+    expect(screen.getByText('INS-20261014-0011')).toBeInTheDocument();
+    await user.selectOptions(screen.getByTestId('season-select'), '2025/26');
+    await waitFor(() => expect(search().get('season')).toBe('2025/26'));
+    expect(await screen.findByText('INS-20260214-0003')).toBeInTheDocument();
+    expect(screen.queryByText('INS-20261014-0011')).not.toBeInTheDocument();
+    expect(screen.getByTestId('season-select')).toHaveValue('2025/26');
+    expect(screen.getByTestId('cap-total')).toHaveTextContent(
+      'Season total $390 / $400',
+    );
+    expect(screen.getByTestId('request-status')).toHaveTextContent('Unpaid');
+    expect(state.seasonQueries).toContain('2025/26');
   });
 
   it('blocks a request whose lessons span two seasons, naming the lesson', async () => {

@@ -1662,6 +1662,7 @@ export interface Messages {
     requestVoidConfirm: string;
     partOfRequest: string;
     wholeRequestNote: string;
+    wholeRequestNoteNoCount: string;
     requestsPagerLabel: string;
     pagerLabel: string;
     pagerShowing: string;

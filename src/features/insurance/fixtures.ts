@@ -414,7 +414,12 @@ export function adminRequestHandlers(state: AdminRequestsState) {
           (!params.get('paymentStatus') ||
             r.paymentStatus === params.get('paymentStatus')),
       );
-      return HttpResponse.json({ requests: rows, total: rows.length });
+      const limit = Number(params.get('limit') ?? rows.length);
+      const offset = (Number(params.get('page') ?? 1) - 1) * limit;
+      return HttpResponse.json({
+        requests: rows.slice(offset, offset + limit),
+        total: rows.length,
+      });
     }),
     http.post(
       `${API}/admin/insurance/requests/:id/:action`,

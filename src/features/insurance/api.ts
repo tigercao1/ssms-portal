@@ -5,10 +5,15 @@ import { track } from '@/lib/analytics';
 
 export const MY_INSURANCE_KEY = ['me', 'insurance'] as const;
 
-export function useMyInsurance() {
+export function useMyInsurance(season: string | null = null) {
   return useQuery({
-    queryKey: MY_INSURANCE_KEY,
-    queryFn: () => api<MyInsurance>('/me/insurance'),
+    queryKey: season ? [...MY_INSURANCE_KEY, { season }] : MY_INSURANCE_KEY,
+    queryFn: () =>
+      api<MyInsurance>(
+        season
+          ? `/me/insurance?season=${encodeURIComponent(season)}`
+          : '/me/insurance',
+      ),
   });
 }
 

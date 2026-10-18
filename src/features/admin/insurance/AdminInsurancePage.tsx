@@ -52,6 +52,7 @@ import {
   useMarkRequestPaid,
   useMarkRequestUnpaid,
   useMarkUnpaid,
+  useRequestLessonCount,
   useVoidRecord,
   useVoidRequest,
 } from './insuranceApi';
@@ -70,7 +71,13 @@ interface ActionTarget {
   id: string;
   no: string;
   summary: string;
-  request?: { no: string; lessons: number };
+  request?: {
+    id: string;
+    no: string;
+    season: string;
+    instructorId: string;
+    lessons: number | null;
+  };
 }
 
 type Dialog =
@@ -521,19 +528,46 @@ function wholeRequest(target: Pick<ActionTarget, 'kind' | 'request'>) {
   return target.kind === 'request' || Boolean(target.request);
 }
 
-function WholeRequestNote({
-  target,
-}: {
-  target: Pick<ActionTarget, 'request'>;
-}) {
+function useWholeRequest(target: Pick<ActionTarget, 'request'>) {
+  const request = target.request;
+  const lookup = useRequestLessonCount(
+    request && request.lessons === null
+      ? {
+          id: request.id,
+          season: request.season,
+          instructorId: request.instructorId,
+        }
+      : null,
+  );
+  if (!request) return null;
+  if (request.lessons !== null)
+    return { no: request.no, lessons: request.lessons, loading: false };
+  return {
+    no: request.no,
+    lessons: lookup.data ?? null,
+    loading: lookup.isPending,
+  };
+}
+
+type WholeRequest = ReturnType<typeof useWholeRequest>;
+
+function WholeRequestNote({ whole }: { whole: WholeRequest }) {
   const f = useInsuranceText();
   const s = useT().adminInsurance;
-  if (!target.request) return null;
+  if (!whole) return null;
   return (
     <p data-testid="whole-request" className="text-sm font-semibold text-navy">
-      {s.wholeRequestNote
-        .replace('{requestNo}', target.request.no)
-        .replace('{lessons}', f.lessons(target.request.lessons))}
+      {whole.loading ? (
+        <span data-testid="whole-request-loading">
+          <Spinner />
+        </span>
+      ) : whole.lessons === null ? (
+        s.wholeRequestNoteNoCount.replace('{requestNo}', whole.no)
+      ) : (
+        s.wholeRequestNote
+          .replace('{requestNo}', whole.no)
+          .replace('{lessons}', f.lessons(whole.lessons))
+      )}
     </p>
   );
 }
@@ -679,13 +713,13 @@ function RecordsTable({
                           ...(r.requestId &&
                             r.requestNo && {
                               request: {
+                                id: r.requestId,
                                 no: r.requestNo,
+                                season: r.seasonKey,
+                                instructorId: r.instructorId,
                                 lessons:
                                   requests.find((x) => x.id === r.requestId)
-                                    ?.lessonCount ??
-                                  rows.filter(
-                                    (x) => x.requestId === r.requestId,
-                                  ).length,
+                                    ?.lessonCount ?? null,
                               },
                             }),
                         }}
@@ -997,12 +1031,14 @@ function MarkPaidDialog({
   const recordAction = useMarkPaid();
   const requestAction = useMarkRequestPaid();
   const markPaid = target.kind === 'request' ? requestAction : recordAction;
+  const whole = useWholeRequest(target);
+  const counting = Boolean(whole?.loading);
   const [paidOn, setPaidOn] = useState(() => todayIso());
   const [note, setNote] = useState('');
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (!paidOn || markPaid.isPending) return;
+    if (!paidOn || counting || markPaid.isPending) return;
     markPaid.mutate(
       {
         id: target.id,
@@ -1027,7 +1063,7 @@ function MarkPaidDialog({
           </Button>
           <Button
             loading={markPaid.isPending}
-            disabled={!paidOn}
+            disabled={!paidOn || counting}
             onClick={() => submit()}
           >
             {s.markPaidConfirm}
@@ -1037,7 +1073,7 @@ function MarkPaidDialog({
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <p className="text-sm text-slate">{target.summary}</p>
-        <WholeRequestNote target={target} />
+        <WholeRequestNote whole={whole} />
         <Field label={s.paidOnLabel} required>
           {(p) => (
             <Input
@@ -1081,6 +1117,7 @@ function MarkUnpaidDialog({
   const recordAction = useMarkUnpaid();
   const requestAction = useMarkRequestUnpaid();
   const markUnpaid = target.kind === 'request' ? requestAction : recordAction;
+  const whole = useWholeRequest(target);
   return (
     <Modal
       title={s.markUnpaidTitle.replace('{recordNo}', target.no)}
@@ -1096,6 +1133,7 @@ function MarkUnpaidDialog({
           </Button>
           <Button
             loading={markUnpaid.isPending}
+            disabled={Boolean(whole?.loading)}
             onClick={() =>
               markUnpaid.mutate(
                 { id: target.id },
@@ -1110,7 +1148,7 @@ function MarkUnpaidDialog({
     >
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-slate">{target.summary}</p>
-        <WholeRequestNote target={target} />
+        <WholeRequestNote whole={whole} />
         <p>
           {wholeRequest(target) ? s.requestMarkUnpaidBody : s.markUnpaidBody}
         </p>
@@ -1266,6 +1304,8 @@ function VoidDialog({
   const recordAction = useVoidRecord();
   const requestAction = useVoidRequest();
   const voidRecord = target.kind === 'request' ? requestAction : recordAction;
+  const whole = useWholeRequest(target);
+  const counting = Boolean(whole?.loading);
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const missing = !reason.trim();
@@ -1273,7 +1313,7 @@ function VoidDialog({
   function submit(e?: FormEvent) {
     e?.preventDefault();
     setTouched(true);
-    if (missing || voidRecord.isPending) return;
+    if (missing || counting || voidRecord.isPending) return;
     voidRecord.mutate(
       { id: target.id, body: { reason: reason.trim() } },
       { onSuccess: () => onDone() },
@@ -1296,7 +1336,7 @@ function VoidDialog({
           <Button
             variant="danger"
             loading={voidRecord.isPending}
-            disabled={touched && missing}
+            disabled={(touched && missing) || counting}
             onClick={() => submit()}
           >
             {confirm}
@@ -1306,7 +1346,7 @@ function VoidDialog({
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
         <p className="text-sm text-slate">{summary}</p>
-        <WholeRequestNote target={target} />
+        <WholeRequestNote whole={whole} />
         <p className="text-sm">{body}</p>
         <Field
           label={s.voidReason}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Banner, Button, Card, Modal, Spinner } from '@/components';
 import { useSession } from '@/auth/SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
@@ -8,6 +8,7 @@ import {
   LockIcon,
   OnboardingIncompleteLocked,
 } from '@/features/documents/onboarding/Locked';
+import { SeasonSelect } from '@/features/reference/SeasonSelect';
 import { useMyInsurance } from './api';
 import { useInsuranceDraft } from './draft';
 import {
@@ -35,7 +36,10 @@ interface ListLocationState {
 export function InsurancePage() {
   const t = useT();
   const { pathname } = useLocation();
-  const { data, isLoading, isError, refetch } = useMyInsurance();
+  const [searchParams] = useSearchParams();
+  const { data, isLoading, isError, refetch } = useMyInsurance(
+    searchParams.get('season'),
+  );
   const mode: DraftMode | null =
     pathname === REVIEW_PATH
       ? 'review'
@@ -84,9 +88,11 @@ export function InsurancePage() {
 function PageHeader({
   data,
   action,
+  onSeason,
 }: {
   data: MyInsurance;
   action?: ReactNode;
+  onSeason?: (key: string) => void;
 }) {
   const t = useT();
   return (
@@ -94,9 +100,20 @@ function PageHeader({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="flex flex-wrap items-center gap-2.5 text-[28px] leading-tight">
           {t.insurance.title}
-          <SeasonPill season={data.season?.key ?? null} />
+          {!onSeason && <SeasonPill season={data.season?.key ?? null} />}
         </h1>
-        {action}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onSeason && (
+            <SeasonSelect
+              data-testid="season-select"
+              aria-label={t.seasons.colKey}
+              className="w-44"
+              value={data.season?.key ?? ''}
+              onChange={onSeason}
+            />
+          )}
+          {action}
+        </div>
       </div>
       <p className="mt-2.5 max-w-2xl text-[14.5px] text-slate">
         {t.insurance.headerCopy}
@@ -126,8 +143,11 @@ function InsuranceBody({
     if (!submitted) return;
     setHighlightId(submitted.id);
     showToast(fill(s.submittedToast, { no: submitted.no }));
-    navigate(LIST_PATH, { replace: true, state: null });
-  }, [submitted, showToast, navigate, s.submittedToast]);
+    navigate(
+      { pathname: LIST_PATH, search: location.search },
+      { replace: true, state: null },
+    );
+  }, [submitted, showToast, navigate, location.search, s.submittedToast]);
 
   const canCreate = data.season !== null;
   const list = (
@@ -179,16 +199,19 @@ function ListView({
   const f = useInsuranceText();
   const s = f.s;
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
+  const { search } = useLocation();
   const quote = useDraftQuote(state.draft, data);
   const [confirming, setConfirming] = useState(false);
   const draftLessons = state.draft?.lessons.length ?? 0;
   const hasDraft = draftLessons > 0;
-  const openDraft = () => navigate(EDIT_PATH);
+  const openDraft = () => navigate({ pathname: EDIT_PATH, search });
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         data={data}
+        onSeason={(key) => setSearchParams({ season: key })}
         action={
           canCreate ? (
             <Button data-testid="new-request" onClick={openDraft}>

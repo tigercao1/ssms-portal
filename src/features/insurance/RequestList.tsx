@@ -126,7 +126,10 @@ function EntryCard({
   useEffect(() => {
     if (!highlighted) return;
     setOpen(true);
-    ref.current?.scrollIntoView?.({ block: 'center' });
+    const frame = requestAnimationFrame(() =>
+      ref.current?.scrollIntoView?.({ block: 'center' }),
+    );
+    return () => cancelAnimationFrame(frame);
   }, [highlighted]);
 
   let no: string;

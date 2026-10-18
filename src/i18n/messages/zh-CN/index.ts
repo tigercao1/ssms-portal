@@ -1710,6 +1710,7 @@ export const zhCN: Messages = {
     requestVoidConfirm: '作废投保记录',
     partOfRequest: '属于 {requestNo}',
     wholeRequestNote: '这会更新整份投保 {requestNo}（{lessons}）',
+    wholeRequestNoteNoCount: '这会更新整份投保 {requestNo}',
     requestsPagerLabel: '投保记录分页',
     pagerLabel: '记录分页',
     pagerShowing: '第 {from}–{to} 条，共 {total} 条',

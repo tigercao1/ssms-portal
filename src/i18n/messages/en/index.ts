@@ -1792,6 +1792,7 @@ export const en: Messages = {
     requestVoidConfirm: 'Void request',
     partOfRequest: 'Part of {requestNo}',
     wholeRequestNote: 'This updates the whole request {requestNo} ({lessons}).',
+    wholeRequestNoteNoCount: 'This updates the whole request {requestNo}.',
     requestsPagerLabel: 'Request pages',
     pagerLabel: 'Records pages',
     pagerShowing: '{from}–{to} of {total}',
