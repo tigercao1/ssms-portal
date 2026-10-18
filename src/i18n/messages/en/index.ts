@@ -130,7 +130,7 @@ export const en: Messages = {
     openMenu: 'Open menu',
     closeMenu: 'Close menu',
     onboardingLocked: 'Locked until your profile is approved',
-    lessonsLockedOnboarding: 'Locked until you finish onboarding',
+    onboardingIncompleteLocked: 'Locked until you finish onboarding',
   },
   status: {
     pending: 'Pending',
@@ -1674,6 +1674,10 @@ export const en: Messages = {
       "You can't register private lessons for insurance. Contact SSnow if you have questions.",
     lockedEmpty:
       'Only approved instructors can register private lessons for insurance.',
+    onboardingTitle: 'Finish onboarding to use private lesson insurance',
+    onboardingBody:
+      'Private lesson insurance opens once every required document and certification on your onboarding checklist is done.',
+    onboardingOpen: 'Go to onboarding',
   },
   adminInsurance: {
     title: 'Lesson insurance',

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
@@ -91,6 +92,44 @@ export function lockText(
     default:
       return [t.onboarding.lockedTitle, t.onboarding.lockedBody];
   }
+}
+
+export function OnboardingIncompleteLocked({
+  title,
+  body,
+  linkLabel,
+}: {
+  title: string;
+  body: string;
+  linkLabel: string;
+}) {
+  return (
+    <>
+      <div
+        role="status"
+        className="flex items-start gap-3 rounded-md border-l-[3px] border-l-status-pending bg-surface px-4 py-3 text-sm shadow-card"
+      >
+        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-sunken text-status-pending">
+          <LockIcon />
+        </span>
+        <div>
+          <p className="font-semibold text-navy">{title}</p>
+          <p className="text-ink">{body}</p>
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken text-status-pending">
+          <LockIcon className="h-6 w-6" />
+        </span>
+        <Link
+          to="/onboarding"
+          className="text-sm font-medium text-navy underline underline-offset-4 hover:text-red"
+        >
+          {linkLabel}
+        </Link>
+      </div>
+    </>
+  );
 }
 
 /** Greyed, non-interactive rows previewing what unlocks on approval. */

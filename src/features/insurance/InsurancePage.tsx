@@ -2,7 +2,10 @@ import { useRef } from 'react';
 import { Banner, Button, Card, Spinner } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
-import { LockIcon } from '@/features/documents/onboarding/Locked';
+import {
+  LockIcon,
+  OnboardingIncompleteLocked,
+} from '@/features/documents/onboarding/Locked';
 import { useMyInsurance } from './api';
 import { InsuranceRecords } from './InsuranceRecords';
 import { dollars } from './money';
@@ -59,7 +62,13 @@ export function InsurancePage() {
           </p>
         )}
       </header>
-      {data.locked ? (
+      {data.locked && data.lockReason === 'onboarding_incomplete' ? (
+        <OnboardingIncompleteLocked
+          title={t.insurance.onboardingTitle}
+          body={t.insurance.onboardingBody}
+          linkLabel={t.insurance.onboardingOpen}
+        />
+      ) : data.locked ? (
         <LockedInsurance reason={data.lockReason ?? 'pending_approval'} />
       ) : (
         <InsuranceBody data={data} />

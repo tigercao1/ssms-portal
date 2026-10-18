@@ -1,12 +1,14 @@
 import { useId, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Banner, Button, Card, Spinner } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import type { Locale } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/features/admin/payroll/payrollFormat';
-import { LockIcon } from '@/features/documents/onboarding/Locked';
+import {
+  LockIcon,
+  OnboardingIncompleteLocked,
+} from '@/features/documents/onboarding/Locked';
 import { StatePill } from '@/features/documents/onboarding/StatePill';
 import { useMyLessons } from './api';
 import {
@@ -66,20 +68,11 @@ function LessonsBody({ data }: { data: MyLessonsResponse }) {
   const t = useT();
   if (data.locked && data.lockReason === 'onboarding_incomplete')
     return (
-      <>
-        <LessonsBanner reason="onboarding_incomplete" />
-        <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken text-status-pending">
-            <LockIcon className="h-6 w-6" />
-          </span>
-          <Link
-            to="/onboarding"
-            className="text-sm font-medium text-navy underline underline-offset-4 hover:text-red"
-          >
-            {t.myLessons.onboardingOpen}
-          </Link>
-        </div>
-      </>
+      <OnboardingIncompleteLocked
+        title={t.myLessons.onboardingTitle}
+        body={t.myLessons.onboardingBody}
+        linkLabel={t.myLessons.onboardingOpen}
+      />
     );
   if (data.locked && data.lockReason !== 'rejected')
     return (
@@ -114,17 +107,17 @@ function LessonsBody({ data }: { data: MyLessonsResponse }) {
   );
 }
 
-function LessonsBanner({ reason }: { reason: LessonsLockReason }) {
+function LessonsBanner({
+  reason,
+}: {
+  reason: Exclude<LessonsLockReason, 'onboarding_incomplete'>;
+}) {
   const t = useT();
   const rejected = reason === 'rejected';
   const copy = {
     pending_approval: {
       title: t.myLessons.pendingTitle,
       body: t.myLessons.pendingBody,
-    },
-    onboarding_incomplete: {
-      title: t.myLessons.onboardingTitle,
-      body: t.myLessons.onboardingBody,
     },
     rejected: {
       title: t.myLessons.rejectedTitle,
