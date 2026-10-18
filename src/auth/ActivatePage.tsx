@@ -10,6 +10,8 @@ import { supabase } from '@/lib/supabase';
 import { ApiError } from '@/lib/api';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Input, Spinner } from '@/components';
+import { ResendButton } from './ResendButton';
+import { useResendCooldown } from './useResendCooldown';
 import { AuthLayout } from './AuthLayout';
 import { useSession } from './SessionProvider';
 import { redeemActivation, resendActivation } from './activationApi';
@@ -129,28 +131,29 @@ export function ActivatePage() {
 function ExpiredLink({ initialEmail }: { initialEmail: string }) {
   const t = useT();
   const [email, setEmail] = useState(initialEmail);
-  const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cooldown = useResendCooldown('activation', email);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) return;
-    setError(null);
-    setBusy(true);
-    try {
-      await resendActivation(trimmed);
-      setSent(true);
-    } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 429
-          ? t.activation.resendRateLimited
-          : t.auth.genericError,
-      );
-    } finally {
-      setBusy(false);
-    }
+    await cooldown.send(async () => {
+      setError(null);
+      try {
+        await resendActivation(trimmed);
+        setSent(true);
+        return 'sent';
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 429) {
+          setError(t.activation.resendRateLimited);
+          return 'rate-limited';
+        }
+        setError(t.auth.genericError);
+        return 'failed';
+      }
+    });
   }
 
   return (
@@ -172,9 +175,14 @@ function ExpiredLink({ initialEmail }: { initialEmail: string }) {
             />
           )}
         </Field>
-        <Button type="submit" loading={busy} className="w-full">
+        <ResendButton
+          type="submit"
+          busy={cooldown.busy}
+          secondsLeft={cooldown.secondsLeft}
+          className="w-full"
+        >
           {t.activation.resendButton}
-        </Button>
+        </ResendButton>
         <Link
           to="/login"
           className="text-center text-sm text-navy hover:underline"

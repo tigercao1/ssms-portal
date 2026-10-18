@@ -78,6 +78,7 @@ export const en: Messages = {
       'If an account exists for this address, a sign-in link is on its way. Open it to sign in — no password needed.',
     rateLimited:
       'Too many emails were requested. Please wait a minute and try again.',
+    resendIn: 'Resend in {seconds}s',
   },
   activation: {
     verifyingTitle: 'Activating your account…',

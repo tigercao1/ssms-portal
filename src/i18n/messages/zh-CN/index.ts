@@ -73,6 +73,7 @@ export const zhCN: Messages = {
     magicLinkSentBody:
       '如果该邮箱已注册账户，登录链接已发送至您的邮箱。点击链接即可登录，无需密码。',
     rateLimited: '邮件发送过于频繁，请稍等一分钟后再试。',
+    resendIn: '{seconds} 秒后可重新发送',
   },
   activation: {
     verifyingTitle: '正在激活您的账户…',

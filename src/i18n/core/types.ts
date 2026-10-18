@@ -74,6 +74,7 @@ export interface Messages {
     magicLinkSentTitle: string;
     magicLinkSentBody: string;
     rateLimited: string;
+    resendIn: string;
   };
   activation: {
     verifyingTitle: string;
