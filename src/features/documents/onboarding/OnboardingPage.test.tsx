@@ -82,10 +82,12 @@ describe('OnboardingPage', () => {
     expect(screen.getByText('Documents to read')).toBeInTheDocument();
     expect(screen.getByText('Documents to sign')).toBeInTheDocument();
     expect(screen.getByText('Certifications')).toBeInTheDocument();
-    expect(screen.getAllByText('5 of 9 done')[0]).toBeInTheDocument();
+    expect(
+      screen.getByText('4 of 9 done · 1 awaiting review'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute(
       'aria-valuenow',
-      '5',
+      '4',
     );
 
     expect(
@@ -122,7 +124,9 @@ describe('OnboardingPage', () => {
     expect(
       row('CASI Level 2').getByText('Reviewer note: Photo is blurry'),
     ).toBeInTheDocument();
-    expect(row('CSIA Carving Level 1').getByText('Valid')).toBeInTheDocument();
+    expect(
+      row('CSIA Carving Level 1').getByText('Verified'),
+    ).toBeInTheDocument();
     expect(row('CSIA Carving Level 1').queryByRole('button')).toBeNull();
     expect(
       row('CASI Carving Level 1').getByText('Not uploaded'),
@@ -134,11 +138,57 @@ describe('OnboardingPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows pending uploads as awaiting review', async () => {
+  it('marks an upload awaiting review in yellow and keeps it out of the done count', async () => {
+    state.assignments = state.assignments.filter(
+      (a) => a.status === 'completed',
+    );
     state.certUploads = [fakeCertUpload({ validUntil: '2027-12-31' })];
     state.meCerts = [{ org: 'csia', track: 'regular', level: 3 }];
     renderWithProviders(<OnboardingPage />);
-    expect(await screen.findByText('Awaiting review')).toBeInTheDocument();
+    const pill = await screen.findByText('Awaiting review');
+    expect(pill.closest('span')!.style.borderColor).toBe(
+      'var(--status-pending)',
+    );
+    const marker = screen
+      .getByText('CSIA Level 3')
+      .closest('li')!
+      .querySelector('[aria-hidden]')!;
+    expect(marker).toHaveClass('border-status-pending');
+    expect(marker).toHaveTextContent('');
+    expect(
+      screen.getByText('2 of 3 done · 1 awaiting review'),
+    ).toBeInTheDocument();
+    const bar = screen.getByRole('progressbar', {
+      name: '2 of 3 done · 1 awaiting review',
+    });
+    expect(bar).toHaveAttribute('aria-valuenow', '2');
+    expect(
+      bar.querySelector<HTMLElement>('.bg-status-pending')!.style.width,
+    ).toMatch(/^33\.3/);
+    expect(screen.queryByText('All required items are done.')).toBeNull();
+  });
+
+  it('says all required items are done once nothing is awaiting review', async () => {
+    state.assignments = state.assignments.filter(
+      (a) => a.status === 'completed',
+    );
+    state.certUploads = [
+      fakeCertUpload({ reviewStatus: 'approved', validUntil: '2027-12-31' }),
+    ];
+    state.meCerts = [{ org: 'csia', track: 'regular', level: 3 }];
+    renderWithProviders(<OnboardingPage />);
+    expect(
+      await screen.findByText('All required items are done.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('3 of 3 done')).toBeInTheDocument();
+    const marker = screen
+      .getByText('CSIA Level 3')
+      .closest('li')!
+      .querySelector('[aria-hidden]')!;
+    expect(marker).toHaveTextContent('✓');
+    expect(
+      screen.getByRole('progressbar').querySelector('.bg-status-pending'),
+    ).toBeNull();
   });
 
   it('requires a file and a valid-until date of today or later, then uploads', async () => {
@@ -270,7 +320,9 @@ describe('OnboardingPage', () => {
     expect(
       await screen.findByRole('heading', { name: '入职资料 · 2026/27 雪季' }),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('已完成 5 / 9')[0]).toBeInTheDocument();
+    expect(screen.getByText('已完成 4 / 9 · 1 项待审核')).toBeInTheDocument();
+    expect(row('CSIA 级别 3').getByText('待审核')).toBeInTheDocument();
+    expect(row('CSIA 刻滑 级别 1').getByText('已验证')).toBeInTheDocument();
     expect(screen.getByText('教练手册')).toBeInTheDocument();
     expect(screen.getAllByText('已过期').length).toBeGreaterThan(0);
   });
@@ -311,7 +363,9 @@ describe('OnboardingPage', () => {
 describe('OnboardingCard', () => {
   it('summarises progress and links to the checklist', async () => {
     renderWithProviders(<OnboardingCard />);
-    expect(await screen.findByText('5 of 9 done')).toBeInTheDocument();
+    expect(
+      await screen.findByText('4 of 9 done · 1 awaiting review'),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Go to onboarding' }),
     ).toHaveAttribute('href', '/onboarding');

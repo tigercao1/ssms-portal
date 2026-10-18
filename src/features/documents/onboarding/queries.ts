@@ -99,7 +99,7 @@ export function useUploadCertification() {
   });
 }
 
-const DONE_CERT_STATES = new Set(['valid', 'expiring', 'pending']);
+const DONE_CERT_STATES = new Set(['valid', 'expiring']);
 
 export function isItemRequired(item: ChecklistItem): boolean {
   return item.type === 'certification' || item.required;
@@ -110,10 +110,23 @@ export function isItemDone(item: ChecklistItem): boolean {
   return DONE_CERT_STATES.has(item.state);
 }
 
-export function checklistProgress(items: readonly ChecklistItem[]): {
+export function isItemInReview(item: ChecklistItem): boolean {
+  return item.type === 'certification' && item.state === 'pending';
+}
+
+export interface ChecklistProgress {
   done: number;
+  inReview: number;
   total: number;
-} {
+}
+
+export function checklistProgress(
+  items: readonly ChecklistItem[],
+): ChecklistProgress {
   const required = items.filter(isItemRequired);
-  return { done: required.filter(isItemDone).length, total: required.length };
+  return {
+    done: required.filter(isItemDone).length,
+    inReview: required.filter(isItemInReview).length,
+    total: required.length,
+  };
 }

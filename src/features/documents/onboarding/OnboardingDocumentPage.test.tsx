@@ -807,8 +807,12 @@ describe('OnboardingDocumentPage — last item', () => {
   });
 });
 
-describe('OnboardingDocumentPage — go-live banner', () => {
-  it('drops a completed document from the profile banner without a reload', async () => {
+describe('OnboardingDocumentPage — go-live status', () => {
+  it('moves the profile card to going live once the last document is done, without a reload', async () => {
+    state.assignments = state.assignments.filter(
+      (a) => a.status === 'completed' || a.id === 'asg-read',
+    );
+    state.meCerts = [];
     const handbookDone = () =>
       state.assignments.some(
         (a) => a.id === 'asg-read' && a.status === 'completed',
@@ -845,6 +849,10 @@ describe('OnboardingDocumentPage — go-live banner', () => {
         <Route element={<AppShell />}>
           <Route path="/profile" element={<ProfileViewPage />} />
           <Route
+            path="/onboarding"
+            element={<Link to="/onboarding/asg-read">Open handbook</Link>}
+          />
+          <Route
             path="/onboarding/:assignmentId"
             element={<OnboardingDocumentPage />}
           />
@@ -853,9 +861,11 @@ describe('OnboardingDocumentPage — go-live banner', () => {
       { route: '/profile', staleTime: 60_000 },
     );
 
-    await user.click(
-      await screen.findByRole('link', { name: 'Open: Instructor handbook' }),
-    );
+    expect(
+      await screen.findByText('Required items pending'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Go to onboarding' }));
+    await user.click(screen.getByRole('link', { name: 'Open handbook' }));
     await user.click(
       await screen.findByRole('checkbox', {
         name: 'I have read and understood this document',
@@ -865,12 +875,11 @@ describe('OnboardingDocumentPage — go-live banner', () => {
     await screen.findByRole('heading', { name: 'Marked as read' });
 
     await user.click(screen.getByRole('link', { name: 'My profile' }));
+    expect(await screen.findByText('Going live')).toBeInTheDocument();
     expect(
-      await screen.findByText('All set: your profile is going live.'),
+      screen.getByText('Usually within a few minutes.'),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Open: Instructor handbook' }),
-    ).toBeNull();
+    expect(screen.queryByText('Required items pending')).toBeNull();
   });
 });
 
