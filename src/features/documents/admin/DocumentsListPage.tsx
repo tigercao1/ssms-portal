@@ -244,27 +244,40 @@ function AudienceCell({ row }: { row: TemplateSummary }) {
         {signedLink(t.signedCopies.link)}
       </>
     );
-  const detail =
-    row.assignTo === 'all'
-      ? (row.kind === 'read'
-          ? t.documents.audienceAllDetailRead
-          : t.documents.audienceAllDetail
-        )
-          .replace('{assigned}', String(row.approvedAssignedCount))
-          .replace('{approved}', String(row.approvedCount))
-          .replace('{done}', String(row.approvedCompletedCount))
-      : t.documents.audienceSelectedDetail.replace(
-          '{n}',
-          String(row.assignedCount),
-        );
+  if (row.assignTo === 'all') {
+    const drifted = row.approvedAssignedCount !== row.approvedCount;
+    return (
+      <>
+        <div>{t.documents.audienceAll}</div>
+        {drifted && (
+          <div className="my-0.5 inline-block rounded-sm border-l-[3px] border-status-pending bg-status-pending/10 px-2 py-0.5 text-xs font-medium text-ink">
+            {t.documents.audienceAllDrift
+              .replace('{assigned}', String(row.approvedAssignedCount))
+              .replace('{approved}', String(row.approvedCount))}
+          </div>
+        )}
+        <div>
+          {signedLink(
+            (row.kind === 'read'
+              ? t.documents.audienceAllDoneRead
+              : t.documents.audienceAllDone
+            ).replace('{done}', String(row.approvedCompletedCount)),
+          )}
+        </div>
+      </>
+    );
+  }
   return (
     <>
+      <div>{t.documents.audienceSelected}</div>
       <div>
-        {row.assignTo === 'all'
-          ? t.documents.audienceAll
-          : t.documents.audienceSelected}
+        {signedLink(
+          t.documents.audienceSelectedDetail.replace(
+            '{n}',
+            String(row.assignedCount),
+          ),
+        )}
       </div>
-      <div>{signedLink(detail)}</div>
     </>
   );
 }

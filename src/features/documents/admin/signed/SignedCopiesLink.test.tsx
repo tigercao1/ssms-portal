@@ -26,17 +26,17 @@ describe('DocumentsListPage signed copies link', () => {
     await screen.findByText('Code of conduct');
     expect(
       within(row('Code of conduct')).getByRole('link', {
-        name: '1 of 2 approved assigned · 1 signed',
+        name: '1 signed',
       }),
     ).toHaveAttribute('href', '/admin/documents/tpl-conduct/signed');
     expect(
       within(row('Code of conduct')).getByRole('link', {
-        name: '1 of 2 approved assigned · 1 signed',
+        name: '1 signed',
       }),
     ).toHaveAttribute('title', 'Signed copies of Code of conduct');
     expect(
       within(row('Instructor handbook')).getByRole('link', {
-        name: '1 of 2 approved assigned · 1 acknowledged',
+        name: '1 acknowledged',
       }),
     ).toHaveAttribute('href', '/admin/documents/tpl-handbook/signed');
     expect(

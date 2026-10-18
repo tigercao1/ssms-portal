@@ -784,8 +784,9 @@ export interface Messages {
     templateStatusRetired: string;
     audienceAll: string;
     audienceSelected: string;
-    audienceAllDetail: string;
-    audienceAllDetailRead: string;
+    audienceAllDrift: string;
+    audienceAllDone: string;
+    audienceAllDoneRead: string;
     audienceSelectedDetail: string;
     publish: string;
     republish: string;
