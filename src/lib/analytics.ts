@@ -1,5 +1,10 @@
 import type { CaptureResult, PostHog, PostHogConfig } from 'posthog-js';
 import { env } from './env';
+import {
+  aliasBlocklistedScript,
+  POSTHOG_PROXY_PATH,
+  POSTHOG_UI_HOST,
+} from './posthogProxy';
 
 export type AnalyticsRole = 'admin' | 'instructor';
 
@@ -331,6 +336,12 @@ export function redactExceptionEvent(
 
 export const posthogConfig: Partial<PostHogConfig> = {
   defaults: '2026-08-30',
+  api_host: POSTHOG_PROXY_PATH,
+  ui_host: POSTHOG_UI_HOST,
+  prepare_external_dependency_script: (script) => {
+    script.src = aliasBlocklistedScript(script.src);
+    return script;
+  },
   person_profiles: 'identified_only',
   disable_capture_url_hashes: true,
   mask_personal_data_properties: true,
@@ -356,10 +367,7 @@ let client: Promise<PostHog> | null = null;
 export function initAnalytics(): void {
   if (!env.posthogKey || client) return;
   client = import('posthog-js').then(({ default: posthog }) => {
-    posthog.init(env.posthogKey, {
-      ...posthogConfig,
-      api_host: env.posthogHost,
-    });
+    posthog.init(env.posthogKey, posthogConfig);
     return posthog;
   });
   client.catch(() => {

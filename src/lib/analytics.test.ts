@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/react';
+import type { PostHogConfig } from 'posthog-js';
 
 const posthog = vi.hoisted(() => ({
   init: vi.fn(),
@@ -13,7 +14,7 @@ vi.mock('posthog-js', () => ({ default: posthog }));
 async function loadAnalytics(posthogKey: string) {
   vi.resetModules();
   vi.doMock('./env', () => ({
-    env: { posthogKey, posthogHost: 'https://ph.example.com' },
+    env: { posthogKey },
   }));
   return import('./analytics');
 }
@@ -40,6 +41,35 @@ describe('analytics', () => {
     expect(posthog.reset).not.toHaveBeenCalled();
   });
 
+  it('sends to the first-party proxy path and links the toolbar to PostHog', async () => {
+    const analytics = await loadAnalytics('phc_test');
+    analytics.initAnalytics();
+
+    await waitFor(() => expect(posthog.init).toHaveBeenCalledTimes(1));
+    expect(posthog.init).toHaveBeenCalledWith(
+      'phc_test',
+      expect.objectContaining({
+        api_host: '/snr',
+        ui_host: 'https://us.posthog.com',
+      }),
+    );
+  });
+
+  it('loads the session recorder through the proxy under a neutral name', async () => {
+    const analytics = await loadAnalytics('phc_test');
+    analytics.initAnalytics();
+    await waitFor(() => expect(posthog.init).toHaveBeenCalledTimes(1));
+    const config = posthog.init.mock.calls[0]![1] as PostHogConfig;
+    const script = document.createElement('script');
+    script.src = '/snr/static/1.438.12/posthog-recorder.js?v=1';
+
+    const prepared = config.prepare_external_dependency_script!(script);
+
+    expect(prepared?.src).toBe(
+      `${window.location.origin}/snr/static/1.438.12/snr-rc.js?v=1`,
+    );
+  });
+
   it('strips URL hashes and masks invite tokens when initialised', async () => {
     const analytics = await loadAnalytics('phc_test');
     analytics.initAnalytics();
@@ -49,7 +79,6 @@ describe('analytics', () => {
     expect(posthog.init).toHaveBeenCalledWith(
       'phc_test',
       expect.objectContaining({
-        api_host: 'https://ph.example.com',
         disable_capture_url_hashes: true,
         mask_personal_data_properties: true,
         custom_personal_data_properties: expect.arrayContaining(['t']),

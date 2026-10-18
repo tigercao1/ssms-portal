@@ -8,10 +8,13 @@
   // Docs: https://developers.cloudflare.com/workers/static-assets/
   "name": "ssms-portal",
   "compatibility_date": "2026-09-19",
+  "main": "worker/src/index.ts",
 
   "assets": {
     // Vite's build output.
     "directory": "./dist/",
+    "binding": "ASSETS",
+    "run_worker_first": ["/snr/*"],
 
     // SPA fallback: any path that isn't a real file returns index.html with
     // HTTP 200, so react-router deep links like /admin/instructors/:id resolve
