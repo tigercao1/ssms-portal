@@ -409,6 +409,48 @@ export interface MyCalendarStatus {
   connected: boolean;
 }
 
+export type GoLiveProfileField =
+  | 'displayNameEn'
+  | 'bio'
+  | 'photo'
+  | 'locations'
+  | 'languages'
+  | 'courseLevels';
+
+export type GoLiveMissingItem =
+  | { group: 'profile'; field: GoLiveProfileField }
+  | { group: 'certification'; reason: 'none_verified' }
+  | {
+      group: 'onboarding';
+      assignmentId: string;
+      titleEn: string;
+      titleZh: string | null;
+    };
+
+export type CertVerificationStatus =
+  | 'verified'
+  | 'pending'
+  | 'rejected'
+  | 'expired'
+  | 'no_proof'
+  | 'level_mismatch';
+
+export interface GoLiveCertification {
+  org: CertOrg;
+  track: CertTrack;
+  level: number;
+  status: CertVerificationStatus;
+  validUntil: string | null;
+}
+
+export interface GoLiveReadiness {
+  live: boolean;
+  ready: boolean;
+  liveUrl: string | null;
+  missing: GoLiveMissingItem[];
+  certifications: GoLiveCertification[];
+}
+
 export interface GoogleConnectionStatus {
   configured: boolean;
   connected: boolean;

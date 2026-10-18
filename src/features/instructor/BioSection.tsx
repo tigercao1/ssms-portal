@@ -5,6 +5,7 @@ import {
   MachineTranslationNote,
   TranslatedByBadge,
 } from '@/features/translation/TranslatedByBadge';
+import { cn } from '@/lib/cn';
 import { formatDateTime } from '@/lib/date';
 import type {
   BioAiUsage,
@@ -64,6 +65,18 @@ function bioField(
   return lang === 'en'
     ? { bioEn: value, bioEnMachineTranslated: machine }
     : { bioZh: value, bioZhMachineTranslated: machine };
+}
+
+const CJK = /[\u3400-\u9fff\uf900-\ufaff]/g;
+const LATIN = /[a-z]/gi;
+
+export function mismatchedLang(lang: Lang, text: string): Lang | null {
+  const cjk = text.match(CJK)?.length ?? 0;
+  const latin = text.match(LATIN)?.length ?? 0;
+  if (cjk + latin < 4) return null;
+  if (lang === 'en' && cjk > latin) return 'zh';
+  if (lang === 'zh' && cjk === 0) return 'en';
+  return null;
 }
 
 function useSaveLock() {
@@ -548,7 +561,10 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
   const lock = useSaveLock();
   const hasBio = Boolean(profile.bioEn?.trim() || profile.bioZh?.trim());
   const [composing, setComposing] = useState(false);
-  const [texts, setTexts] = useState<Record<Lang, string>>({ en: '', zh: '' });
+  const preferredLang: Lang =
+    profile.preferredLanguage === 'zh-CN' ? 'zh' : 'en';
+  const [lang, setLang] = useState<Lang>(preferredLang);
+  const [text, setText] = useState('');
   const [request, setRequest] = useState<DraftRequest | null>(null);
   const [untranslated, setUntranslated] = useState<Lang | null>(null);
   const exhausted = usage.data?.remaining === 0;
@@ -567,25 +583,33 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
   function finish(missing: Lang | null) {
     setUntranslated(missing);
     setComposing(false);
-    setTexts({ en: '', zh: '' });
+    setText('');
   }
 
   function startRewrite() {
-    const preferred: Lang = profile.preferredLanguage === 'zh-CN' ? 'zh' : 'en';
-    const lang = bioOf(profile, preferred) ? preferred : otherLang(preferred);
-    setTexts({ en: '', zh: '', [lang]: bioOf(profile, lang) });
+    const source = bioOf(profile, preferredLang)
+      ? preferredLang
+      : otherLang(preferredLang);
+    setLang(source);
+    setText(bioOf(profile, source));
     save.reset();
     setComposing(true);
   }
 
   async function onSave() {
-    await lock.hold(async () => finish(await saveBio(texts)));
+    await lock.hold(async () =>
+      finish(
+        await saveBio({ [lang]: text, [otherLang(lang)]: '' } as Record<
+          Lang,
+          string
+        >),
+      ),
+    );
   }
 
   const showComposer = !hasBio || composing;
-  const refineText = LANGS.map((lang) => texts[lang].trim())
-    .filter(Boolean)
-    .join('\n\n');
+  const refineText = text.trim();
+  const mismatch = mismatchedLang(lang, text);
   const canAsk =
     Boolean(refineText) && refineText.length <= MAX_BIO_SOURCE && !exhausted;
 
@@ -639,36 +663,68 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               <button
                 type="button"
                 disabled={lock.locked}
-                onClick={() => setTexts({ en: '', zh: '' })}
+                onClick={() => setText('')}
                 className="text-sm font-medium text-navy underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t.bio.clear}
               </button>
             )}
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {LANGS.map((lang) => (
-              <Field
-                key={lang}
-                label={titleOf(t, lang)}
-                hint={`${texts[lang].length}/${MAX_BIO}`}
-              >
-                {(p) => (
-                  <Textarea
-                    {...p}
-                    rows={6}
-                    disabled={lock.locked}
-                    className={LOCKED_TEXTAREA}
-                    maxLength={MAX_BIO}
-                    value={texts[lang]}
-                    onChange={(e) =>
-                      setTexts((v) => ({ ...v, [lang]: e.target.value }))
-                    }
-                  />
-                )}
-              </Field>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate">{t.bio.writingIn}</span>
+            <div
+              role="group"
+              aria-label={t.bio.writingIn}
+              className="inline-flex overflow-hidden rounded-md border border-grey text-sm"
+            >
+              {LANGS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={lang === option}
+                  disabled={lock.locked}
+                  onClick={() => setLang(option)}
+                  className={cn(
+                    'px-3 py-1 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                    lang === option
+                      ? 'bg-navy text-white'
+                      : 'bg-surface text-slate hover:bg-navy-tint',
+                  )}
+                >
+                  {titleOf(t, option)}
+                </button>
+              ))}
+            </div>
           </div>
+          <Field label={titleOf(t, lang)} hint={`${text.length}/${MAX_BIO}`}>
+            {(p) => (
+              <Textarea
+                {...p}
+                rows={6}
+                lang={lang === 'zh' ? 'zh-CN' : 'en'}
+                disabled={lock.locked}
+                className={LOCKED_TEXTAREA}
+                maxLength={MAX_BIO}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+              />
+            )}
+          </Field>
+          {mismatch && (
+            <Banner tone="pending">
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {mismatch === 'zh' ? t.bio.looksLikeZh : t.bio.looksLikeEn}
+                <button
+                  type="button"
+                  disabled={lock.locked}
+                  onClick={() => setLang(mismatch)}
+                  className="font-medium text-navy underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t.bio.switchTo.replace('{lang}', titleOf(t, mismatch))}
+                </button>
+              </span>
+            </Banner>
+          )}
           {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
           <p className="text-xs text-slate">{t.bio.actionsHint}</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

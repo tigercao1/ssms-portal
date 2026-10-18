@@ -4,13 +4,15 @@ import { Banner, Button, Card, Spinner } from '@/components';
 import { ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/date';
 import type { Messages } from '@/i18n/core/types';
-import type { ShopifyEntryStatus } from '@/lib/types';
+import type { GoLiveReadiness, ShopifyEntryStatus } from '@/lib/types';
 import {
   isSyncEffective,
   useRunShopifySync,
   useShopifyInstructorSync,
   useShopifySyncStatus,
 } from './shopifySyncApi';
+import { useAdminGoLive } from './api';
+import { missingItemKey, missingItemLabel } from '@/features/instructor/goLive';
 
 function statusText(status: ShopifyEntryStatus | null, t: Messages) {
   switch (status) {
@@ -33,6 +35,7 @@ export function ShopifyInstructorPanel({
   const sync = useShopifyInstructorSync(instructorId);
   const global = useShopifySyncStatus();
   const run = useRunShopifySync();
+  const goLive = useAdminGoLive(instructorId);
   const notFound = sync.error instanceof ApiError && sync.error.status === 404;
   const data = sync.data;
 
@@ -75,6 +78,11 @@ export function ShopifyInstructorPanel({
       ) : (
         <Banner tone="error">{t.errors.generic}</Banner>
       )}
+      {goLive.data && (
+        <dl className="flex flex-col gap-2 text-sm">
+          <GoLiveCheckRow readiness={goLive.data} />
+        </dl>
+      )}
 
       <Button
         variant="secondary"
@@ -110,10 +118,40 @@ export function ShopifyInstructorPanel({
   );
 }
 
+function GoLiveCheckRow({ readiness }: { readiness: GoLiveReadiness }) {
+  const t = useT();
+  const { locale } = useLocale();
+  const count = readiness.missing.length;
+  const missingText = t.goLive.checkMissing.replace('{n}', String(count));
+  return (
+    <Row label={t.goLive.checkLabel}>
+      {readiness.ready ? (
+        <span className="text-status-approved">{t.goLive.checkReady}</span>
+      ) : count === 0 ? (
+        <span className="text-slate">{t.goLive.checkNotEligible}</span>
+      ) : (
+        <div className="flex flex-col items-end gap-1">
+          <span className="font-semibold">{missingText}</span>
+          <ul
+            aria-label={missingText}
+            className="flex flex-col items-end gap-0.5 text-xs text-slate"
+          >
+            {readiness.missing.map((item) => (
+              <li key={missingItemKey(item)}>
+                {missingItemLabel(item, t, locale)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Row>
+  );
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-slate">{label}</dt>
+      <dt className="shrink-0 text-slate">{label}</dt>
       <dd className="text-right text-ink">{children}</dd>
     </div>
   );

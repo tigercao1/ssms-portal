@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { server } from '@/test/msw';
+import { fakeGoLive, server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import {
   createDocumentsState,
@@ -13,6 +13,7 @@ import { todayIso } from '../api';
 import { fakeAssignment, fakeCertUpload, fakeTemplate } from '../api/fixtures';
 import type { ApprovalStatus } from '@/lib/types';
 import { InstructorDocumentsSection } from './InstructorDocumentsSection';
+import { ShopifyInstructorPanel } from '@/features/admin/ShopifyInstructorPanel';
 
 const API = 'http://localhost:3000';
 let state: DocumentsMockState;
@@ -718,5 +719,82 @@ describe('InstructorDocumentsSection — certification uploads', () => {
     expect(await within(csia).findByRole('alert')).toHaveTextContent(
       'validUntil must be YYYY-MM-DD',
     );
+  });
+});
+
+describe('InstructorDocumentsSection — go-live certification status', () => {
+  it('shows the verification status of each declared level', async () => {
+    renderWithProviders(
+      <InstructorDocumentsSection
+        instructorId="inst-1"
+        instructorName="Jane Doe"
+        approvalStatus="approved"
+        certifications={[{ org: 'csia', track: 'regular', level: 3 }]}
+        certStatuses={[
+          {
+            org: 'csia',
+            track: 'regular',
+            level: 3,
+            status: 'pending',
+            validUntil: null,
+          },
+          {
+            org: 'casi',
+            track: 'regular',
+            level: 2,
+            status: 'verified',
+            validUntil: '2027-06-30',
+          },
+          {
+            org: 'casi',
+            track: 'park',
+            level: 1,
+            status: 'level_mismatch',
+            validUntil: '2027-06-30',
+          },
+        ]}
+      />,
+    );
+    const list = await screen.findByRole('list', { name: 'Certifications' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      'CSIA Level 3Verification pending',
+      'CASI Level 2Verified · until Jun 30, 2027',
+      'CASI Park Level 1Re-verification needed',
+    ]);
+  });
+
+  it('refreshes the go-live check after a proof is approved', async () => {
+    let goLiveRequests = 0;
+    server.use(
+      http.get(`${API}/admin/instructors/:id/go-live`, () => {
+        goLiveRequests += 1;
+        return HttpResponse.json({
+          ...fakeGoLive,
+          ready: goLiveRequests > 1,
+          missing: goLiveRequests > 1 ? [] : fakeGoLive.missing,
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <InstructorDocumentsSection
+          instructorId="inst-1"
+          instructorName="Jane Doe"
+          approvalStatus="approved"
+          certifications={[{ org: 'csia', track: 'regular', level: 3 }]}
+        />
+        <ShopifyInstructorPanel instructorId="inst-1" />
+      </>,
+      { staleTime: 60_000 },
+    );
+    expect(await screen.findByText('3 missing')).toBeInTheDocument();
+    const csia = await screen.findByRole('listitem', { name: 'CSIA' });
+    await user.click(within(csia).getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText('Ready')).toBeInTheDocument();
   });
 });

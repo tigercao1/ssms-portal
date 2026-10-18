@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import {
   focusManager,
@@ -10,8 +11,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { I18nProvider } from '@/i18n/core/I18nProvider';
 import { ProfileViewPage } from './ProfileViewPage';
 import { renderWithProviders } from '@/test/render';
-import { fakeProfile, server } from '@/test/msw';
-import type { InstructorProfile } from '@/lib/types';
+import { fakeGoLive, fakeProfile, server } from '@/test/msw';
+import type { GoLiveReadiness, InstructorProfile } from '@/lib/types';
+import { GO_LIVE_POLL_MS, useUpdateProfile } from './api';
 import { CALENDAR_GUIDE_URL } from './calendarGuide';
 
 const API = 'http://localhost:3000';
@@ -158,7 +160,9 @@ describe('ProfileViewPage reference names', () => {
     );
     renderWithProviders(<ProfileViewPage />);
     expect(await screen.findByText('惠斯勒')).toBeInTheDocument();
-    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(
+      screen.getByText('English', { selector: ':not(option)' }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -441,6 +445,331 @@ describe('ProfileViewPage Google Calendar', () => {
     renderWithProviders(<ProfileViewPage />);
     expect(
       await screen.findByText('已连接', { selector: '.text-status-approved' }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('ProfileViewPage go-live', () => {
+  function serveGoLive(
+    profileOverrides: Partial<InstructorProfile>,
+    goLive: Partial<GoLiveReadiness> = {},
+  ) {
+    const requests: string[] = [];
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, ...profileOverrides }),
+      ),
+      http.get(`${API}/me/go-live`, ({ request }) => {
+        requests.push(request.url);
+        return HttpResponse.json({ ...fakeGoLive, ...goLive });
+      }),
+    );
+    return requests;
+  }
+  const approvedActive = {
+    approvalStatus: 'approved',
+    isActive: true,
+  } as const;
+
+  it('lists what is missing with a link to fix each item', async () => {
+    serveGoLive(approvedActive);
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText(
+        'You’re approved. 3 things left before your profile goes live on ssnow.club',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Add: Main photo' }),
+    ).toHaveAttribute('href', '/profile/edit');
+    expect(
+      screen.getByRole('link', { name: 'View: No verified certification yet' }),
+    ).toHaveAttribute('href', '/onboarding');
+    expect(
+      screen.getByRole('link', {
+        name: 'Open: Independent contractor agreement',
+      }),
+    ).toHaveAttribute('href', '/onboarding/asg-contract');
+    expect(screen.getByText('Not live')).toBeInTheDocument();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Your profile is approved and visible publicly.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('links each missing profile field to the profile editor', async () => {
+    serveGoLive(approvedActive, {
+      missing: [
+        { group: 'profile', field: 'displayNameEn' },
+        { group: 'profile', field: 'bio' },
+        { group: 'profile', field: 'locations' },
+        { group: 'profile', field: 'languages' },
+        { group: 'profile', field: 'courseLevels' },
+      ],
+    });
+    renderWithProviders(<ProfileViewPage />);
+    for (const label of [
+      'English display name',
+      'Bio',
+      'Teaching location',
+      'Language',
+      'Course level offered',
+    ]) {
+      expect(
+        await screen.findByRole('link', { name: `Add: ${label}` }),
+      ).toHaveAttribute('href', '/profile/edit');
+    }
+  });
+
+  it('says one thing is left when one item is missing', async () => {
+    serveGoLive(approvedActive, {
+      missing: [{ group: 'profile', field: 'photo' }],
+    });
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText(
+        'You’re approved. 1 thing left before your profile goes live on ssnow.club',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('tells a ready instructor the profile is going live', async () => {
+    serveGoLive(approvedActive, { ready: true, missing: [] });
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('All set: your profile is going live.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Usually within a few minutes.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Not live')).toBeInTheDocument();
+  });
+
+  it('links a live instructor to the public page in a new tab', async () => {
+    serveGoLive(approvedActive, {
+      live: true,
+      ready: true,
+      liveUrl: 'https://ssnow.club/pages/our-team/jane-snow',
+      missing: [],
+    });
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('Your profile is live.'),
+    ).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'View it on ssnow.club ↗' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://ssnow.club/pages/our-team/jane-snow',
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.queryByText('Not live')).not.toBeInTheDocument();
+  });
+
+  it('shows the live banner in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive(approvedActive, {
+      live: true,
+      ready: true,
+      liveUrl: 'https://ssnow.club/pages/our-team/jane-snow',
+      missing: [],
+    });
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('您的资料已上线。')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: '在 ssnow.club 查看 ↗' }),
+    ).toHaveAttribute('href', 'https://ssnow.club/pages/our-team/jane-snow');
+    expect(screen.getByText('已上线')).toBeInTheDocument();
+    expect(
+      screen.queryByText('您的资料已通过审核并公开显示。'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('switches from the ready banner to the live banner once Shopify publishes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let live = false;
+      server.use(
+        http.get(`${API}/me/instructor`, () =>
+          HttpResponse.json({ ...fakeProfile, ...approvedActive }),
+        ),
+        http.get(`${API}/me/go-live`, () =>
+          HttpResponse.json({
+            ...fakeGoLive,
+            ready: true,
+            live,
+            liveUrl: live
+              ? 'https://ssnow.club/pages/our-team/jane-snow'
+              : null,
+            missing: [],
+          }),
+        ),
+      );
+      renderWithProviders(<ProfileViewPage />);
+      expect(
+        await screen.findByText('All set: your profile is going live.'),
+      ).toBeInTheDocument();
+
+      live = true;
+      await act(() => vi.advanceTimersByTimeAsync(GO_LIVE_POLL_MS));
+
+      expect(
+        await screen.findByText('Your profile is live.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Live')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops checking once the profile is live', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const requests = serveGoLive(approvedActive, {
+        ready: true,
+        live: true,
+        liveUrl: 'https://ssnow.club/pages/our-team/jane-snow',
+        missing: [],
+      });
+      renderWithProviders(<ProfileViewPage />);
+      expect(
+        await screen.findByText('Your profile is live.'),
+      ).toBeInTheDocument();
+      const before = requests.length;
+
+      await act(() => vi.advanceTimersByTimeAsync(GO_LIVE_POLL_MS * 3));
+
+      expect(requests).toHaveLength(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the ready banner in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive(approvedActive, { ready: true, missing: [] });
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText('资料已齐全，正在上线中。'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('通常几分钟内完成。')).toBeInTheDocument();
+    expect(screen.getByText('未上线')).toBeInTheDocument();
+  });
+
+  it('lists what is missing in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive(approvedActive);
+    renderWithProviders(<ProfileViewPage />);
+    expect(
+      await screen.findByText(
+        '您的资料已通过审核。还差 3 项即可在 ssnow.club 上线',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '添加: 主照片' })).toHaveAttribute(
+      'href',
+      '/profile/edit',
+    );
+    expect(
+      screen.getByRole('link', { name: '查看: 暂无已验证的认证' }),
+    ).toHaveAttribute('href', '/onboarding');
+    expect(
+      screen.getByRole('link', { name: '打开: 独立承包人协议' }),
+    ).toHaveAttribute('href', '/onboarding/asg-contract');
+  });
+
+  it.each([
+    ['pending', true, /Your profile is pending review/],
+    ['rejected', true, /Your profile was not approved/],
+    ['approved', false, /Your profile is deactivated/],
+  ] as const)(
+    'keeps the %s banner (active: %s) and shows no live pill',
+    async (approvalStatus, isActive, banner) => {
+      serveGoLive({ approvalStatus, isActive });
+      renderWithProviders(<ProfileViewPage />);
+      expect(await screen.findByText(banner)).toBeInTheDocument();
+      expect(screen.queryByText('Not live')).not.toBeInTheDocument();
+      expect(screen.queryByText('Live')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/things left before your profile goes live/),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ['verified', 'Verified · until Jun 30, 2027'],
+    ['pending', 'Verification pending'],
+    ['rejected', 'Proof rejected'],
+    ['expired', 'Proof expired'],
+    ['no_proof', 'No proof uploaded'],
+    ['level_mismatch', 'Re-verification needed'],
+  ] as const)('marks a %s certification "%s"', async (status, label) => {
+    serveGoLive(approvedActive, {
+      certifications: [
+        {
+          org: 'csia',
+          track: 'regular',
+          level: 4,
+          status,
+          validUntil: '2027-06-30',
+        },
+      ],
+    });
+    renderWithProviders(<ProfileViewPage />);
+    const row = (await screen.findByText('CSIA Level 4')).closest('li')!;
+    expect(await within(row).findByText(label)).toBeInTheDocument();
+  });
+
+  it('marks certification status in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive({ approvalStatus: 'pending' });
+    renderWithProviders(<ProfileViewPage />);
+    expect(await screen.findByText('等待验证')).toBeInTheDocument();
+  });
+
+  it('refreshes the banner after the profile is saved', async () => {
+    let photo = false;
+    server.use(
+      http.get(`${API}/me/instructor`, () =>
+        HttpResponse.json({ ...fakeProfile, ...approvedActive }),
+      ),
+      http.get(`${API}/me/go-live`, () =>
+        HttpResponse.json(
+          photo
+            ? { ...fakeGoLive, ready: true, missing: [] }
+            : {
+                ...fakeGoLive,
+                missing: [{ group: 'profile', field: 'photo' }],
+              },
+        ),
+      ),
+      http.patch(`${API}/me/instructor`, () => {
+        photo = true;
+        return HttpResponse.json({ ...fakeProfile, ...approvedActive });
+      }),
+    );
+    function SaveButton() {
+      const update = useUpdateProfile();
+      return (
+        <button type="button" onClick={() => update.mutate({})}>
+          Save
+        </button>
+      );
+    }
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <ProfileViewPage />
+        <SaveButton />
+      </>,
+      { staleTime: 60_000 },
+    );
+    expect(
+      await screen.findByRole('link', { name: 'Add: Main photo' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(
+      await screen.findByText('All set: your profile is going live.'),
     ).toBeInTheDocument();
   });
 });
