@@ -151,12 +151,7 @@ export function GoLiveBanner({ readiness }: { readiness: GoLiveReadiness }) {
 export function LivePill({ live }: { live: boolean }) {
   const t = useT();
   return live ? (
-    <span
-      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border-l-[3px] border-status-live px-2 py-0.5 text-xs font-semibold text-status-live-ink"
-      style={{
-        background: 'color-mix(in srgb, var(--status-live) 12%, transparent)',
-      }}
-    >
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border-l-[3px] border-status-live bg-status-live/[0.12] px-2 py-0.5 text-xs font-semibold text-status-live-ink">
       <span className="relative flex h-1.5 w-1.5" aria-hidden>
         <span className="absolute inline-flex h-full w-full rounded-full bg-status-live opacity-75 motion-safe:animate-ping" />
         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-status-live" />
