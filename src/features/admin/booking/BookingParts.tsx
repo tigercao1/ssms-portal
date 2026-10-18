@@ -160,6 +160,7 @@ export function CustomerPicker({
     <div className="flex flex-col gap-4">
       {selected.length > 0 && (
         <ul
+          data-private
           aria-label={t.booking.selectedCustomers}
           className="flex flex-wrap gap-2"
         >
@@ -236,6 +237,7 @@ export function CustomerPicker({
         ) : (
           <div className="flex flex-col gap-1.5">
             <ul
+              data-private
               id={listId}
               role="listbox"
               aria-label={t.booking.customerResults}

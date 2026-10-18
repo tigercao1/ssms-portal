@@ -108,7 +108,7 @@ export function DocumentsListPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-public>
                 {rows.map((row, i) => (
                   <Fragment key={row.id}>
                     <TemplateRow

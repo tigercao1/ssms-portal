@@ -221,7 +221,7 @@ function BioCard({
         onClick={disabled ? undefined : onEdit}
         className="relative min-h-24 cursor-pointer rounded-md border border-grey bg-sunken px-3 py-2 pr-11"
       >
-        <p className="whitespace-pre-wrap break-words text-ink">
+        <p data-private className="whitespace-pre-wrap break-words text-ink">
           {text || <span className="text-slate">{t.bio.empty}</span>}
         </p>
         <div

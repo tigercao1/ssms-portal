@@ -76,7 +76,9 @@ export function LoginPage() {
       <AuthLayout>
         <h2 className="text-3xl">{t.auth.magicLinkSentTitle}</h2>
         <p className="mt-2 text-slate">{t.auth.magicLinkSentBody}</p>
-        <p className="mt-1 font-mono text-sm text-ink">{email.trim()}</p>
+        <p data-private className="mt-1 font-mono text-sm text-ink">
+          {email.trim()}
+        </p>
         <button
           type="button"
           onClick={() => setLinkSent(false)}

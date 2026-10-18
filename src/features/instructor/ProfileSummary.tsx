@@ -14,6 +14,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
   if (url) {
     return (
       <img
+        data-private
         src={url}
         alt={name}
         className="h-20 w-20 rounded-lg object-cover"
@@ -95,7 +96,7 @@ export function ProfileSummary({
     <div className="flex flex-col gap-6">
       <Card className="flex items-center gap-5">
         <Avatar url={profile.profilePhotoUrl} name={name} />
-        <div>
+        <div data-private>
           <h2 className="text-2xl">{name || profile.email}</h2>
           <p className="font-mono text-sm text-slate">{profile.email}</p>
           {legalName && (
@@ -109,7 +110,7 @@ export function ProfileSummary({
       {extraPhotos.length > 0 && (
         <Card className="flex flex-col gap-3">
           <h3 className="text-lg">{t.profile.morePhotos}</h3>
-          <div className="flex flex-wrap gap-4">
+          <div data-private className="flex flex-wrap gap-4">
             {extraPhotos.map((photo) => (
               <img
                 key={photo.label}
@@ -124,7 +125,7 @@ export function ProfileSummary({
 
       <Card className="grid gap-6 sm:grid-cols-2">
         <Section title={t.profile.bio}>
-          <p className="whitespace-pre-wrap text-sm text-ink">
+          <p data-private className="whitespace-pre-wrap text-sm text-ink">
             {bio || <span className="text-slate">{t.profile.noneYet}</span>}
           </p>
           <TranslatedByBadge model={bioTranslatedBy} />

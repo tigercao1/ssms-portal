@@ -1213,6 +1213,7 @@ function GrantSeasonPassDialog({
   return (
     <Modal
       title={s.grantTitle.replace('{name}', name)}
+      privateTitle
       onClose={onClose}
       footer={
         <>
@@ -1323,6 +1324,7 @@ function VoidDialog({
   return (
     <Modal
       title={title}
+      privateTitle
       onClose={onClose}
       footer={
         <>
@@ -1345,7 +1347,9 @@ function VoidDialog({
       }
     >
       <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-        <p className="text-sm text-slate">{summary}</p>
+        <p data-private className="text-sm text-slate">
+          {summary}
+        </p>
         <WholeRequestNote whole={whole} />
         <p className="text-sm">{body}</p>
         <Field

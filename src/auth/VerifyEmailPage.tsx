@@ -44,7 +44,9 @@ export function VerifyEmailPage() {
       <h2 className="text-3xl">{t.auth.verifyTitle}</h2>
       <p className="mt-2 text-slate">{t.auth.verifyBody}</p>
       {user?.email && (
-        <p className="mt-1 font-mono text-sm text-ink">{user.email}</p>
+        <p data-private className="mt-1 font-mono text-sm text-ink">
+          {user.email}
+        </p>
       )}
 
       <div className="mt-8 flex flex-col gap-4">

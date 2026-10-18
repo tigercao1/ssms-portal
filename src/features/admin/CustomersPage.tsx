@@ -418,7 +418,9 @@ export function CreateCustomerCard({
         )}
         {createdName !== null && (
           <Banner tone="approved">
-            {t.customers.created.replace('{name}', createdName)}
+            <span data-private>
+              {t.customers.created.replace('{name}', createdName)}
+            </span>
           </Banner>
         )}
         <Button type="submit" loading={create.isPending} disabled={!ready}>

@@ -10,12 +10,14 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  privateTitle = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   size?: 'md' | 'lg';
+  privateTitle?: boolean;
 }) {
   const t = useT();
   const titleId = useId();
@@ -60,7 +62,11 @@ export function Modal({
         )}
       >
         <div className="flex items-center justify-between border-b border-grey/60 px-5 py-4">
-          <h2 id={titleId} className="text-lg">
+          <h2
+            id={titleId}
+            data-private={privateTitle || undefined}
+            className="text-lg"
+          >
             {title}
           </h2>
           <button

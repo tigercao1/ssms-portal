@@ -315,7 +315,7 @@ function EditRate({
       className="flex flex-col gap-3 rounded-md border border-grey/60 bg-sunken p-4"
     >
       <div className="flex flex-col gap-1">
-        <h3 className="font-medium text-navy">
+        <h3 data-private className="font-medium text-navy">
           {t.lessonTypes.editRateTitle.replace('{name}', name)}
         </h3>
         <p className="text-xs text-slate">{t.lessonTypes.instructorFixed}</p>

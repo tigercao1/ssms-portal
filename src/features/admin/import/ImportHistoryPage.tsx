@@ -319,7 +319,9 @@ function RecentImports({
               )}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-ink">{i.filename}</p>
+                <p data-private className="truncate text-sm text-ink">
+                  {i.filename}
+                </p>
                 <p className="text-xs text-slate">
                   {formatSchoolDateTime(i.createdAt, locale)}
                   {i.counts.total !== undefined &&

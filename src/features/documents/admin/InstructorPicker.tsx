@@ -49,7 +49,10 @@ export function InstructorPicker({
       {instructors.isLoading ? (
         <Spinner />
       ) : (
-        <ul className="max-h-64 divide-y divide-grey/40 overflow-y-auto rounded-md border border-grey/60">
+        <ul
+          data-private
+          className="max-h-64 divide-y divide-grey/40 overflow-y-auto rounded-md border border-grey/60"
+        >
           {rows.map((i) => (
             <li key={i.id}>
               <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-sunken">

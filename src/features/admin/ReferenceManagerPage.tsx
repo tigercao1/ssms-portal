@@ -156,7 +156,7 @@ function ReferenceTable({
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-public>
               {(rows.data ?? []).map((r, i) => {
                 const selected = r.id === editing?.id;
                 return (

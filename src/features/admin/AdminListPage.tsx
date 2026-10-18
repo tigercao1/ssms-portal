@@ -297,7 +297,7 @@ export function AdminListPage() {
             </Card>
 
             {/* Mobile cards */}
-            <div className="flex flex-col gap-3 sm:hidden">
+            <div data-private className="flex flex-col gap-3 sm:hidden">
               {instructors.map((row) => (
                 <Link key={row.id} to={`/admin/instructors/${row.id}`}>
                   <Card className="fade-rise flex flex-col gap-2">

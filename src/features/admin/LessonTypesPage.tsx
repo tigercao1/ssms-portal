@@ -98,7 +98,7 @@ export function LessonTypesPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-public>
                 {rows.map((row, i) => {
                   const open = expanded?.id === row.id ? expanded.mode : null;
                   const typeRates = ratesByType.get(row.id) ?? [];

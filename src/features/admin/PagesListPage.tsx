@@ -79,7 +79,7 @@ function PagesTable() {
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody data-public>
           {pages.data.map((page, i) => (
             <tr key={page.id} className={cn(i % 2 === 1 && 'bg-sunken')}>
               <td className="px-4 py-3">

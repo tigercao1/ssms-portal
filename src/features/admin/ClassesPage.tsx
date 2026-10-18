@@ -265,7 +265,9 @@ function ClassRow({
       </div>
       <div className="flex flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-ink">{instructorName}</span>
+          <span data-private className="font-medium text-ink">
+            {instructorName}
+          </span>
           <span className="rounded-sm bg-sunken px-2 py-0.5 text-xs text-slate">
             {t.lessons[STATUS_KEYS[item.status]]}
           </span>
@@ -297,7 +299,7 @@ function ClassRow({
         {item.participants.length === 0 ? (
           <span className="text-slate">{t.lessons.noParticipants}</span>
         ) : (
-          <ul className="flex flex-col gap-0.5">
+          <ul data-private className="flex flex-col gap-0.5">
             {item.participants.map((p) => (
               <li key={p.customerId} className="text-ink">
                 {customerName(p) || p.email || p.phone || '—'}{' '}

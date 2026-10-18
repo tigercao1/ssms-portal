@@ -358,6 +358,7 @@ function UpcomingSection({
           </div>
           <div className="flex flex-col gap-2 lg:hidden">
             <ul
+              data-private
               aria-label={t.myLessons.upcomingTitle}
               className="flex flex-col gap-2"
             >
@@ -484,6 +485,7 @@ function PeriodCard({ period }: { period: MyPayPeriod }) {
             </span>
           )}
           <span
+            data-private
             data-testid="period-total"
             className="font-semibold tabular-nums text-navy"
           >
@@ -509,7 +511,7 @@ function PeriodRows({ period, label }: { period: MyPayPeriod; label: string }) {
   const t = useT();
   const { locale } = useLocale();
   return (
-    <ul aria-label={label} className="text-sm">
+    <ul data-private aria-label={label} className="text-sm">
       {period.lessons.map((lesson) => {
         const name = lessonName(lesson, locale, t.myLessons.noLessonType);
         return (
