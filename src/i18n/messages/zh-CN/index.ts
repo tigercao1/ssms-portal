@@ -125,8 +125,8 @@ export const zhCN: Messages = {
     pending: '待审核',
     approved: '已通过',
     rejected: '已拒绝',
-    inactive: '已下线',
-    active: '已上线',
+    inactive: '已停用',
+    active: '已启用',
   },
   rateUnit: {
     hour: '按小时',
@@ -204,8 +204,8 @@ export const zhCN: Messages = {
     slotRemovePhoto: '移除照片',
   },
   goLive: {
-    livePill: '已公开',
-    notLivePill: '未公开',
+    livePill: '已上线',
+    notLivePill: '未上线',
     liveTitle: '您的资料已上线。',
     liveLink: '在 ssnow.club 查看',
     readyTitle: '资料已齐全，正在上线中。',
@@ -235,7 +235,7 @@ export const zhCN: Messages = {
     checkLabel: '上线检查',
     checkReady: '已就绪',
     checkMissing: '缺少 {n} 项',
-    checkNotEligible: '未通过审核或已下线',
+    checkNotEligible: '未通过审核或已停用',
   },
   bio: {
     composeHint: '用一种语言填写简介，保存时会自动翻译成另一种语言。',
