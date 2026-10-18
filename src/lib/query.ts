@@ -14,13 +14,15 @@ export function shouldRetryQuery(
   return failureCount < 1;
 }
 
-/** Shared TanStack Query client (W0.3). */
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: shouldRetryQuery,
-      refetchOnWindowFocus: false,
+/** TanStack Query client (W0.3); the session provider creates one per signed-in user. */
+export function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 30_000,
+        retry: shouldRetryQuery,
+        refetchOnWindowFocus: false,
+      },
     },
-  },
-});
+  });
+}

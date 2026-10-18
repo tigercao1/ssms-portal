@@ -73,9 +73,14 @@ export function resetAuth() {
 export const supabase = { auth };
 
 export async function getAccessToken() {
-  return current?.access_token ?? null;
+  const { data } = await auth.getSession();
+  return data.session?.access_token ?? null;
 }
 
-export async function getSessionUserId() {
-  return current?.user.id ?? null;
+export async function getSessionSnapshot() {
+  const { data } = await auth.getSession();
+  return {
+    userId: data.session?.user.id ?? null,
+    accessToken: data.session?.access_token ?? null,
+  };
 }

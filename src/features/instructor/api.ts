@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
-import { getSessionUserId } from '@/lib/supabase';
+import { getSessionSnapshot } from '@/lib/supabase';
 import type {
   AllowedAvatarMime,
   AvatarUploadTicket,
@@ -47,15 +47,21 @@ export class AccountSwitchedError extends Error {
 /** W2.2 — patch the caller's profile; refuses if the signed-in user changed since mount. */
 export function useUpdateProfile() {
   const qc = useQueryClient();
-  const [loadedForUserId] = useState(getSessionUserId);
+  const [loadedForUserId] = useState(() =>
+    getSessionSnapshot().then((s) => s.userId),
+  );
   return useMutation({
     mutationFn: async (body: UpdateProfileBody) => {
       const [loadedFor, current] = await Promise.all([
         loadedForUserId,
-        getSessionUserId(),
+        getSessionSnapshot(),
       ]);
-      if (loadedFor !== current) throw new AccountSwitchedError();
-      return api<InstructorProfile>('/me/instructor', { method: 'PATCH', body });
+      if (loadedFor !== current.userId) throw new AccountSwitchedError();
+      return api<InstructorProfile>('/me/instructor', {
+        method: 'PATCH',
+        body,
+        accessToken: current.accessToken,
+      });
     },
     onSuccess: (profile) => {
       qc.setQueryData(PROFILE_KEY, profile);

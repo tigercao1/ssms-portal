@@ -24,7 +24,13 @@ export async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-export async function getSessionUserId(): Promise<string | null> {
+export async function getSessionSnapshot(): Promise<{
+  userId: string | null;
+  accessToken: string | null;
+}> {
   const { data } = await supabase.auth.getSession();
-  return data.session?.user?.id ?? null;
+  return {
+    userId: data.session?.user?.id ?? null,
+    accessToken: data.session?.access_token ?? null,
+  };
 }

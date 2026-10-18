@@ -9,7 +9,8 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createQueryClient } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import { identifyUser, resetUser, track } from '@/lib/analytics';
 
@@ -34,12 +35,13 @@ function readRole(user: User | null): 'admin' | 'instructor' | null {
 
 /**
  * Owns the Supabase auth session (W1.4). Subscribes to auth-state changes so
- * sign-in / sign-out / token-refresh propagate to the whole tree, and drops the
- * query cache whenever the signed-in user changes (here or in another tab).
+ * sign-in / sign-out / token-refresh propagate to the whole tree, and gives the
+ * tree a fresh query client whenever the signed-in user changes (here or in
+ * another tab).
  * Role + email-verified are derived here for the route guards.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient();
+  const [queryClient, setQueryClient] = useState(createQueryClient);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const appliedUserId = useRef<string | null | undefined>(undefined);
@@ -53,7 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         appliedUserId.current !== undefined &&
         appliedUserId.current !== nextUserId
       )
-        queryClient.clear();
+        setQueryClient(createQueryClient());
       appliedUserId.current = nextUserId;
       setSession(next);
       setLoading(false);
@@ -72,7 +74,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
       window.removeEventListener('storage', onStorage);
     };
-  }, [queryClient]);
+  }, []);
 
   const userId = session?.user?.id ?? null;
   const role = readRole(session?.user ?? null);
@@ -104,7 +106,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session, loading, signOut]);
 
   return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+    <QueryClientProvider client={queryClient}>
+      <SessionContext.Provider value={value}>
+        {children}
+      </SessionContext.Provider>
+    </QueryClientProvider>
   );
 }
 

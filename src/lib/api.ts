@@ -22,6 +22,7 @@ interface RequestOptions {
   responseType?: 'json' | 'text';
   /** Skip attaching the bearer token (public/health calls). */
   anonymous?: boolean;
+  accessToken?: string | null;
   signal?: AbortSignal;
 }
 
@@ -56,6 +57,7 @@ export async function apiWithHeaders<T>(
     contentType,
     responseType = 'json',
     anonymous = false,
+    accessToken,
     signal,
   } = options;
 
@@ -66,7 +68,8 @@ export async function apiWithHeaders<T>(
   if (body !== undefined && !isForm)
     headers['Content-Type'] = contentType ?? 'application/json';
   if (!anonymous) {
-    const token = await getAccessToken();
+    const token =
+      accessToken === undefined ? await getAccessToken() : accessToken;
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 

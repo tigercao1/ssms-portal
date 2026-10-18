@@ -1,6 +1,4 @@
-import type { ReactNode } from 'react';
 import { act, render, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { auth, fakeSession, resetAuth, setSession } from '@/test/supabaseAuth';
 import { SessionProvider } from './SessionProvider';
@@ -15,19 +13,11 @@ const analytics = vi.hoisted(() => ({
 vi.mock('@/lib/analytics', () => analytics);
 
 beforeEach(() => resetAuth());
-
-function renderProvider(children: ReactNode) {
-  return render(
-    <QueryClientProvider client={new QueryClient()}>
-      <SessionProvider>{children}</SessionProvider>
-    </QueryClientProvider>,
-  );
-}
 afterEach(() => vi.clearAllMocks());
 
 describe('SessionProvider analytics identity', () => {
   it('does not reset an anonymous visitor who never signed in', async () => {
-    renderProvider('child');
+    render(<SessionProvider>child</SessionProvider>);
     await waitFor(() => expect(auth.getSession).toHaveBeenCalled());
     await act(async () => {});
     act(() => setSession(null));
@@ -38,7 +28,7 @@ describe('SessionProvider analytics identity', () => {
   });
 
   it('identifies on sign-in and resets once on sign-out', async () => {
-    renderProvider('child');
+    render(<SessionProvider>child</SessionProvider>);
 
     act(() => setSession(fakeSession()));
     await waitFor(() =>
