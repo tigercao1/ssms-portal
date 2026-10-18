@@ -219,7 +219,7 @@ export const en: Messages = {
     slotRemovePhoto: 'Remove photo',
   },
   bio: {
-    composeHint: 'Write in English, 中文, or both. Any language you leave empty is machine-translated when you save.',
+    composeHint: 'Write your bio in one language. We’ll translate it into the other language when you save.',
     actionsHint: 'Optional: Refine polishes your wording and translates it so you can review both before saving.',
     refine: 'Refine',
     notTranslated: 'Your bio is saved, but the other language couldn’t be translated right now. Use “Update translation” to add it later.',
@@ -241,6 +241,10 @@ export const en: Messages = {
     clear: 'Clear',
     stale: 'May be out of date',
     staleHint: 'The other language was changed more recently.',
+    writingIn: 'I’m writing in',
+    looksLikeZh: 'This looks like Chinese.',
+    looksLikeEn: 'This looks like English.',
+    switchTo: 'Switch to {lang}',
     updateTranslation: 'Update translation',
   },
   settings: {

@@ -228,6 +228,10 @@ export interface Messages {
     clear: string;
     stale: string;
     staleHint: string;
+    writingIn: string;
+    looksLikeZh: string;
+    looksLikeEn: string;
+    switchTo: string;
     updateTranslation: string;
   };
   settings: {
