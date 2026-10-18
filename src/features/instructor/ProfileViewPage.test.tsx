@@ -491,7 +491,7 @@ describe('ProfileViewPage go-live', () => {
       }),
     ).toHaveAttribute('href', '/onboarding/asg-contract');
     expect(screen.getByText('Not live')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
     expect(
       screen.queryByText('Your profile is approved and visible publicly.'),
     ).not.toBeInTheDocument();
@@ -580,7 +580,7 @@ describe('ProfileViewPage go-live', () => {
     expect(
       screen.getByRole('link', { name: '在 ssnow.club 查看 ↗' }),
     ).toHaveAttribute('href', 'https://ssnow.club/pages/our-team/jane-snow');
-    expect(screen.getByText('已公开')).toBeInTheDocument();
+    expect(screen.getByText('已上线')).toBeInTheDocument();
     expect(
       screen.queryByText('您的资料已通过审核并公开显示。'),
     ).not.toBeInTheDocument();
@@ -594,7 +594,7 @@ describe('ProfileViewPage go-live', () => {
       await screen.findByText('资料已齐全，正在上线中。'),
     ).toBeInTheDocument();
     expect(screen.getByText('通常几分钟内完成。')).toBeInTheDocument();
-    expect(screen.getByText('未公开')).toBeInTheDocument();
+    expect(screen.getByText('未上线')).toBeInTheDocument();
   });
 
   it('lists what is missing in Chinese', async () => {

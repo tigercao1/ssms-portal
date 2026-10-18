@@ -45,14 +45,16 @@ export function ProfileViewPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl">{t.profile.title}</h1>
-          <StatusPill
-            status={profile.approvalStatus}
-            isActive={profile.isActive}
-          />
-          {readiness && <LivePill live={readiness.live} />}
+          <h1 className="whitespace-nowrap text-3xl">{t.profile.title}</h1>
+          <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <StatusPill
+              status={profile.approvalStatus}
+              isActive={profile.isActive}
+            />
+            {readiness && <LivePill live={readiness.live} />}
+          </div>
         </div>
         <Link to="/profile/edit">
           <Button>{t.profile.editProfile}</Button>
