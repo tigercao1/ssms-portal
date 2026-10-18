@@ -6,6 +6,7 @@ import type {
   Customer,
   GoogleCalendar,
   GoogleConnectionStatus,
+  GoLiveReadiness,
   InstructorProfile,
   LessonType,
   PayRate,
@@ -94,6 +95,31 @@ export const fakeShopifyInstructorSync: ShopifyInstructorSync = {
   queued: false,
   attempts: 0,
   previewUrl: 'https://ssnow.club/pages/our-team-preview/jane-snow',
+};
+
+export const fakeGoLive: GoLiveReadiness = {
+  live: false,
+  ready: false,
+  liveUrl: null,
+  missing: [
+    { group: 'profile', field: 'photo' },
+    { group: 'certification', reason: 'none_verified' },
+    {
+      group: 'onboarding',
+      assignmentId: 'asg-contract',
+      titleEn: 'Independent contractor agreement',
+      titleZh: '独立承包人协议',
+    },
+  ],
+  certifications: [
+    {
+      org: 'csia',
+      track: 'regular',
+      level: 4,
+      status: 'pending',
+      validUntil: '2027-06-30',
+    },
+  ],
 };
 
 export const fakeGoogleStatus: GoogleConnectionStatus = {
@@ -318,6 +344,7 @@ export const handlers = [
   http.get(`${API}/me/instructor/calendar`, () =>
     HttpResponse.json({ connected: false }),
   ),
+  http.get(`${API}/me/go-live`, () => HttpResponse.json(fakeGoLive)),
   http.get(`${API}/me/instructor/bio/ai-usage`, () =>
     HttpResponse.json({ limit: 5, used: 0, remaining: 5, resetsAt: null }),
   ),
@@ -360,6 +387,9 @@ export const handlers = [
       lastFetched: null,
       lastError: null,
     }),
+  ),
+  http.get(`${API}/admin/instructors/:id/go-live`, () =>
+    HttpResponse.json(fakeGoLive),
   ),
   http.get(`${API}/admin/instructors/:id/google-calendar`, ({ params }) =>
     HttpResponse.json({

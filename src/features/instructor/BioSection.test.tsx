@@ -123,13 +123,20 @@ function setup(
   return { patches, drafts };
 }
 
+const langButton = (name: string) =>
+  within(screen.getByRole('group', { name: 'I’m writing in' })).getByRole(
+    'button',
+    { name },
+  );
+
 async function compose(texts: { en?: string; zh?: string }) {
   renderWithProviders(<EditProfilePage />);
-  const en = await screen.findByRole('textbox', { name: 'English' });
-  const zh = screen.getByRole('textbox', { name: '中文' });
-  if (texts.en) await userEvent.type(en, texts.en);
-  if (texts.zh) await userEvent.type(zh, texts.zh);
-  return { en, zh };
+  await screen.findByRole('group', { name: 'I’m writing in' });
+  if (texts.zh) await userEvent.click(langButton('中文'));
+  const lang = texts.zh ? '中文' : 'English';
+  const box = screen.getByRole('textbox', { name: lang });
+  await userEvent.type(box, texts.zh ?? texts.en ?? '');
+  return { en: box, zh: box };
 }
 
 const bioCard = () =>
@@ -139,15 +146,18 @@ const saveButton = () =>
   within(bioCard()).getByRole('button', { name: 'Save' });
 
 describe('BioSection first-time flow', () => {
-  it('shows both language boxes with the daily count and no Use as written', async () => {
+  it('shows one box in the preferred language with the daily count and no Use as written', async () => {
     setup(noBio, { remaining: 3 });
     renderWithProviders(<EditProfilePage />);
     expect(
       await screen.findByRole('textbox', { name: 'English' }),
     ).toHaveAttribute('maxLength', '1000');
-    expect(screen.getByRole('textbox', { name: '中文' })).toHaveValue('');
+    expect(langButton('English')).toHaveAttribute('aria-pressed', 'true');
     expect(
-      screen.getByText(/Any language you leave empty is machine-translated/),
+      screen.queryByRole('textbox', { name: '中文' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Write your bio in one language/),
     ).toBeInTheDocument();
     expect(await screen.findByText('3 of 5 left today')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refine' })).toBeDisabled();
@@ -212,21 +222,63 @@ describe('BioSection first-time flow', () => {
     expect(drafts).toEqual([{ text: '我是教练。', mode: 'translate' }]);
   });
 
-  it('Save with both languages saves them as written without calling AI', async () => {
-    const { patches, drafts } = setup(noBio);
-    await compose({ en: 'Hello', zh: '你好' });
+  it('defaults the picker to a Chinese preferred language', async () => {
+    setup({ ...noBio, preferredLanguage: 'zh-CN' });
+    renderWithProviders(<EditProfilePage />);
+    expect(
+      await screen.findByRole('textbox', { name: '中文' }),
+    ).toBeInTheDocument();
+    expect(langButton('中文')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('nudges to switch when the text is in the other language, and keeps the text', async () => {
+    const { patches } = setup(noBio, {
+      draft: () =>
+        HttpResponse.json({
+          en: 'I am a coach.',
+          zh: '我是滑雪教练',
+          sourceLangs: ['zh-CN'],
+          model: 'gemini-test',
+          usage: usage(4),
+        }),
+    });
+    renderWithProviders(<EditProfilePage />);
+    const box = await screen.findByRole('textbox', { name: 'English' });
+    await userEvent.type(box, '我是滑雪教练');
+    expect(screen.getByText('This looks like Chinese.')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Switch to 中文' }),
+    );
+    expect(screen.getByRole('textbox', { name: '中文' })).toHaveValue(
+      '我是滑雪教练',
+    );
+    expect(
+      screen.queryByText('This looks like Chinese.'),
+    ).not.toBeInTheDocument();
     await userEvent.click(saveButton());
     await waitFor(() =>
       expect(patches).toEqual([
         {
-          bioEn: 'Hello',
-          bioZh: '你好',
-          bioEnMachineTranslated: false,
+          bioZh: '我是滑雪教练',
           bioZhMachineTranslated: false,
+          bioEn: 'I am a coach.',
+          bioEnMachineTranslated: true,
         },
       ]),
     );
-    expect(drafts).toHaveLength(0);
+  });
+
+  it('nudges back to English when English text is under 中文', async () => {
+    setup(noBio);
+    renderWithProviders(<EditProfilePage />);
+    await screen.findByRole('textbox', { name: 'English' });
+    await userEvent.click(langButton('中文'));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: '中文' }),
+      'I teach skiing',
+    );
+    expect(screen.getByText('This looks like English.')).toBeInTheDocument();
+    expect(saveButton()).toBeEnabled();
   });
 
   it('refines English text and marks only the translated side as machine-translated', async () => {
@@ -275,36 +327,6 @@ describe('BioSection first-time flow', () => {
     expect(
       screen.getByRole('button', { name: 'Edit English bio' }),
     ).toBeInTheDocument();
-  });
-
-  it('refines both boxes together and flags neither side', async () => {
-    const { patches, drafts } = setup(noBio, {
-      draft: () =>
-        HttpResponse.json({
-          en: 'I teach beginner skiers.',
-          zh: '我也教单板。',
-          sourceLangs: ['en', 'zh-CN'],
-          model: 'gemini-test',
-          usage: usage(4),
-        }),
-    });
-    await compose({ en: 'I teach beginners', zh: '我也教单板' });
-    await userEvent.click(screen.getByRole('button', { name: 'Refine' }));
-    await within(dialog()).findByText('我也教单板。');
-    expect(drafts).toEqual([
-      { text: 'I teach beginners\n\n我也教单板', mode: 'refine' },
-    ]);
-    await userEvent.click(
-      within(dialog()).getByRole('button', { name: 'Save' }),
-    );
-    await waitFor(() =>
-      expect(patches).toEqual([
-        expect.objectContaining({
-          bioEnMachineTranslated: false,
-          bioZhMachineTranslated: false,
-        }),
-      ]),
-    );
   });
 
   it('drops the machine flag when the translation is edited by hand', async () => {
@@ -496,7 +518,7 @@ describe('BioSection errors', () => {
         HttpResponse.json({}, { status: 500 }),
       ),
     );
-    const { en } = await compose({ en: 'Hi', zh: '你好' });
+    const { en } = await compose({ en: 'Hi' });
     await userEvent.click(saveButton());
     expect(
       await screen.findByText('Something went wrong.'),
@@ -524,7 +546,9 @@ describe('BioSection existing bio', () => {
     );
     const box = screen.getByRole('textbox', { name: '中文' });
     expect(box).toHaveValue('资深教练。');
-    expect(screen.getByRole('textbox', { name: 'English' })).toHaveValue('');
+    expect(
+      screen.queryByRole('textbox', { name: 'English' }),
+    ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(box).toHaveValue('');
     await userEvent.type(box, '新的简介');
@@ -801,15 +825,13 @@ describe('BioSection while a save is translating', () => {
   it('locks the composer until the translated save lands', async () => {
     const held = heldDraft();
     const { patches, drafts } = setup(noBio, { draft: held.draft });
-    const { en, zh } = await compose({ en: 'I teach skiing' });
+    const { en } = await compose({ en: 'I teach skiing' });
     await userEvent.click(saveButton());
     await waitFor(() => expect(drafts).toHaveLength(1));
     expect(en).toBeDisabled();
-    expect(zh).toBeDisabled();
+    expect(langButton('中文')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Refine' })).toBeDisabled();
-    await userEvent.type(zh, '我自己写的');
     await userEvent.type(en, ' more');
-    expect(zh).toHaveValue('');
     expect(en).toHaveValue('I teach skiing');
     held.release();
     await waitFor(() =>
@@ -833,7 +855,7 @@ describe('BioSection while a save is translating', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('textbox', { name: 'English' })).toBeDisabled();
-    expect(screen.getByRole('textbox', { name: '中文' })).toBeDisabled();
+    expect(langButton('中文')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Clear' })).toBeDisabled();
     expect(
       within(bioCard()).getByRole('button', { name: 'Cancel' }),
@@ -845,7 +867,7 @@ describe('BioSection while a save is translating', () => {
       screen.getByRole('button', { name: 'Edit Chinese bio' }),
     ).toBeDisabled();
     await userEvent.click(screen.getByText('资深教练。'));
-    expect(within(bioCard()).getAllByRole('textbox')).toHaveLength(2);
+    expect(within(bioCard()).getAllByRole('textbox')).toHaveLength(1);
     held.release();
     await waitFor(() => expect(patches).toHaveLength(1));
     await waitFor(() =>

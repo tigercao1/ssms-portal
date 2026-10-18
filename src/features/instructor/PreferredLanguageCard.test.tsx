@@ -2,13 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { PreferredLanguageCard } from './PreferredLanguageCard';
+import { ProfileViewPage } from './ProfileViewPage';
 import { SettingsPage } from './SettingsPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeProfile, server } from '@/test/msw';
 
 const API = 'http://localhost:3000';
 
-vi.mock('@/auth/SessionProvider', () => ({
+vi.mock('@/auth/SessionProvider', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useSession: () => ({ user: { email: 'jane@example.com' } }),
 }));
 
@@ -24,34 +27,29 @@ function capturePatches() {
   return bodies;
 }
 
-describe('SettingsPage email language', () => {
-  it('starts from the profile preference, not the site language', async () => {
-    server.use(
-      http.get(`${API}/me/instructor`, () =>
-        HttpResponse.json({ ...fakeProfile, preferredLanguage: 'zh-CN' }),
-      ),
+describe('PreferredLanguageCard', () => {
+  it('starts from the profile preference, not the site language', () => {
+    renderWithProviders(
+      <PreferredLanguageCard
+        profile={{ ...fakeProfile, preferredLanguage: 'zh-CN' }}
+      />,
     );
-    renderWithProviders(<SettingsPage />);
-    expect(await screen.findByLabelText('Email language')).toHaveValue('zh-CN');
+    expect(screen.getByLabelText('Preferred language')).toHaveValue('zh-CN');
     expect(document.documentElement.lang).toBe('en');
   });
 
   it('saves the chosen language without changing the site language', async () => {
     const bodies = capturePatches();
-    renderWithProviders(<SettingsPage />);
-    const select = await screen.findByLabelText('Email language');
+    renderWithProviders(<PreferredLanguageCard profile={fakeProfile} />);
+    const select = screen.getByLabelText('Preferred language');
     expect(select).toHaveValue('en');
 
     await userEvent.selectOptions(select, 'zh-CN');
 
     expect(await screen.findByText('Saved')).toBeInTheDocument();
     expect(bodies).toEqual([{ preferredLanguage: 'zh-CN' }]);
-    expect(screen.getByLabelText('Email language')).toHaveValue('zh-CN');
     expect(document.documentElement.lang).toBe('en');
     expect(localStorage.getItem('ssms.locale')).toBe('en');
-    expect(
-      screen.getByRole('heading', { name: 'Settings' }),
-    ).toBeInTheDocument();
   });
 
   it('shows an error and keeps the saved value when the save fails', async () => {
@@ -60,8 +58,8 @@ describe('SettingsPage email language', () => {
         HttpResponse.json({ message: 'boom' }, { status: 500 }),
       ),
     );
-    renderWithProviders(<SettingsPage />);
-    const select = await screen.findByLabelText('Email language');
+    renderWithProviders(<PreferredLanguageCard profile={fakeProfile} />);
+    const select = screen.getByLabelText('Preferred language');
 
     await userEvent.selectOptions(select, 'zh-CN');
 
@@ -72,23 +70,25 @@ describe('SettingsPage email language', () => {
     expect(screen.queryByText('Saved')).not.toBeInTheDocument();
   });
 
-  it('shows the label and hint in Chinese', async () => {
+  it('shows the label and hint in Chinese', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
-    renderWithProviders(<SettingsPage />);
-    expect(await screen.findByLabelText('邮件语言')).toHaveValue('en');
-    expect(screen.getByText(/如需切换网站语言/)).toBeInTheDocument();
+    renderWithProviders(<PreferredLanguageCard profile={fakeProfile} />);
+    expect(screen.getByLabelText('首选语言')).toHaveValue('en');
+    expect(screen.getByText(/填写简介时的默认语言/)).toBeInTheDocument();
   });
 
-  it('shows an error when the profile fails to load', async () => {
-    server.use(
-      http.get(`${API}/me/instructor`, () =>
-        HttpResponse.json({ message: 'boom' }, { status: 500 }),
-      ),
-    );
-    renderWithProviders(<SettingsPage />);
+  it('appears on the profile page', async () => {
+    renderWithProviders(<ProfileViewPage />);
     expect(
-      await screen.findByText('Something went wrong.'),
+      await screen.findByLabelText('Preferred language'),
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText('Email language')).not.toBeInTheDocument();
+  });
+
+  it('is no longer on the settings page', () => {
+    renderWithProviders(<SettingsPage />);
+    expect(screen.getByText('jane@example.com')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Preferred language'),
+    ).not.toBeInTheDocument();
   });
 });

@@ -137,7 +137,6 @@ export interface Messages {
   profile: {
     title: string;
     pendingBanner: string;
-    approvedBanner: string;
     rejectedBanner: string;
     inactiveBanner: string;
     editProfile: string;
@@ -206,6 +205,40 @@ export interface Messages {
     slotReplacePhoto: string;
     slotRemovePhoto: string;
   };
+  goLive: {
+    livePill: string;
+    notLivePill: string;
+    liveTitle: string;
+    liveLink: string;
+    readyTitle: string;
+    readyBody: string;
+    missingTitleOne: string;
+    missingTitle: string;
+    groupProfile: string;
+    groupCertification: string;
+    groupOnboarding: string;
+    fieldDisplayNameEn: string;
+    fieldBio: string;
+    fieldPhoto: string;
+    fieldLocations: string;
+    fieldLanguages: string;
+    fieldCourseLevels: string;
+    noneVerified: string;
+    actionAdd: string;
+    actionView: string;
+    actionOpen: string;
+    certVerified: string;
+    certVerifiedNoDate: string;
+    certPending: string;
+    certRejected: string;
+    certExpired: string;
+    certNoProof: string;
+    certLevelMismatch: string;
+    checkLabel: string;
+    checkReady: string;
+    checkMissing: string;
+    checkNotEligible: string;
+  };
   bio: {
     composeHint: string;
     actionsHint: string;
@@ -229,13 +262,16 @@ export interface Messages {
     clear: string;
     stale: string;
     staleHint: string;
+    writingIn: string;
+    looksLikeZh: string;
+    looksLikeEn: string;
+    switchTo: string;
     updateTranslation: string;
   };
   settings: {
     title: string;
     languageLabel: string;
-    emailLanguageLabel: string;
-    emailLanguageHint: string;
+    preferredLanguageHint: string;
     account: string;
     signedInAs: string;
   };
