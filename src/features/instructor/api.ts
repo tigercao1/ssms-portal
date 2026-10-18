@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '@/lib/api';
+import { AccountSwitchedError, api, ApiError } from '@/lib/api';
+import { queryClientAccount } from '@/lib/query';
 import { getSessionSnapshot } from '@/lib/supabase';
 import type {
   AllowedAvatarMime,
@@ -37,26 +37,15 @@ export function useMyCalendarStatus(enabled: boolean) {
   });
 }
 
-export class AccountSwitchedError extends Error {
-  constructor() {
-    super('Signed-in account changed since this form was loaded');
-    this.name = 'AccountSwitchedError';
-  }
-}
-
-/** W2.2 — patch the caller's profile; refuses if the signed-in user changed since mount. */
+/** W2.2 — patch the caller's profile; refuses unless the session still owns the cached data. */
 export function useUpdateProfile() {
   const qc = useQueryClient();
-  const [loadedForUserId] = useState(() =>
-    getSessionSnapshot().then((s) => s.userId),
-  );
+  const owner = queryClientAccount(qc);
   return useMutation({
     mutationFn: async (body: UpdateProfileBody) => {
-      const [loadedFor, current] = await Promise.all([
-        loadedForUserId,
-        getSessionSnapshot(),
-      ]);
-      if (loadedFor !== current.userId) throw new AccountSwitchedError();
+      const current = await getSessionSnapshot();
+      if (owner === undefined || owner !== current.userId)
+        throw new AccountSwitchedError();
       return api<InstructorProfile>('/me/instructor', {
         method: 'PATCH',
         body,

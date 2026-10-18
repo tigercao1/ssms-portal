@@ -1,16 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { signOut, refreshSession, getAccessToken } = vi.hoisted(() => ({
+const { signOut, refreshSession, getSessionSnapshot } = vi.hoisted(() => ({
   signOut: vi.fn(),
   refreshSession: vi.fn(),
-  getAccessToken: vi.fn(),
+  getSessionSnapshot: vi.fn(),
 }));
 vi.mock('@/lib/supabase', () => ({
   supabase: { auth: { signOut, refreshSession } },
-  getAccessToken,
+  getSessionSnapshot,
 }));
 
-import { api, ApiError, apiWithHeaders } from './api';
+import {
+  AccountSwitchedError,
+  api,
+  ApiError,
+  apiWithHeaders,
+  bindRequestsToAccount,
+} from './api';
 
 function mockFetch(status: number, body: unknown) {
   vi.stubGlobal(
@@ -26,12 +32,26 @@ function mockFetch(status: number, body: unknown) {
 
 describe('api client', () => {
   beforeEach(() => {
-    getAccessToken.mockResolvedValue('tok-123');
+    getSessionSnapshot.mockResolvedValue({
+      userId: 'user-1',
+      accessToken: 'tok-123',
+    });
   });
   afterEach(() => {
     vi.unstubAllGlobals();
     signOut.mockClear();
     refreshSession.mockReset();
+    bindRequestsToAccount(undefined);
+  });
+
+  it('sends nothing when the stored session belongs to another account than the bound one', async () => {
+    mockFetch(200, { ok: true });
+    bindRequestsToAccount('user-2');
+    await expect(api('/thing')).rejects.toBeInstanceOf(AccountSwitchedError);
+    expect(fetch).not.toHaveBeenCalled();
+
+    bindRequestsToAccount('user-1');
+    await expect(api('/thing')).resolves.toEqual({ ok: true });
   });
 
   it('returns parsed JSON on 200 and attaches the bearer token', async () => {

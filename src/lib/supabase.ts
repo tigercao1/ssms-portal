@@ -18,12 +18,6 @@ export const supabase = createClient(
   },
 );
 
-/** Current access token (JWT) for attaching to API calls, or null. */
-export async function getAccessToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
-}
-
 export async function getSessionSnapshot(): Promise<{
   userId: string | null;
   accessToken: string | null;

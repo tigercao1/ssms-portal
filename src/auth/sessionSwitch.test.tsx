@@ -67,6 +67,7 @@ const profiles: Record<string, InstructorProfile> = {
 let releaseProfile: Record<string, Promise<void>> = {};
 let releasePatch: Record<string, Promise<void>> = {};
 let patches: Array<{ token: string | null; body: UpdateProfileBody }> = [];
+let profileReads: Array<string | null> = [];
 
 function userFromToken(request: Request) {
   return request.headers.get('Authorization')?.replace('Bearer jwt-', '') ?? '';
@@ -77,8 +78,10 @@ beforeEach(() => {
   releaseProfile = {};
   releasePatch = {};
   patches = [];
+  profileReads = [];
   server.use(
     http.get(`${API}/me/instructor`, async ({ request }) => {
+      profileReads.push(request.headers.get('Authorization'));
       const user = userFromToken(request);
       await releaseProfile[user];
       return HttpResponse.json(profiles[user]);
@@ -235,6 +238,46 @@ describe('switching the signed-in account', () => {
         body: expect.objectContaining({ displayNameEn: 'T5 Documents' }),
       }),
     );
+  });
+
+  it('refuses to save a cached profile opened after the session changed underneath it', async () => {
+    setStoredSession(sessionFor('t5'));
+    renderPortal('/profile');
+    expect(await screen.findByText('T5 Documents')).toBeInTheDocument();
+
+    setStoredSession(sessionFor('t6'));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit profile' }));
+    expect(await screen.findByDisplayValue('T5 Documents')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText(/You are now signed in as a different account/),
+    ).toBeInTheDocument();
+    expect(patches).toEqual([]);
+  });
+
+  it("never loads another account's data into the page that is still showing the previous account", async () => {
+    setStoredSession(sessionFor('t5'));
+    renderPortal('/profile');
+    expect(await screen.findByText('T5 Documents')).toBeInTheDocument();
+
+    setStoredSession(sessionFor('t6'));
+    act(() => {
+      window.dispatchEvent(new Event('visibilitychange'));
+    });
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(profileReads).not.toContain('Bearer jwt-t6');
+    expect(screen.getByText('T5 Documents')).toBeInTheDocument();
+    expect(screen.queryByText('T6 Person')).not.toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'sb-project-auth-token' }),
+      );
+    });
+    expect(await screen.findByText('T6 Person')).toBeInTheDocument();
+    expect(screen.queryByText('T5 Documents')).not.toBeInTheDocument();
   });
 
   it('still saves when the same user is signed in', async () => {

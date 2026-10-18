@@ -14,7 +14,8 @@ import {
   useLanguages,
   useTeachingLocations,
 } from '@/features/reference/api';
-import { AccountSwitchedError, useMyProfile, useUpdateProfile } from './api';
+import { AccountSwitchedError } from '@/lib/api';
+import { useMyProfile, useUpdateProfile } from './api';
 import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
 import { BioSection } from './BioSection';
 import { MultiSelectChips } from './MultiSelectChips';

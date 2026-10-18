@@ -14,15 +14,32 @@ export function shouldRetryQuery(
   return failureCount < 1;
 }
 
+const owners = new WeakMap<QueryClient, string | null>();
+
+export function bindQueryClientToAccount(
+  client: QueryClient,
+  userId: string | null,
+) {
+  owners.set(client, userId);
+  return client;
+}
+
+export function queryClientAccount(client: QueryClient) {
+  return owners.get(client);
+}
+
 /** TanStack Query client (W0.3); the session provider creates one per signed-in user. */
-export function createQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 30_000,
-        retry: shouldRetryQuery,
-        refetchOnWindowFocus: false,
+export function createQueryClient(userId: string | null = null) {
+  return bindQueryClientToAccount(
+    new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 30_000,
+          retry: shouldRetryQuery,
+          refetchOnWindowFocus: false,
+        },
       },
-    },
-  });
+    }),
+    userId,
+  );
 }
