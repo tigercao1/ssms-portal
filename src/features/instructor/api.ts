@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
+import { getSessionUserId } from '@/lib/supabase';
 import type {
   AllowedAvatarMime,
   AvatarUploadTicket,
@@ -35,12 +37,26 @@ export function useMyCalendarStatus(enabled: boolean) {
   });
 }
 
-/** W2.2 — patch the caller's profile. */
+export class AccountSwitchedError extends Error {
+  constructor() {
+    super('Signed-in account changed since this form was loaded');
+    this.name = 'AccountSwitchedError';
+  }
+}
+
+/** W2.2 — patch the caller's profile; refuses if the signed-in user changed since mount. */
 export function useUpdateProfile() {
   const qc = useQueryClient();
+  const [loadedForUserId] = useState(getSessionUserId);
   return useMutation({
-    mutationFn: (body: UpdateProfileBody) =>
-      api<InstructorProfile>('/me/instructor', { method: 'PATCH', body }),
+    mutationFn: async (body: UpdateProfileBody) => {
+      const [loadedFor, current] = await Promise.all([
+        loadedForUserId,
+        getSessionUserId(),
+      ]);
+      if (loadedFor !== current) throw new AccountSwitchedError();
+      return api<InstructorProfile>('/me/instructor', { method: 'PATCH', body });
+    },
     onSuccess: (profile) => {
       qc.setQueryData(PROFILE_KEY, profile);
       track('profile_saved');

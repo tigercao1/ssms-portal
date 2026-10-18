@@ -157,6 +157,7 @@ export interface Messages {
     calendarGuide: string;
     // form
     editTitle: string;
+    accountSwitched: string;
     identitySection: string;
     bioSection: string;
     detailsSection: string;

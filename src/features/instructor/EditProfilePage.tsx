@@ -14,7 +14,7 @@ import {
   useLanguages,
   useTeachingLocations,
 } from '@/features/reference/api';
-import { useMyProfile, useUpdateProfile } from './api';
+import { AccountSwitchedError, useMyProfile, useUpdateProfile } from './api';
 import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
 import { BioSection } from './BioSection';
 import { MultiSelectChips } from './MultiSelectChips';
@@ -139,7 +139,7 @@ function Form({
     setDraft((d) => ({ ...d, [key]: val }));
   }
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
     const nextNameError = draft.displayNameEn.trim() ? null : t.validation.required;
     const nextAgeError = validateMinStudentAge(draft.minStudentAge, t);
@@ -165,14 +165,19 @@ function Form({
       dateOfBirth: draft.dateOfBirth || null,
       minStudentAge: Number(draft.minStudentAge),
     };
-    await update.mutateAsync(body);
-    navigate('/profile');
+    update.mutate(body, { onSuccess: () => navigate('/profile') });
   }
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6 pb-24">
       <h1 className="text-3xl">{t.profile.editTitle}</h1>
-      {update.isError && <Banner tone="error">{t.errors.generic}</Banner>}
+      {update.isError && (
+        <Banner tone="error">
+          {update.error instanceof AccountSwitchedError
+            ? t.profile.accountSwitched
+            : t.errors.generic}
+        </Banner>
+      )}
 
       <Card className="flex flex-col gap-4">
         <h2 className="text-lg">{t.profile.identitySection}</h2>

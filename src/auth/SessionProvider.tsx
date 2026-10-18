@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { identifyUser, resetUser, track } from '@/lib/analytics';
 
@@ -33,29 +34,45 @@ function readRole(user: User | null): 'admin' | 'instructor' | null {
 
 /**
  * Owns the Supabase auth session (W1.4). Subscribes to auth-state changes so
- * sign-in / sign-out / token-refresh propagate to the whole tree. Role +
- * email-verified are derived here for the route guards.
+ * sign-in / sign-out / token-refresh propagate to the whole tree, and drops the
+ * query cache whenever the signed-in user changes (here or in another tab).
+ * Role + email-verified are derived here for the route guards.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const appliedUserId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    function apply(next: Session | null) {
       if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      const nextUserId = next?.user?.id ?? null;
+      if (
+        appliedUserId.current !== undefined &&
+        appliedUserId.current !== nextUserId
+      )
+        queryClient.clear();
+      appliedUserId.current = nextUserId;
       setSession(next);
       setLoading(false);
-    });
+    }
+    function onStorage(e: StorageEvent) {
+      if (e.key && !e.key.startsWith('sb-')) return;
+      supabase.auth.getSession().then(({ data }) => apply(data.session));
+    }
+    supabase.auth.getSession().then(({ data }) => apply(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) =>
+      apply(next),
+    );
+    window.addEventListener('storage', onStorage);
     return () => {
       active = false;
       sub.subscription.unsubscribe();
+      window.removeEventListener('storage', onStorage);
     };
-  }, []);
+  }, [queryClient]);
 
   const userId = session?.user?.id ?? null;
   const role = readRole(session?.user ?? null);

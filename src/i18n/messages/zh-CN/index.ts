@@ -156,6 +156,7 @@ export const zhCN: Messages = {
     calendarNotConnectedBody: '您的 Google 日历尚未连接，被安排的课程不会显示在日历中。请按照指南完成连接。',
     calendarGuide: '如何连接日历',
     editTitle: '编辑资料',
+    accountSwitched: '您现在登录的是另一个账号，因此这些修改未保存。请刷新页面后编辑当前账号的资料。',
     identitySection: '身份信息',
     bioSection: '简介',
     detailsSection: '详细信息',
