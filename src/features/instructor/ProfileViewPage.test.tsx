@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -13,7 +13,7 @@ import { ProfileViewPage } from './ProfileViewPage';
 import { renderWithProviders } from '@/test/render';
 import { fakeGoLive, fakeProfile, server } from '@/test/msw';
 import type { GoLiveReadiness, InstructorProfile } from '@/lib/types';
-import { useUpdateProfile } from './api';
+import { GO_LIVE_POLL_MS, useUpdateProfile } from './api';
 import { CALENDAR_GUIDE_URL } from './calendarGuide';
 
 const API = 'http://localhost:3000';
@@ -491,7 +491,7 @@ describe('ProfileViewPage go-live', () => {
       }),
     ).toHaveAttribute('href', '/onboarding/asg-contract');
     expect(screen.getByText('Not live')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('Approved')).toBeInTheDocument();
     expect(
       screen.queryByText('Your profile is approved and visible publicly.'),
     ).not.toBeInTheDocument();
@@ -580,10 +580,70 @@ describe('ProfileViewPage go-live', () => {
     expect(
       screen.getByRole('link', { name: '在 ssnow.club 查看 ↗' }),
     ).toHaveAttribute('href', 'https://ssnow.club/pages/our-team/jane-snow');
-    expect(screen.getByText('已公开')).toBeInTheDocument();
+    expect(screen.getByText('已上线')).toBeInTheDocument();
     expect(
       screen.queryByText('您的资料已通过审核并公开显示。'),
     ).not.toBeInTheDocument();
+  });
+
+  it('switches from the ready banner to the live banner once Shopify publishes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let live = false;
+      server.use(
+        http.get(`${API}/me/instructor`, () =>
+          HttpResponse.json({ ...fakeProfile, ...approvedActive }),
+        ),
+        http.get(`${API}/me/go-live`, () =>
+          HttpResponse.json({
+            ...fakeGoLive,
+            ready: true,
+            live,
+            liveUrl: live
+              ? 'https://ssnow.club/pages/our-team/jane-snow'
+              : null,
+            missing: [],
+          }),
+        ),
+      );
+      renderWithProviders(<ProfileViewPage />);
+      expect(
+        await screen.findByText('All set: your profile is going live.'),
+      ).toBeInTheDocument();
+
+      live = true;
+      await act(() => vi.advanceTimersByTimeAsync(GO_LIVE_POLL_MS));
+
+      expect(
+        await screen.findByText('Your profile is live.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Live')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops checking once the profile is live', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const requests = serveGoLive(approvedActive, {
+        ready: true,
+        live: true,
+        liveUrl: 'https://ssnow.club/pages/our-team/jane-snow',
+        missing: [],
+      });
+      renderWithProviders(<ProfileViewPage />);
+      expect(
+        await screen.findByText('Your profile is live.'),
+      ).toBeInTheDocument();
+      const before = requests.length;
+
+      await act(() => vi.advanceTimersByTimeAsync(GO_LIVE_POLL_MS * 3));
+
+      expect(requests).toHaveLength(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows the ready banner in Chinese', async () => {
@@ -594,7 +654,7 @@ describe('ProfileViewPage go-live', () => {
       await screen.findByText('资料已齐全，正在上线中。'),
     ).toBeInTheDocument();
     expect(screen.getByText('通常几分钟内完成。')).toBeInTheDocument();
-    expect(screen.getByText('未公开')).toBeInTheDocument();
+    expect(screen.getByText('未上线')).toBeInTheDocument();
   });
 
   it('lists what is missing in Chinese', async () => {
