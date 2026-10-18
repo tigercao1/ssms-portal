@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
-import type { InsuranceRecord, MyInsurance, RegisterLessonBody } from './types';
+import type { InsuranceRequest, MyInsurance, SubmitRequestBody } from './types';
 import { track } from '@/lib/analytics';
 
 export const MY_INSURANCE_KEY = ['me', 'insurance'] as const;
@@ -12,30 +12,19 @@ export function useMyInsurance() {
   });
 }
 
-export function useSeasonInsurance(season: string | null, enabled: boolean) {
-  return useQuery({
-    queryKey: [...MY_INSURANCE_KEY, { season }],
-    queryFn: () =>
-      api<MyInsurance>(
-        `/me/insurance?season=${encodeURIComponent(season ?? '')}`,
-      ),
-    enabled: enabled && Boolean(season),
-  });
-}
-
-function useInvalidateMyInsurance() {
+export function useSubmitRequest() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: MY_INSURANCE_KEY });
-}
-
-export function useRegisterLesson() {
-  const invalidate = useInvalidateMyInsurance();
   return useMutation({
-    mutationFn: (body: RegisterLessonBody) =>
-      api<InsuranceRecord>('/me/insurance/records', { method: 'POST', body }),
-    onSuccess: () => {
-      track('insurance_lesson_registered');
-      return invalidate();
+    mutationFn: (body: SubmitRequestBody) =>
+      api<InsuranceRequest>('/me/insurance/requests', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (request) => {
+      track('insurance_request_submitted', {
+        lessons: request.lessonCount,
+      });
+      return qc.invalidateQueries({ queryKey: MY_INSURANCE_KEY });
     },
   });
 }
@@ -44,4 +33,26 @@ export function errorCodeOf(error: unknown): string | null {
   if (!(error instanceof ApiError)) return null;
   const code = (error.body as { code?: unknown } | undefined)?.code;
   return typeof code === 'string' ? code : null;
+}
+
+export interface LessonStudentIndex {
+  lessonIndex: number;
+  studentIndex?: number;
+}
+
+export function errorIndexesOf(error: unknown): LessonStudentIndex[] {
+  if (!(error instanceof ApiError) || !error.body) return [];
+  const body = error.body as Record<string, unknown>;
+  if (typeof body.lessonIndex === 'number')
+    return [{ lessonIndex: body.lessonIndex }];
+  for (const value of Object.values(body))
+    if (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.every(
+        (v) => v && typeof (v as LessonStudentIndex).lessonIndex === 'number',
+      )
+    )
+      return value as LessonStudentIndex[];
+  return [];
 }

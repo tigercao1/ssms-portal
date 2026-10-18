@@ -7,7 +7,10 @@ import { renderWithProviders } from '@/test/render';
 import {
   adminRecord,
   adminRecords,
+  adminRequestHandlers,
   adminSummary,
+  createAdminRequestsState,
+  type AdminRequestsState,
 } from '@/features/insurance/fixtures';
 import type {
   AdminInsuranceRecord,
@@ -24,6 +27,7 @@ let recordQueries: URLSearchParams[];
 let actions: { id: string; action: string; body: unknown }[];
 let summary: AdminInsuranceSummary[];
 let grants: { instructorId: string; body: unknown }[];
+let requestsState: AdminRequestsState;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -35,7 +39,9 @@ beforeEach(() => {
   actions = [];
   summary = adminSummary.map((row) => ({ ...row }));
   grants = [];
+  requestsState = createAdminRequestsState();
   server.use(
+    ...adminRequestHandlers(requestsState),
     http.get(`${API}/admin/insurance/summary`, ({ request }) => {
       summaryQueries.push(new URL(request.url).search);
       return HttpResponse.json(summary);
@@ -499,7 +505,11 @@ describe('AdminInsurancePage', () => {
     await waitFor(() =>
       expect(recordQueries.at(-1)!.has('instructorId')).toBe(false),
     );
-    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(
+      within(
+        screen.getByRole('navigation', { name: 'Records pages' }),
+      ).getByRole('button', { name: 'Next' }),
+    );
     await waitFor(() => expect(recordQueries.at(-1)!.get('page')).toBe('2'));
     await user.click(screen.getByRole('button', { name: 'Jane Snow' }));
     await waitFor(() => {
@@ -646,4 +656,227 @@ describe('AdminInsurancePage', () => {
       await screen.findByText('已取消 Li Wei 的整季保险。'),
     ).toBeInTheDocument();
   });
+
+  it('lists requests and expands one into its lessons and students', async () => {
+    const user = await renderPage();
+    const table = await screen.findByRole('table', {
+      name: 'Insurance requests',
+    });
+    expect(requestsState.queries[0]!.get('season')).toBe('2026/27');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual([
+      'Request no.',
+      'Instructor',
+      'Lessons',
+      'Students',
+      'Amount',
+      'Status',
+      'Submitted',
+      'Actions',
+    ]);
+    expect(requestRow('INS-20261014-0011')).toHaveTextContent(
+      'INS-20261014-0011Jane Snow311$190Unpaid',
+    );
+    expect(requestRow('INS-20261006-0004')).toHaveTextContent(
+      'Paid Oct 6, 2026e-transfer #8812',
+    );
+    const toggle = within(table).getByRole('button', {
+      name: 'Show the lessons in INS-20261014-0011',
+    });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const lessons = within(table).getAllByTestId('tree-lesson');
+    expect(lessons).toHaveLength(3);
+    expect(lessons[2]).toHaveTextContent('Horseshoe Resort · 3 students');
+    expect(within(table).getAllByTestId('tree-student')).toHaveLength(11);
+    await user.click(toggle);
+    expect(within(table).queryByTestId('tree-lesson')).not.toBeInTheDocument();
+  });
+
+  it('marks a request paid for all its lessons', async () => {
+    const user = await renderPage();
+    await screen.findByRole('table', { name: 'Insurance requests' });
+    expect(await requestActionNames(user, 'INS-20261014-0011')).toEqual([
+      'Mark paid',
+      'Void',
+    ]);
+    await requestAction(user, 'INS-20261014-0011', 'Mark paid');
+    const dialog = screen.getByRole('dialog', {
+      name: 'Mark INS-20261014-0011 paid',
+    });
+    expect(dialog).toHaveTextContent('Jane Snow · $190');
+    await user.type(within(dialog).getByLabelText(/Note/), 'e-transfer #9');
+    await user.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
+    expect(
+      await screen.findByText('INS-20261014-0011 marked paid.'),
+    ).toBeInTheDocument();
+    expect(requestsState.actions).toEqual([
+      {
+        id: 'req-2',
+        action: 'mark-paid',
+        body: { paidOn: '2026-12-20', note: 'e-transfer #9' },
+      },
+    ]);
+    expect(actions).toEqual([]);
+    await waitFor(() =>
+      expect(requestRow('INS-20261014-0011')).toHaveTextContent('Paid'),
+    );
+  });
+
+  it('marks a paid request unpaid after confirming', async () => {
+    const user = await renderPage();
+    await screen.findByRole('table', { name: 'Insurance requests' });
+    expect(await requestActionNames(user, 'INS-20261006-0004')).toEqual([
+      'Mark unpaid',
+      'Void',
+    ]);
+    await requestAction(user, 'INS-20261006-0004', 'Mark unpaid');
+    const dialog = screen.getByRole('dialog', {
+      name: 'Mark INS-20261006-0004 unpaid?',
+    });
+    expect(dialog).toHaveTextContent(
+      'Every lesson in the request goes back to unpaid',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Mark unpaid' }),
+    );
+    expect(
+      await screen.findByText('INS-20261006-0004 marked unpaid.'),
+    ).toBeInTheDocument();
+    expect(requestsState.actions).toEqual([
+      { id: 'req-1', action: 'mark-unpaid', body: {} },
+    ]);
+  });
+
+  it('voids a whole request with a reason', async () => {
+    const user = await renderPage();
+    await screen.findByRole('table', { name: 'Insurance requests' });
+    await requestAction(user, 'INS-20261014-0011', 'Void');
+    const dialog = screen.getByRole('dialog', {
+      name: 'Void INS-20261014-0011?',
+    });
+    expect(dialog).toHaveTextContent(
+      "Every lesson in this request is voided and no longer counts toward the instructor's $400 cap.",
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Void request' }),
+    );
+    expect(within(dialog).getByText('Enter a reason.')).toBeInTheDocument();
+    expect(requestsState.actions).toEqual([]);
+    await user.type(
+      within(dialog).getByLabelText(/Reason/),
+      'Lessons cancelled',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Void request' }),
+    );
+    expect(
+      await screen.findByText('INS-20261014-0011 voided.'),
+    ).toBeInTheDocument();
+    expect(requestsState.actions).toEqual([
+      { id: 'req-2', action: 'void', body: { reason: 'Lessons cancelled' } },
+    ]);
+    await waitFor(() =>
+      expect(requestRow('INS-20261014-0011')).toHaveTextContent(
+        'Voided: Lessons cancelled',
+      ),
+    );
+    expect(
+      within(requestRow('INS-20261014-0011')).queryByRole('button', {
+        name: 'Actions for INS-20261014-0011',
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('points to the request when a lesson inside it is acted on directly', async () => {
+    server.use(
+      http.post(`${API}/admin/insurance/records/:id/mark-paid`, () =>
+        HttpResponse.json({ code: 'part_of_request' }, { status: 409 }),
+      ),
+    );
+    const user = await renderPage();
+    await recordAction(user, 'INS-20261219-0002', 'Mark paid');
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
+    expect(
+      await within(dialog).findByText(
+        "This lesson is part of an insurance request. Use the request's actions above.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('applies the instructor and status filters to requests', async () => {
+    const user = await renderPage();
+    await screen.findByRole('table', { name: 'Insurance requests' });
+    await user.selectOptions(screen.getByLabelText('Status'), 'paid');
+    await waitFor(() =>
+      expect(requestsState.queries.at(-1)!.get('paymentStatus')).toBe('paid'),
+    );
+    expect(recordQueries.at(-1)!.get('paymentStatus')).toBe('paid');
+    await screen.findByText('INS-20261006-0004');
+    expect(screen.queryByText('INS-20261014-0011')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Instructor'), 'inst-2');
+    expect(
+      await screen.findByText('No requests match these filters.'),
+    ).toBeInTheDocument();
+    expect(requestsState.queries.at(-1)!.get('instructorId')).toBe('inst-2');
+  });
+
+  it('labels the requests table in Chinese', async () => {
+    const user = await renderPage('zh-CN');
+    const table = await screen.findByRole('table', { name: '投保记录' });
+    expect(requestRow('INS-20261014-0011')).toHaveTextContent('待付款');
+    await user.click(
+      within(table).getByRole('button', {
+        name: '展开 INS-20261014-0011 的课程',
+      }),
+    );
+    expect(within(table).getAllByTestId('tree-lesson')[0]).toHaveTextContent(
+      '第 1 节',
+    );
+    await requestAction(
+      user,
+      'INS-20261014-0011',
+      '作废',
+      'INS-20261014-0011 的操作',
+    );
+    expect(
+      screen.getByRole('dialog', { name: '作废 INS-20261014-0011？' }),
+    ).toHaveTextContent('这条投保记录的每一节课都会作废');
+  });
 });
+
+function requestRow(requestNo: string) {
+  return within(
+    screen.getByRole('table', { name: /Insurance requests|投保记录/ }),
+  )
+    .getByText(requestNo)
+    .closest('tr') as HTMLElement;
+}
+
+async function requestAction(
+  user: User,
+  requestNo: string,
+  name: string,
+  trigger = `Actions for ${requestNo}`,
+) {
+  await user.click(
+    within(requestRow(requestNo)).getByRole('button', { name: trigger }),
+  );
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
+async function requestActionNames(user: User, requestNo: string) {
+  await user.click(
+    within(requestRow(requestNo)).getByRole('button', {
+      name: `Actions for ${requestNo}`,
+    }),
+  );
+  const names = screen.getAllByRole('menuitem').map((item) => item.textContent);
+  await user.keyboard('{Escape}');
+  return names;
+}

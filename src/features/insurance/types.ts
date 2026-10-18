@@ -56,14 +56,32 @@ export interface MyInsurance {
   unpaidCents: number;
   coverage: SeasonCoverage;
   records: InsuranceRecord[];
+  requests: InsuranceRequest[];
 }
 
-export interface RegisterLessonBody {
+export interface InsuranceRequest {
+  id: string;
+  requestNo: string;
+  seasonKey: string;
+  paymentStatus: InsurancePaymentStatus;
+  totalCents: number;
+  lessonCount: number;
+  studentCount: number;
+  createdAt: string;
+  paidOn: string | null;
+  lessons: InsuranceRecord[];
+}
+
+export interface RequestLessonBody {
   lessonDate: string;
   durationHours: number;
   locationId?: string;
   locationOther?: string;
   students: InsuranceStudent[];
+}
+
+export interface SubmitRequestBody {
+  lessons: RequestLessonBody[];
   idempotencyKey: string;
 }
 
@@ -112,4 +130,19 @@ export interface AdminInsuranceFilter {
   paymentStatus?: InsurancePaymentStatus;
   page: number;
   limit: number;
+}
+
+export interface AdminInsuranceRequest extends InsuranceRequest {
+  instructorId: string;
+  instructorName: string | null;
+  instructorNameZh: string | null;
+  instructorEmail: string | null;
+  paidNote: string | null;
+  voidedAt: string | null;
+  voidedReason: string | null;
+}
+
+export interface AdminInsuranceRequestsPage {
+  requests: AdminInsuranceRequest[];
+  total: number;
 }

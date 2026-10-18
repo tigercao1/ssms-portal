@@ -82,6 +82,8 @@ export const router = createBrowserRouter([
         element: <OnboardingDocumentPage />,
       },
       { path: '/insurance', element: <InsurancePage /> },
+      { path: '/insurance/new', element: <InsurancePage /> },
+      { path: '/insurance/new/review', element: <InsurancePage /> },
       { path: '/lessons', element: <LessonsPayPage /> },
       { path: '/settings', element: <SettingsPage /> },
 

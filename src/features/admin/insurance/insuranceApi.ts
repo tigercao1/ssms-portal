@@ -9,6 +9,8 @@ import type {
   AdminInsuranceFilter,
   AdminInsuranceRecord,
   AdminInsuranceRecordsPage,
+  AdminInsuranceRequest,
+  AdminInsuranceRequestsPage,
   AdminInsuranceSummary,
   GrantSeasonPassBody,
 } from '@/features/insurance/types';
@@ -49,6 +51,18 @@ export function useInsuranceRecords(filter: AdminInsuranceFilter) {
   });
 }
 
+export function useInsuranceRequests(filter: AdminInsuranceFilter) {
+  return useQuery({
+    queryKey: [...insuranceKey, 'requests', filter] as const,
+    enabled: filter.season !== '',
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      api<AdminInsuranceRequestsPage>(
+        `/admin/insurance/requests?${recordsQuery(filter)}`,
+      ),
+  });
+}
+
 function useRecordAction<TBody>(action: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -65,6 +79,25 @@ export const useMarkPaid = () =>
   useRecordAction<{ paidOn: string; note?: string }>('mark-paid');
 export const useMarkUnpaid = () => useRecordAction<never>('mark-unpaid');
 export const useVoidRecord = () => useRecordAction<{ reason: string }>('void');
+
+function useRequestAction<TBody>(action: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body?: TBody }) =>
+      api<AdminInsuranceRequest>(
+        `/admin/insurance/requests/${encodeURIComponent(id)}/${action}`,
+        { method: 'POST', body: body ?? {} },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: insuranceKey }),
+  });
+}
+
+export const useMarkRequestPaid = () =>
+  useRequestAction<{ paidOn: string; note?: string }>('mark-paid');
+export const useMarkRequestUnpaid = () =>
+  useRequestAction<never>('mark-unpaid');
+export const useVoidRequest = () =>
+  useRequestAction<{ reason: string }>('void');
 
 export function useGrantSeasonPass() {
   const qc = useQueryClient();

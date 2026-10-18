@@ -342,11 +342,11 @@ describe('AppShell instructor nav', () => {
     );
   });
 
-  it('locks Private lesson insurance while pending or rejected', async () => {
+  it('locks Lesson insurance while pending or rejected', async () => {
     renderInstructorShell('pending');
     expect(
       await screen.findByRole('link', {
-        name: 'Private lesson insurance Locked until your profile is approved',
+        name: 'Lesson insurance Locked until your profile is approved',
       }),
     ).toHaveAttribute('href', '/insurance');
   });
@@ -355,7 +355,7 @@ describe('AppShell instructor nav', () => {
     renderInstructorShell('rejected');
     expect(
       await screen.findByRole('link', {
-        name: 'Private lesson insurance Locked until your profile is approved',
+        name: 'Lesson insurance Locked until your profile is approved',
       }),
     ).toHaveAttribute('href', '/insurance');
   });
@@ -363,7 +363,7 @@ describe('AppShell instructor nav', () => {
   it('shows a plain insurance link once approved, in Chinese too', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     renderInstructorShell('approved');
-    const link = screen.getByRole('link', { name: '私课保险登记' });
+    const link = screen.getByRole('link', { name: '私课投保' });
     expect(link).toHaveAttribute('href', '/insurance');
     await waitFor(() => expect(link.querySelector('svg')).toBeNull());
   });
