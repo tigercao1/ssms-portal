@@ -369,7 +369,7 @@ describe('InsurancePage list', () => {
       .getByText('Finish onboarding to insure private lessons')
       .closest('[role="status"]');
     expect(banner).toHaveTextContent(
-      'Lesson insurance opens once every required document and certification on your onboarding checklist is done.',
+      'Lesson insurance opens once every required document on your onboarding checklist is done and your certifications are approved.',
     );
     expect(
       screen.getByRole('link', { name: 'Go to onboarding' }),
@@ -387,7 +387,7 @@ describe('InsurancePage list', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        '入职清单上所有必填的文件和证书都完成后，即可为私课投保。',
+        '入职清单上所有必填文件完成、且证书审核通过后，即可为私课投保。',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '前往入职资料' })).toHaveAttribute(

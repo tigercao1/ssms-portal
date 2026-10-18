@@ -439,7 +439,7 @@ export function buildChecklist(
       state: certState(upload, today),
     };
   });
-  const satisfied = new Set(['valid', 'expiring', 'pending']);
+  const satisfied = new Set(['valid', 'expiring']);
   return {
     season,
     locked: false,
