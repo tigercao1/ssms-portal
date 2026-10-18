@@ -664,6 +664,91 @@ describe('AdminDetailPage Shopify panel', () => {
       screen.getByRole('button', { name: 'Sync this instructor now' }),
     ).toBeInTheDocument();
   });
+
+  function servePublication(publishedAt: string | null) {
+    serveRecord({ approvalStatus: 'approved' });
+    const bodies: unknown[] = [];
+    let record: AdminInstructorRecord = {
+      ...(fakeAdminList[0] as AdminInstructorRecord),
+      approvalStatus: 'approved',
+      publishedAt,
+    };
+    server.use(
+      http.get(`${API}/admin/instructors/:id`, () => HttpResponse.json(record)),
+      http.patch(
+        `${API}/admin/instructors/:id/publication`,
+        async ({ request }) => {
+          const body = (await request.json()) as { published: boolean };
+          bodies.push(body);
+          record = {
+            ...record,
+            publishedAt: body.published ? '2026-10-18T16:00:00Z' : null,
+          };
+          return HttpResponse.json(record);
+        },
+      ),
+    );
+    return bodies;
+  }
+
+  it('publishes an unpublished instructor without a confirm step', async () => {
+    const bodies = servePublication(null);
+    renderDetail();
+
+    expect((await screen.findByText('Website')).nextSibling).toHaveTextContent(
+      'Not published',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Publish to website' }),
+    );
+    await waitFor(() => expect(bodies).toEqual([{ published: true }]));
+    expect(
+      await screen.findByRole('button', { name: 'Unpublish' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Website').nextSibling).toHaveTextContent(
+      /^Published Oct 18, 2026$/,
+    );
+  });
+
+  it('unpublishes only after confirming', async () => {
+    const bodies = servePublication('2026-10-01T12:00:00Z');
+    renderDetail();
+
+    expect((await screen.findByText('Website')).nextSibling).toHaveTextContent(
+      'Published Oct 1, 2026',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Unpublish' }));
+    expect(
+      screen.getByText(/comes off the SSnow official website/),
+    ).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(bodies).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Unpublish' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(bodies).toEqual([{ published: false }]));
+    expect(
+      await screen.findByRole('button', { name: 'Publish to website' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Website').nextSibling).toHaveTextContent(
+      'Not published',
+    );
+  });
+
+  it('labels the publish control in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveRecord({ approvalStatus: 'approved', publishedAt: null });
+    renderDetail();
+
+    expect((await screen.findByText('官网')).nextSibling).toHaveTextContent(
+      '未发布',
+    );
+    expect(
+      screen.getByRole('button', { name: '发布到官网' }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('AdminDetailPage more photos', () => {

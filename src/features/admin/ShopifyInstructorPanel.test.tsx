@@ -46,7 +46,9 @@ function serve(
 }
 
 function renderPanel() {
-  return renderWithProviders(<ShopifyInstructorPanel instructorId="inst-1" />);
+  return renderWithProviders(
+    <ShopifyInstructorPanel instructorId="inst-1" publishedAt={null} />,
+  );
 }
 
 describe('ShopifyInstructorPanel', () => {
@@ -226,6 +228,32 @@ describe('ShopifyInstructorPanel go-live check', () => {
       'Independent contractor agreement',
     ]);
     expect(ids).toEqual(['inst-1']);
+  });
+
+  it('lists the missing admin review last as "Not published yet"', async () => {
+    serve();
+    serveGoLive({ missing: [...fakeGoLive.missing, { group: 'review' }] });
+    renderPanel();
+    const list = await screen.findByRole('list', { name: '4 missing' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      'Main photo',
+      'No verified certification yet',
+      'Independent contractor agreement',
+      'Not published yet',
+    ]);
+  });
+
+  it('lists the missing admin review in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serve();
+    serveGoLive({ missing: [{ group: 'review' }] });
+    renderPanel();
+    expect(await screen.findByText('缺少 1 项')).toBeInTheDocument();
+    expect(screen.getByText('尚未发布')).toBeInTheDocument();
   });
 
   it('says Ready when nothing is missing', async () => {
