@@ -29,6 +29,10 @@ export function RequestResetPage() {
         setError(t.auth.rateLimited);
         return 'rate-limited';
       }
+      if (err) {
+        setError(t.auth.genericError);
+        return 'failed';
+      }
       track('password_reset_requested');
       setSent(true);
       return 'sent';

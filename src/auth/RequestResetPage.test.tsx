@@ -64,4 +64,35 @@ describe('RequestResetPage', () => {
       screen.getByRole('button', { name: /^Resend in \d+s$/ }),
     ).toBeDisabled();
   });
+
+  it.each([
+    ['a server error', { status: 500, name: 'AuthApiError' }],
+    ['a network error', { status: 0, name: 'AuthRetryableFetchError' }],
+  ])(
+    'shows an error and lets the user retry straight away after %s',
+    async (_label, error) => {
+      auth.resetPasswordForEmail.mockResolvedValueOnce({ data: {}, error });
+      auth.resetPasswordForEmail.mockResolvedValueOnce({
+        data: {},
+        error: null,
+      });
+
+      await requestReset('jane@example.com');
+
+      expect(await screen.findByText(/Something went wrong/)).toBeVisible();
+      expect(
+        screen.queryByText('If that email exists, a reset link is on its way.'),
+      ).not.toBeInTheDocument();
+
+      cleanup();
+      await requestReset('jane@example.com');
+
+      expect(
+        await screen.findByText(
+          'If that email exists, a reset link is on its way.',
+        ),
+      ).toBeVisible();
+      expect(auth.resetPasswordForEmail).toHaveBeenCalledTimes(2);
+    },
+  );
 });
