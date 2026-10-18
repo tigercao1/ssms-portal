@@ -136,7 +136,7 @@ describe('PhotoUploader', () => {
     const opened = vi.fn();
     input.addEventListener('click', opened);
     expect(input).toHaveAttribute('type', 'file');
-    expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
+    expect(input).toHaveAttribute('accept', 'image/*');
     expect(input).toHaveClass('sr-only');
 
     await userEvent.click(screen.getByText('Upload photo'));

@@ -150,7 +150,7 @@ export function PhotoPicker({
           <span className="text-sm font-medium text-navy">{slotLabel}</span>
         )}
         <FileButton
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
           variant="secondary"
           size="sm"
           loading={upload.isPending}
