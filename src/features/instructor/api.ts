@@ -37,12 +37,18 @@ export function useMyCalendarStatus(enabled: boolean) {
   });
 }
 
+export const GO_LIVE_POLL_MS = 10_000;
+
 export function useMyGoLive(enabled: boolean) {
   return useQuery({
     queryKey: MY_GO_LIVE_KEY,
     queryFn: () => api<GoLiveReadiness>('/me/go-live'),
     enabled,
     refetchOnWindowFocus: 'always',
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data?.ready && !data.live ? GO_LIVE_POLL_MS : false;
+    },
   });
 }
 
