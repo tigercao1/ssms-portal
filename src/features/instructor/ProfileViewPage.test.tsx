@@ -655,6 +655,53 @@ describe('ProfileViewPage go-live', () => {
     expect(card.queryByText(/您的资料还需要/)).toBeNull();
   });
 
+  const verifiedAndUnprovenCerts = [
+    cert('valid'),
+    { ...cert('missing'), org: 'casi', level: 2 } as const,
+  ];
+
+  it('shows "Awaiting review" when only the admin review is missing and another certification has no proof', async () => {
+    serveGoLive(approvedActive, { missing: [{ group: 'review' }] });
+    serveChecklist([
+      doc('asg-contract', 'completed'),
+      ...verifiedAndUnprovenCerts,
+    ]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    const pill = await card.findByText('Awaiting review');
+    expect(pillColor(pill)).toBe('var(--status-pending)');
+    expect(
+      card.getByText(
+        "SSnow is reviewing your profile. You'll go live on the SSnow official website once it's approved.",
+      ),
+    ).toBeInTheDocument();
+    expect(card.queryByText('Required items pending')).toBeNull();
+    expect(
+      card.getByRole('progressbar', { name: '2 of 3 done' }),
+    ).toBeInTheDocument();
+    expect(
+      card.getByRole('link', { name: 'Go to onboarding' }),
+    ).toHaveAttribute('href', '/onboarding');
+  });
+
+  it('shows "Awaiting review" in Chinese when only the admin review is missing and another certification has no proof', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveGoLive(approvedActive, { missing: [{ group: 'review' }] });
+    serveChecklist([
+      doc('asg-contract', 'completed'),
+      ...verifiedAndUnprovenCerts,
+    ]);
+    renderWithProviders(<ProfileViewPage />);
+    const card = await findCard();
+    expect(await card.findByText('待审核')).toBeInTheDocument();
+    expect(
+      card.getByText(
+        'SSnow 正在审核您的资料，审核通过后即可在 SSnow 官网上线。',
+      ),
+    ).toBeInTheDocument();
+    expect(card.queryByText('有待完成事项')).toBeNull();
+  });
+
   it('keeps the certification copy when a certification is also in review', async () => {
     serveGoLive(approvedActive, {
       missing: [

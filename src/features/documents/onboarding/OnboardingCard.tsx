@@ -77,20 +77,21 @@ function cardStatus(
   const onlyReviewMissing =
     readiness.missing.length > 0 &&
     readiness.missing.every((m) => m.group === 'review');
-  if (done + inReview === total && !hasProfileGaps) {
-    if (inReview > 0)
-      return {
-        tone: 'warn',
-        pill: t.onboarding.cardPillInReview,
-        body: t.onboarding.cardInReviewBody,
-      };
-    if (onlyReviewMissing)
-      return {
-        tone: 'warn',
-        pill: t.onboarding.cardPillInReview,
-        body: t.onboarding.cardProfileReviewBody,
-      };
-  }
+  if (onlyReviewMissing)
+    return {
+      tone: 'warn',
+      pill: t.onboarding.cardPillInReview,
+      body:
+        inReview > 0
+          ? t.onboarding.cardInReviewBody
+          : t.onboarding.cardProfileReviewBody,
+    };
+  if (done + inReview === total && !hasProfileGaps && inReview > 0)
+    return {
+      tone: 'warn',
+      pill: t.onboarding.cardPillInReview,
+      body: t.onboarding.cardInReviewBody,
+    };
   return {
     tone: 'warn',
     pill: t.onboarding.cardPillToDo,
