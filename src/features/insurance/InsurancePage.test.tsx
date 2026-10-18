@@ -676,6 +676,61 @@ describe('InsurancePage records and states', () => {
     expect(screen.queryByRole('button', { name: /登记/ })).toBeNull();
   });
 
+  it('locks the tab with no form when deactivated', async () => {
+    serve(myInsurance({ locked: true, lockReason: 'deactivated' }));
+    await renderPage();
+    const banner = screen
+      .getByText('Your profile is deactivated')
+      .closest('[role="status"]');
+    expect(banner).toHaveTextContent(
+      "You can't register private lessons for insurance while deactivated. Contact SSnow if you have questions.",
+    );
+    expect(
+      screen.getByText(
+        'Only approved, active instructors can register private lessons for insurance.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Lesson date')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^Register( ·| for free|$)/ }),
+    ).toBeNull();
+  });
+
+  it('says the tab is deactivated in Chinese', async () => {
+    serve(myInsurance({ locked: true, lockReason: 'deactivated' }));
+    await renderPage('zh-CN');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '你的资料已下线下线期间无法登记私课保险。如有疑问，请联系 SSnow。',
+    );
+    expect(screen.queryByLabelText('上课日期')).toBeNull();
+  });
+
+  it('sends an instructor with unfinished onboarding to the checklist', async () => {
+    serve(myInsurance({ locked: true, lockReason: 'onboarding_incomplete' }));
+    await renderPage();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Finish onboarding to register private lessons' +
+        'Insurance registration opens once every required document and certification on your onboarding checklist is done.',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Go to onboarding' }),
+    ).toHaveAttribute('href', '/onboarding');
+    expect(screen.queryByLabelText('Lesson date')).toBeNull();
+  });
+
+  it('asks to finish onboarding in Chinese', async () => {
+    serve(myInsurance({ locked: true, lockReason: 'onboarding_incomplete' }));
+    await renderPage('zh-CN');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '完成入职资料后即可登记私课保险' +
+        '入职清单上所有必填的文件和证书都完成后，即可登记私课保险。',
+    );
+    expect(screen.getByRole('link', { name: '前往入职资料' })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    );
+  });
+
   it('shows a load error with retry', async () => {
     server.use(
       http.get('http://localhost:3000/me/insurance', () =>

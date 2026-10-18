@@ -2,18 +2,44 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useSession } from '@/auth/SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
-import { Brandmark, Contour } from '@/components';
+import { Brandmark, Contour, LockIcon } from '@/components';
 import { LangSwitch } from '@/components/LangSwitch';
 import { cn } from '@/lib/cn';
 import { useMyChecklist } from '@/features/documents/onboarding/queries';
-import { LockIcon } from '@/features/documents/onboarding/Locked';
+import type { MyChecklist } from '@/features/documents/api';
+import type { InstructorLockReason } from '@/lib/types';
 
 interface NavItem {
   to: string;
   label: string;
   end?: boolean;
-  locked?: boolean;
-  lockedLabel?: string;
+  lock?: InstructorLockReason | null;
+}
+
+type LockedSurface = 'onboarding' | 'insurance' | 'lessons';
+
+function instructorLock(
+  checklist: MyChecklist | undefined,
+): InstructorLockReason | null {
+  if (!checklist) return null;
+  if (checklist.lockReason) return checklist.lockReason;
+  return checklist.complete ? null : 'onboarding_incomplete';
+}
+
+function navLock(
+  surface: LockedSurface,
+  reason: InstructorLockReason | null,
+): InstructorLockReason | null {
+  switch (surface) {
+    case 'onboarding':
+      return reason === 'onboarding_incomplete' ? null : reason;
+    case 'insurance':
+      return reason;
+    case 'lessons':
+      return reason === 'pending_approval' || reason === 'onboarding_incomplete'
+        ? reason
+        : null;
+  }
 }
 
 /** App shell (W1.7): navy contour sidebar + topbar; role-aware nav; responsive. */
@@ -26,8 +52,13 @@ export function AppShell() {
   const wasOpen = useRef(false);
   const { pathname } = useLocation();
   const checklist = useMyChecklist({ enabled: !isAdmin });
-  const onboardingIncomplete =
-    checklist.data?.locked === false && checklist.data.complete === false;
+  const lock = instructorLock(checklist.data);
+  const lockedLabel: Record<InstructorLockReason, string> = {
+    pending_approval: t.nav.lockedPending,
+    rejected: t.nav.lockedRejected,
+    deactivated: t.nav.lockedDeactivated,
+    onboarding_incomplete: t.nav.lockedOnboarding,
+  };
 
   useEffect(() => {
     setOpen(false);
@@ -75,22 +106,17 @@ export function AppShell() {
         {
           to: '/onboarding',
           label: t.nav.onboarding,
-          locked: checklist.data?.locked ?? false,
+          lock: navLock('onboarding', lock),
         },
         {
           to: '/insurance',
           label: t.nav.insurance,
-          locked: checklist.data?.locked ?? false,
+          lock: navLock('insurance', lock),
         },
         {
           to: '/lessons',
           label: t.nav.lessonsPay,
-          locked:
-            checklist.data?.lockReason === 'pending_approval' ||
-            onboardingIncomplete,
-          lockedLabel: onboardingIncomplete
-            ? t.nav.lessonsLockedOnboarding
-            : undefined,
+          lock: navLock('lessons', lock),
         },
         { to: '/settings', label: t.nav.settings },
       ];
@@ -137,16 +163,14 @@ export function AppShell() {
                 )
               }
             >
-              {it.locked ? (
+              {it.lock ? (
                 <span
                   className="inline-flex items-center gap-2"
-                  title={it.lockedLabel ?? t.nav.onboardingLocked}
+                  title={lockedLabel[it.lock]}
                 >
                   <LockIcon />
                   {it.label}{' '}
-                  <span className="sr-only">
-                    {it.lockedLabel ?? t.nav.onboardingLocked}
-                  </span>
+                  <span className="sr-only">{lockedLabel[it.lock]}</span>
                 </span>
               ) : (
                 it.label

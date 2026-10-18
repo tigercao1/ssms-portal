@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Card } from '@/components';
+import { Card, LockIcon, statusCopy } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import type { MyChecklist } from '../api';
 import { ProgressBar } from './ProgressBar';
 import { checklistProgress, useMyChecklist } from './queries';
-import { LockIcon, lockText } from './Locked';
 
 function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
   const t = useT();
@@ -14,7 +13,9 @@ function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
   const total = closed ? 0 : checklist.items.length;
   const docs = checklist.items.filter((i) => i.type === 'document').length;
   const [closedTitle, closedBody] =
-    closed && checklist.lockReason ? lockText(checklist.lockReason, t) : [];
+    closed && checklist.lockReason
+      ? statusCopy('onboarding', checklist.lockReason, t)
+      : [];
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-dashed border-grey bg-sunken p-5">
       <div className="flex items-center gap-3">

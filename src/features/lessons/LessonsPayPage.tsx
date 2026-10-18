@@ -1,12 +1,18 @@
-import { useId, useState } from 'react';
+import { type ReactNode, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Banner, Button, Card, Spinner } from '@/components';
+import {
+  Banner,
+  Button,
+  Card,
+  Spinner,
+  StatusBanner,
+  StatusIcon,
+} from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import type { Locale } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/features/admin/payroll/payrollFormat';
-import { LockIcon } from '@/features/documents/onboarding/Locked';
 import { StatePill } from '@/features/documents/onboarding/StatePill';
 import { useMyLessons } from './api';
 import {
@@ -67,36 +73,33 @@ function LessonsBody({ data }: { data: MyLessonsResponse }) {
   if (data.locked && data.lockReason === 'onboarding_incomplete')
     return (
       <>
-        <LessonsBanner reason="onboarding_incomplete" />
-        <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken text-status-pending">
-            <LockIcon className="h-6 w-6" />
-          </span>
+        <StatusBanner surface="lessons" reason="onboarding_incomplete" />
+        <LockedPlaceholder reason="onboarding_incomplete">
           <Link
             to="/onboarding"
             className="text-sm font-medium text-navy underline underline-offset-4 hover:text-red"
           >
             {t.myLessons.onboardingOpen}
           </Link>
-        </div>
+        </LockedPlaceholder>
       </>
     );
-  if (data.locked && data.lockReason !== 'rejected')
+  if (data.locked && data.lockReason === 'pending_approval')
     return (
       <>
-        <LessonsBanner reason="pending_approval" />
-        <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken text-status-pending">
-            <LockIcon className="h-6 w-6" />
-          </span>
+        <StatusBanner surface="lessons" reason="pending_approval" />
+        <LockedPlaceholder reason="pending_approval">
           <p className="text-sm text-slate">{t.myLessons.pendingEmpty}</p>
-        </div>
+        </LockedPlaceholder>
       </>
     );
   if (data.locked)
     return (
       <>
-        <LessonsBanner reason="rejected" />
+        <StatusBanner
+          surface="lessons"
+          reason={data.lockReason ?? 'pending_approval'}
+        />
         {data.periods.length > 0 ? (
           <PastSection periods={data.periods} />
         ) : (
@@ -114,64 +117,20 @@ function LessonsBody({ data }: { data: MyLessonsResponse }) {
   );
 }
 
-function LessonsBanner({ reason }: { reason: LessonsLockReason }) {
-  const t = useT();
-  const rejected = reason === 'rejected';
-  const copy = {
-    pending_approval: {
-      title: t.myLessons.pendingTitle,
-      body: t.myLessons.pendingBody,
-    },
-    onboarding_incomplete: {
-      title: t.myLessons.onboardingTitle,
-      body: t.myLessons.onboardingBody,
-    },
-    rejected: {
-      title: t.myLessons.rejectedTitle,
-      body: t.myLessons.rejectedBody,
-    },
-  }[reason];
+function LockedPlaceholder({
+  reason,
+  children,
+}: {
+  reason: LessonsLockReason;
+  children: ReactNode;
+}) {
   return (
-    <div
-      role="status"
-      className={cn(
-        'flex items-start gap-3 rounded-md border-l-[3px] px-4 py-3 text-sm',
-        rejected
-          ? 'border-l-status-rejected bg-red-tint'
-          : 'border-l-status-pending bg-surface shadow-card',
-      )}
-    >
-      <span
-        className={cn(
-          'grid h-7 w-7 flex-none place-items-center rounded-full',
-          rejected
-            ? 'bg-surface text-status-rejected'
-            : 'bg-sunken text-status-pending',
-        )}
-      >
-        {rejected ? <CrossIcon /> : <LockIcon />}
+    <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
+      <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken">
+        <StatusIcon reason={reason} className="h-6 w-6" />
       </span>
-      <div>
-        <p className="font-semibold text-navy">{copy.title}</p>
-        <p className="text-ink">{copy.body}</p>
-      </div>
+      {children}
     </div>
-  );
-}
-
-function CrossIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.4}
-      strokeLinecap="round"
-      className="h-3.5 w-3.5"
-    >
-      <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
   );
 }
 

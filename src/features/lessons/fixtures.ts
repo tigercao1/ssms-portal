@@ -174,6 +174,11 @@ export const rejectedLessons: MyLessonsResponse = {
   periods: [awaiting, paid],
 };
 
+export const deactivatedLessons: MyLessonsResponse = {
+  ...rejectedLessons,
+  lockReason: 'deactivated',
+};
+
 export const onboardingLessons: MyLessonsResponse = {
   ...emptyLessons,
   locked: true,

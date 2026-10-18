@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Field, Input } from '@/components';
+import { Button, Field, Input, StatusBanner } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import type { CertOrg, CertTrack } from '@/lib/types';
 import { todayIso } from '../api';
@@ -11,7 +11,7 @@ import {
   type CertFileError,
 } from './certFile';
 import { useUploadCertification } from './queries';
-import { LockedBanner, lockReasonOf } from './Locked';
+import { lockReasonOf } from './Locked';
 
 interface CertUploadSheetProps {
   open: boolean;
@@ -135,7 +135,9 @@ export function CertUploadSheet({
             />
           )}
         </Field>
-        {uploadLock && <LockedBanner reason={uploadLock} />}
+        {uploadLock && (
+          <StatusBanner surface="onboarding" reason={uploadLock} />
+        )}
         {uploadError && (
           <p role="alert" className="text-sm text-status-rejected">
             {uploadError}

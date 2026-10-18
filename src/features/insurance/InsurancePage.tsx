@@ -1,8 +1,14 @@
 import { useRef } from 'react';
-import { Banner, Button, Card, Spinner } from '@/components';
+import { Link } from 'react-router-dom';
+import {
+  Banner,
+  Button,
+  Card,
+  Spinner,
+  StatusBanner,
+  StatusIcon,
+} from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
-import { cn } from '@/lib/cn';
-import { LockIcon } from '@/features/documents/onboarding/Locked';
 import { useMyInsurance } from './api';
 import { InsuranceRecords } from './InsuranceRecords';
 import { dollars } from './money';
@@ -60,7 +66,7 @@ export function InsurancePage() {
         )}
       </header>
       {data.locked ? (
-        <LockedInsurance reason={data.lockReason ?? 'pending_approval'} />
+        <InsuranceLockedState reason={data.lockReason ?? 'pending_approval'} />
       ) : (
         <InsuranceBody data={data} />
       )}
@@ -150,50 +156,27 @@ function PaymentNote() {
   );
 }
 
-function LockedInsurance({ reason }: { reason: InsuranceLockReason }) {
+function InsuranceLockedState({ reason }: { reason: InsuranceLockReason }) {
   const t = useT();
-  const s = t.insurance;
-  const rejected = reason === 'rejected';
   return (
     <>
-      <div
-        role="status"
-        className={cn(
-          'flex items-start gap-3 rounded-md border-l-[3px] px-4 py-3 text-sm',
-          rejected
-            ? 'border-l-status-rejected bg-red-tint'
-            : 'border-l-status-pending bg-surface shadow-card',
-        )}
-      >
-        <span
-          className={cn(
-            'grid h-7 w-7 flex-none place-items-center rounded-full',
-            rejected
-              ? 'bg-surface text-status-rejected'
-              : 'bg-sunken text-status-pending',
-          )}
-        >
-          <LockIcon />
-        </span>
-        <div>
-          <p className="font-semibold text-navy">
-            {rejected ? s.rejectedTitle : s.pendingTitle}
-          </p>
-          <p className="text-ink">
-            {rejected ? s.rejectedBody : s.pendingBody}
-          </p>
-        </div>
-      </div>
+      <StatusBanner surface="insurance" reason={reason} />
       <div className="flex flex-col items-center gap-3 rounded-lg bg-surface px-5 py-8 text-center shadow-card">
-        <span
-          className={cn(
-            'grid h-12 w-12 place-items-center rounded-full bg-sunken',
-            rejected ? 'text-status-rejected' : 'text-status-pending',
-          )}
-        >
-          <LockIcon className="h-6 w-6" />
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-sunken">
+          <StatusIcon reason={reason} className="h-6 w-6" />
         </span>
-        <p className="max-w-md text-sm text-slate">{s.lockedEmpty}</p>
+        {reason === 'onboarding_incomplete' ? (
+          <Link
+            to="/onboarding"
+            className="text-sm font-medium text-navy underline underline-offset-4 hover:text-red"
+          >
+            {t.insurance.onboardingOpen}
+          </Link>
+        ) : (
+          <p className="max-w-md text-sm text-slate">
+            {t.insurance.lockedEmpty}
+          </p>
+        )}
       </div>
     </>
   );

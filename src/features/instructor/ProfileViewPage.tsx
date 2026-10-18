@@ -1,22 +1,28 @@
 import { Link } from 'react-router-dom';
 import { useT } from '@/i18n/core/I18nProvider';
-import { Banner, Button, Card, Spinner, StatusPill } from '@/components';
+import {
+  Banner,
+  Button,
+  Card,
+  Spinner,
+  StatusBanner,
+  StatusPill,
+} from '@/components';
 import { useMyProfile } from './api';
 import { ProfileSummary } from './ProfileSummary';
 import { CalendarStatusCard } from './CalendarStatusCard';
 import { OnboardingCard } from '@/features/documents/onboarding/OnboardingCard';
 import type { InstructorProfile } from '@/lib/types';
 
-function statusBanner(profile: InstructorProfile, t: ReturnType<typeof useT>) {
-  if (profile.approvalStatus === 'approved' && !profile.isActive)
-    return <Banner tone="info">{t.profile.inactiveBanner}</Banner>;
+function profileStatus(profile: InstructorProfile) {
+  if (!profile.isActive) return 'deactivated';
   switch (profile.approvalStatus) {
     case 'approved':
-      return <Banner tone="approved">{t.profile.approvedBanner}</Banner>;
+      return 'approved';
     case 'rejected':
-      return <Banner tone="rejected">{t.profile.rejectedBanner}</Banner>;
+      return 'rejected';
     default:
-      return <Banner tone="pending">{t.profile.pendingBanner}</Banner>;
+      return 'pending_approval';
   }
 }
 
@@ -53,7 +59,7 @@ export function ProfileViewPage() {
         </Link>
       </div>
 
-      {statusBanner(profile, t)}
+      <StatusBanner surface="profile" reason={profileStatus(profile)} />
       <OnboardingCard />
       <CalendarStatusCard enabled={profile.approvalStatus === 'approved'} />
       <ProfileSummary profile={profile} />

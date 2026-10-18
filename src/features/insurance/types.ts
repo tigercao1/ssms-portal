@@ -1,4 +1,6 @@
-export type InsuranceLockReason = 'pending_approval' | 'rejected';
+import type { InstructorLockReason } from '@/lib/types';
+
+export type InsuranceLockReason = InstructorLockReason;
 export type InsuranceKind = 'lesson' | 'season_pass';
 export type InsuranceCoverage =
   | 'per_lesson'
