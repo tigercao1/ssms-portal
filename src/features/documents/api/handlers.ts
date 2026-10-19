@@ -12,6 +12,7 @@ import type {
   DocumentExportRequest,
   DocumentExportStatus,
   DocumentLanguage,
+  DocumentReviewItem,
   Field,
   PublishRequest,
   Template,
@@ -897,6 +898,50 @@ export function documentsHandlers(
         ),
       }),
     ),
+    http.get(`${A}/admin/document-reviews`, ({ request }) => {
+      const status = new URL(request.url).searchParams.get('status');
+      if (status !== 'pending' && status !== 'decided')
+        return badRequest('status must be pending or decided');
+      const items: DocumentReviewItem[] = presentCertUploads(state.certUploads)
+        .filter((u) =>
+          status === 'pending'
+            ? u.reviewStatus === 'pending' && u.current
+            : u.reviewStatus !== 'pending' && u.reviewedAt !== null,
+        )
+        .sort((a, b) =>
+          status === 'pending'
+            ? a.insertedAt.localeCompare(b.insertedAt)
+            : (b.reviewedAt ?? '').localeCompare(a.reviewedAt ?? ''),
+        )
+        .map((u) => {
+          const who = state.instructors[u.instructorId];
+          return {
+            type: 'certification_upload',
+            id: u.id,
+            instructor: {
+              id: u.instructorId,
+              email: who?.email ?? '',
+              firstName: who?.firstName ?? null,
+              lastName: who?.lastName ?? null,
+              displayNameEn: null,
+              displayNameZh: null,
+            },
+            submittedAt: u.insertedAt,
+            reviewStatus: u.reviewStatus,
+            reviewNote: u.reviewNote,
+            reviewedAt: u.reviewedAt,
+            contentType: u.contentType,
+            certificationUpload: u,
+            level:
+              u.instructorId === state.meInstructorId
+                ? (state.meCerts.find(
+                    (c) => c.org === u.org && c.track === u.track,
+                  )?.level ?? null)
+                : null,
+          };
+        });
+      return HttpResponse.json(items);
+    }),
     http.get(
       `${A}/admin/documents/assignments/:id/signed-url`,
       ({ params }) => {

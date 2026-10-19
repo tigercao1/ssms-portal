@@ -264,6 +264,33 @@ export interface CertUploadReview {
   validUntil?: string;
 }
 
+export type DocumentReviewFilter = 'pending' | 'decided';
+
+export interface DocumentReviewInstructor {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayNameEn: string | null;
+  displayNameZh: string | null;
+}
+
+/** `GET /admin/document-reviews` item; `type` names the document kind. */
+export interface CertUploadReviewItem {
+  type: 'certification_upload';
+  id: string;
+  instructor: DocumentReviewInstructor;
+  submittedAt: string;
+  reviewStatus: ReviewStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  contentType: string;
+  certificationUpload: CertUpload;
+  level: number | null;
+}
+
+export type DocumentReviewItem = CertUploadReviewItem;
+
 export interface InstructorDocuments {
   assignments: Assignment[];
   certificationUploads: CertUpload[];

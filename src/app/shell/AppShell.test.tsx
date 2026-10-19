@@ -225,6 +225,28 @@ describe('AppShell admin nav', () => {
     );
   });
 
+  it('links to Document review right after Documents', () => {
+    renderShell();
+    const links = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(
+      screen.getByRole('link', { name: 'Document review' }),
+    ).toHaveAttribute('href', '/admin/document-review');
+    expect(links.indexOf('/admin/document-review')).toBe(
+      links.indexOf('/admin/documents') + 1,
+    );
+  });
+
+  it('labels Document review in Chinese', () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderShell();
+    expect(screen.getByRole('link', { name: '资料审核' })).toHaveAttribute(
+      'href',
+      '/admin/document-review',
+    );
+  });
+
   it('labels Lesson insurance in Chinese', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     renderShell();

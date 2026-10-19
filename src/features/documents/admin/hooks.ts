@@ -19,9 +19,11 @@ import {
   documentsKeys,
   getDocumentExport,
   getInstructorDocuments,
+  getCertUploadUrl,
   getPublishPreview,
   getTemplate,
   listDocumentExports,
+  listDocumentReviews,
   listTemplateAssignments,
   listTemplates,
   publishTemplate,
@@ -39,6 +41,7 @@ import {
   type CertUploadReview,
   type DocumentExport,
   type DocumentExportRequest,
+  type DocumentReviewFilter,
   type DocumentLanguage,
   type Field,
   type PublishRequest,
@@ -276,11 +279,35 @@ export function useArchiveAssignment(instructorId: string) {
 }
 
 export function useReviewCertUpload(instructorId: string) {
+  const qc = useQueryClient();
   const invalidate = useInstructorDocumentsInvalidate(instructorId);
   return useMutation({
     mutationFn: ({ id, ...body }: CertUploadReview & { id: string }) =>
       reviewCertUpload(id, body),
-    onSuccess: invalidate,
+    onSuccess: () =>
+      Promise.all([
+        invalidate(),
+        qc.invalidateQueries({ queryKey: documentsKeys.documentReviews }),
+      ]),
+  });
+}
+
+export function useDocumentReviews(status: DocumentReviewFilter) {
+  return useQuery({
+    queryKey: documentsKeys.documentReviewList(status),
+    queryFn: () => listDocumentReviews(status),
+  });
+}
+
+export const CERT_UPLOAD_URL_STALE_MS = 4 * 60_000;
+
+export function useCertUploadUrl(uploadId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: documentsKeys.certUploadUrl(uploadId),
+    queryFn: () => getCertUploadUrl(uploadId),
+    enabled,
+    staleTime: CERT_UPLOAD_URL_STALE_MS,
+    retry: false,
   });
 }
 

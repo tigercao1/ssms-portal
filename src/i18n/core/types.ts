@@ -115,6 +115,7 @@ export interface Messages {
     onboarding: string;
     insurance: string;
     adminInsurance: string;
+    documentReview: string;
     lessonsPay: string;
     instructorArea: string;
     adminArea: string;
@@ -867,6 +868,35 @@ export interface Messages {
     editorLanguage: string;
     signedInLanguage: string;
     readInLanguage: string;
+  };
+  documentReview: {
+    title: string;
+    intro: string;
+    filterLabel: string;
+    filterPending: string;
+    filterDecided: string;
+    decidedHint: string;
+    listLabel: string;
+    emptyPending: string;
+    emptyPendingBody: string;
+    emptyDecided: string;
+    emptyDecidedBody: string;
+    typeCertificationUpload: string;
+    submittedOn: string;
+    decidedOn: string;
+    superseded: string;
+    openInstructor: string;
+    previewAlt: string;
+    enlarge: string;
+    openFullSize: string;
+    pdfFile: string;
+    openPdf: string;
+    previewFailed: string;
+    rejectReason: string;
+    rejectReasonHint: string;
+    confirmReject: string;
+    approvedNotice: string;
+    rejectedNotice: string;
   };
   signedCopies: {
     link: string;
