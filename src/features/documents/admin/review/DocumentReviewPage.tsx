@@ -60,7 +60,6 @@ function fill(template: string, values: Record<string, string>): string {
   );
 }
 
-/** Every instructor-submitted document awaiting a manual decision, across instructors. */
 export function DocumentReviewPage() {
   const t = useT();
   const r = t.documentReview;

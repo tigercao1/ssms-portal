@@ -275,7 +275,6 @@ export interface DocumentReviewInstructor {
   displayNameZh: string | null;
 }
 
-/** `GET /admin/document-reviews` item; `type` names the document kind. */
 export interface CertUploadReviewItem {
   type: 'certification_upload';
   id: string;
