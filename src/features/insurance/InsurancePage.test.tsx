@@ -994,6 +994,11 @@ describe('InsurancePage draft editing', () => {
     ],
     [{ code: 'too_many_lessons' }, 400, 'A request holds up to 10 lessons.'],
     [{ code: 'locked' }, 403, 'Only approved instructors can insure lessons.'],
+    [
+      { reason: 'onboarding_incomplete' },
+      403,
+      'Finish your onboarding documents and membership cards to open lesson insurance.',
+    ],
   ])('explains a %o response', async (body, status, message) => {
     serve();
     server.use(
@@ -1006,6 +1011,39 @@ describe('InsurancePage draft editing', () => {
     await user.click(screen.getByRole('button', { name: 'Review & submit' }));
     await user.click(screen.getByRole('button', { name: 'Submit · $10 due' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  });
+
+  it('explains an onboarding lock on submit in Chinese', async () => {
+    serve();
+    server.use(
+      http.post(`${API}/me/insurance/requests`, () =>
+        HttpResponse.json(
+          {
+            message:
+              'Finish your onboarding documents and membership cards to open lesson insurance',
+            reason: 'onboarding_incomplete',
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+    const { user } = await renderPage({
+      route: '/insurance/new',
+      locale: 'zh-CN',
+    });
+    await addLesson(
+      user,
+      { date: '2026-12-26', students: [['Anna', true]] },
+      false,
+    );
+    await user.click(screen.getByRole('button', { name: '核对并提交' }));
+    await user.click(
+      screen.getByRole('button', { name: '提交投保 · 应付 $10' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '完成入职文件和会员卡后，即可为私课投保。',
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Finish');
   });
 
   it('reuses the idempotency key when a submit is retried', async () => {

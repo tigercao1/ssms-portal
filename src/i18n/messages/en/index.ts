@@ -1732,6 +1732,8 @@ export const en: Messages = {
     errLocationConflict:
       'Lesson {n}: choose a ski area or type another one, not both',
     lockedSubmit: 'Only approved instructors can insure lessons.',
+    lockedSubmitOnboarding:
+      'Finish your onboarding documents and membership cards to open lesson insurance.',
     capPartial: 'List {list} · {amount} after cap',
     capFree: 'List {list} · free after cap',
     seasonPassFree: 'Season pass · free',

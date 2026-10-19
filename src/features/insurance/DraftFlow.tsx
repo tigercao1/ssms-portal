@@ -116,7 +116,12 @@ function submitErrorText(
   if (code === 'too_many_lessons')
     return [fill(s.maxLessons, { max: MAX_LESSONS })];
   if (error instanceof ApiError && error.status === 403)
-    return [s.lockedSubmit];
+    return [
+      (error.body as { reason?: unknown } | undefined)?.reason ===
+      'onboarding_incomplete'
+        ? s.lockedSubmitOnboarding
+        : s.lockedSubmit,
+    ];
   return [errorText(error, t.errors.generic)];
 }
 
