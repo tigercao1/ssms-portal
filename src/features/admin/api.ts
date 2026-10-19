@@ -16,6 +16,7 @@ import type {
   ExtraPhotoSlot,
   GoLiveReadiness,
   InstructorProfile,
+  InstructorStage,
   ReferenceRecord,
   ReferenceUsage,
   UpdateProfileBody,
@@ -53,7 +54,9 @@ export function useAdminInstructors(filter: AdminListFilter) {
 
 export const INSTRUCTORS_PAGE_SIZE = 50;
 
-export interface AdminInstructorPageQuery extends AdminListFilter {
+export interface AdminInstructorPageQuery {
+  stages: InstructorStage[];
+  active?: boolean;
   calendarConnected?: boolean;
   q: string;
   page: number;
@@ -67,7 +70,7 @@ export interface AdminInstructorPage {
 
 export function useAdminInstructorPage({
   q,
-  status,
+  stages,
   active,
   calendarConnected,
   page,
@@ -77,7 +80,7 @@ export function useAdminInstructorPage({
       'admin',
       'instructors',
       'page',
-      { q, status, active, calendarConnected, page },
+      { q, stages, active, calendarConnected, page },
     ] as const,
     queryFn: async (): Promise<AdminInstructorPage> => {
       const qs = new URLSearchParams({
@@ -85,7 +88,7 @@ export function useAdminInstructorPage({
         page: String(page),
       });
       if (q) qs.set('q', q);
-      if (status) qs.set('status', status);
+      for (const stage of stages) qs.append('stage', stage);
       if (active !== undefined) qs.set('active', String(active));
       if (calendarConnected !== undefined)
         qs.set('calendarConnected', String(calendarConnected));

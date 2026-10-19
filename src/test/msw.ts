@@ -68,6 +68,7 @@ export const fakeAdminList: AdminInstructorRecord[] = [
     approvalStatus: 'pending',
     isActive: true,
     calendarConnected: false,
+    stage: 'pending',
     insertedAt: '2026-01-02T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
   },
@@ -99,6 +100,7 @@ export const fakeShopifyInstructorSync: ShopifyInstructorSync = {
 
 export const fakeGoLive: GoLiveReadiness = {
   live: false,
+  stage: 'onboarding',
   ready: false,
   liveUrl: null,
   missing: [
@@ -266,6 +268,7 @@ export function listAdminInstructors(
   params: URLSearchParams,
 ): { rows: AdminInstructorRecord[]; total: number } {
   const status = params.get('status');
+  const stages = params.getAll('stage').flatMap((s) => s.split(','));
   const active = params.get('active');
   const calendarConnected = params.get('calendarConnected');
   const tokens = (params.get('q') ?? '')
@@ -278,6 +281,7 @@ export function listAdminInstructors(
       .toLowerCase();
     return (
       (!status || r.approvalStatus === status) &&
+      (stages.length === 0 || (!!r.stage && stages.includes(r.stage))) &&
       (active === null || String(r.isActive) === active) &&
       (calendarConnected === null ||
         String(r.calendarConnected) === calendarConnected) &&

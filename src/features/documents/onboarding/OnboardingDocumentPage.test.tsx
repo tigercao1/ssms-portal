@@ -934,7 +934,7 @@ describe('OnboardingDocumentPage — go-live status', () => {
       http.get(`${API}/me/go-live`, () =>
         HttpResponse.json(
           handbookDone()
-            ? { ...fakeGoLive, ready: true, missing: [] }
+            ? { ...fakeGoLive, ready: true, stage: 'going_live', missing: [] }
             : {
                 ...fakeGoLive,
                 missing: [

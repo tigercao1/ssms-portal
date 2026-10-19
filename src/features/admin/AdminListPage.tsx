@@ -19,21 +19,24 @@ import {
   EmptyState,
   Input,
   Pager,
-  Select,
   Spinner,
+  StagePill,
   StatusPill,
 } from '@/components';
 import { INSTRUCTORS_PAGE_SIZE, useAdminInstructorPage } from './api';
-import type { AdminInstructorRecord, ApprovalStatus } from '@/lib/types';
+import {
+  AppliedFilterChips,
+  filtersFrom,
+  InstructorFilters,
+  type InstructorFilterState,
+} from './InstructorFilters';
+import type { AdminInstructorRecord } from '@/lib/types';
 
 const SEARCH_DEBOUNCE_MS = 200;
-const STATUSES: readonly ApprovalStatus[] = ['pending', 'approved', 'rejected'];
 
 interface ListUpdate {
   q?: string;
-  status?: ApprovalStatus | null;
-  active?: boolean | null;
-  calendar?: boolean | null;
+  filters?: InstructorFilterState;
   page?: number;
 }
 
@@ -42,36 +45,21 @@ function pageFrom(params: URLSearchParams): number {
   return Number.isInteger(page) && page > 1 ? page : 1;
 }
 
-function statusFrom(params: URLSearchParams): ApprovalStatus | undefined {
-  const status = params.get('status');
-  return STATUSES.find((s) => s === status);
-}
-
-function booleanFrom(
-  params: URLSearchParams,
-  key: string,
-): boolean | undefined {
-  const value = params.get(key);
-  return value === 'true' ? true : value === 'false' ? false : undefined;
-}
-
 /** W2.7 / W3.4 — admin instructor list + filters; table on desktop, cards on mobile. */
 export function AdminListPage() {
   const t = useT();
   const { locale } = useLocale();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
-  const status = statusFrom(params);
-  const active = booleanFrom(params, 'active');
-  const calendarConnected = booleanFrom(params, 'calendar');
+  const filters = filtersFrom(params);
   const page = pageFrom(params);
   const [draft, setDraft] = useState(q);
   const committed = useRef(q);
   const results = useAdminInstructorPage({
     q,
-    status,
-    active,
-    calendarConnected,
+    stages: filters.stages,
+    active: filters.active,
+    calendarConnected: filters.calendar,
     page,
   });
   const instructors = results.data?.instructors ?? [];
@@ -85,22 +73,19 @@ export function AdminListPage() {
       setParams(
         (prev) => {
           const out = new URLSearchParams(prev);
-          const set = (key: string, value: string | null | undefined) => {
-            if (value === undefined) return;
+          const set = (key: string, value: string | undefined) => {
             if (value) out.set(key, value);
             else out.delete(key);
             out.delete('page');
           };
-          set('q', next.q);
-          set('status', next.status);
-          set(
-            'active',
-            next.active == null ? next.active : String(next.active),
-          );
-          set(
-            'calendar',
-            next.calendar == null ? next.calendar : String(next.calendar),
-          );
+          if (next.q !== undefined) set('q', next.q);
+          if (next.filters) {
+            out.delete('status');
+            out.delete('stage');
+            for (const stage of next.filters.stages) out.append('stage', stage);
+            set('active', next.filters.active?.toString());
+            set('calendar', next.filters.calendar?.toString());
+          }
           if (next.page !== undefined) {
             if (next.page > 1) out.set('page', String(next.page));
             else out.delete('page');
@@ -158,60 +143,15 @@ export function AdminListPage() {
             {t.admin.search}
           </Button>
         </form>
-        <label className="flex flex-col gap-1 text-xs text-slate">
-          {t.admin.filterStatus}
-          <Select
-            className="sm:w-44"
-            value={status ?? ''}
-            onChange={(e) =>
-              update({
-                status: (e.target.value || null) as ApprovalStatus | null,
-              })
-            }
-          >
-            <option value="">{t.admin.all}</option>
-            <option value="pending">{t.status.pending}</option>
-            <option value="approved">{t.status.approved}</option>
-            <option value="rejected">{t.status.rejected}</option>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate">
-          {t.admin.filterActive}
-          <Select
-            className="sm:w-44"
-            value={active === undefined ? '' : String(active)}
-            onChange={(e) =>
-              update({
-                active:
-                  e.target.value === '' ? null : e.target.value === 'true',
-              })
-            }
-          >
-            <option value="">{t.admin.all}</option>
-            <option value="true">{t.status.active}</option>
-            <option value="false">{t.status.inactive}</option>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate">
-          {t.admin.colCalendar}
-          <Select
-            className="sm:w-44"
-            value={
-              calendarConnected === undefined ? '' : String(calendarConnected)
-            }
-            onChange={(e) =>
-              update({
-                calendar:
-                  e.target.value === '' ? null : e.target.value === 'true',
-              })
-            }
-          >
-            <option value="">{t.admin.all}</option>
-            <option value="true">{t.admin.calendarConnected}</option>
-            <option value="false">{t.admin.calendarNotConnected}</option>
-          </Select>
-        </label>
+        <InstructorFilters
+          value={filters}
+          onChange={(next) => update({ filters: next })}
+        />
       </div>
+      <AppliedFilterChips
+        value={filters}
+        onChange={(next) => update({ filters: next })}
+      />
 
       {results.isLoading ? (
         <div className="flex justify-center py-16">
@@ -274,10 +214,7 @@ export function AdminListPage() {
                         {row.email}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusPill
-                          status={row.approvalStatus}
-                          isActive={row.isActive}
-                        />
+                        <RowStatus row={row} />
                       </td>
                       <td className="px-4 py-3">
                         <CalendarStatus connected={row.calendarConnected} />
@@ -303,10 +240,7 @@ export function AdminListPage() {
                   <Card className="fade-rise flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-navy">{name(row)}</span>
-                      <StatusPill
-                        status={row.approvalStatus}
-                        isActive={row.isActive}
-                      />
+                      <RowStatus row={row} />
                     </div>
                     <span className="font-mono text-xs text-slate">
                       {row.email}
@@ -349,6 +283,14 @@ export function AdminListPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function RowStatus({ row }: { row: AdminInstructorRecord }) {
+  return row.stage ? (
+    <StagePill stage={row.stage} />
+  ) : (
+    <StatusPill status={row.approvalStatus} isActive={row.isActive} />
   );
 }
 

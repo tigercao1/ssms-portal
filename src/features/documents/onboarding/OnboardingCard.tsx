@@ -7,11 +7,7 @@ import { profileGapsText } from '@/features/instructor/goLive';
 import type { MyChecklist } from '../api';
 import { ProgressBar, progressText } from './ProgressBar';
 import { StatePill, type PillTone } from './StatePill';
-import {
-  checklistProgress,
-  useMyChecklist,
-  type ChecklistProgress,
-} from './queries';
+import { checklistProgress, useMyChecklist } from './queries';
 import { LockIcon, lockText } from './Locked';
 
 function LockedOnboardingCard({ checklist }: { checklist: MyChecklist }) {
@@ -56,35 +52,35 @@ type CardStatus = { tone: PillTone; pill: string; body: string };
 
 function cardStatus(
   readiness: GoLiveReadiness,
-  progress: ChecklistProgress,
   toDoBody: string,
   t: Messages,
 ): CardStatus {
-  if (readiness.live)
-    return {
-      tone: 'done',
-      pill: t.onboarding.cardAllDone,
-      body: t.onboarding.cardBody,
-    };
-  if (readiness.ready)
-    return {
-      tone: 'info',
-      pill: t.onboarding.cardPillGoingLive,
-      body: t.onboarding.cardGoingLiveBody,
-    };
-  const { done, inReview, total } = progress;
-  const hasProfileGaps = readiness.missing.some((m) => m.group === 'profile');
-  if (inReview > 0 && done + inReview === total && !hasProfileGaps)
-    return {
-      tone: 'warn',
-      pill: t.onboarding.cardPillInReview,
-      body: t.onboarding.cardInReviewBody,
-    };
-  return {
-    tone: 'warn',
-    pill: t.onboarding.cardPillToDo,
-    body: toDoBody,
-  };
+  switch (readiness.stage) {
+    case 'live':
+      return {
+        tone: 'done',
+        pill: t.onboarding.cardAllDone,
+        body: t.onboarding.cardBody,
+      };
+    case 'going_live':
+      return {
+        tone: 'info',
+        pill: t.onboarding.cardPillGoingLive,
+        body: t.onboarding.cardGoingLiveBody,
+      };
+    case 'in_review':
+      return {
+        tone: 'warn',
+        pill: t.onboarding.cardPillInReview,
+        body: t.onboarding.cardInReviewBody,
+      };
+    default:
+      return {
+        tone: 'warn',
+        pill: t.onboarding.cardPillToDo,
+        body: toDoBody,
+      };
+  }
 }
 
 const LINK_CLASS =
@@ -104,7 +100,7 @@ export function OnboardingCard({ readiness }: { readiness?: GoLiveReadiness }) {
   const toDoBody = empty
     ? t.onboarding.cardEmptyToDoBody
     : t.onboarding.cardToDoBody.replace('{progress}', progress);
-  const status = readiness && cardStatus(readiness, counts, toDoBody, t);
+  const status = readiness && cardStatus(readiness, toDoBody, t);
   const profileGaps =
     readiness &&
     profileGapsText(readiness.missing, t, locale, {
