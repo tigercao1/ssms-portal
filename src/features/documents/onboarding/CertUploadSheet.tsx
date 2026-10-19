@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Button, Field, Input } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import type { CertOrg, CertTrack } from '@/lib/types';
+import membershipCardExample from '@/assets/membership-card-example.webp';
 import { todayIso } from '../api';
 import { Sheet } from '../signer/Sheet';
 import {
@@ -18,6 +19,7 @@ interface CertUploadSheetProps {
   org: CertOrg;
   track: CertTrack;
   certLabel: string;
+  season: string | null;
   onClose: () => void;
   onUploaded: () => void;
 }
@@ -28,6 +30,7 @@ export function CertUploadSheet({
   org,
   track,
   certLabel,
+  season,
   onClose,
   onUploaded,
 }: CertUploadSheetProps) {
@@ -102,6 +105,27 @@ export function CertUploadSheet({
         onSubmit={submit}
         className="flex flex-col gap-4"
       >
+        <div className="flex flex-col gap-3 text-sm text-ink">
+          <p>
+            {(season
+              ? t.onboarding.membershipIntro.replace('{season}', season)
+              : t.onboarding.membershipIntroNoSeason
+            ).replace('{org}', org.toUpperCase())}
+          </p>
+          <p className="text-slate">{t.onboarding.membershipCardShows}</p>
+          <figure className="flex flex-col gap-1">
+            <img
+              src={membershipCardExample}
+              alt={t.onboarding.exampleAlt}
+              width={480}
+              height={306}
+              className="h-auto w-full max-w-60 rounded-md border border-grey"
+            />
+            <figcaption className="text-xs text-slate">
+              {t.onboarding.exampleCaption}
+            </figcaption>
+          </figure>
+        </div>
         <Field
           label={t.onboarding.fileLabel}
           hint={t.onboarding.fileHint}

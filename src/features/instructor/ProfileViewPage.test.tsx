@@ -550,7 +550,9 @@ describe('ProfileViewPage go-live', () => {
     expect(
       screen.queryByText(/things? left before your profile goes live/),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText('No verified certification yet')).toBeNull();
+    expect(
+      screen.queryByText('No certification verified by a membership card yet'),
+    ).toBeNull();
     expect(
       screen.queryByRole('link', { name: /^(Add|View|Open):/ }),
     ).not.toBeInTheDocument();
@@ -612,7 +614,7 @@ describe('ProfileViewPage go-live', () => {
     expect(pillColor(pill)).toBe('var(--status-pending)');
     expect(
       card.getByText(
-        "We're checking your certification. You'll go live once it's approved.",
+        "We're checking your membership card. You'll go live once it's approved.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -705,7 +707,7 @@ describe('ProfileViewPage go-live', () => {
     expect(pillColor(pill)).toBe('var(--status-approved)');
     expect(
       card.getByText(
-        'Documents to read and sign, and certifications to upload.',
+        "Documents to read and sign, and this season's membership card to upload.",
       ),
     ).toBeInTheDocument();
   });
@@ -835,7 +837,7 @@ describe('ProfileViewPage go-live', () => {
     const card = await findCard();
     expect(await card.findByText('待审核')).toBeInTheDocument();
     expect(
-      card.getByText('我们正在审核您的证书，通过后即可上线。'),
+      card.getByText('我们正在审核您的会员卡，通过后即可上线。'),
     ).toBeInTheDocument();
     expect(
       card.getByRole('progressbar', { name: '已完成 1 / 2 · 1 项待审核' }),
@@ -966,7 +968,7 @@ describe('ProfileViewPage go-live', () => {
     expect(pillColor(pill)).toBe('var(--status-approved)');
     expect(
       card.getByText(
-        'Documents to read and sign, and certifications to upload.',
+        "Documents to read and sign, and this season's membership card to upload.",
       ),
     ).toBeInTheDocument();
     expect(card.queryByRole('progressbar')).toBeNull();
@@ -1039,9 +1041,9 @@ describe('ProfileViewPage go-live', () => {
   it.each([
     ['verified', 'Verified · until Jun 30, 2027'],
     ['pending', 'Awaiting review'],
-    ['rejected', 'Proof rejected'],
-    ['expired', 'Proof expired'],
-    ['no_proof', 'No proof uploaded'],
+    ['rejected', 'Membership card rejected'],
+    ['expired', 'Membership card expired'],
+    ['no_proof', 'No membership card uploaded'],
     ['level_mismatch', 'Re-verification needed'],
   ] as const)('marks a %s certification "%s"', async (status, label) => {
     serveGoLive(approvedActive, {

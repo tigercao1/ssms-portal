@@ -342,7 +342,7 @@ describe('LessonsPayPage states', () => {
       await screen.findByText('Finish onboarding to see your lessons and pay')
     ).closest('[role="status"]');
     expect(banner).toHaveTextContent(
-      'Lessons and pay open once every required document on your onboarding checklist is done and your certifications are approved.',
+      'Lessons and pay open once every required document on your onboarding checklist is done and your membership cards are approved.',
     );
     expect(
       screen.getByRole('link', { name: 'Go to onboarding' }),
@@ -360,7 +360,7 @@ describe('LessonsPayPage states', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        '入职清单上所有必填文件完成、且证书审核通过后，即可查看课程和工资。',
+        '入职清单上所有必填文件完成、且会员卡审核通过后，即可查看课程和工资。',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '前往入职资料' })).toHaveAttribute(

@@ -336,6 +336,7 @@ export function OnboardingPage() {
           org={uploading.item.org}
           track={uploading.item.track}
           certLabel={uploading.label}
+          season={data.season}
           onClose={() => setUploading(null)}
           onUploaded={() => {
             setUploading(null);

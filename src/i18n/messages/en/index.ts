@@ -231,13 +231,13 @@ export const en: Messages = {
     fieldLocations: 'Teaching location',
     fieldLanguages: 'Language',
     fieldCourseLevels: 'Course level offered',
-    noneVerified: 'No verified certification yet',
+    noneVerified: 'No certification verified by a membership card yet',
     certVerified: 'Verified · until {date}',
     certVerifiedNoDate: 'Verified',
     certPending: 'Awaiting review',
-    certRejected: 'Proof rejected',
-    certExpired: 'Proof expired',
-    certNoProof: 'No proof uploaded',
+    certRejected: 'Membership card rejected',
+    certExpired: 'Membership card expired',
+    certNoProof: 'No membership card uploaded',
     certLevelMismatch: 'Re-verification needed',
     checkLabel: 'Go-live check',
     checkReady: 'Ready',
@@ -840,9 +840,9 @@ export const en: Messages = {
     statusViewed: 'Viewed',
     statusCompleted: 'Completed',
     statusArchived: 'Archived',
-    certsTitle: 'Certification uploads',
-    certsMissingTitle: 'Certifications without an upload',
-    noCertUploads: 'No certification uploads yet.',
+    certsTitle: 'Membership card uploads',
+    certsMissingTitle: 'Certifications without a membership card',
+    noCertUploads: 'No membership card uploads yet.',
     previousUploads: 'Previous uploads ({n})',
     validThrough: 'Valid through',
     reviewNote: 'Note to instructor',
@@ -1415,7 +1415,7 @@ export const en: Messages = {
       "You can't be booked for new lessons. Your past lessons and pay are below.",
     onboardingTitle: 'Finish onboarding to see your lessons and pay',
     onboardingBody:
-      'Lessons and pay open once every required document on your onboarding checklist is done and your certifications are approved.',
+      'Lessons and pay open once every required document on your onboarding checklist is done and your membership cards are approved.',
     onboardingOpen: 'Go to onboarding',
   },
   onboarding: {
@@ -1431,12 +1431,12 @@ export const en: Messages = {
     loadFailed: 'Your onboarding checklist could not be loaded.',
     sectionRead: 'Documents to read',
     sectionSign: 'Documents to sign',
-    sectionCerts: 'Certifications',
+    sectionCerts: 'Membership cards',
     optional: 'Optional',
     dueBy: 'Due {date}',
     kindRead: 'Read',
     kindSign: 'Sign',
-    kindCert: 'Upload one file for this certification',
+    kindCert: "Upload this season's membership card",
     statusAssigned: 'Not started',
     statusViewed: 'In progress',
     statusCompleted: 'Completed',
@@ -1455,7 +1455,8 @@ export const en: Messages = {
     validUntilOn: 'Valid until {date}',
     reviewNote: 'Reviewer note: {note}',
     cardTitle: 'Onboarding',
-    cardBody: 'Documents to read and sign, and certifications to upload.',
+    cardBody:
+      "Documents to read and sign, and this season's membership card to upload.",
     cardAllDone: 'All done',
     cardPillToDo: 'Required items pending',
     cardPillInReview: 'Awaiting review',
@@ -1463,7 +1464,7 @@ export const en: Messages = {
     cardToDoBody:
       '{progress}. Finish the rest to go live on the SSnow official website.',
     cardInReviewBody:
-      "We're checking your certification. You'll go live once it's approved.",
+      "We're checking your membership card. You'll go live once it's approved.",
     cardGoingLiveBody: 'Usually within a few minutes.',
     cardEmptyToDoBody:
       'Complete your profile to go live on the SSnow official website.',
@@ -1482,19 +1483,27 @@ export const en: Messages = {
     downloadSigned: 'Download signed copy',
     downloadFailed: 'The download link could not be created. Try again.',
     sha256: 'SHA-256',
-    uploadTitle: 'Upload {cert}',
-    fileLabel: 'Certificate file',
+    uploadTitle: 'Upload membership card · {cert}',
+    membershipIntro:
+      'Upload your {org} membership card for the {season} season, showing your membership is active. Your instructor certificate on its own is not enough.',
+    membershipIntroNoSeason:
+      'Upload your {org} membership card for this season, showing your membership is active. Your instructor certificate on its own is not enough.',
+    membershipCardShows:
+      'A valid card shows your name, membership number and an expiry date that covers this season.',
+    exampleCaption: 'Example membership card',
+    exampleAlt:
+      'Example CASI membership card with the member name, membership number and expiry date',
+    fileLabel: 'Membership card',
     fileHint: 'PDF, JPG, PNG or WebP, up to 10 MB.',
     fileRequired: 'Choose a file.',
     fileType: 'Use a PDF, JPG, PNG or WebP file.',
     fileTooLarge: 'The file must be 10 MB or smaller.',
     validUntil: 'Valid until',
-    validUntilHint:
-      'The date your membership or registration is valid through.',
+    validUntilHint: 'The expiry date printed on your membership card.',
     validUntilPast: 'Must be today or later.',
     uploadButton: 'Upload',
     uploading: 'Uploading…',
-    uploadDone: 'Uploaded — awaiting review.',
+    uploadDone: 'Membership card uploaded — awaiting review.',
     uploadFailed: 'Upload failed. Try again.',
     alreadyCompleted: 'This document has already been completed.',
     sourceUnavailable:
@@ -1507,12 +1516,12 @@ export const en: Messages = {
     cardLockedTitle: 'Onboarding · {n} items',
     cardLockedUnlocks: 'Unlocks when your profile is approved',
     cardLockedBody:
-      "{docs} documents to sign and {certs} certifications to upload. We'll email you when you can start.",
+      "{docs} documents to sign and {certs} membership cards to upload. We'll email you when you can start.",
     rejectedTitle: "Your profile wasn't approved",
     rejectedBody: 'Contact SSnow if you think this is a mistake.',
     deactivatedTitle: 'Your profile is deactivated',
     deactivatedBody:
-      "You can't sign documents or upload certificates while deactivated. Your past lessons and pay are still under Lessons & pay.",
+      "You can't sign documents or upload membership cards while deactivated. Your past lessons and pay are still under Lessons & pay.",
   },
   signer: {
     signatureTitle: 'Your signature',
@@ -1708,7 +1717,7 @@ export const en: Messages = {
     lockedEmpty: 'Only approved instructors can insure private lessons.',
     onboardingTitle: 'Finish onboarding to insure private lessons',
     onboardingBody:
-      'Lesson insurance opens once every required document on your onboarding checklist is done and your certifications are approved.',
+      'Lesson insurance opens once every required document on your onboarding checklist is done and your membership cards are approved.',
     onboardingOpen: 'Go to onboarding',
   },
   adminInsurance: {
