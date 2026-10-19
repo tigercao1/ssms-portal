@@ -119,6 +119,28 @@ describe('api client', () => {
     });
   });
 
+  it('returns the body as a Blob on blob requests and still parses errors', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/pdf' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const blob = await api<Blob>('/file.pdf', { responseType: 'blob' });
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3]),
+    );
+    expect(
+      (fetchMock.mock.calls[0] as [string, RequestInit])[1].headers,
+    ).toMatchObject({ Accept: '*/*' });
+
+    mockFetch(409, { message: 'Add your legal name' });
+    await expect(
+      api('/file.pdf', { responseType: 'blob' }),
+    ).rejects.toMatchObject({ status: 409, message: 'Add your legal name' });
+  });
+
   it('refreshes the session once on 403 and still throws', async () => {
     refreshSession.mockResolvedValue({ data: {}, error: null });
     mockFetch(403, { message: 'Admin role required' });

@@ -271,6 +271,16 @@ export const zhCN: Messages = {
     account: '账户',
     signedInAs: '当前登录',
   },
+  employmentLetter: {
+    title: '在职证明',
+    body: '下载 SSnow 出具的在职证明，确认您在本校任职。证明日期为今天，并使用您的法定姓名。',
+    issuedTo: '出具对象：{name}',
+    download: '下载证明（PDF）',
+    downloadFailed: '无法生成您的证明，请重试。',
+    legalNameMissing: '申请在职证明前，请先在个人资料中填写您的法定名和姓。',
+    addLegalName: '填写法定姓名',
+    notEligible: '个人资料获批且账户处于启用状态后，即可申请在职证明。',
+  },
   admin: {
     dashboardTitle: '仪表板',
     statPending: '待审核',
@@ -1502,7 +1512,8 @@ export const zhCN: Messages = {
   insurance: {
     title: '私课投保',
     loadFailed: '无法加载你的私课投保。',
-    headerCopy: '教练自行售出的私人课程，学员签署俱乐部 waiver 后，可按 $10/小时/学员 的标准投保。保险费每雪季 $400 封顶，达到上限后不再收取。',
+    headerCopy:
+      '教练自行售出的私人课程，学员签署俱乐部 waiver 后，可按 $10/小时/学员 的标准投保。保险费每雪季 $400 封顶，达到上限后不再收取。',
     newRequest: '新建投保',
     resumeDraft: '继续草稿',
     noSeason: '现在没有开放的保险季，暂时不能投保。',
@@ -1511,7 +1522,8 @@ export const zhCN: Messages = {
     requestsCountMany: '共 {n} 条',
     emptyTitle: '还没有投保记录',
     emptyBody: '一次投保可以包含多节课，提交后会作为一条记录出现在这里。',
-    paymentNote: '保险费通过电子转账线下支付，管理员确认收款后状态会更新为已支付。',
+    paymentNote:
+      '保险费通过电子转账线下支付，管理员确认收款后状态会更新为已支付。',
     progressLabel: '本季封顶进度',
     progressTotal: '本季累计 {amount} / {cap}',
     progressRemaining: '再投保 {amount} 即封顶，之后免费',
@@ -1690,14 +1702,17 @@ export const zhCN: Messages = {
     removePassConfirm: '取消整季',
     removePassToast: '已取消 {name} 的整季保险。',
     requestsTitle: '投保记录',
-    requestsIntro: '每条投保记录是教练的一次提交。标记已付、标记未付和作废都会作用于其中的每一节课。',
+    requestsIntro:
+      '每条投保记录是教练的一次提交。标记已付、标记未付和作废都会作用于其中的每一节课。',
     requestsEmpty: '没有符合筛选条件的投保记录。',
     colRequestNo: '投保编号',
     colLessons: '课程',
     colSubmitted: '提交时间',
     showLessons: '展开 {requestNo} 的课程',
-    requestVoidBody: '这条投保记录的每一节课都会作废，不再计入该教练的 $400 封顶。之后的投保金额不变。此操作无法撤销。',
-    requestMarkUnpaidBody: '用于撤销误标的付款。这条投保记录的每一节课都会恢复为待付款，付款日期和备注会被清除。',
+    requestVoidBody:
+      '这条投保记录的每一节课都会作废，不再计入该教练的 $400 封顶。之后的投保金额不变。此操作无法撤销。',
+    requestMarkUnpaidBody:
+      '用于撤销误标的付款。这条投保记录的每一节课都会恢复为待付款，付款日期和备注会被清除。',
     requestVoidConfirm: '作废投保记录',
     partOfRequest: '属于 {requestNo}',
     wholeRequestNote: '这会更新整份投保 {requestNo}（{lessons}）',

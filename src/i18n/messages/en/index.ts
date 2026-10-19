@@ -287,6 +287,18 @@ export const en: Messages = {
     account: 'Account',
     signedInAs: 'Signed in as',
   },
+  employmentLetter: {
+    title: 'Employment letter',
+    body: 'Download a letter from SSnow confirming that you work with us. It is dated today and uses your legal name.',
+    issuedTo: 'Issued to {name}',
+    download: 'Download letter (PDF)',
+    downloadFailed: 'We couldn’t create your letter. Please try again.',
+    legalNameMissing:
+      'Add your legal first and last name to your profile before you request an employment letter.',
+    addLegalName: 'Add legal name',
+    notEligible:
+      'Employment letters are available once your profile is approved and your account is active.',
+  },
   admin: {
     dashboardTitle: 'Dashboard',
     statPending: 'Pending',
@@ -1448,10 +1460,13 @@ export const en: Messages = {
     cardPillToDo: 'Required items pending',
     cardPillInReview: 'Awaiting review',
     cardPillGoingLive: 'Going live',
-    cardToDoBody: '{progress}. Finish the rest to go live on the SSnow official website.',
-    cardInReviewBody: "We're checking your certification. You'll go live once it's approved.",
+    cardToDoBody:
+      '{progress}. Finish the rest to go live on the SSnow official website.',
+    cardInReviewBody:
+      "We're checking your certification. You'll go live once it's approved.",
     cardGoingLiveBody: 'Usually within a few minutes.',
-    cardEmptyToDoBody: 'Complete your profile to go live on the SSnow official website.',
+    cardEmptyToDoBody:
+      'Complete your profile to go live on the SSnow official website.',
     cardProfileGaps: 'Your profile also needs: {fields}.',
     cardGapCertification: 'a certification',
     cardOpen: 'Go to onboarding',
@@ -1577,16 +1592,20 @@ export const en: Messages = {
   insurance: {
     title: 'Lesson insurance',
     loadFailed: "Couldn't load your lesson insurance.",
-    headerCopy: 'For private lessons you sold yourself. Once each student has signed the club waiver, you can insure the lesson at $10 per hour per student. Insurance is capped at $400 a season; nothing more is charged after that.',
+    headerCopy:
+      'For private lessons you sold yourself. Once each student has signed the club waiver, you can insure the lesson at $10 per hour per student. Insurance is capped at $400 a season; nothing more is charged after that.',
     newRequest: 'New insurance request',
     resumeDraft: 'Continue draft',
-    noSeason: "No insurance season is open right now, so you can't insure lessons yet.",
+    noSeason:
+      "No insurance season is open right now, so you can't insure lessons yet.",
     requestsTitle: 'Insurance requests',
     requestsCountOne: '{n} request',
     requestsCountMany: '{n} requests',
     emptyTitle: 'No insurance requests yet',
-    emptyBody: 'One request can cover several lessons. Once submitted, it shows up here as one entry.',
-    paymentNote: 'Insurance is paid offline by e-Transfer. The status changes to Paid once an admin confirms the payment.',
+    emptyBody:
+      'One request can cover several lessons. Once submitted, it shows up here as one entry.',
+    paymentNote:
+      'Insurance is paid offline by e-Transfer. The status changes to Paid once an admin confirms the payment.',
     progressLabel: 'Season cap progress',
     progressTotal: 'Season total {amount} / {cap}',
     progressRemaining: '{amount} more until the cap; free after that',
@@ -1641,7 +1660,8 @@ export const en: Messages = {
     needLesson: 'Add at least one lesson to submit',
     review: 'Review & submit',
     reviewTitle: 'Review',
-    reviewIntro: 'Check each lesson and its price. Submitting creates one request with one number.',
+    reviewIntro:
+      'Check each lesson and its price. Submitting creates one request with one number.',
     backToEdit: 'Back to edit',
     backToList: 'Back to requests',
     submit: 'Submit · {amount} due',
@@ -1649,14 +1669,17 @@ export const en: Messages = {
     submittedToast: 'Submitted {no}',
     errorsTitle: "Can't submit yet. Fix these first:",
     errDate: 'Lesson {n}: no date',
-    errOtherSeason: 'Lesson {n}: all the lessons in one request must be in the same season ({key})',
+    errOtherSeason:
+      'Lesson {n}: all the lessons in one request must be in the same season ({key})',
     errStudents: 'Lesson {n}: add at least one student',
     errName: 'Lesson {n}: student {m} has no name',
     errWaiver: "Lesson {n}: {name} hasn't confirmed the waiver",
     errWaiverNoName: "Lesson {n}: student {m} hasn't confirmed the waiver",
     errNoSeason: 'Lesson {n}: no insurance season covers this date',
-    errMixedSeasons: 'All the lessons in one request must be in the same season.',
-    errLocationConflict: 'Lesson {n}: choose a ski area or type another one, not both',
+    errMixedSeasons:
+      'All the lessons in one request must be in the same season.',
+    errLocationConflict:
+      'Lesson {n}: choose a ski area or type another one, not both',
     lockedSubmit: 'Only approved instructors can insure lessons.',
     capPartial: 'List {list} · {amount} after cap',
     capFree: 'List {list} · free after cap',
@@ -1680,7 +1703,8 @@ export const en: Messages = {
     pendingTitle: 'Your profile is being reviewed',
     pendingBody: 'Once you are approved you can insure your private lessons.',
     rejectedTitle: 'Your profile was not approved',
-    rejectedBody: "You can't insure private lessons. Contact SSnow if you have questions.",
+    rejectedBody:
+      "You can't insure private lessons. Contact SSnow if you have questions.",
     lockedEmpty: 'Only approved instructors can insure private lessons.',
     onboardingTitle: 'Finish onboarding to insure private lessons',
     onboardingBody:
@@ -1770,14 +1794,17 @@ export const en: Messages = {
     removePassConfirm: 'Remove season pass',
     removePassToast: "{name}'s season pass was removed.",
     requestsTitle: 'Insurance requests',
-    requestsIntro: 'Each request is one submission from an instructor. Mark paid, mark unpaid and void apply to every lesson in it.',
+    requestsIntro:
+      'Each request is one submission from an instructor. Mark paid, mark unpaid and void apply to every lesson in it.',
     requestsEmpty: 'No requests match these filters.',
     colRequestNo: 'Request no.',
     colLessons: 'Lessons',
     colSubmitted: 'Submitted',
     showLessons: 'Show the lessons in {requestNo}',
-    requestVoidBody: "Every lesson in this request is voided and no longer counts toward the instructor's $400 cap. Later requests keep their amounts. This can't be undone.",
-    requestMarkUnpaidBody: 'Use this to undo a payment that was marked by mistake. Every lesson in the request goes back to unpaid, and the payment date and note are cleared.',
+    requestVoidBody:
+      "Every lesson in this request is voided and no longer counts toward the instructor's $400 cap. Later requests keep their amounts. This can't be undone.",
+    requestMarkUnpaidBody:
+      'Use this to undo a payment that was marked by mistake. Every lesson in the request goes back to unpaid, and the payment date and note are cleared.',
     requestVoidConfirm: 'Void request',
     partOfRequest: 'Part of {requestNo}',
     wholeRequestNote: 'This updates the whole request {requestNo} ({lessons}).',

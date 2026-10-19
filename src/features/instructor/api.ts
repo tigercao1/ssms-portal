@@ -6,6 +6,7 @@ import type {
   BioAiUsage,
   BioDraft,
   BioDraftMode,
+  EmploymentLetterStatus,
   ExtraPhotoSlot,
   GoLiveReadiness,
   InstructorProfile,
@@ -34,6 +35,20 @@ export function useMyCalendarStatus(enabled: boolean) {
     queryKey: ['me', 'instructor', 'calendar'] as const,
     queryFn: () => api<MyCalendarStatus>('/me/instructor/calendar'),
     enabled,
+  });
+}
+
+export function useMyEmploymentLetter() {
+  return useQuery({
+    queryKey: ['me', 'employment-letter'] as const,
+    queryFn: () => api<EmploymentLetterStatus>('/me/employment-letter'),
+  });
+}
+
+export function useDownloadEmploymentLetter() {
+  return useMutation({
+    mutationFn: () =>
+      api<Blob>('/me/employment-letter/letter.pdf', { responseType: 'blob' }),
   });
 }
 
