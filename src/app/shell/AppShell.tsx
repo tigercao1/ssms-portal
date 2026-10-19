@@ -74,6 +74,7 @@ export function AppShell() {
         { to: '/admin', label: t.nav.dashboard, end: true },
         { to: '/admin/instructors', label: t.nav.instructors },
         { to: '/admin/documents', label: t.nav.documents },
+        { to: '/admin/document-review', label: t.nav.documentReview },
         { to: '/admin/reference', label: t.nav.reference },
         { to: '/admin/pages', label: t.nav.pages },
         { to: '/admin/shopify-sync', label: t.nav.shopifySync },

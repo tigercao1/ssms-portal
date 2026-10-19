@@ -15,6 +15,9 @@ import type {
   DocumentExportRequest,
   DocumentExportUrl,
   DocumentLanguage,
+  DocumentReviewItem,
+  DocumentReviewPage,
+  DocumentReviewQuery,
   Field,
   FileUrl,
   InstructorDocuments,
@@ -50,6 +53,11 @@ export const documentsKeys = {
     ['admin', 'documents', 'exports', exportId] as const,
   instructorDocuments: (instructorId: string) =>
     ['admin', 'instructor', instructorId, 'documents'] as const,
+  documentReviews: ['admin', 'documents', 'reviews'] as const,
+  documentReviewList: (query: DocumentReviewQuery) =>
+    ['admin', 'documents', 'reviews', query] as const,
+  certUploadUrl: (uploadId: string) =>
+    ['admin', 'certification-uploads', uploadId, 'url'] as const,
   myChecklist: ['me', 'documents'] as const,
   myDocument: (assignmentId: string, language?: DocumentLanguage) =>
     ['me', 'documents', assignmentId, language ?? null] as const,
@@ -260,6 +268,27 @@ export function archiveAssignment(assignmentId: string) {
 
 export function getCertUploadUrl(uploadId: string) {
   return api<FileUrl>(`/admin/certification-uploads/${enc(uploadId)}/url`);
+}
+
+export async function listDocumentReviews(
+  query: DocumentReviewQuery,
+): Promise<DocumentReviewPage> {
+  const qs = new URLSearchParams({
+    status: query.status,
+    page: String(query.page),
+    limit: String(query.limit),
+  });
+  const { data, headers } = await apiWithHeaders<DocumentReviewItem[]>(
+    `/admin/document-reviews?${qs.toString()}`,
+  );
+  const total = Number(headers.get('X-Total-Count') ?? Number.NaN);
+  return {
+    items: data,
+    page: query.page,
+    total: Number.isFinite(total)
+      ? total
+      : (query.page - 1) * query.limit + data.length,
+  };
 }
 
 export function reviewCertUpload(uploadId: string, body: CertUploadReview) {
