@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '@/i18n/core/I18nProvider';
+import { cn } from '@/lib/cn';
 
 export function Drawer({
   title,
@@ -8,6 +9,7 @@ export function Drawer({
   onClose,
   closeLabel,
   blocked = false,
+  fullWidth = false,
   footer,
   children,
 }: {
@@ -16,6 +18,7 @@ export function Drawer({
   onClose: () => void;
   closeLabel?: string;
   blocked?: boolean;
+  fullWidth?: boolean;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -56,7 +59,10 @@ export function Drawer({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="absolute inset-y-0 right-0 flex w-[min(580px,100vw)] flex-col bg-canvas shadow-pop focus:outline-none"
+        className={cn(
+          'absolute inset-y-0 right-0 flex flex-col bg-canvas shadow-pop focus:outline-none',
+          fullWidth ? 'w-full' : 'w-[min(580px,100vw)]',
+        )}
       >
         <div className="flex items-center gap-2 border-b border-grey/60 bg-surface py-2 pl-4 pr-2.5">
           {back}

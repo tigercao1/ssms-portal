@@ -676,6 +676,8 @@ describe('AdminListPage stages and the Filters popover', () => {
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     const sheet = screen.getByRole('dialog', { name: 'Filters' });
     expect(sheet).toHaveAttribute('aria-modal', 'true');
+    expect(sheet).toHaveClass('w-full');
+    expect(sheet).not.toHaveClass('w-[min(580px,100vw)]');
     expect(screen.getByTestId('drawer-scrim')).toBeInTheDocument();
     await user.click(
       within(

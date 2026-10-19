@@ -237,6 +237,7 @@ export function InstructorFilters({
       {open && !popover && (
         <Drawer
           title={t.admin.filters}
+          fullWidth
           onClose={() => close(true)}
           footer={
             <>
