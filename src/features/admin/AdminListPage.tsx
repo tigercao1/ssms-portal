@@ -58,7 +58,6 @@ export function AdminListPage() {
   const results = useAdminInstructorPage({
     q,
     stages: filters.stages,
-    active: filters.active,
     calendarConnected: filters.calendar,
     page,
   });
@@ -81,9 +80,9 @@ export function AdminListPage() {
           if (next.q !== undefined) set('q', next.q);
           if (next.filters) {
             out.delete('status');
+            out.delete('active');
             out.delete('stage');
             for (const stage of next.filters.stages) out.append('stage', stage);
-            set('active', next.filters.active?.toString());
             set('calendar', next.filters.calendar?.toString());
           }
           if (next.page !== undefined) {

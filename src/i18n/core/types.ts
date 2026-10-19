@@ -129,7 +129,6 @@ export interface Messages {
     approved: string;
     rejected: string;
     inactive: string;
-    active: string;
     onboarding: string;
     inReview: string;
     goingLive: string;
@@ -290,7 +289,6 @@ export interface Messages {
     noPending: string;
     listTitle: string;
     filterStatus: string;
-    filterAccount: string;
     filters: string;
     filtersApplied: string;
     appliedFilters: string;

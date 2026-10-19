@@ -17,7 +17,6 @@ export const FILTER_POPOVER_QUERY = '(min-width: 640px)';
 
 export interface InstructorFilterState {
   stages: InstructorStage[];
-  active?: boolean;
   calendar?: boolean;
 }
 
@@ -35,25 +34,16 @@ export function filtersFrom(params: URLSearchParams): InstructorFilterState {
   const requested = params.getAll('stage').flatMap((s) => s.split(','));
   return {
     stages: INSTRUCTOR_STAGES.filter((stage) => requested.includes(stage)),
-    active: booleanFrom(params, 'active'),
     calendar: booleanFrom(params, 'calendar'),
   };
 }
 
 export function filterCount(filters: InstructorFilterState): number {
-  return (
-    filters.stages.length +
-    (filters.active === undefined ? 0 : 1) +
-    (filters.calendar === undefined ? 0 : 1)
-  );
+  return filters.stages.length + (filters.calendar === undefined ? 0 : 1);
 }
 
 function toggled<T>(current: T | undefined, option: T): T | undefined {
   return current === option ? undefined : option;
-}
-
-function accountLabel(active: boolean, t: Messages): string {
-  return active ? t.status.active : t.status.inactive;
 }
 
 function calendarLabel(connected: boolean, t: Messages): string {
@@ -130,19 +120,6 @@ function FilterPanel({
             onChange={() => toggleStage(stage)}
           >
             <StagePill stage={stage} />
-          </FilterCheckbox>
-        ))}
-      </FilterGroup>
-      <FilterGroup legend={t.admin.filterAccount}>
-        {[true, false].map((option) => (
-          <FilterCheckbox
-            key={String(option)}
-            checked={value.active === option}
-            onChange={() =>
-              onChange({ ...value, active: toggled(value.active, option) })
-            }
-          >
-            {accountLabel(option, t)}
           </FilterCheckbox>
         ))}
       </FilterGroup>
@@ -277,24 +254,6 @@ export function AppliedFilterChips({
       remove: () =>
         onChange({ ...value, stages: value.stages.filter((s) => s !== stage) }),
     })),
-    ...(value.active === undefined
-      ? []
-      : [
-          {
-            key: 'active',
-            label: chipText(
-              t.admin.filterAccount,
-              accountLabel(value.active, t),
-              t,
-            ),
-            pill: chipText(
-              t.admin.filterAccount,
-              accountLabel(value.active, t),
-              t,
-            ),
-            remove: () => onChange({ ...value, active: undefined }),
-          },
-        ]),
     ...(value.calendar === undefined
       ? []
       : [

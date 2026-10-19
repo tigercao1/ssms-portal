@@ -327,7 +327,7 @@ describe('AdminListPage paging, search and URL state', () => {
       lee,
     ]);
     const user = userEvent.setup();
-    renderPage('/?q=coach&stage=deactivated&active=false&page=2');
+    renderPage('/?q=coach&stage=deactivated&calendar=false&page=2');
 
     expect(await screen.findByText('Showing 51–60 of 60')).toBeInTheDocument();
     expect(screen.getByRole('searchbox')).toHaveValue('coach');
@@ -338,17 +338,42 @@ describe('AdminListPage paging, search and URL state', () => {
       request({
         q: 'coach',
         stage: ['deactivated'],
-        active: 'false',
+        calendarConnected: 'false',
         page: '2',
       }),
     ]);
     const status = await openFilters(user, 'Status', 'Filters, 2 applied');
     expect(within(status).getByLabelText('Inactive')).toBeChecked();
     expect(
-      within(screen.getByRole('group', { name: 'Account' })).getByLabelText(
-        'Inactive',
+      within(screen.getByRole('group', { name: 'Calendar' })).getByLabelText(
+        'Not connected',
       ),
     ).toBeChecked();
+  });
+
+  it('ignores the old account filter in a bookmarked URL and drops it on the next change', async () => {
+    serveInstructors([
+      ...manyInstructors(3, { isActive: false, stage: 'deactivated' }),
+      lee,
+    ]);
+    const user = userEvent.setup();
+    renderPage('/?active=false&stage=going_live');
+
+    expect(await screen.findByText('Showing 1–1 of 1')).toBeInTheDocument();
+    expect(requests).toEqual([request({ stage: ['going_live'] })]);
+    expect(
+      within(screen.getByRole('list', { name: 'Applied filters' }))
+        .getAllByRole('button', { name: /^Remove filter/ })
+        .map((chip) => chip.getAttribute('aria-label')),
+    ).toEqual(['Remove filter: Status: Going live']);
+
+    const status = await openFilters(user, 'Status', 'Filters, 1 applied');
+    await user.click(within(status).getByLabelText('Inactive'));
+    expect(await screen.findByText('Showing 1–4 of 4')).toBeInTheDocument();
+    expect(location()).toBe('?stage=deactivated&stage=going_live');
+    expect(requests.at(-1)).toEqual(
+      request({ stage: ['deactivated', 'going_live'] }),
+    );
   });
 
   it('puts filters in the URL and goes back to page 1 when one changes', async () => {
@@ -364,17 +389,17 @@ describe('AdminListPage paging, search and URL state', () => {
     expect(location()).toBe('?stage=going_live');
     expect(requests.at(-1)).toEqual(request({ stage: ['going_live'] }));
 
-    const account = screen.getByRole('group', { name: 'Account' });
-    await user.click(within(account).getByLabelText('Active'));
+    const calendar = screen.getByRole('group', { name: 'Calendar' });
+    await user.click(within(calendar).getByLabelText('Not connected'));
     await waitFor(() =>
-      expect(location()).toBe('?stage=going_live&active=true'),
+      expect(location()).toBe('?stage=going_live&calendar=false'),
     );
     expect(requests.at(-1)).toEqual(
-      request({ stage: ['going_live'], active: 'true' }),
+      request({ stage: ['going_live'], calendarConnected: 'false' }),
     );
 
     await user.click(within(status).getByLabelText('Going live'));
-    await user.click(within(account).getByLabelText('Active'));
+    await user.click(within(calendar).getByLabelText('Not connected'));
     expect(await screen.findByText('Showing 1–50 of 81')).toBeInTheDocument();
     expect(location()).toBe('');
   });
@@ -531,7 +556,7 @@ describe('AdminListPage stages and the Filters popover', () => {
     expect(within(table).queryByText('Pending')).not.toBeInTheDocument();
   });
 
-  it('groups every stage, account and calendar option in one popover', async () => {
+  it('groups every stage and calendar option in one popover', async () => {
     serveInstructors(roster);
     const user = userEvent.setup();
     renderPage();
@@ -556,8 +581,12 @@ describe('AdminListPage stages and the Filters popover', () => {
       'Going live',
       'Live',
     ]);
-    expect(labels('Account')).toEqual(['Active', 'Inactive']);
     expect(labels('Calendar')).toEqual(['Connected', 'Not connected']);
+    expect(
+      within(dialog)
+        .getAllByRole('group')
+        .map((group) => group.querySelector('legend')?.textContent),
+    ).toEqual(['Status', 'Calendar']);
     await waitFor(() =>
       expect(within(dialog).getAllByRole('checkbox')[0]).toHaveFocus(),
     );
@@ -625,7 +654,7 @@ describe('AdminListPage stages and the Filters popover', () => {
   it('clears every filter from inside the popover', async () => {
     serveInstructors(roster);
     const user = userEvent.setup();
-    renderPage('/?stage=live&active=true');
+    renderPage('/?stage=live&calendar=true');
     await screen.findByText('Showing 1–1 of 1');
 
     await user.click(
@@ -712,14 +741,14 @@ describe('AdminListPage stages and the Filters popover', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     serveInstructors(roster);
     const user = userEvent.setup();
-    renderPage('/?stage=in_review&active=true');
+    renderPage('/?stage=in_review&calendar=false');
     await screen.findByText('第 1–2 位，共 2 位');
 
     expect(
       screen.getByRole('button', { name: '移除筛选：状态：审核中' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: '移除筛选：账户：已启用' }),
+      screen.getByRole('button', { name: '移除筛选：日历：未连接' }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '筛选，已选 2 项' }));
     const dialog = screen.getByRole('dialog', { name: '筛选' });
@@ -737,8 +766,10 @@ describe('AdminListPage stages and the Filters popover', () => {
       '已上线',
     ]);
     expect(
-      within(dialog).getByRole('group', { name: '账户' }),
-    ).toBeInTheDocument();
+      within(dialog)
+        .getAllByRole('group')
+        .map((group) => group.querySelector('legend')?.textContent),
+    ).toEqual(['状态', '日历']);
     expect(
       within(dialog).getByRole('button', { name: '全部清除' }),
     ).toBeEnabled();
