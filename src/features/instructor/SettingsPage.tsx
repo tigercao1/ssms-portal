@@ -1,6 +1,7 @@
 import { useT } from '@/i18n/core/I18nProvider';
 import { useSession } from '@/auth/SessionProvider';
 import { Card } from '@/components';
+import { EmploymentLetterCard } from './EmploymentLetterCard';
 
 export function SettingsPage() {
   const t = useT();
@@ -17,6 +18,8 @@ export function SettingsPage() {
           {user?.email}
         </p>
       </Card>
+
+      <EmploymentLetterCard />
     </div>
   );
 }

@@ -409,6 +409,17 @@ export interface MyCalendarStatus {
   connected: boolean;
 }
 
+export type EmploymentLetterState =
+  | 'disabled'
+  | 'not_eligible'
+  | 'legal_name_missing'
+  | 'ready';
+
+export interface EmploymentLetterStatus {
+  state: EmploymentLetterState;
+  legalName: string | null;
+}
+
 export type GoLiveProfileField =
   | 'displayNameEn'
   | 'bio'

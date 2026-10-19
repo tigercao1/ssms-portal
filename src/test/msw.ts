@@ -345,6 +345,9 @@ export const handlers = [
     HttpResponse.json({ connected: false }),
   ),
   http.get(`${API}/me/go-live`, () => HttpResponse.json(fakeGoLive)),
+  http.get(`${API}/me/employment-letter`, () =>
+    HttpResponse.json({ state: 'disabled', legalName: null }),
+  ),
   http.get(`${API}/me/instructor/bio/ai-usage`, () =>
     HttpResponse.json({ limit: 5, used: 0, remaining: 5, resetsAt: null }),
   ),

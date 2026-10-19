@@ -19,7 +19,7 @@ interface RequestOptions {
   /** Send `body` (a string) as-is with this Content-Type instead of JSON. */
   contentType?: string;
   /** Return the response body as text instead of parsing JSON. */
-  responseType?: 'json' | 'text';
+  responseType?: 'json' | 'text' | 'blob';
   /** Skip attaching the bearer token (public/health calls). */
   anonymous?: boolean;
   signal?: AbortSignal;
@@ -60,7 +60,12 @@ export async function apiWithHeaders<T>(
   } = options;
 
   const headers: Record<string, string> = {
-    Accept: responseType === 'text' ? 'text/plain' : 'application/json',
+    Accept:
+      responseType === 'blob'
+        ? '*/*'
+        : responseType === 'text'
+          ? 'text/plain'
+          : 'application/json',
   };
   const isForm = body instanceof FormData;
   if (body !== undefined && !isForm)
@@ -88,6 +93,8 @@ export async function apiWithHeaders<T>(
   }
   if (res.status === 403) await refreshSessionQuietly();
 
+  if (responseType === 'blob' && res.ok)
+    return { data: (await res.blob()) as T, headers: res.headers };
   const text = await res.text();
   if (responseType === 'text' && res.ok)
     return { data: text as T, headers: res.headers };
@@ -111,7 +118,10 @@ async function refreshSessionQuietly(): Promise<void> {
   }
 }
 
-function parseBody(text: string, responseType: 'json' | 'text'): unknown {
+function parseBody(
+  text: string,
+  responseType: RequestOptions['responseType'],
+): unknown {
   if (responseType === 'json') return JSON.parse(text);
   try {
     return JSON.parse(text);

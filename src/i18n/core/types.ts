@@ -266,6 +266,16 @@ export interface Messages {
     account: string;
     signedInAs: string;
   };
+  employmentLetter: {
+    title: string;
+    body: string;
+    issuedTo: string;
+    download: string;
+    downloadFailed: string;
+    legalNameMissing: string;
+    addLegalName: string;
+    notEligible: string;
+  };
   admin: {
     dashboardTitle: string;
     statPending: string;
