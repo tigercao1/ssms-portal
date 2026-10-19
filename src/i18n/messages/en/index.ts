@@ -139,7 +139,7 @@ export const en: Messages = {
     rejected: 'Rejected',
     inactive: 'Inactive',
     onboarding: 'Onboarding',
-    inReview: 'Awaiting cert review',
+    inReview: 'In review',
     goingLive: 'Going live',
     live: 'Live',
   },

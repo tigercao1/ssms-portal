@@ -72,7 +72,7 @@ function serveRoster(rows: AdminInstructorRecord[]) {
 const expected: { stage: InstructorStage; label: string; count: number }[] = [
   { stage: 'pending', label: 'Pending', count: 1 },
   { stage: 'onboarding', label: 'Onboarding', count: 2 },
-  { stage: 'in_review', label: 'Awaiting cert review', count: 1 },
+  { stage: 'in_review', label: 'In review', count: 1 },
   { stage: 'going_live', label: 'Going live', count: 1 },
   { stage: 'live', label: 'Live', count: 3 },
   { stage: 'rejected', label: 'Rejected', count: 1 },

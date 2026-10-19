@@ -537,7 +537,7 @@ describe('AdminListPage stages and the Filters popover', () => {
     expect(pill('deactivated 1')).toHaveTextContent('Inactive');
     expect(pill('deactivated 1')).toHaveClass('text-status-inactive');
     expect(pill('onboarding 1')).toHaveTextContent('Onboarding');
-    expect(pill('in_review 1')).toHaveTextContent('Awaiting cert review');
+    expect(pill('in_review 1')).toHaveTextContent('In review');
     expect(pill('going_live 1')).toHaveTextContent('Going live');
     expect(pill('going_live 1')).toHaveClass('text-navy');
     expect(pill('live 1')).toHaveTextContent('Live');
@@ -577,7 +577,7 @@ describe('AdminListPage stages and the Filters popover', () => {
       'Rejected',
       'Inactive',
       'Onboarding',
-      'Awaiting cert review',
+      'In review',
       'Going live',
       'Live',
     ]);
@@ -602,7 +602,7 @@ describe('AdminListPage stages and the Filters popover', () => {
     await screen.findByText('Showing 1–8 of 8');
 
     const status = await openFilters(user, 'Status');
-    await user.click(within(status).getByLabelText('Awaiting cert review'));
+    await user.click(within(status).getByLabelText('In review'));
     await user.click(within(status).getByLabelText('Pending'));
 
     expect(await screen.findByText('Showing 1–3 of 3')).toBeInTheDocument();
@@ -620,7 +620,7 @@ describe('AdminListPage stages and the Filters popover', () => {
         .map((chip) => chip.getAttribute('aria-label')),
     ).toEqual([
       'Remove filter: Status: Pending',
-      'Remove filter: Status: Awaiting cert review',
+      'Remove filter: Status: In review',
     ]);
   });
 
