@@ -5,6 +5,16 @@
  */
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export const INSTRUCTOR_STAGES = [
+  'pending',
+  'rejected',
+  'deactivated',
+  'onboarding',
+  'in_review',
+  'going_live',
+  'live',
+] as const;
+export type InstructorStage = (typeof INSTRUCTOR_STAGES)[number];
 export type PreferredLanguage = 'en' | 'zh-CN';
 export type CertOrg = 'csia' | 'casi';
 export type CertTrack = 'regular' | 'park' | 'carving';
@@ -150,6 +160,7 @@ export interface AdminInstructorRecord {
   approvalStatus: ApprovalStatus;
   isActive: boolean;
   calendarConnected: boolean;
+  stage?: InstructorStage | null;
   displayOrder?: number | null;
   insertedAt: string;
   updatedAt: string;
@@ -456,6 +467,7 @@ export interface GoLiveCertification {
 
 export interface GoLiveReadiness {
   live: boolean;
+  stage: InstructorStage;
   ready: boolean;
   liveUrl: string | null;
   missing: GoLiveMissingItem[];

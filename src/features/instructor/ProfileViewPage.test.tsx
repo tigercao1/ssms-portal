@@ -605,6 +605,7 @@ describe('ProfileViewPage go-live', () => {
 
   it('shows "Awaiting review" when everything is submitted and a certification is in review', async () => {
     serveGoLive(approvedActive, {
+      stage: 'in_review',
       missing: [{ group: 'certification', reason: 'none_verified' }],
     });
     serveChecklist([doc('asg-contract', 'completed'), cert('pending')]);
@@ -671,7 +672,11 @@ describe('ProfileViewPage go-live', () => {
   });
 
   it('shows a navy "Going live" card for a ready instructor', async () => {
-    serveGoLive(approvedActive, { ready: true, missing: [] });
+    serveGoLive(approvedActive, {
+      ready: true,
+      stage: 'going_live',
+      missing: [],
+    });
     serveChecklist([doc('asg-contract', 'completed'), cert('valid')]);
     renderWithProviders(<ProfileViewPage />);
     const card = await findCard();
@@ -686,6 +691,7 @@ describe('ProfileViewPage go-live', () => {
     serveGoLive(approvedActive, {
       live: true,
       ready: true,
+      stage: 'live',
       liveUrl,
       missing: [],
     });
@@ -717,6 +723,7 @@ describe('ProfileViewPage go-live', () => {
     serveGoLive(approvedActive, {
       live: true,
       ready: true,
+      stage: 'live',
       liveUrl,
       missing: [],
     });
@@ -743,6 +750,7 @@ describe('ProfileViewPage go-live', () => {
             ...fakeGoLive,
             ready: true,
             live,
+            stage: live ? 'live' : 'going_live',
             liveUrl: live ? liveUrl : null,
             missing: [],
           }),
@@ -772,6 +780,7 @@ describe('ProfileViewPage go-live', () => {
       const requests = serveGoLive(approvedActive, {
         ready: true,
         live: true,
+        stage: 'live',
         liveUrl,
         missing: [],
       });
@@ -791,7 +800,11 @@ describe('ProfileViewPage go-live', () => {
 
   it('shows the going-live card in Chinese', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
-    serveGoLive(approvedActive, { ready: true, missing: [] });
+    serveGoLive(approvedActive, {
+      ready: true,
+      stage: 'going_live',
+      missing: [],
+    });
     serveChecklist([doc('asg-contract', 'completed'), cert('valid')]);
     renderWithProviders(<ProfileViewPage />);
     const card = await findCard();
@@ -830,6 +843,7 @@ describe('ProfileViewPage go-live', () => {
   it('shows the awaiting-review card in Chinese', async () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     serveGoLive(approvedActive, {
+      stage: 'in_review',
       missing: [{ group: 'certification', reason: 'none_verified' }],
     });
     serveChecklist([doc('asg-contract', 'completed'), cert('pending')]);
@@ -941,7 +955,11 @@ describe('ProfileViewPage go-live', () => {
   });
 
   it('shows "Going live" for an empty checklist', async () => {
-    serveGoLive(approvedActive, { ready: true, missing: [] });
+    serveGoLive(approvedActive, {
+      ready: true,
+      stage: 'going_live',
+      missing: [],
+    });
     serveChecklist([]);
     renderWithProviders(<ProfileViewPage />);
     const card = await findCard();
@@ -958,6 +976,7 @@ describe('ProfileViewPage go-live', () => {
     serveGoLive(approvedActive, {
       live: true,
       ready: true,
+      stage: 'live',
       liveUrl,
       missing: [],
     });
@@ -1079,7 +1098,7 @@ describe('ProfileViewPage go-live', () => {
       http.get(`${API}/me/go-live`, () =>
         HttpResponse.json(
           photo
-            ? { ...fakeGoLive, ready: true, missing: [] }
+            ? { ...fakeGoLive, ready: true, stage: 'going_live', missing: [] }
             : {
                 ...fakeGoLive,
                 missing: [{ group: 'profile', field: 'photo' }],

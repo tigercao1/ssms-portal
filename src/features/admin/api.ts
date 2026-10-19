@@ -16,6 +16,7 @@ import type {
   ExtraPhotoSlot,
   GoLiveReadiness,
   InstructorProfile,
+  InstructorStage,
   ReferenceRecord,
   ReferenceUsage,
   UpdateProfileBody,
@@ -53,7 +54,8 @@ export function useAdminInstructors(filter: AdminListFilter) {
 
 export const INSTRUCTORS_PAGE_SIZE = 50;
 
-export interface AdminInstructorPageQuery extends AdminListFilter {
+export interface AdminInstructorPageQuery {
+  stages: InstructorStage[];
   calendarConnected?: boolean;
   q: string;
   page: number;
@@ -67,8 +69,7 @@ export interface AdminInstructorPage {
 
 export function useAdminInstructorPage({
   q,
-  status,
-  active,
+  stages,
   calendarConnected,
   page,
 }: AdminInstructorPageQuery) {
@@ -77,7 +78,7 @@ export function useAdminInstructorPage({
       'admin',
       'instructors',
       'page',
-      { q, status, active, calendarConnected, page },
+      { q, stages, calendarConnected, page },
     ] as const,
     queryFn: async (): Promise<AdminInstructorPage> => {
       const qs = new URLSearchParams({
@@ -85,8 +86,7 @@ export function useAdminInstructorPage({
         page: String(page),
       });
       if (q) qs.set('q', q);
-      if (status) qs.set('status', status);
-      if (active !== undefined) qs.set('active', String(active));
+      for (const stage of stages) qs.append('stage', stage);
       if (calendarConnected !== undefined)
         qs.set('calendarConnected', String(calendarConnected));
       const { data, headers } = await apiWithHeaders<AdminInstructorRecord[]>(

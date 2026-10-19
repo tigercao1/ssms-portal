@@ -129,7 +129,10 @@ export interface Messages {
     approved: string;
     rejected: string;
     inactive: string;
-    active: string;
+    onboarding: string;
+    inReview: string;
+    goingLive: string;
+    live: string;
   };
   rateUnit: {
     hour: string;
@@ -279,14 +282,17 @@ export interface Messages {
   };
   admin: {
     dashboardTitle: string;
-    statPending: string;
-    statApproved: string;
-    statInactive: string;
     needsReview: string;
     noPending: string;
     listTitle: string;
     filterStatus: string;
-    filterActive: string;
+    filters: string;
+    filtersApplied: string;
+    appliedFilters: string;
+    clearAll: string;
+    removeFilter: string;
+    filterChip: string;
+    showResults: string;
     all: string;
     colName: string;
     colEmail: string;
