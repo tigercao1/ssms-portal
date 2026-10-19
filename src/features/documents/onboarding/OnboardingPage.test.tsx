@@ -81,7 +81,7 @@ describe('OnboardingPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Documents to read')).toBeInTheDocument();
     expect(screen.getByText('Documents to sign')).toBeInTheDocument();
-    expect(screen.getByText('Certifications')).toBeInTheDocument();
+    expect(screen.getByText('Membership cards')).toBeInTheDocument();
     expect(
       screen.getByText('4 of 9 done · 1 awaiting review'),
     ).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('OnboardingPage', () => {
 
   it('shows every certification state with the right action', async () => {
     renderWithProviders(<OnboardingPage />);
-    await screen.findByText('Certifications');
+    await screen.findByText('Membership cards');
     expect(
       row('CSIA Level 3').getByText('Awaiting review'),
     ).toBeInTheDocument();
@@ -231,8 +231,16 @@ describe('OnboardingPage', () => {
       }),
     );
     const dialog = screen.getByRole('dialog', {
-      name: 'Upload CASI Carving Level 1',
+      name: 'Upload membership card · CASI Carving Level 1',
     });
+    expect(
+      within(dialog).getByText(
+        /Upload your CASI membership card for the 2026\/27 season/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('img', { name: /Example CASI membership card/ }),
+    ).toBeInTheDocument();
     const date = within(dialog).getByLabelText(/Valid until/);
     expect(date).toHaveAttribute('min', '2026-10-12');
     expect(date).toBeRequired();
@@ -246,7 +254,7 @@ describe('OnboardingPage', () => {
     const pdf = new File([patternBytes(4321)], 'cert.pdf', {
       type: 'application/pdf',
     });
-    await user.upload(within(dialog).getByLabelText(/Certificate file/), pdf);
+    await user.upload(within(dialog).getByLabelText(/Membership card/), pdf);
     await user.type(date, '2026-10-11');
     await user.click(within(dialog).getByRole('button', { name: 'Upload' }));
     expect(
@@ -258,7 +266,7 @@ describe('OnboardingPage', () => {
     await user.type(date, '2026-10-12');
     await user.click(within(dialog).getByRole('button', { name: 'Upload' }));
     expect(
-      await screen.findByText('Uploaded — awaiting review.'),
+      await screen.findByText('Membership card uploaded — awaiting review.'),
     ).toBeInTheDocument();
     expect(ticket).toEqual({
       org: 'casi',
@@ -302,7 +310,7 @@ describe('OnboardingPage', () => {
     );
     const dialog = screen.getByRole('dialog');
     await user.upload(
-      within(dialog).getByLabelText(/Certificate file/),
+      within(dialog).getByLabelText(/Membership card/),
       sizedFile('c.pdf', 'application/pdf', 10),
     );
     await user.type(within(dialog).getByLabelText(/Valid until/), '2027-01-01');
@@ -462,7 +470,7 @@ describe('locked onboarding while pending approval', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "2 documents to sign and 2 certifications to upload. We'll email you when you can start.",
+        "2 documents to sign and 2 membership cards to upload. We'll email you when you can start.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
@@ -472,7 +480,7 @@ describe('locked onboarding while pending approval', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     const { unmount } = renderWithProviders(<OnboardingCard />);
     expect(
-      await screen.findByText('审核通过后即可填写 2 份文件并上传 2 份证书。'),
+      await screen.findByText('审核通过后即可填写 2 份文件并上传 2 张会员卡。'),
     ).toBeInTheDocument();
     unmount();
     state.templates = [];
@@ -538,7 +546,7 @@ describe('locked onboarding for a deactivated instructor', () => {
       await screen.findByText('Your profile is deactivated'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/can't sign documents or upload certificates/),
+      screen.getByText(/can't sign documents or upload membership cards/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -572,7 +580,7 @@ describe('locked onboarding for a deactivated instructor', () => {
     renderWithProviders(<OnboardingCard />);
     expect(await screen.findByText('您的资料已下线')).toBeInTheDocument();
     expect(
-      screen.getByText(/下线期间无法签署文件或上传证书/),
+      screen.getByText(/下线期间无法签署文件或上传会员卡/),
     ).toBeInTheDocument();
   });
 
@@ -587,7 +595,7 @@ describe('locked onboarding for a deactivated instructor', () => {
     state.meIsActive = false;
     const dialog = screen.getByRole('dialog');
     await user.upload(
-      within(dialog).getByLabelText(/Certificate file/),
+      within(dialog).getByLabelText(/Membership card/),
       sizedFile('c.pdf', 'application/pdf', 10),
     );
     await user.type(within(dialog).getByLabelText(/Valid until/), '2027-01-01');

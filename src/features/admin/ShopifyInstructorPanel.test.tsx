@@ -222,7 +222,7 @@ describe('ShopifyInstructorPanel go-live check', () => {
         .map((li) => li.textContent),
     ).toEqual([
       'Main photo',
-      'No verified certification yet',
+      'No certification verified by a membership card yet',
       'Independent contractor agreement',
     ]);
     expect(ids).toEqual(['inst-1']);

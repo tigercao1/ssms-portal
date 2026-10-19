@@ -1366,6 +1366,11 @@ export interface Messages {
     downloadFailed: string;
     sha256: string;
     uploadTitle: string;
+    membershipIntro: string;
+    membershipIntroNoSeason: string;
+    membershipCardShows: string;
+    exampleCaption: string;
+    exampleAlt: string;
     fileLabel: string;
     fileHint: string;
     fileRequired: string;

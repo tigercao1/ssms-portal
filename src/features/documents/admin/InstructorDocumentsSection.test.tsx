@@ -525,7 +525,7 @@ describe('InstructorDocumentsSection — documents', () => {
       await screen.findByText('No documents assigned yet.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('No certification uploads yet.'),
+      screen.getByText('No membership card uploads yet.'),
     ).toBeInTheDocument();
     unmount();
     server.use(
@@ -553,7 +553,8 @@ describe('InstructorDocumentsSection — certification uploads', () => {
     expect(within(csia).getByText('Awaiting review')).toBeInTheDocument();
     expect(within(csia).queryByText('Expires within 30 days')).toBeNull();
     expect(
-      screen.getByText('Certifications without an upload').parentElement,
+      screen.getByText('Certifications without a membership card')
+        .parentElement,
     ).toHaveTextContent('CASI Level 1');
     expect(screen.queryByText(/Rejected/)).toBeNull();
     await user.click(
