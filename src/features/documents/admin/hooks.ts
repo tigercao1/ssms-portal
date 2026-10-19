@@ -41,7 +41,7 @@ import {
   type CertUploadReview,
   type DocumentExport,
   type DocumentExportRequest,
-  type DocumentReviewFilter,
+  type DocumentReviewQuery,
   type DocumentLanguage,
   type Field,
   type PublishRequest,
@@ -292,10 +292,13 @@ export function useReviewCertUpload(instructorId: string) {
   });
 }
 
-export function useDocumentReviews(status: DocumentReviewFilter) {
+export const DOCUMENT_REVIEW_PAGE_SIZE = 25;
+
+export function useDocumentReviews(query: DocumentReviewQuery) {
   return useQuery({
-    queryKey: documentsKeys.documentReviewList(status),
-    queryFn: () => listDocumentReviews(status),
+    queryKey: documentsKeys.documentReviewList(query),
+    queryFn: () => listDocumentReviews(query),
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
+import { useLocation } from 'react-router-dom';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import {
@@ -15,6 +16,12 @@ import { DocumentReviewPage, reviewInstructorName } from './DocumentReviewPage';
 const API = 'http://localhost:3000';
 let state: DocumentsMockState;
 let reviews: unknown[];
+let slowPages: string[];
+let listRequests: {
+  status: string | null;
+  page: string | null;
+  limit: string | null;
+}[];
 let tab: {
   opener: unknown;
   location: { href: string };
@@ -48,7 +55,19 @@ beforeEach(() => {
     }),
   ];
   reviews = [];
+  listRequests = [];
+  slowPages = [];
   server.use(
+    http.get(`${API}/admin/document-reviews`, async ({ request }) => {
+      const qs = new URL(request.url).searchParams;
+      listRequests.push({
+        status: qs.get('status'),
+        page: qs.get('page'),
+        limit: qs.get('limit'),
+      });
+      if (slowPages.includes(qs.get('page') ?? '')) await delay(150);
+      return undefined;
+    }),
     http.patch(
       `${API}/admin/certification-uploads/:id`,
       async ({ request, params }) => {
@@ -69,6 +88,47 @@ afterEach(() => vi.restoreAllMocks());
 
 const card = (name: string) =>
   screen.findByRole('listitem', { name: `Membership card · ${name}` });
+
+function LocationProbe() {
+  const { search } = useLocation();
+  return <output data-testid="location">{search}</output>;
+}
+
+function renderPage(route = '/') {
+  return renderWithProviders(
+    <>
+      <DocumentReviewPage />
+      <LocationProbe />
+    </>,
+    { route },
+  );
+}
+
+const location = () => screen.getByTestId('location').textContent;
+const cardNames = () =>
+  within(screen.getByRole('list', { name: 'Documents to review' }))
+    .getAllByRole('listitem')
+    .map((i) => i.getAttribute('aria-label'));
+
+function seedCoaches(count: number, decided = false) {
+  state.certUploads = Array.from({ length: count }, (_, i) => {
+    const n = i + 1;
+    state.instructors[`inst-c${n}`] = {
+      firstName: 'Coach',
+      lastName: String(n),
+      email: `coach${n}@example.com`,
+    };
+    return fakeCertUpload({
+      id: `cu-c${String(n).padStart(2, '0')}`,
+      instructorId: `inst-c${n}`,
+      insertedAt: new Date(Date.UTC(2026, 9, 1, 0, n)).toISOString(),
+      ...(decided && {
+        reviewStatus: 'approved' as const,
+        reviewedAt: new Date(Date.UTC(2026, 9, 10, 0, 60 - n)).toISOString(),
+      }),
+    });
+  });
+}
 
 describe('DocumentReviewPage', () => {
   it('lists pending items across instructors, oldest first, with a link to each instructor', async () => {
@@ -221,6 +281,7 @@ describe('DocumentReviewPage', () => {
     expect(
       screen.getByRole('button', { name: 'Recently decided' }),
     ).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByText('Rejected')).toBeInTheDocument();
     const decided = await card('Jane Snow');
     expect(within(decided).getByText('Rejected')).toBeInTheDocument();
     expect(
@@ -271,6 +332,146 @@ describe('DocumentReviewPage', () => {
     expect(
       within(jane).getByRole('link', { name: '查看教练' }),
     ).toBeInTheDocument();
+  });
+});
+
+describe('DocumentReviewPage paging and URL state', () => {
+  it('pages 25 at a time with the page in the URL, keeping the page while the next loads', async () => {
+    seedCoaches(30);
+    slowPages = ['2'];
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText('Showing 1–25 of 30')).toBeInTheDocument();
+    expect(cardNames()).toHaveLength(25);
+    expect(cardNames()[0]).toBe('Membership card · Coach 1');
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    expect(listRequests).toEqual([
+      { status: 'pending', page: '1', limit: '25' },
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(
+      screen.getByRole('list', { name: 'Documents to review' }),
+    ).toHaveAttribute('aria-busy', 'true');
+    expect(cardNames()[0]).toBe('Membership card · Coach 1');
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(await screen.findByText('Showing 26–30 of 30')).toBeInTheDocument();
+    expect(cardNames()).toEqual(
+      [26, 27, 28, 29, 30].map((n) => `Membership card · Coach ${n}`),
+    );
+    expect(location()).toBe('?page=2');
+    expect(listRequests.at(-1)).toEqual({
+      status: 'pending',
+      page: '2',
+      limit: '25',
+    });
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(await screen.findByText('Showing 1–25 of 30')).toBeInTheDocument();
+    expect(location()).toBe('');
+  });
+
+  it('restores the filter and page from the URL', async () => {
+    seedCoaches(30, true);
+    renderPage('/?status=decided&page=2');
+
+    expect(await screen.findByText('Showing 26–30 of 30')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Recently decided' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(cardNames()[0]).toBe('Membership card · Coach 26');
+    expect(listRequests).toEqual([
+      { status: 'decided', page: '2', limit: '25' },
+    ]);
+  });
+
+  it('puts the filter in the URL and goes back to page 1 when it changes', async () => {
+    seedCoaches(30);
+    const user = userEvent.setup();
+    renderPage('/?page=2');
+    expect(await screen.findByText('Showing 26–30 of 30')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Recently decided' }));
+    expect(await screen.findByText('No recent decisions')).toBeInTheDocument();
+    expect(location()).toBe('?status=decided');
+    expect(listRequests.at(-1)).toEqual({
+      status: 'decided',
+      page: '1',
+      limit: '25',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Awaiting review' }));
+    expect(await screen.findByText('Showing 1–25 of 30')).toBeInTheDocument();
+    expect(location()).toBe('');
+  });
+
+  it('refetches after a decision and pulls the next item onto the page', async () => {
+    seedCoaches(26);
+    const user = userEvent.setup();
+    renderPage();
+    const first = await card('Coach 1');
+    expect(screen.getByText('Showing 1–25 of 26')).toBeInTheDocument();
+
+    await user.click(within(first).getByRole('button', { name: 'Approve' }));
+
+    expect(await screen.findByText('Showing 1–25 of 25')).toBeInTheDocument();
+    expect(
+      screen.getByText('Approved the Membership card from Coach 1.'),
+    ).toBeInTheDocument();
+    expect(cardNames()[0]).toBe('Membership card · Coach 2');
+    expect(cardNames().at(-1)).toBe('Membership card · Coach 26');
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(location()).toBe('');
+  });
+
+  it('steps back a page when a decision empties the last one', async () => {
+    seedCoaches(26);
+    const user = userEvent.setup();
+    renderPage('/?page=2');
+    const last = await card('Coach 26');
+    expect(screen.getByText('Showing 26–26 of 26')).toBeInTheDocument();
+
+    await user.click(within(last).getByRole('button', { name: 'Reject' }));
+    await user.type(
+      within(last).getByRole('textbox', { name: 'Reason for rejecting' }),
+      'Expired',
+    );
+    await user.click(
+      within(last).getByRole('button', { name: 'Reject and email' }),
+    );
+
+    expect(await screen.findByText('Showing 1–25 of 25')).toBeInTheDocument();
+    expect(location()).toBe('');
+    expect(
+      screen.getByText(
+        'Rejected the Membership card from Coach 26 and emailed them.',
+      ),
+    ).toBeInTheDocument();
+    expect(listRequests.at(-1)).toEqual({
+      status: 'pending',
+      page: '1',
+      limit: '25',
+    });
+  });
+
+  it('steps back to the last page when the URL points past the end', async () => {
+    seedCoaches(30);
+    renderPage('/?page=5');
+    expect(await screen.findByText('Showing 26–30 of 30')).toBeInTheDocument();
+    expect(location()).toBe('?page=2');
+  });
+
+  it('shows the pager in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    seedCoaches(30);
+    renderPage();
+    expect(await screen.findByText('第 1–25 条，共 30 条')).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: '资料审核分页' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一页' })).toBeEnabled();
   });
 });
 

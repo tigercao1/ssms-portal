@@ -290,6 +290,18 @@ export interface CertUploadReviewItem {
 
 export type DocumentReviewItem = CertUploadReviewItem;
 
+export interface DocumentReviewQuery {
+  status: DocumentReviewFilter;
+  page: number;
+  limit: number;
+}
+
+export interface DocumentReviewPage {
+  items: DocumentReviewItem[];
+  total: number;
+  page: number;
+}
+
 export interface InstructorDocuments {
   assignments: Assignment[];
   certificationUploads: CertUpload[];

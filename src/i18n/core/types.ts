@@ -897,6 +897,10 @@ export interface Messages {
     confirmReject: string;
     approvedNotice: string;
     rejectedNotice: string;
+    pagination: string;
+    showing: string;
+    prevPage: string;
+    nextPage: string;
   };
   signedCopies: {
     link: string;

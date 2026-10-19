@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Locale, Messages } from '@/i18n/core/types';
 import { localizeField } from '@/i18n/core/localize';
@@ -11,6 +11,7 @@ import {
   Card,
   EmptyState,
   Modal,
+  Pager,
   Spinner,
   Textarea,
 } from '@/components';
@@ -22,6 +23,7 @@ import {
   type DocumentReviewItem,
 } from '../../api';
 import {
+  DOCUMENT_REVIEW_PAGE_SIZE,
   useCertUploadUrl,
   useDocumentReviews,
   useReviewCertUpload,
@@ -31,6 +33,20 @@ import { errorText, formatDay } from '../format';
 import { certName, openPresigned } from '../InstructorDocumentsSection';
 
 const FILTERS: DocumentReviewFilter[] = ['pending', 'decided'];
+
+interface ReviewUpdate {
+  status?: DocumentReviewFilter;
+  page?: number;
+}
+
+function filterFrom(params: URLSearchParams): DocumentReviewFilter {
+  return params.get('status') === 'decided' ? 'decided' : 'pending';
+}
+
+function pageFrom(params: URLSearchParams): number {
+  const page = Number(params.get('page'));
+  return Number.isInteger(page) && page > 1 ? page : 1;
+}
 
 export function reviewInstructorName(
   instructor: DocumentReviewInstructor,
@@ -63,10 +79,59 @@ function fill(template: string, values: Record<string, string>): string {
 export function DocumentReviewPage() {
   const t = useT();
   const r = t.documentReview;
-  const [filter, setFilter] = useState<DocumentReviewFilter>('pending');
+  const [params, setParams] = useSearchParams();
+  const filter = filterFrom(params);
+  const page = pageFrom(params);
   const [notice, setNotice] = useState<string | null>(null);
-  const reviews = useDocumentReviews(filter);
-  const items = reviews.data ?? [];
+  const reviews = useDocumentReviews({
+    status: filter,
+    page,
+    limit: DOCUMENT_REVIEW_PAGE_SIZE,
+  });
+  const items = reviews.data?.items ?? [];
+  const total = reviews.data?.total ?? 0;
+  const shownPage = reviews.data?.page ?? page;
+  const busy = reviews.isPlaceholderData;
+  const fresh = reviews.data && !busy ? reviews.data : undefined;
+  const lastPage = fresh
+    ? Math.max(1, Math.ceil(fresh.total / DOCUMENT_REVIEW_PAGE_SIZE))
+    : page;
+
+  const update = useCallback(
+    (next: ReviewUpdate) => {
+      setParams(
+        (prev) => {
+          const out = new URLSearchParams(prev);
+          if (next.status !== undefined) {
+            if (next.status === 'decided') out.set('status', next.status);
+            else out.delete('status');
+            out.delete('page');
+          }
+          if (next.page !== undefined) {
+            if (next.page > 1) out.set('page', String(next.page));
+            else out.delete('page');
+          }
+          return out;
+        },
+        { replace: next.page === undefined },
+      );
+    },
+    [setParams],
+  );
+
+  useEffect(() => {
+    if (fresh && fresh.items.length === 0 && lastPage < page) {
+      setParams(
+        (prev) => {
+          const out = new URLSearchParams(prev);
+          if (lastPage > 1) out.set('page', String(lastPage));
+          else out.delete('page');
+          return out;
+        },
+        { replace: true },
+      );
+    }
+  }, [fresh, lastPage, page, setParams]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,7 +152,7 @@ export function DocumentReviewPage() {
               type="button"
               aria-pressed={filter === f}
               onClick={() => {
-                setFilter(f);
+                if (f !== filter) update({ status: f });
                 setNotice(null);
               }}
               className={cn(
@@ -117,26 +182,49 @@ export function DocumentReviewPage() {
         <Banner tone="error">
           {errorText(reviews.error, t.errors.generic)}
         </Banner>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && page === 1 ? (
         <EmptyState
           title={filter === 'pending' ? r.emptyPending : r.emptyDecided}
         >
           {filter === 'pending' ? r.emptyPendingBody : r.emptyDecidedBody}
         </EmptyState>
       ) : (
-        <ul
-          aria-label={r.listLabel}
-          data-private
-          className="flex flex-col gap-4"
-        >
-          {items.map((item) => (
-            <CertUploadReviewCard
-              key={`${item.type}:${item.id}`}
-              item={item}
-              onDecided={setNotice}
+        <div className="flex flex-col gap-4">
+          <ul
+            aria-label={r.listLabel}
+            aria-busy={busy}
+            data-private
+            className={cn(
+              'flex flex-col gap-4 transition-opacity',
+              busy && 'opacity-60',
+            )}
+          >
+            {items.map((item) => (
+              <CertUploadReviewCard
+                key={`${item.type}:${item.id}`}
+                item={item}
+                onDecided={setNotice}
+              />
+            ))}
+          </ul>
+          <Card className="p-0">
+            <Pager
+              page={page}
+              shownPage={shownPage}
+              pageSize={DOCUMENT_REVIEW_PAGE_SIZE}
+              count={items.length}
+              total={total}
+              busy={busy}
+              onPage={(next) => update({ page: next })}
+              text={{
+                label: r.pagination,
+                showing: r.showing,
+                previous: r.prevPage,
+                next: r.nextPage,
+              }}
             />
-          ))}
-        </ul>
+          </Card>
+        </div>
       )}
     </div>
   );

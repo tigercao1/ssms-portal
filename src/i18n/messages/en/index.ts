@@ -980,6 +980,10 @@ export const en: Messages = {
     confirmReject: 'Reject and email',
     approvedNotice: 'Approved the {type} from {name}.',
     rejectedNotice: 'Rejected the {type} from {name} and emailed them.',
+    pagination: 'Document review pages',
+    showing: 'Showing {from}–{to} of {total}',
+    prevPage: 'Previous',
+    nextPage: 'Next',
   },
   signedCopies: {
     link: 'Signed copies',

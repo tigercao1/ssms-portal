@@ -925,6 +925,10 @@ export const zhCN: Messages = {
     confirmReject: '驳回并发送邮件',
     approvedNotice: '已通过 {name} 的{type}。',
     rejectedNotice: '已驳回 {name} 的{type}，并已发送邮件通知。',
+    pagination: '资料审核分页',
+    showing: '第 {from}–{to} 条，共 {total} 条',
+    prevPage: '上一页',
+    nextPage: '下一页',
   },
   signedCopies: {
     link: '已签副本',
