@@ -305,9 +305,6 @@ export const en: Messages = {
   },
   admin: {
     dashboardTitle: 'Dashboard',
-    statPending: 'Pending',
-    statApproved: 'Approved',
-    statInactive: 'Inactive',
     needsReview: 'Needs review',
     noPending: 'No instructors awaiting review.',
     listTitle: 'Instructors',

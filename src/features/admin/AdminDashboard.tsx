@@ -1,28 +1,59 @@
 import { Link } from 'react-router-dom';
 import { useT, useLocale } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
-import { Card, EmptyState, Spinner, StatusPill } from '@/components';
+import {
+  Card,
+  EmptyState,
+  Spinner,
+  StagePill,
+  stageMeta,
+  type InstructorStage,
+} from '@/components';
 import { useAdminInstructors } from './api';
 
-function Stat({
-  label,
+const DASHBOARD_STAGES: readonly InstructorStage[] = [
+  'pending',
+  'onboarding',
+  'in_review',
+  'going_live',
+  'live',
+  'rejected',
+  'deactivated',
+];
+
+function stageListPath(stage: InstructorStage): string {
+  return `/admin/instructors?${new URLSearchParams({ stage })}`;
+}
+
+function StageStat({
+  stage,
   value,
-  accent,
 }: {
-  label: string;
+  stage: InstructorStage;
   value: number;
-  accent?: boolean;
 }) {
+  const t = useT();
+  const meta = stageMeta(stage, t);
+  const accent = stage === 'pending' && value > 0;
   return (
-    <Card className="flex flex-col gap-1">
-      <span
-        className="font-display text-5xl"
-        style={{ color: accent && value > 0 ? 'var(--red)' : 'var(--ink)' }}
-      >
-        {value}
-      </span>
-      <span className="text-sm text-slate">{label}</span>
-    </Card>
+    <Link to={stageListPath(stage)} className="group rounded-lg">
+      <Card className="flex h-full flex-col gap-1 p-4 transition-colors group-hover:bg-sunken">
+        <div
+          className="font-display text-5xl"
+          style={{ color: accent ? 'var(--red)' : 'var(--ink)' }}
+        >
+          {value}
+        </div>
+        <div className="flex items-baseline gap-1.5 text-sm font-medium">
+          <span
+            className="h-1.5 w-1.5 flex-none -translate-y-0.5 rounded-full"
+            style={{ background: meta.color }}
+            aria-hidden
+          />
+          <span className={meta.textClass}>{meta.label}</span>
+        </div>
+      </Card>
+    </Link>
   );
 }
 
@@ -40,18 +71,20 @@ export function AdminDashboard() {
     );
 
   const all = data ?? [];
-  const pending = all.filter((i) => i.approvalStatus === 'pending');
-  const approved = all.filter((i) => i.approvalStatus === 'approved');
-  const inactive = all.filter((i) => i.approvalStatus === 'approved' && !i.isActive);
+  const pending = all.filter((i) => i.stage === 'pending');
 
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-3xl">{t.admin.dashboardTitle}</h1>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label={t.admin.statPending} value={pending.length} accent />
-        <Stat label={t.admin.statApproved} value={approved.length} />
-        <Stat label={t.admin.statInactive} value={inactive.length} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        {DASHBOARD_STAGES.map((stage) => (
+          <StageStat
+            key={stage}
+            stage={stage}
+            value={all.filter((i) => i.stage === stage).length}
+          />
+        ))}
       </div>
 
       <div className="flex flex-col gap-3">
@@ -67,10 +100,13 @@ export function AdminDashboard() {
                 className="flex items-center justify-between px-4 py-3 hover:bg-sunken"
               >
                 <span data-private className="font-medium text-navy">
-                  {localizeField(row.displayNameEn, row.displayNameZh, locale) ||
-                    row.email}
+                  {localizeField(
+                    row.displayNameEn,
+                    row.displayNameZh,
+                    locale,
+                  ) || row.email}
                 </span>
-                <StatusPill status={row.approvalStatus} isActive={row.isActive} />
+                <StagePill stage="pending" />
               </Link>
             ))}
           </Card>

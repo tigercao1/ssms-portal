@@ -282,9 +282,6 @@ export interface Messages {
   };
   admin: {
     dashboardTitle: string;
-    statPending: string;
-    statApproved: string;
-    statInactive: string;
     needsReview: string;
     noPending: string;
     listTitle: string;

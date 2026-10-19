@@ -287,9 +287,6 @@ export const zhCN: Messages = {
   },
   admin: {
     dashboardTitle: '仪表板',
-    statPending: '待审核',
-    statApproved: '已通过',
-    statInactive: '已停用',
     needsReview: '待审核',
     noPending: '没有待审核的教练。',
     listTitle: '教练',
