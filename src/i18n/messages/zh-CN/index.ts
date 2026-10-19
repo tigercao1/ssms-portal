@@ -1643,6 +1643,7 @@ export const zhCN: Messages = {
     errMixedSeasons: '同一次投保的所有课程必须在同一个雪季。',
     errLocationConflict: '第 {n} 节：雪场和其他雪场名称只能填一个',
     lockedSubmit: '只有通过审核的教练才能投保。',
+    lockedSubmitOnboarding: '完成入职文件和会员卡后，即可为私课投保。',
     capPartial: '原价 {list} · 封顶后应付 {amount}',
     capFree: '原价 {list} · 封顶后免费',
     seasonPassFree: '整季保险 · 免费',

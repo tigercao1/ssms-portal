@@ -1594,6 +1594,7 @@ export interface Messages {
     errMixedSeasons: string;
     errLocationConflict: string;
     lockedSubmit: string;
+    lockedSubmitOnboarding: string;
     capPartial: string;
     capFree: string;
     seasonPassFree: string;
