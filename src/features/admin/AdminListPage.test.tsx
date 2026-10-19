@@ -716,7 +716,7 @@ describe('AdminListPage stages and the Filters popover', () => {
     await screen.findByText('第 1–2 位，共 2 位');
 
     expect(
-      screen.getByRole('button', { name: '移除筛选：状态：证书待审核' }),
+      screen.getByRole('button', { name: '移除筛选：状态：审核中' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: '移除筛选：账户：已启用' }),
@@ -732,7 +732,7 @@ describe('AdminListPage stages and the Filters popover', () => {
       '已拒绝',
       '已停用',
       '入职中',
-      '证书待审核',
+      '审核中',
       '上线中',
       '已上线',
     ]);

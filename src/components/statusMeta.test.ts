@@ -38,12 +38,7 @@ describe('stageMeta', () => {
     ['rejected', 'Rejected', '已拒绝', 'var(--status-rejected)'],
     ['deactivated', 'Inactive', '已停用', 'var(--status-inactive)'],
     ['onboarding', 'Onboarding', '入职中', 'var(--status-pending)'],
-    [
-      'in_review',
-      'Awaiting cert review',
-      '证书待审核',
-      'var(--status-pending)',
-    ],
+    ['in_review', 'Awaiting cert review', '审核中', 'var(--status-pending)'],
     ['going_live', 'Going live', '上线中', 'var(--navy)'],
     ['live', 'Live', '已上线', 'var(--status-live)'],
   ] as const)('shows %s as %s / %s in %s', (stage, enLabel, zhLabel, color) => {

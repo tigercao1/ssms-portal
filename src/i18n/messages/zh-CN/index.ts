@@ -132,7 +132,7 @@ export const zhCN: Messages = {
     inactive: '已停用',
     active: '已启用',
     onboarding: '入职中',
-    inReview: '证书待审核',
+    inReview: '审核中',
     goingLive: '上线中',
     live: '已上线',
   },
