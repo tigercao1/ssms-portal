@@ -266,6 +266,10 @@ export const zhCN: Messages = {
     looksLikeEn: '内容看起来是英文。',
     switchTo: '切换为{lang}',
     updateTranslation: '更新翻译',
+    unsaved: '简介有未保存的修改。请在简介中点击“保存”保留修改，或放弃修改。',
+    unsavedReview:
+      '简介有未保存的修改。请点击下方的“保存”保留修改，或放弃修改。',
+    discard: '放弃简介修改',
   },
   settings: {
     title: '设置',

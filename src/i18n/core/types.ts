@@ -262,6 +262,9 @@ export interface Messages {
     looksLikeEn: string;
     switchTo: string;
     updateTranslation: string;
+    unsaved: string;
+    unsavedReview: string;
+    discard: string;
   };
   settings: {
     title: string;

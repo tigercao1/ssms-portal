@@ -1,4 +1,12 @@
-import { useCallback, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Field, Modal, Spinner, Textarea } from '@/components';
 import {
@@ -28,6 +36,12 @@ const LOCKED_TEXTAREA = 'disabled:cursor-not-allowed disabled:opacity-60';
 type Lang = 'en' | 'zh';
 const LANGS: Lang[] = ['en', 'zh'];
 type Messages = ReturnType<typeof useT>;
+type BioBox = Lang | 'composer';
+type ReviewEdits = Partial<Record<Lang, string>>;
+
+export interface BioSectionHandle {
+  warnIfUnsaved: () => boolean;
+}
 
 interface DraftRequest {
   text: string;
@@ -44,6 +58,14 @@ export function writtenLangs(request: DraftRequest, draft?: BioDraft): Lang[] {
 
 function bioOf(p: InstructorProfile, lang: Lang): string {
   return (lang === 'en' ? p.bioEn : p.bioZh) ?? '';
+}
+
+function reviewValue(
+  edits: ReviewEdits,
+  draft: BioDraft | undefined,
+  lang: Lang,
+): string {
+  return edits[lang] ?? draft?.[lang] ?? '';
 }
 
 function machineOf(p: InstructorProfile, lang: Lang): boolean {
@@ -249,11 +271,13 @@ function BioTextarea({
   label,
   value,
   disabled = false,
+  textareaRef,
   onChange,
 }: {
   label: string;
   value: string;
   disabled?: boolean;
+  textareaRef?: Ref<HTMLTextAreaElement>;
   onChange: (v: string) => void;
 }) {
   return (
@@ -261,6 +285,7 @@ function BioTextarea({
       {(p) => (
         <Textarea
           {...p}
+          ref={textareaRef}
           rows={5}
           autoFocus
           disabled={disabled}
@@ -288,6 +313,10 @@ function BioDraftModal({
   draft,
   usage,
   lock,
+  edits,
+  onEditChange,
+  textareaRef,
+  warning,
   onBack,
   onSaved,
 }: {
@@ -295,19 +324,18 @@ function BioDraftModal({
   draft: ReturnType<typeof useBioDraft>;
   usage: BioAiUsage | undefined;
   lock: SaveLock;
+  edits: ReviewEdits;
+  onEditChange: (lang: Lang, value: string) => void;
+  textareaRef: (lang: Lang) => Ref<HTMLTextAreaElement>;
+  warning: ReactNode;
   onBack: () => void;
   onSaved: (untranslated: Lang | null) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const { saveBio, save, pending } = useSaveBio();
-  const [edits, setEdits] = useState<Partial<Record<Lang, string>>>({});
-  const [editing, setEditing] = useState<Record<Lang, boolean>>({
-    en: false,
-    zh: false,
-  });
   const result = draft.data;
-  const valueOf = (lang: Lang) => edits[lang] ?? result?.[lang] ?? '';
+  const valueOf = (lang: Lang) => reviewValue(edits, result, lang);
   const written = writtenLangs(request, result);
   const machine = (lang: Lang) =>
     written.length > 0 &&
@@ -385,12 +413,13 @@ function BioDraftModal({
           <div className="grid gap-4 md:grid-cols-2">
             {LANGS.map((lang) => (
               <div key={lang} className="flex flex-col gap-2">
-                {editing[lang] ? (
+                {edits[lang] !== undefined ? (
                   <BioTextarea
                     label={titleOf(t, lang)}
                     value={valueOf(lang)}
                     disabled={lock.locked}
-                    onChange={(v) => setEdits((e) => ({ ...e, [lang]: v }))}
+                    textareaRef={textareaRef(lang)}
+                    onChange={(v) => onEditChange(lang, v)}
                   />
                 ) : (
                   <BioCard
@@ -398,13 +427,14 @@ function BioDraftModal({
                     text={valueOf(lang)}
                     editLabel={editLabelOf(t, lang)}
                     disabled={lock.locked}
-                    onEdit={() => setEditing((e) => ({ ...e, [lang]: true }))}
+                    onEdit={() => onEditChange(lang, valueOf(lang))}
                   />
                 )}
                 {machine(lang) && <TranslatedByBadge model={result.model} />}
               </div>
             ))}
           </div>
+          {warning}
         </div>
       )}
     </Modal>
@@ -418,6 +448,10 @@ function SavedBioCard({
   stale,
   usage,
   lock,
+  value,
+  onValueChange: setValue,
+  textareaRef,
+  warning,
   onUpdateTranslation,
   onSaved,
 }: {
@@ -426,13 +460,16 @@ function SavedBioCard({
   stale: boolean;
   usage: BioAiUsage | undefined;
   lock: SaveLock;
+  value: string | null;
+  onValueChange: (value: string | null) => void;
+  textareaRef: Ref<HTMLTextAreaElement>;
+  warning: ReactNode;
   onUpdateTranslation: () => void;
   onSaved: (untranslated: Lang | null) => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const { saveBio, translateFrom, save, pending } = useSaveBio();
-  const [value, setValue] = useState<string | null>(null);
   const [notCleared, setNotCleared] = useState(false);
   const saved = bioOf(profile, lang);
   const machineModel =
@@ -473,6 +510,12 @@ function SavedBioCard({
 
   const onSave = () => lock.hold(saveEdit);
 
+  function startEdit() {
+    setNotCleared(false);
+    save.reset();
+    setValue(saved);
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {value === null ? (
@@ -481,7 +524,7 @@ function SavedBioCard({
           text={saved}
           editLabel={editLabelOf(t, lang)}
           disabled={lock.locked}
-          onEdit={() => setValue(saved)}
+          onEdit={startEdit}
         />
       ) : (
         <>
@@ -489,11 +532,13 @@ function SavedBioCard({
             label={titleOf(t, lang)}
             value={value}
             disabled={lock.locked}
+            textareaRef={textareaRef}
             onChange={(v) => {
               setValue(v);
               setNotCleared(false);
             }}
           />
+          {warning}
           {notCleared && <Banner tone="pending">{t.bio.notCleared}</Banner>}
           {save.isError && <Banner tone="error">{t.errors.generic}</Banner>}
           <div className="flex flex-wrap justify-end gap-2">
@@ -552,7 +597,10 @@ function SavedBioCard({
 }
 
 /** Instructor bio in both languages; an empty one is machine-translated on save. */
-export function BioSection({ profile }: { profile: InstructorProfile }) {
+export const BioSection = forwardRef<
+  BioSectionHandle,
+  { profile: InstructorProfile }
+>(function BioSection({ profile }, ref) {
   const t = useT();
   const { locale } = useLocale();
   const usage = useBioAiUsage();
@@ -567,8 +615,88 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
   const [text, setText] = useState('');
   const [request, setRequest] = useState<DraftRequest | null>(null);
   const [untranslated, setUntranslated] = useState<Lang | null>(null);
+  const [edits, setEdits] = useState<Record<Lang, string | null>>({
+    en: null,
+    zh: null,
+  });
+  const [reviewEdits, setReviewEdits] = useState<ReviewEdits>({});
+  const [warned, setWarned] = useState(false);
+  const boxes = useRef<Partial<Record<BioBox, HTMLTextAreaElement | null>>>({});
+  const reviewBoxes = useRef<Partial<Record<Lang, HTMLTextAreaElement | null>>>(
+    {},
+  );
   const exhausted = usage.data?.remaining === 0;
   const stale = hasBio ? staleSide(profile) : null;
+  const showComposer = !hasBio || composing;
+  const reviewUnsaved =
+    request && draft.data
+      ? LANGS.filter(
+          (l) => reviewValue(reviewEdits, draft.data, l) !== bioOf(profile, l),
+        )
+      : [];
+  const unsaved: (BioBox | 'review')[] =
+    reviewUnsaved.length > 0 ? ['review'] : [];
+  if (hasBio)
+    unsaved.push(
+      ...LANGS.filter(
+        (l) => edits[l] !== null && edits[l] !== bioOf(profile, l),
+      ),
+    );
+  if (showComposer && text.trim() && text !== bioOf(profile, lang))
+    unsaved.push('composer');
+  if (warned && unsaved.length === 0) setWarned(false);
+
+  function editReview(lang: Lang, value: string) {
+    setReviewEdits((e) => ({ ...e, [lang]: value }));
+  }
+
+  function focusBox(box: HTMLTextAreaElement | null | undefined) {
+    box?.scrollIntoView?.({ block: 'center' });
+    box?.focus({ preventScroll: true });
+  }
+
+  function focusReview() {
+    const open = reviewUnsaved.find((l) => reviewEdits[l] !== undefined);
+    if (open) return focusBox(reviewBoxes.current[open]);
+    const closed = reviewUnsaved[0];
+    if (closed)
+      editReview(closed, reviewValue(reviewEdits, draft.data, closed));
+  }
+
+  useImperativeHandle(ref, () => ({
+    warnIfUnsaved: () => {
+      const first = unsaved[0];
+      if (!first) return false;
+      setWarned(true);
+      if (first === 'review') focusReview();
+      else focusBox(boxes.current[first]);
+      return true;
+    },
+  }));
+
+  function discardUnsaved() {
+    setEdits({ en: null, zh: null });
+    setText('');
+    setComposing(false);
+    save.reset();
+    closeModal();
+  }
+
+  const warning = warned && (
+    <Banner tone="error">
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {unsaved[0] === 'review' ? t.bio.unsavedReview : t.bio.unsaved}
+        <button
+          type="button"
+          disabled={lock.locked}
+          onClick={discardUnsaved}
+          className="font-medium text-navy underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t.bio.discard}
+        </button>
+      </span>
+    </Banner>
+  );
 
   function start(next: DraftRequest) {
     setRequest(next);
@@ -577,6 +705,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
 
   function closeModal() {
     setRequest(null);
+    setReviewEdits({});
     draft.reset();
   }
 
@@ -607,7 +736,6 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
     );
   }
 
-  const showComposer = !hasBio || composing;
   const refineText = text.trim();
   const mismatch = mismatchedLang(lang, text);
   const canAsk =
@@ -627,6 +755,14 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               stale={stale === lang}
               usage={usage.data}
               lock={lock}
+              value={edits[lang]}
+              onValueChange={(value) =>
+                setEdits((e) => ({ ...e, [lang]: value }))
+              }
+              textareaRef={(el) => {
+                boxes.current[lang] = el;
+              }}
+              warning={unsaved[0] === lang && warning}
               onSaved={setUntranslated}
               onUpdateTranslation={() => {
                 const source = otherLang(lang);
@@ -700,6 +836,9 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
             {(p) => (
               <Textarea
                 {...p}
+                ref={(el) => {
+                  boxes.current.composer = el;
+                }}
                 rows={6}
                 lang={lang === 'zh' ? 'zh-CN' : 'en'}
                 disabled={lock.locked}
@@ -710,6 +849,7 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
               />
             )}
           </Field>
+          {unsaved[0] === 'composer' && warning}
           {mismatch && (
             <Banner tone="pending">
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -771,6 +911,12 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
           draft={draft}
           usage={usage.data}
           lock={lock}
+          edits={reviewEdits}
+          onEditChange={editReview}
+          textareaRef={(l) => (el) => {
+            reviewBoxes.current[l] = el;
+          }}
+          warning={unsaved[0] === 'review' && warning}
           onBack={closeModal}
           onSaved={(missing) => {
             closeModal();
@@ -780,4 +926,4 @@ export function BioSection({ profile }: { profile: InstructorProfile }) {
       )}
     </div>
   );
-}
+});
