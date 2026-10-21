@@ -284,6 +284,8 @@ export const en: Messages = {
     updateTranslation: 'Update translation',
     unsaved:
       'You have unsaved bio changes. Press Save in the bio box to keep them, or discard them.',
+    unsavedReview:
+      'You have unsaved bio changes. Press Save below to keep them, or discard them.',
     discard: 'Discard bio changes',
   },
   settings: {

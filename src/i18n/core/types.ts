@@ -263,6 +263,7 @@ export interface Messages {
     switchTo: string;
     updateTranslation: string;
     unsaved: string;
+    unsavedReview: string;
     discard: string;
   };
   settings: {

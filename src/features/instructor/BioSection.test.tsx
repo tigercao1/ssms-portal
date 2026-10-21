@@ -41,6 +41,13 @@ const bothBios: InstructorProfile = {
   bioZhUpdatedAt: '2026-10-01T00:00:00Z',
 };
 
+const zhStale: InstructorProfile = {
+  ...bothBios,
+  bioEn: 'Updated English.',
+  bioEnUpdatedAt: '2026-10-05T00:00:00Z',
+  bioZhUpdatedAt: '2026-10-01T00:00:00Z',
+};
+
 const BIO_SIDES = [
   {
     text: 'bioEn',
@@ -738,13 +745,6 @@ describe('BioSection existing bio', () => {
 });
 
 describe('BioSection stale warning', () => {
-  const zhStale: InstructorProfile = {
-    ...bothBios,
-    bioEn: 'Updated English.',
-    bioEnUpdatedAt: '2026-10-05T00:00:00Z',
-    bioZhUpdatedAt: '2026-10-01T00:00:00Z',
-  };
-
   it('Update translation translates the newer side and saves the result', async () => {
     const { patches, drafts } = setup(zhStale, {
       draft: () =>
@@ -1176,6 +1176,86 @@ describe('Save changes with unsaved bio text', () => {
     await userEvent.type(en, '?');
     expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
     expect(patches).toHaveLength(0);
+  });
+
+  const translation = () =>
+    HttpResponse.json({
+      en: 'Updated English.',
+      zh: '更新的中文。',
+      sourceLangs: ['en'],
+      model: 'gemini-test',
+      usage: usage(4),
+    });
+
+  async function tabToSubmit(name: string) {
+    const submit = screen.getByRole('button', { name });
+    for (let i = 0; i < 200 && document.activeElement !== submit; i++)
+      await userEvent.tab();
+    expect(submit).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+  }
+
+  it('blocks a keyboard save while the review window holds edited text', async () => {
+    const { patches } = setup(zhStale, { draft: translation });
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Update translation' }),
+    );
+    await userEvent.click(
+      await within(dialog()).findByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    const zh = within(dialog()).getByRole('textbox', { name: '中文' });
+    await userEvent.type(zh, '！');
+    await tabToSubmit('Save changes');
+
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
+      'You have unsaved bio changes. Press Save below to keep them, or discard them.',
+    );
+    expect(zh).toHaveFocus();
+    expect(zh).toHaveValue('更新的中文。！');
+    expect(patches).toHaveLength(0);
+
+    await userEvent.click(
+      within(dialog()).getByRole('button', { name: 'Discard bio changes' }),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await saveChanges();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).not.toHaveProperty('bioEn');
+    expect(patches[0]).not.toHaveProperty('bioZh');
+  });
+
+  it('opens the unsaved translation for review in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const { patches } = setup(zhStale, { draft: translation });
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '更新翻译' }),
+    );
+    const review = await screen.findByRole('dialog', { name: '确认您的简介' });
+    await within(review).findByText('更新的中文。');
+    await tabToSubmit('保存更改');
+
+    expect(await within(review).findByRole('alert')).toHaveTextContent(
+      '简介有未保存的修改。请点击下方的“保存”保留修改，或放弃修改。',
+    );
+    const zh = within(review).getByRole('textbox', { name: '中文' });
+    expect(zh).toHaveFocus();
+    expect(zh).toHaveValue('更新的中文。');
+    expect(within(review).getAllByRole('textbox')).toHaveLength(1);
+    expect(patches).toHaveLength(0);
+
+    await userEvent.click(within(review).getByRole('button', { name: '保存' }));
+    await waitFor(() =>
+      expect(patches).toEqual([
+        {
+          bioEn: 'Updated English.',
+          bioZh: '更新的中文。',
+          bioEnMachineTranslated: false,
+          bioZhMachineTranslated: true,
+        },
+      ]),
+    );
   });
 });
 
