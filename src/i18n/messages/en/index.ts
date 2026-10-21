@@ -282,6 +282,9 @@ export const en: Messages = {
     looksLikeEn: 'This looks like English.',
     switchTo: 'Switch to {lang}',
     updateTranslation: 'Update translation',
+    unsaved:
+      'You have unsaved bio changes. Press Save in the bio box to keep them, or discard them.',
+    discard: 'Discard bio changes',
   },
   settings: {
     title: 'Settings',

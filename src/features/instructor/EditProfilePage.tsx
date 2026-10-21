@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '@/i18n/core/I18nProvider';
 import {
@@ -16,7 +16,7 @@ import {
 } from '@/features/reference/api';
 import { useMyProfile, useUpdateProfile } from './api';
 import { MorePhotosUploader, PhotoUploader } from './PhotoUploader';
-import { BioSection } from './BioSection';
+import { BioSection, type BioSectionHandle } from './BioSection';
 import { MultiSelectChips } from './MultiSelectChips';
 import { CertEditor, TrainerEditor } from './CertEditor';
 import {
@@ -134,6 +134,7 @@ function Form({
   });
   const [nameError, setNameError] = useState<string | null>(null);
   const [ageError, setAgeError] = useState<string | null>(null);
+  const bio = useRef<BioSectionHandle>(null);
 
   function set<K extends keyof typeof draft>(key: K, val: (typeof draft)[K]) {
     setDraft((d) => ({ ...d, [key]: val }));
@@ -141,6 +142,7 @@ function Form({
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    const bioUnsaved = bio.current?.warnIfUnsaved() ?? false;
     const nextNameError = draft.displayNameEn.trim() ? null : t.validation.required;
     const nextAgeError = validateMinStudentAge(draft.minStudentAge, t);
     const nextLegalNameErrors = validateLegalName(
@@ -152,6 +154,7 @@ function Form({
     setAgeError(nextAgeError);
     setLegalNameErrors(nextLegalNameErrors);
     if (
+      bioUnsaved ||
       nextNameError ||
       nextAgeError ||
       nextLegalNameErrors.firstName ||
@@ -209,7 +212,7 @@ function Form({
 
       <Card className="flex flex-col gap-4">
         <h2 className="text-lg">{t.profile.bioSection}</h2>
-        <BioSection profile={profile} />
+        <BioSection ref={bio} profile={profile} />
       </Card>
 
       <Card className="grid gap-4 sm:grid-cols-2">

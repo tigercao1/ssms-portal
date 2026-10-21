@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
@@ -949,6 +949,233 @@ describe('BioSection while a save is translating', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe('Save changes with unsaved bio text', () => {
+  const UNSAVED =
+    'You have unsaved bio changes. Press Save in the bio box to keep them, or discard them.';
+  const saveChanges = () =>
+    userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  const discard = () =>
+    userEvent.click(
+      within(bioCard()).getByRole('button', { name: 'Discard bio changes' }),
+    );
+
+  afterEach(() => {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  });
+
+  it('blocks the save and focuses an edited bio card', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const { patches } = setup(bothBios);
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    const zh = screen.getByRole('textbox', { name: '中文' });
+    await userEvent.type(zh, '新的');
+    await saveChanges();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(UNSAVED);
+    expect(zh).toHaveFocus();
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+    expect(patches).toHaveLength(0);
+  });
+
+  it('blocks the save in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const { patches } = setup(bothBios);
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '编辑英文简介' }),
+    );
+    const en = screen.getByRole('textbox', { name: '英文' });
+    await userEvent.clear(en);
+    await userEvent.click(screen.getByRole('button', { name: '保存更改' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '简介有未保存的修改。请在简介中点击“保存”保留修改，或放弃修改。',
+    );
+    expect(en).toHaveFocus();
+    expect(
+      screen.getByRole('button', { name: '放弃简介修改' }),
+    ).toBeInTheDocument();
+    expect(patches).toHaveLength(0);
+  });
+
+  it('blocks the save while the writing box holds text for Refine', async () => {
+    const { patches, drafts } = setup(noBio);
+    const { en } = await compose({ en: 'Notes for the AI' });
+    await userEvent.click(screen.getByRole('button', { name: 'Refine' }));
+    await within(dialog()).findByText('EN draft');
+    await userEvent.click(
+      within(dialog()).getByRole('button', { name: 'Back' }),
+    );
+    await saveChanges();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(UNSAVED);
+    expect(en).toHaveFocus();
+    expect(en).toHaveValue('Notes for the AI');
+    expect(drafts).toHaveLength(1);
+    expect(patches).toHaveLength(0);
+  });
+
+  it('blocks the save in Chinese while the writing box holds text', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const { patches } = setup({ ...noBio, preferredLanguage: 'zh-CN' });
+    renderWithProviders(<EditProfilePage />);
+    const box = await screen.findByRole('textbox', { name: '中文' });
+    await userEvent.type(box, '我教滑雪');
+    await userEvent.click(screen.getByRole('button', { name: '保存更改' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '简介有未保存的修改。',
+    );
+    expect(box).toHaveFocus();
+    expect(patches).toHaveLength(0);
+  });
+
+  it('keeps the profile fields unsaved until the bio is discarded', async () => {
+    const { patches } = setup(bothBios);
+    renderWithProviders(<EditProfilePage />);
+    const name = await screen.findByDisplayValue('Jane Snow');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Janet Snow');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Rewrite with AI' }),
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'English' }),
+      ' Now on park.',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    await userEvent.type(screen.getByRole('textbox', { name: '中文' }), '！');
+    await saveChanges();
+
+    expect(await screen.findByText(UNSAVED)).toBeInTheDocument();
+    expect(screen.getAllByText(UNSAVED)).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: '中文' })).toHaveFocus();
+    expect(patches).toHaveLength(0);
+
+    await discard();
+    expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
+    expect(within(bioCard()).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText('Veteran instructor.')).toBeInTheDocument();
+    expect(screen.getByText('资深教练。')).toBeInTheDocument();
+
+    await saveChanges();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).toMatchObject({ displayNameEn: 'Janet Snow' });
+    expect(patches[0]).not.toHaveProperty('bioEn');
+    expect(patches[0]).not.toHaveProperty('bioZh');
+  });
+
+  it('clears the writing box on discard when there is no bio yet', async () => {
+    const { patches } = setup(noBio);
+    const { en } = await compose({ en: 'Draft bio' });
+    await saveChanges();
+    await screen.findByText(UNSAVED);
+
+    await discard();
+    expect(en).toHaveValue('');
+    expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
+
+    await saveChanges();
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(patches[0]).not.toHaveProperty('bioEn');
+  });
+
+  it('blocks a clear that could not be saved and starts the next edit clean after discard', async () => {
+    const { patches } = setup(bothBios, {
+      draft: () => new HttpResponse(null, { status: 503 }),
+    });
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    await userEvent.clear(screen.getByRole('textbox', { name: '中文' }));
+    await userEvent.click(saveButton());
+    await screen.findByText(/This bio wasn’t cleared/);
+    await saveChanges();
+    expect(await screen.findByText(UNSAVED)).toBeInTheDocument();
+
+    await discard();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Chinese bio' }),
+    );
+    expect(screen.getByRole('textbox', { name: '中文' })).toHaveValue(
+      '资深教练。',
+    );
+    expect(
+      screen.queryByText(/This bio wasn’t cleared/),
+    ).not.toBeInTheDocument();
+    expect(patches).toHaveLength(0);
+  });
+
+  it('saves normally once the bio itself is saved', async () => {
+    const { patches } = setup(bothBios);
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit English bio' }),
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'English' }),
+      ' Today.',
+    );
+    await saveChanges();
+    await screen.findByText(UNSAVED);
+
+    await userEvent.click(saveButton());
+    await waitFor(() =>
+      expect(patches).toEqual([
+        { bioEn: 'Veteran instructor. Today.', bioEnMachineTranslated: false },
+      ]),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument(),
+    );
+
+    await saveChanges();
+    await waitFor(() => expect(patches).toHaveLength(2));
+    expect(patches[1]).not.toHaveProperty('bioEn');
+  });
+
+  it('does not block when the open bio boxes match the saved bio', async () => {
+    const { patches } = setup(bothBios);
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit English bio' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Rewrite with AI' }),
+    );
+    expect(within(bioCard()).getAllByRole('textbox')).toHaveLength(2);
+    await saveChanges();
+
+    await waitFor(() => expect(patches).toHaveLength(1));
+    expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
+  });
+
+  it('drops the message once the text matches the saved bio again', async () => {
+    const { patches } = setup(bothBios);
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit English bio' }),
+    );
+    const en = screen.getByRole('textbox', { name: 'English' });
+    await userEvent.type(en, '!');
+    await saveChanges();
+    await screen.findByText(UNSAVED);
+
+    await userEvent.type(en, '{Backspace}');
+    expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
+    await userEvent.type(en, '?');
+    expect(screen.queryByText(UNSAVED)).not.toBeInTheDocument();
+    expect(patches).toHaveLength(0);
   });
 });
 

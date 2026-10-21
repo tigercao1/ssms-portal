@@ -262,6 +262,8 @@ export interface Messages {
     looksLikeEn: string;
     switchTo: string;
     updateTranslation: string;
+    unsaved: string;
+    discard: string;
   };
   settings: {
     title: string;
