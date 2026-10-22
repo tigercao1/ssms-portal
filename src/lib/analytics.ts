@@ -1,4 +1,4 @@
-import type { PostHog, PostHogConfig } from 'posthog-js';
+import type { CaptureResult, PostHog, PostHogConfig } from 'posthog-js';
 import { env } from './env';
 
 export type AnalyticsRole = 'admin' | 'instructor';
@@ -115,14 +115,79 @@ export function maskReplayAttribute(
   return VISIBLE_ATTRIBUTES.has(name) ? value : MASKED;
 }
 
-export function stripRequestUrl<T extends { name: string }>(request: T): T {
+function stripUrl(value: string): string {
   let url: URL;
   try {
-    url = new URL(request.name, window.location.origin);
+    url = new URL(value, window.location.origin);
   } catch {
-    return { ...request, name: MASKED };
+    return MASKED;
   }
-  return { ...request, name: url.origin + sanitizePath(url.pathname) };
+  return url.origin + sanitizePath(url.pathname);
+}
+
+export function stripRequestUrl<T extends { name: string }>(request: T): T {
+  return { ...request, name: stripUrl(request.name) };
+}
+
+const HTTP_URL = /\bhttps?:\/\/[^\s"'<>()]+/gi;
+const URL_PARAM = /([?#&])([\w.%-]+)=[^\s&#"'<>()]*/g;
+const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+const JWT = /\beyJ[\w-]*\.[\w-]+\.[\w-]*/g;
+const LONG_SECRET = /[\w-]{32,}/g;
+const LOCATION_KEYS = new Set(['filename', 'abs_path', 'url']);
+
+function maskSecret(candidate: string): string {
+  return /\d/.test(candidate) &&
+    /[a-z]/i.test(candidate) &&
+    !IS_UUID.test(candidate)
+    ? '[token]'
+    : candidate;
+}
+
+export function redactText(text: string): string {
+  return text
+    .replace(HTTP_URL, stripUrl)
+    .replace(URL_PARAM, `$1$2=${MASKED}`)
+    .replace(EMAIL, '[email]')
+    .replace(JWT, '[token]')
+    .replace(LONG_SECRET, maskSecret);
+}
+
+function stripLocation(value: string): string {
+  return value.replace(HTTP_URL, stripUrl).replace(/[?#].*/, '');
+}
+
+function redactValue(value: unknown, key = ''): unknown {
+  if (typeof value === 'string')
+    return LOCATION_KEYS.has(key) ? stripLocation(value) : redactText(value);
+  if (Array.isArray(value)) return value.map((item) => redactValue(item));
+  if (value !== null && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value).map(([name, item]) => [
+        name,
+        redactValue(item, name),
+      ]),
+    );
+  return value;
+}
+
+export function redactExceptionEvent(
+  event: CaptureResult,
+): CaptureResult | null {
+  if (event.event !== '$exception') return event;
+  try {
+    return {
+      ...event,
+      properties: Object.fromEntries(
+        Object.entries(event.properties).map(([name, value]) => [
+          name,
+          name.startsWith('$exception') ? redactValue(value) : value,
+        ]),
+      ),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export const posthogConfig: Partial<PostHogConfig> = {
@@ -132,6 +197,7 @@ export const posthogConfig: Partial<PostHogConfig> = {
   mask_personal_data_properties: true,
   custom_personal_data_properties: ['t', 'token', 'token_hash', 'code'],
   capture_exceptions: true,
+  before_send: redactExceptionEvent,
   mask_all_text: true,
   mask_all_element_attributes: true,
   session_recording: {
