@@ -507,6 +507,8 @@ export const zhCN: Messages = {
     contentHint: '单个独立的 .html 或 .htm 文件，最大 2 MB。',
     uploadFile: '上传 HTML',
     replaceFile: '替换 HTML',
+    downloadFile: '下载 HTML',
+    downloadFailed: '无法下载 HTML 文件，请重试。',
     fileInputLabel: '要上传的 HTML 文件',
     uploaded: '已上传 {name}。',
     fileTypeError: '请选择 .html 或 .htm 文件。',

@@ -15,6 +15,7 @@ import {
 import type { PublicPage } from '@/lib/types';
 import {
   useDeletePage,
+  useDownloadPageHtml,
   usePageContent,
   usePublicPage,
   usePublishPage,
@@ -26,6 +27,17 @@ import { CopyLinkButton, formatBytes, PageStatusPill } from './PageParts';
 
 function errorText(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
+}
+
+function saveBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Admin editor for one public page: title, HTML upload, sandboxed preview, publishing. */
@@ -311,6 +323,7 @@ function DetailsCard({ page }: { page: PublicPage }) {
 function ContentCard({ page }: { page: PublicPage }) {
   const t = useT();
   const upload = useUploadPageContent(page.id);
+  const download = useDownloadPageHtml(page.id);
   const [fileError, setFileError] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<string | null>(null);
 
@@ -323,6 +336,7 @@ function ContentCard({ page }: { page: PublicPage }) {
     e.target.value = '';
     if (!file) return;
     upload.reset();
+    download.reset();
     setUploaded(null);
     const problem = checkHtmlFile(file);
     if (problem) {
@@ -357,7 +371,7 @@ function ContentCard({ page }: { page: PublicPage }) {
           </p>
         )}
       </div>
-      <div>
+      <div className="flex flex-wrap gap-2">
         <FileButton
           variant="secondary"
           accept="text/html,.html,.htm"
@@ -367,7 +381,23 @@ function ContentCard({ page }: { page: PublicPage }) {
         >
           {page.hasContent ? t.pages.replaceFile : t.pages.uploadFile}
         </FileButton>
+        {page.hasContent && (
+          <Button
+            variant="ghost"
+            loading={download.isPending}
+            onClick={() =>
+              download.mutate(undefined, {
+                onSuccess: (blob) => saveBlob(`${page.slug}.html`, blob),
+              })
+            }
+          >
+            {t.pages.downloadFile}
+          </Button>
+        )}
       </div>
+      {download.isError && (
+        <Banner tone="error">{t.pages.downloadFailed}</Banner>
+      )}
       {fileError && <Banner tone="error">{fileError}</Banner>}
       {uploadError && <Banner tone="error">{uploadError}</Banner>}
       {uploaded && (

@@ -488,6 +488,8 @@ export interface Messages {
     contentHint: string;
     uploadFile: string;
     replaceFile: string;
+    downloadFile: string;
+    downloadFailed: string;
     fileInputLabel: string;
     uploaded: string;
     fileTypeError: string;

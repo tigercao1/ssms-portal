@@ -541,6 +541,8 @@ export const en: Messages = {
     contentHint: 'One self-contained .html or .htm file, up to 2 MB.',
     uploadFile: 'Upload HTML',
     replaceFile: 'Replace HTML',
+    downloadFile: 'Download HTML',
+    downloadFailed: 'Couldn’t download the HTML file. Try again.',
     fileInputLabel: 'HTML file to upload',
     uploaded: 'Uploaded {name}.',
     fileTypeError: 'Choose an .html or .htm file.',

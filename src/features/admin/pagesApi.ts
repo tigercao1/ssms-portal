@@ -29,6 +29,13 @@ export function usePageContent(id: string, enabled: boolean) {
   });
 }
 
+export function useDownloadPageHtml(id: string) {
+  return useMutation({
+    mutationFn: () =>
+      api<Blob>(`/admin/pages/${id}/download`, { responseType: 'blob' }),
+  });
+}
+
 function readFileBytes(file: File): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
