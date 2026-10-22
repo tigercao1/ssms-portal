@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -250,6 +250,86 @@ describe('PageEditorPage preview', () => {
     );
     renderEditor();
     expect(await screen.findByRole('alert')).toHaveTextContent('Not found');
+  });
+});
+
+describe('PageEditorPage download', () => {
+  it('hides Download HTML until a file is uploaded', async () => {
+    serve();
+    renderEditor();
+    expect(
+      await screen.findByText('No HTML uploaded yet.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Download HTML' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('saves the uploaded bytes as <slug>.html', async () => {
+    serve({ hasContent: true, sizeBytes: 7 });
+    const latin1 = [0x3c, 0x70, 0x3e, 0x63, 0x61, 0x66, 0xe9];
+    const requested: string[] = [];
+    server.use(
+      http.get(`${API}/admin/pages/:id/download`, ({ params }) => {
+        requested.push(String(params.id));
+        return new HttpResponse(new Uint8Array(latin1), {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="winter-guide.html"',
+          },
+        });
+      }),
+    );
+    const blobs: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:page';
+    });
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const saved: string[] = [];
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        saved.push(`${this.download} ${this.href}`);
+      });
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Download HTML' }),
+    );
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(requested).toEqual(['p1']);
+    expect(saved).toEqual(['winter-guide.html blob:page']);
+    expect([...new Uint8Array(await (blobs[0] as Blob).arrayBuffer())]).toEqual(
+      latin1,
+    );
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:page');
+    click.mockRestore();
+  });
+
+  it('shows an error when the download fails', async () => {
+    serve({ hasContent: true });
+    server.use(
+      http.get(`${API}/admin/pages/:id/download`, () =>
+        HttpResponse.json(
+          { message: 'Docs storage is unavailable' },
+          { status: 502 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Download HTML' }),
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t download the HTML file. Try again.',
+    );
   });
 });
 
