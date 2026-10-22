@@ -130,36 +130,80 @@ export function stripRequestUrl<T extends { name: string }>(request: T): T {
 }
 
 const HTTP_URL = /\bhttps?:\/\/[^\s"'<>()]+/gi;
+const LOCATION_IN_TEXT = new RegExp(
+  `(${HTTP_URL.source}|(?:${STATIC_PREFIXES.join('|')})[^\\s"'<>()]*)`,
+  'i',
+);
 const URL_PARAM = /([?#&])([\w.%-]+)=[^\s&#"'<>()]*/g;
-const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+const BEARER = /\b(bearer)\s+[\w.~+/-]+=*/gi;
+const SENSITIVE_NAME = String.raw`[\w.-]*(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|authorization|signature)|(?:t|code|otp|pass|key|auth|session|sig|sid)(?![\w.-])`;
+const PAIR_SEPARATOR = String.raw`\s*(?:=|:(?!\d{1,5}\/))\s*`;
+const QUOTED_VALUE = String.raw`(\\?["'])(?:(?!\5).)*\5`;
+const BARE_VALUE = String.raw`\\?["']?(?:(?:bearer|basic)\s+)?[^\s"'&,;<>(){}[\]\\]+`;
+const SENSITIVE_PAIR = new RegExp(
+  String.raw`(^|[^\w.-])(\\?["']?)(?=${SENSITIVE_NAME})(?=([\w.-]+))\3(\2${PAIR_SEPARATOR})(?:${QUOTED_VALUE}|${BARE_VALUE})`,
+  'gi',
+);
+const SENSITIVE_KEY = new RegExp(
+  String.raw`^(?=${SENSITIVE_NAME})[\w.-]+$`,
+  'i',
+);
+const EMAIL = /(^|[^\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const JWT = /\beyJ[\w-]*\.[\w-]+\.[\w-]*/g;
-const LONG_SECRET = /[\w-]{32,}/g;
+const SECRET_CANDIDATE = /[\w-]{6,}/g;
 const LOCATION_KEYS = new Set(['filename', 'abs_path', 'url']);
 
 function maskSecret(candidate: string): string {
-  return /\d/.test(candidate) &&
-    /[a-z]/i.test(candidate) &&
+  return (candidate.length >= 32 || /\d{6}/.test(candidate)) &&
     !IS_UUID.test(candidate)
     ? '[token]'
     : candidate;
 }
 
-export function redactText(text: string): string {
+function redactSecrets(text: string): string {
   return text
-    .replace(HTTP_URL, stripUrl)
     .replace(URL_PARAM, `$1$2=${MASKED}`)
-    .replace(EMAIL, '[email]')
+    .replace(BEARER, `$1 ${MASKED}`)
+    .replace(SENSITIVE_PAIR, `$1$2$3$4$5${MASKED}$5`)
+    .replace(EMAIL, '$1[email]')
     .replace(JWT, '[token]')
-    .replace(LONG_SECRET, maskSecret);
+    .replace(SECRET_CANDIDATE, maskSecret);
 }
 
 function stripLocation(value: string): string {
   return value.replace(HTTP_URL, stripUrl).replace(/[?#].*/, '');
 }
 
+function isBundleLocation(location: string): boolean {
+  const path = location.replace(/^[a-z][\w+.-]*:\/\/[\w.-]*(?::\d+)?/i, '');
+  return (
+    STATIC_PREFIXES.some((prefix) => path.startsWith(prefix)) &&
+    /^(?:[\w.-]|\/@?)*$/.test(path)
+  );
+}
+
+function redactLocation(value: string): string {
+  const location = stripLocation(value);
+  return isBundleLocation(location) ? location : redactSecrets(location);
+}
+
+export function redactText(text: string): string {
+  return text
+    .split(LOCATION_IN_TEXT)
+    .map((part, index) =>
+      index % 2 ? redactLocation(part) : redactSecrets(part),
+    )
+    .join('');
+}
+
 function redactValue(value: unknown, key = ''): unknown {
+  if (
+    SENSITIVE_KEY.test(key) &&
+    (typeof value === 'string' || typeof value === 'number')
+  )
+    return MASKED;
   if (typeof value === 'string')
-    return LOCATION_KEYS.has(key) ? stripLocation(value) : redactText(value);
+    return LOCATION_KEYS.has(key) ? redactLocation(value) : redactText(value);
   if (Array.isArray(value)) return value.map((item) => redactValue(item));
   if (value !== null && typeof value === 'object')
     return Object.fromEntries(

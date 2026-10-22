@@ -98,6 +98,59 @@ describe('analytics privacy with the real SDK', () => {
       );
     }
   });
+
+  it('masks credential assignments in messages, causes and non-HTTP frames of every reported error', async () => {
+    const cause = new Error(
+      'Cause alice@example.com token=CAUSE_SECRET_TOKEN /update-password?token_hash=RESET_SECRET&code=CODE_SECRET',
+    );
+    cause.stack = [
+      `Error: ${cause.message}`,
+      '    at reset (app:///alice@example.com/reset.js?token_hash=RESET_SECRET#access_token=HASH_SECRET:14:9)',
+    ].join('\n');
+    const error = new Error(
+      'Failed for alice@example.com token=SECRET_TOKEN password=PASSWORD_SECRET api_key=API_KEY_SECRET with Bearer BEARER_SECRET {"otp":"OTP_SECRET"} allletters ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP numeric 123456',
+      { cause },
+    );
+    error.stack = [
+      `Error: ${error.message}`,
+      '    at submit (https://portal.example.com/assets/index-abc123.js?v=VERSION_SECRET#access_token=HASH_SECRET:8:12)',
+      '    at activate (app:///alice@example.com/index.js?token_hash=RESET_SECRET#access_token=HASH_SECRET:20:2)',
+    ].join('\n');
+
+    posthog.captureException(error);
+    window.onerror?.(error.message, 'app:///index.js', 20, 2, error);
+    window.dispatchEvent(
+      new CustomEvent('unhandledrejection', { detail: { reason: error } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const exceptions = events.filter((e) => e.event === '$exception');
+    expect(exceptions).toHaveLength(3);
+    expect(JSON.stringify(exceptions)).not.toMatch(
+      /SECRET|alice@|ABCDEFGHIJ|123456/,
+    );
+    for (const exception of exceptions) {
+      const [failure, chained] = exception.properties.$exception_list;
+      const filenames = (frames: { filename: string }[]) =>
+        frames.map((frame) => frame.filename);
+      expect(failure.value).toBe(
+        'Failed for [email] token=*** password=*** api_key=*** with Bearer *** {"otp":"***"} allletters [token] numeric [token]',
+      );
+      expect(filenames(failure.stacktrace.frames)).toEqual(
+        expect.arrayContaining([
+          'https://portal.example.com/assets/index-abc123.js',
+          'app:///[email]/index.js',
+        ]),
+      );
+      expect(chained.mechanism.source).toBe('cause');
+      expect(chained.value).toBe(
+        'Cause [email] token=*** /update-password?token_hash=***&code=***',
+      );
+      expect(filenames(chained.stacktrace.frames)).toEqual([
+        'app:///[email]/reset.js',
+      ]);
+    }
+  });
 });
 
 describe('redactExceptionEvent', () => {
@@ -123,6 +176,55 @@ describe('redactExceptionEvent', () => {
     expect(
       redactText('Instructor 0b9c1c4e-1111-4222-8333-944455556666 not found'),
     ).toBe('Instructor 0b9c1c4e-1111-4222-8333-944455556666 not found');
+    expect(
+      redactText(
+        'secret ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP and code 123456',
+      ),
+    ).toBe('secret [token] and code [token]');
+  });
+
+  it('masks the values of sensitive assignments in any notation', () => {
+    expect(
+      redactText(
+        'token=a1 TOKEN=a2 Password: hunter2 x-api-key: k1 clientSecret=s1 sig=s2 auth=s3',
+      ),
+    ).toBe(
+      'token=*** TOKEN=*** Password: *** x-api-key: *** clientSecret=*** sig=*** auth=***',
+    );
+    expect(
+      redactText(
+        `{"password":"correct horse","otp":987654,'refresh_token': 'r1'}`,
+      ),
+    ).toBe(`{"password":"***","otp":***,'refresh_token': '***'}`);
+    expect(redactText('Authorization: Bearer abc.def-ghi')).toBe(
+      'Authorization: ***',
+    );
+    expect(redactText('retry with Bearer abc.def-ghi')).toBe(
+      'retry with Bearer ***',
+    );
+    expect(redactText('Error: next=token=t1 for user')).toBe(
+      'Error: next=token=*** for user',
+    );
+  });
+
+  it('keeps ordinary assignments and bundle paths readable', () => {
+    const ordinary =
+      "statusCode: 500 monkey=1 (reading 'key') at http://auth:8080/assets/index.js";
+    expect(redactText(ordinary)).toBe(ordinary);
+    expect(
+      redactText(
+        'Failed to fetch https://portal.example.com/assets/membership-card-example-DFr6qcj2.js',
+      ),
+    ).toBe(
+      'Failed to fetch https://portal.example.com/assets/membership-card-example-DFr6qcj2.js',
+    );
+    expect(
+      redactText(
+        'Unable to preload CSS for /assets/membership-card-example-DFr6qcj2.css?v=1',
+      ),
+    ).toBe(
+      'Unable to preload CSS for /assets/membership-card-example-DFr6qcj2.css',
+    );
   });
 
   it('strips query strings and hash fragments from URLs in messages', () => {
@@ -182,9 +284,26 @@ describe('redactExceptionEvent', () => {
                 function: 'start',
                 in_app: true,
               },
+              {
+                platform: 'web:javascript',
+                filename:
+                  'app:///alice@example.com/index.js?token_hash=reset-secret',
+                url: 'file:///Users/alice@example.com/token=file-secret/app.js',
+                function: 'load',
+                in_app: true,
+              },
+              {
+                platform: 'web:javascript',
+                filename: 'app:///assets/index-abc.js?x=1',
+                function: 'boot',
+                in_app: true,
+              },
             ],
           },
         },
+      ],
+      $exception_steps: [
+        { $message: 'Signed in', otp: 987654, code: 'pkce-secret' },
       ],
       $current_url: 'https://portal.example.com/activate?t=<masked>',
     });
@@ -210,6 +329,14 @@ describe('redactExceptionEvent', () => {
         abs_path: 'https://portal.example.com/reset-password',
       }),
       expect.objectContaining({ filename: 'app:///index.js' }),
+      expect.objectContaining({
+        filename: 'app:///[email]/index.js',
+        url: 'file:///Users/[email]/token=***',
+      }),
+      expect.objectContaining({ filename: 'app:///assets/index-abc.js' }),
+    ]);
+    expect(redacted.properties.$exception_steps).toEqual([
+      { $message: 'Signed in', otp: '***', code: '***' },
     ]);
     expect(redacted.properties.$exception_level).toBe('error');
     expect(redacted.properties.$current_url).toBe(
