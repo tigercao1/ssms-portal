@@ -115,104 +115,119 @@ export function maskReplayAttribute(
   return VISIBLE_ATTRIBUTES.has(name) ? value : MASKED;
 }
 
-function stripUrl(value: string): string {
+export function stripRequestUrl<T extends { name: string }>(request: T): T {
+  let url: URL;
+  try {
+    url = new URL(request.name, window.location.origin);
+  } catch {
+    return { ...request, name: MASKED };
+  }
+  return { ...request, name: url.origin + sanitizePath(url.pathname) };
+}
+
+type Fields = Record<string, unknown>;
+type Check = (value: unknown) => unknown;
+
+const REDACTED = '[redacted]';
+const MAX_MESSAGE_LENGTH = 200;
+const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+const ERROR_NAME_PREFIX =
+  /^(?=[A-Za-z]{1,64}: )[A-Z][A-Za-z]*(?:Error|Exception): /;
+const SAFE_TEXT = /^[A-Za-z .,'()!?-]*$/;
+const LONG_WORD = /[^ ]{25}/;
+const BUNDLE_PATH = /^[A-Za-z0-9._/-]+$/;
+
+function isFields(value: unknown): value is Fields {
+  return typeof value === 'object' && value !== null;
+}
+
+const flag: Check = (value) => (typeof value === 'boolean' ? value : undefined);
+
+const count: Check = (value) =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
+
+const identifier: Check = (value) =>
+  typeof value === 'string' && IDENTIFIER.test(value) ? value : undefined;
+
+const oneOf =
+  (...allowed: string[]): Check =>
+  (value) =>
+    typeof value === 'string' && allowed.includes(value) ? value : undefined;
+
+function safeMessage(value: unknown): string {
+  if (typeof value !== 'string' || value.length > MAX_MESSAGE_LENGTH)
+    return REDACTED;
+  const text = value.replace(ERROR_NAME_PREFIX, '');
+  return SAFE_TEXT.test(text) && !LONG_WORD.test(text) ? value : REDACTED;
+}
+
+const bundleLocation: Check = (value) => {
+  if (typeof value !== 'string') return undefined;
   let url: URL;
   try {
     url = new URL(value, window.location.origin);
   } catch {
-    return MASKED;
+    return undefined;
   }
-  return url.origin + sanitizePath(url.pathname);
+  return url.origin === window.location.origin &&
+    STATIC_PREFIXES.some((prefix) => url.pathname.startsWith(prefix)) &&
+    BUNDLE_PATH.test(url.pathname)
+    ? url.origin + url.pathname
+    : undefined;
+};
+
+const EVENT_FIELDS: Record<string, Check> = {
+  $exception_level: oneOf('fatal', 'error', 'warning', 'log', 'info', 'debug'),
+  $exception_capture_enabled_server_side: flag,
+};
+const MECHANISM_FIELDS: Record<string, Check> = {
+  type: identifier,
+  handled: flag,
+  synthetic: flag,
+  source: oneOf('cause', 'member'),
+  exception_id: count,
+  parent_id: count,
+};
+const FRAME_FIELDS: Record<string, Check> = {
+  platform: oneOf('web:javascript', 'node:javascript', 'hermes'),
+  function: identifier,
+  filename: bundleLocation,
+  abs_path: bundleLocation,
+  lineno: count,
+  colno: count,
+  in_app: flag,
+};
+
+function pick(source: Fields, checks: Record<string, Check>): Fields {
+  const picked: Fields = {};
+  for (const [name, check] of Object.entries(checks)) {
+    const value = check(source[name]);
+    if (value !== undefined) picked[name] = value;
+  }
+  return picked;
 }
 
-export function stripRequestUrl<T extends { name: string }>(request: T): T {
-  return { ...request, name: stripUrl(request.name) };
-}
-
-const HTTP_URL = /\bhttps?:\/\/[^\s"'<>()]+/gi;
-const LOCATION_IN_TEXT = new RegExp(
-  `(${HTTP_URL.source}|(?:${STATIC_PREFIXES.join('|')})[^\\s"'<>()]*)`,
-  'i',
-);
-const URL_PARAM = /([?#&])([\w.%-]+)=[^\s&#"'<>()]*/g;
-const BEARER = /\b(bearer)\s+[\w.~+/-]+=*/gi;
-const SENSITIVE_NAME = String.raw`[\w.-]*(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|authorization|signature)|(?:t|code|otp|pass|key|auth|session|sig|sid)(?![\w.-])`;
-const PAIR_SEPARATOR = String.raw`\s*(?:=|:(?!\d{1,5}\/))\s*`;
-const QUOTED_VALUE = String.raw`(\\?["'])(?:(?!\5).)*\5`;
-const BARE_VALUE = String.raw`\\?["']?(?:(?:bearer|basic)\s+)?[^\s"'&,;<>(){}[\]\\]+`;
-const SENSITIVE_PAIR = new RegExp(
-  String.raw`(^|[^\w.-])(\\?["']?)(?=${SENSITIVE_NAME})(?=([\w.-]+))\3(\2${PAIR_SEPARATOR})(?:${QUOTED_VALUE}|${BARE_VALUE})`,
-  'gi',
-);
-const SENSITIVE_KEY = new RegExp(
-  String.raw`^(?=${SENSITIVE_NAME})[\w.-]+$`,
-  'i',
-);
-const EMAIL = /(^|[^\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-const JWT = /\beyJ[\w-]*\.[\w-]+\.[\w-]*/g;
-const SECRET_CANDIDATE = /[\w-]{6,}/g;
-const LOCATION_KEYS = new Set(['filename', 'abs_path', 'url']);
-
-function maskSecret(candidate: string): string {
-  return (candidate.length >= 32 || /\d{6}/.test(candidate)) &&
-    !IS_UUID.test(candidate)
-    ? '[token]'
-    : candidate;
-}
-
-function redactSecrets(text: string): string {
-  return text
-    .replace(URL_PARAM, `$1$2=${MASKED}`)
-    .replace(BEARER, `$1 ${MASKED}`)
-    .replace(SENSITIVE_PAIR, `$1$2$3$4$5${MASKED}$5`)
-    .replace(EMAIL, '$1[email]')
-    .replace(JWT, '[token]')
-    .replace(SECRET_CANDIDATE, maskSecret);
-}
-
-function stripLocation(value: string): string {
-  return value.replace(HTTP_URL, stripUrl).replace(/[?#].*/, '');
-}
-
-function isBundleLocation(location: string): boolean {
-  const path = location.replace(/^[a-z][\w+.-]*:\/\/[\w.-]*(?::\d+)?/i, '');
-  return (
-    STATIC_PREFIXES.some((prefix) => path.startsWith(prefix)) &&
-    /^(?:[\w.-]|\/@?)*$/.test(path)
-  );
-}
-
-function redactLocation(value: string): string {
-  const location = stripLocation(value);
-  return isBundleLocation(location) ? location : redactSecrets(location);
-}
-
-export function redactText(text: string): string {
-  return text
-    .split(LOCATION_IN_TEXT)
-    .map((part, index) =>
-      index % 2 ? redactLocation(part) : redactSecrets(part),
-    )
-    .join('');
-}
-
-function redactValue(value: unknown, key = ''): unknown {
-  if (
-    SENSITIVE_KEY.test(key) &&
-    (typeof value === 'string' || typeof value === 'number')
-  )
-    return MASKED;
-  if (typeof value === 'string')
-    return LOCATION_KEYS.has(key) ? redactLocation(value) : redactText(value);
-  if (Array.isArray(value)) return value.map((item) => redactValue(item));
-  if (value !== null && typeof value === 'object')
-    return Object.fromEntries(
-      Object.entries(value).map(([name, item]) => [
-        name,
-        redactValue(item, name),
-      ]),
-    );
-  return value;
+function rebuildException(entry: Fields): Fields {
+  const frames = isFields(entry.stacktrace)
+    ? entry.stacktrace.frames
+    : undefined;
+  return {
+    type: identifier(entry.type) ?? 'Error',
+    value: safeMessage(entry.value),
+    ...(isFields(entry.mechanism) && {
+      mechanism: pick(entry.mechanism, MECHANISM_FIELDS),
+    }),
+    ...(Array.isArray(frames) && {
+      stacktrace: {
+        type: 'raw',
+        frames: frames
+          .filter(isFields)
+          .map((frame) => pick(frame, FRAME_FIELDS)),
+      },
+    }),
+  };
 }
 
 export function redactExceptionEvent(
@@ -220,14 +235,19 @@ export function redactExceptionEvent(
 ): CaptureResult | null {
   if (event.event !== '$exception') return event;
   try {
+    const list: unknown = event.properties.$exception_list;
+    if (!Array.isArray(list) || !list.every(isFields)) return null;
     return {
       ...event,
-      properties: Object.fromEntries(
-        Object.entries(event.properties).map(([name, value]) => [
-          name,
-          name.startsWith('$exception') ? redactValue(value) : value,
-        ]),
-      ),
+      properties: {
+        ...Object.fromEntries(
+          Object.entries(event.properties).filter(
+            ([name]) => !name.startsWith('$exception'),
+          ),
+        ),
+        ...pick(event.properties, EVENT_FIELDS),
+        $exception_list: list.map(rebuildException),
+      },
     };
   } catch {
     return null;

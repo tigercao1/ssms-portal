@@ -6,11 +6,81 @@ import {
   posthogConfig,
   PRIVATE_TEXT_SELECTOR,
   redactExceptionEvent,
-  redactText,
   stripRequestUrl,
 } from './analytics';
 
 const events: CaptureResult[] = [];
+const ORIGIN = window.location.origin;
+const ROUND_ONE_MESSAGE =
+  'Failed for alice@example.com token=SECRET_TOKEN password=PASSWORD_SECRET api_key=API_KEY_SECRET /activate?t=ACTIVATION_SECRET /auth/callback?code=CODE_SECRET #access_token=HASH_SECRET allletters ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP numeric 123456 long Zx9_kQ2mVb7LpR4sTn8wYc3HdJ6fGa1eUo5iKl0Nq';
+const ROUND_ONE_CAUSE =
+  'Cause alice@example.com token=CAUSE_SECRET_TOKEN /update-password?token_hash=RESET_SECRET&code=CODE_SECRET #access_token=HASH_SECRET';
+const ROUND_TWO_SUFFIX =
+  ' {"access_token":["ARRAY_SECRET_ONE","ARRAY_SECRET_TWO"]} redirect=https%3A%2F%2Fportal.test%2Factivate%3Ft%3DENCODED_ACTIVATION email=alice%40example.com password=ab[BRACKET_SECRET]cd';
+const LEAK_MESSAGES = [
+  ROUND_ONE_MESSAGE,
+  ROUND_ONE_CAUSE,
+  ROUND_ONE_MESSAGE + ROUND_TWO_SUFFIX,
+  ROUND_ONE_CAUSE + ROUND_TWO_SUFFIX,
+  '{"access_token":["ARRAY_SECRET_ONE","ARRAY_SECRET_TWO"]}',
+  'password=ab[BRACKET_SECRET]cd',
+  'redirect=https%3A%2F%2Fportal.test%2Factivate%3Ft%3DENCODED_ACTIVATION',
+  'email=alice%40example.com',
+  'Failed for alice%2540example.com at %2Freset-password%3Ftoken_hash%3DPCT_SECRET',
+  'Failed for alice\\u0040example.com with token\\u003dESCAPED_SECRET',
+  'Failed for \uff41\uff4c\uff49\uff43\uff45\uff20example',
+  'Failed with tok\u0435n SECRET in Cyrillic',
+  'Failed with S\u200bECRET hidden by a zero width space',
+  'Failed\nwith token SECRET on a new line',
+  'Bearer SECRET_BEARER',
+  'secret ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP',
+  `Failed ${'SECRET '.repeat(40)}`,
+];
+const LEAK_FRAMES = [
+  `    at submit (${ORIGIN}/assets/index-abc123.js?v=VERSION_SECRET#access_token=HASH_SECRET:8:12)`,
+  `    at activate (${ORIGIN}/activate?t=ACTIVATION_SECRET:20:2)`,
+  '    at submit (http://127.0.0.1:8799/assets/index-abc123.js?v=VERSION_SECRET#access_token=HASH_SECRET:8:12)',
+  '    at activate (http://127.0.0.1:8799/activate?t=ACTIVATION_SECRET:20:2)',
+  '    at reset (app:///alice@example.com/index.js?token_hash=RESET_SECRET#access_token=HASH_SECRET:14:9)',
+  '    at reset (https://portal.test/src/alice%40example.com/reset.js?token_hash=RESET_SECRET:14:9)',
+  `    at load (${ORIGIN}/src/alice%40example.com/reset.js:3:1)`,
+  `    at load (${ORIGIN}/assets/alice@example.com.js:3:1)`,
+  `    at load (${ORIGIN}/assets/../reset-password?token_hash=RESET_SECRET:5:6)`,
+  `    at Object.SECRET_FN (${ORIGIN}/node_modules/.vite/deps/chunk.js?v=SECRET_VERSION:1:2)`,
+];
+const SECRETS =
+  /SECRET|ENCODED_ACTIVATION|alice|ABCDEFGHIJ|123456|Zx9_kQ2|\uff41\uff4c/;
+type SentException = {
+  type: string;
+  value: string;
+  mechanism?: { source?: string };
+  stacktrace?: { frames: Record<string, unknown>[] };
+};
+
+function chainOf(messages: string[]): Error {
+  const [message = '', ...causes] = messages;
+  const error = new Error(
+    message,
+    causes.length ? { cause: chainOf(causes) } : undefined,
+  );
+  error.stack = [
+    `Error: ${message}`,
+    `    at reset (${ORIGIN}/update-password?token_hash=RESET_SECRET&code=CODE_SECRET#access_token=HASH_SECRET:14:9)`,
+  ].join('\n');
+  return error;
+}
+
+function sentExceptions(): CaptureResult[] {
+  return events.filter((e) => e.event === '$exception');
+}
+
+function locationsOf(exception: CaptureResult): unknown[] {
+  const list: SentException[] = exception.properties.$exception_list;
+  return list
+    .flatMap((entry) => entry.stacktrace?.frames ?? [])
+    .flatMap((frame) => [frame.filename, frame.abs_path, frame.url])
+    .filter((location) => location !== undefined);
+}
 
 beforeAll(() => {
   posthog.init('phc_test', {
@@ -18,6 +88,7 @@ beforeAll(() => {
     api_host: 'http://posthog.invalid',
     disable_session_recording: true,
     advanced_disable_flags: true,
+    error_tracking: { exceptionRateLimiterBucketSize: 100 },
     before_send: [
       redactExceptionEvent,
       (event) => {
@@ -60,96 +131,212 @@ describe('analytics privacy with the real SDK', () => {
     expect(sent).not.toContain('refresh-secret');
   });
 
-  it('redacts emails and activation tokens from reported and uncaught errors', async () => {
+  it('drops every recorded leak from reported, uncaught and rejected errors and their causes', async () => {
     expect(posthogConfig.before_send).toBe(redactExceptionEvent);
-    const activation = 'https://portal.example.com/activate?t=invite-secret';
-    const error = new Error(
-      `Invite for alice@example.com failed: ${activation}`,
-    );
-    error.stack = [
-      `Error: Invite for alice@example.com failed: ${activation}`,
-      `    at activate (${activation}:10:5)`,
-      '    at run (https://portal.example.com/assets/index-abc.js?v=1#access_token=jwt-secret:1:2)',
-    ].join('\n');
+    const error = chainOf(LEAK_MESSAGES);
+    error.stack = [`Error: ${error.message}`, ...LEAK_FRAMES].join('\n');
 
     posthog.captureException(error);
-    window.onerror?.(error.message, activation, 10, 5, error);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    const exceptions = events.filter((e) => e.event === '$exception');
-    expect(exceptions).toHaveLength(2);
-    const sent = JSON.stringify(exceptions);
-    expect(sent).not.toContain('alice@example.com');
-    expect(sent).not.toContain('invite-secret');
-    expect(sent).not.toContain('jwt-secret');
-    for (const exception of exceptions) {
-      const [first] = exception.properties.$exception_list;
-      expect(first.type).toBe('Error');
-      expect(first.value).toBe(
-        'Invite for [email] failed: https://portal.example.com/activate',
-      );
-      expect(
-        first.stacktrace.frames.map((f: { filename: string }) => f.filename),
-      ).toEqual(
-        expect.arrayContaining([
-          'https://portal.example.com/activate',
-          'https://portal.example.com/assets/index-abc.js',
-        ]),
-      );
-    }
-  });
-
-  it('masks credential assignments in messages, causes and non-HTTP frames of every reported error', async () => {
-    const cause = new Error(
-      'Cause alice@example.com token=CAUSE_SECRET_TOKEN /update-password?token_hash=RESET_SECRET&code=CODE_SECRET',
+    window.onerror?.(
+      error.message,
+      `${ORIGIN}/activate?t=ONERROR_SECRET`,
+      20,
+      2,
+      error,
     );
-    cause.stack = [
-      `Error: ${cause.message}`,
-      '    at reset (app:///alice@example.com/reset.js?token_hash=RESET_SECRET#access_token=HASH_SECRET:14:9)',
-    ].join('\n');
-    const error = new Error(
-      'Failed for alice@example.com token=SECRET_TOKEN password=PASSWORD_SECRET api_key=API_KEY_SECRET with Bearer BEARER_SECRET {"otp":"OTP_SECRET"} allletters ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP numeric 123456',
-      { cause },
-    );
-    error.stack = [
-      `Error: ${error.message}`,
-      '    at submit (https://portal.example.com/assets/index-abc123.js?v=VERSION_SECRET#access_token=HASH_SECRET:8:12)',
-      '    at activate (app:///alice@example.com/index.js?token_hash=RESET_SECRET#access_token=HASH_SECRET:20:2)',
-    ].join('\n');
-
-    posthog.captureException(error);
-    window.onerror?.(error.message, 'app:///index.js', 20, 2, error);
     window.dispatchEvent(
       new CustomEvent('unhandledrejection', { detail: { reason: error } }),
     );
+    const properties = posthog.exceptions?.buildProperties(error, {
+      handled: true,
+    });
+    const [frame] = properties?.$exception_list[0]?.stacktrace?.frames ?? [];
+    Object.assign(frame ?? {}, {
+      filename:
+        'https://portal.test/src/alice%40example.com/reset.js?token_hash=RESET_SECRET',
+      abs_path: `${ORIGIN}/reset-password?token_hash=RESET_SECRET#access_token=HASH_SECRET`,
+      url: `${ORIGIN}/auth/callback?code=CODE_SECRET`,
+      context_line: 'const token = "CONTEXT_SECRET";',
+      vars: { email: 'alice@example.com' },
+      module: 'alice@example.com',
+    });
+    posthog.captureException(error, {
+      ...properties,
+      $exception_source: `${ORIGIN}/activate?t=ACTIVATION_SECRET#access_token=HASH_SECRET`,
+      $exception_message: error.message,
+      $exception_type: 'alice@example.com',
+      $exception_steps: [
+        { $message: 'Signed in as alice@example.com', otp: 'OTP_SECRET' },
+      ],
+      $exception_fingerprint: 'alice@example.com',
+      $exception_personURL: `${ORIGIN}/person/alice@example.com`,
+      $exception_types: ['SECRET_TYPE'],
+      $exception_values: [error.message],
+    });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const exceptions = events.filter((e) => e.event === '$exception');
-    expect(exceptions).toHaveLength(3);
-    expect(JSON.stringify(exceptions)).not.toMatch(
-      /SECRET|alice@|ABCDEFGHIJ|123456/,
-    );
+    const exceptions = sentExceptions();
+    expect(exceptions).toHaveLength(4);
+    expect(JSON.stringify(exceptions)).not.toMatch(SECRETS);
     for (const exception of exceptions) {
-      const [failure, chained] = exception.properties.$exception_list;
-      const filenames = (frames: { filename: string }[]) =>
-        frames.map((frame) => frame.filename);
-      expect(failure.value).toBe(
-        'Failed for [email] token=*** password=*** api_key=*** with Bearer *** {"otp":"***"} allletters [token] numeric [token]',
+      expect(
+        Object.keys(exception.properties)
+          .filter((key) => key.startsWith('$exception'))
+          .sort(),
+      ).toEqual(['$exception_level', '$exception_list']);
+      const list: SentException[] = exception.properties.$exception_list;
+      const [root, ...causes] = list;
+      expect(list.map((entry) => entry.value)).toEqual(
+        LEAK_MESSAGES.map(() => '[redacted]'),
       );
-      expect(filenames(failure.stacktrace.frames)).toEqual(
+      expect(causes.map((cause) => cause.mechanism?.source)).toEqual(
+        causes.map(() => 'cause'),
+      );
+      expect(root?.stacktrace?.frames).toEqual(
         expect.arrayContaining([
-          'https://portal.example.com/assets/index-abc123.js',
-          'app:///[email]/index.js',
+          {
+            platform: 'web:javascript',
+            function: 'submit',
+            filename: `${ORIGIN}/assets/index-abc123.js`,
+            in_app: true,
+            lineno: 8,
+            colno: 12,
+          },
+          {
+            platform: 'web:javascript',
+            function: 'activate',
+            in_app: true,
+            lineno: 20,
+            colno: 2,
+          },
         ]),
       );
-      expect(chained.mechanism.source).toBe('cause');
-      expect(chained.value).toBe(
-        'Cause [email] token=*** /update-password?token_hash=***&code=***',
-      );
-      expect(filenames(chained.stacktrace.frames)).toEqual([
-        'app:///[email]/reset.js',
-      ]);
+      expect(
+        locationsOf(exception).every((location) =>
+          [
+            `${ORIGIN}/assets/index-abc123.js`,
+            `${ORIGIN}/node_modules/.vite/deps/chunk.js`,
+          ].includes(String(location)),
+        ),
+      ).toBe(true);
     }
+  });
+
+  it('drops the text of non-Error, array, object and oversized throwables', async () => {
+    const huge = new Error(`Failed ${'SECRET '.repeat(200_000)}`);
+    huge.stack = [
+      `Error: ${huge.message}`,
+      ...Array.from(
+        { length: 5_000 },
+        (_, i) =>
+          `    at Object.SECRET_${i} (${ORIGIN}/activate?t=SECRET_${i}:${i + 1}:1)`,
+      ),
+    ].join('\n');
+    posthog.captureException('token=STRING_SECRET for alice@example.com');
+    posthog.captureException({
+      token: 'OBJECT_SECRET',
+      message: 'Failed for alice@example.com',
+    });
+    posthog.captureException(
+      Object.assign(new Error(), {
+        message: ['ARRAY_SECRET_ONE', 'ARRAY_SECRET_TWO'],
+      }),
+    );
+    posthog.captureException(
+      Object.assign(new Error(), {
+        message: { error: { message: 'NESTED_SECRET for alice@example.com' } },
+      }),
+    );
+    posthog.captureException(huge);
+    window.onerror?.(
+      'Uncaught Error: token=ONERROR_SECRET',
+      `${ORIGIN}/activate?t=ONERROR_SECRET`,
+      3,
+      4,
+    );
+    for (const reason of [
+      'token=REJECTION_SECRET',
+      { token: 'OBJECT_SECRET' },
+      ['ARRAY_SECRET_ONE', 'ARRAY_SECRET_TWO'],
+    ])
+      window.dispatchEvent(
+        new CustomEvent('unhandledrejection', { detail: { reason } }),
+      );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const exceptions = sentExceptions();
+    expect(exceptions).toHaveLength(9);
+    expect(JSON.stringify(exceptions)).not.toMatch(SECRETS);
+    expect(JSON.stringify(exceptions).length).toBeLessThan(50_000);
+    for (const exception of exceptions) {
+      const list: SentException[] = exception.properties.$exception_list;
+      expect(list.map((entry) => entry.value)).toEqual(
+        list.map(() => '[redacted]'),
+      );
+      expect(locationsOf(exception)).toEqual([]);
+    }
+  });
+
+  it('keeps the type, message, function, line and column of a NotFoundError from a bundle frame', async () => {
+    const stack = [
+      'insertBefore@[native code]',
+      `commitPlacement@${ORIGIN}/assets/index-abc123.js?v=1#hash:8:12`,
+    ].join('\n');
+    const domException = new DOMException(
+      'The object can not be found here.',
+      'NotFoundError',
+    );
+    Object.defineProperty(domException, 'stack', { value: stack });
+    const namedError = Object.assign(
+      new Error('The object can not be found here.'),
+      { name: 'NotFoundError', stack },
+    );
+
+    posthog.captureException(domException);
+    window.onerror?.('', `${ORIGIN}/assets/index-abc123.js`, 8, 12, namedError);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const exceptions = sentExceptions();
+    expect(exceptions).toHaveLength(2);
+    const frames = [
+      {
+        platform: 'web:javascript',
+        function: 'commitPlacement',
+        filename: `${ORIGIN}/assets/index-abc123.js`,
+        in_app: true,
+        lineno: 8,
+        colno: 12,
+      },
+      { platform: 'web:javascript', function: 'insertBefore', in_app: true },
+    ];
+    expect(exceptions.map((e) => e.properties.$exception_list)).toEqual([
+      [
+        {
+          type: 'DOMException',
+          value: 'NotFoundError: The object can not be found here.',
+          mechanism: {
+            type: 'generic',
+            handled: true,
+            synthetic: false,
+            exception_id: 0,
+          },
+          stacktrace: { type: 'raw', frames },
+        },
+      ],
+      [
+        {
+          type: 'NotFoundError',
+          value: 'The object can not be found here.',
+          mechanism: {
+            type: 'generic',
+            handled: false,
+            synthetic: false,
+            exception_id: 0,
+          },
+          stacktrace: { type: 'raw', frames },
+        },
+      ],
+    ]);
   });
 });
 
@@ -159,189 +346,240 @@ describe('redactExceptionEvent', () => {
   ): CaptureResult {
     return { uuid: 'event-1', event: '$exception', properties };
   }
-  const JWT_TOKEN =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+  function firstException(properties: CaptureResult['properties']) {
+    return redactExceptionEvent(exceptionEvent(properties))?.properties
+      .$exception_list[0];
+  }
+  function frameOf(frame: Record<string, unknown>) {
+    return firstException({
+      $exception_list: [{ stacktrace: { type: 'raw', frames: [frame] } }],
+    }).stacktrace.frames[0];
+  }
 
-  it('redacts emails, JWTs and long secrets but keeps the rest of the message', () => {
-    expect(
-      redactText(
-        `Invite for alice.b+1@example.co.uk failed with ${JWT_TOKEN} and key Zx9_kQ2mVb7LpR4sTn8wYc3HdJ6fGa1eUo5iKl0Nq`,
-      ),
-    ).toBe('Invite for [email] failed with [token] and key [token]');
-    expect(
-      redactText(
-        'hash 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8',
-      ),
-    ).toBe('hash [token]');
-    expect(
-      redactText('Instructor 0b9c1c4e-1111-4222-8333-944455556666 not found'),
-    ).toBe('Instructor 0b9c1c4e-1111-4222-8333-944455556666 not found');
-    expect(
-      redactText(
-        'secret ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOP and code 123456',
-      ),
-    ).toBe('secret [token] and code [token]');
-  });
-
-  it('masks the values of sensitive assignments in any notation', () => {
-    expect(
-      redactText(
-        'token=a1 TOKEN=a2 Password: hunter2 x-api-key: k1 clientSecret=s1 sig=s2 auth=s3',
-      ),
-    ).toBe(
-      'token=*** TOKEN=*** Password: *** x-api-key: *** clientSecret=*** sig=*** auth=***',
-    );
-    expect(
-      redactText(
-        `{"password":"correct horse","otp":987654,'refresh_token': 'r1'}`,
-      ),
-    ).toBe(`{"password":"***","otp":***,'refresh_token': '***'}`);
-    expect(redactText('Authorization: Bearer abc.def-ghi')).toBe(
-      'Authorization: ***',
-    );
-    expect(redactText('retry with Bearer abc.def-ghi')).toBe(
-      'retry with Bearer ***',
-    );
-    expect(redactText('Error: next=token=t1 for user')).toBe(
-      'Error: next=token=*** for user',
-    );
-  });
-
-  it('keeps ordinary assignments and bundle paths readable', () => {
-    const ordinary =
-      "statusCode: 500 monkey=1 (reading 'key') at http://auth:8080/assets/index.js";
-    expect(redactText(ordinary)).toBe(ordinary);
-    expect(
-      redactText(
-        'Failed to fetch https://portal.example.com/assets/membership-card-example-DFr6qcj2.js',
-      ),
-    ).toBe(
-      'Failed to fetch https://portal.example.com/assets/membership-card-example-DFr6qcj2.js',
-    );
-    expect(
-      redactText(
-        'Unable to preload CSS for /assets/membership-card-example-DFr6qcj2.css?v=1',
-      ),
-    ).toBe(
-      'Unable to preload CSS for /assets/membership-card-example-DFr6qcj2.css',
-    );
-  });
-
-  it('strips query strings and hash fragments from URLs in messages', () => {
-    expect(
-      redactText(
-        'Failed to load https://portal.example.com/activate?t=invite-secret',
-      ),
-    ).toBe('Failed to load https://portal.example.com/activate');
-    expect(
-      redactText(
-        'No route matches URL "/reset-password?token_hash=reset-secret&type=recovery"',
-      ),
-    ).toBe('No route matches URL "/reset-password?token_hash=***&type=***"');
-    expect(redactText('Callback /auth/callback?code=pkce-secret failed')).toBe(
-      'Callback /auth/callback?code=*** failed',
-    );
-    expect(
-      redactText(
-        'Bad session in #access_token=jwt-secret&refresh_token=refresh-secret',
-      ),
-    ).toBe('Bad session in #access_token=***&refresh_token=***');
-  });
-
-  it('strips query strings and hashes from nested stack frames', () => {
+  it('rebuilds the event from allowlisted exception fields only', () => {
     const event = exceptionEvent({
+      $current_url: `${ORIGIN}/activate?t=<masked>`,
+      $pathname: '/activate',
+      $release_id: 'release-1',
       $exception_level: 'error',
-      $exception_source:
-        'https://portal.example.com/auth/callback#access_token=jwt-secret',
+      $exception_capture_enabled_server_side: true,
+      $exception_source: 'mcp.tool_call',
+      $exception_message: 'Failed for alice@example.com',
+      $exception_type: 'TypeError',
+      $exception_types: ['TypeError'],
+      $exception_values: ['Failed for alice@example.com'],
+      $exception_steps: [{ $message: 'Signed in', otp: 987654 }],
+      $exception_personURL: `${ORIGIN}/person/alice`,
+      $exception_fingerprint: 'alice',
       $exception_list: [
         {
           type: 'TypeError',
-          value: 'Cannot read properties of undefined',
-          mechanism: { type: 'generic', handled: true },
+          value: 'Failed to fetch',
+          module: 'alice',
+          thread_id: 1,
+          mechanism: {
+            type: 'generic',
+            handled: false,
+            synthetic: false,
+            exception_id: 0,
+            data: { email: 'alice@example.com' },
+          },
           stacktrace: {
             type: 'raw',
             frames: [
               {
                 platform: 'web:javascript',
-                filename: 'https://portal.example.com/activate?t=invite-secret',
-                function: 'activate',
-                lineno: 10,
-                colno: 5,
-                in_app: true,
-              },
-              {
-                platform: 'web:javascript',
-                filename:
-                  'https://portal.example.com/assets/index-abc.js?v=1#frag',
-                abs_path:
-                  'https://portal.example.com/reset-password?token_hash=reset-secret',
+                filename: `${ORIGIN}/assets/index-abc.js?v=1#frag`,
+                abs_path: `${ORIGIN}/assets/index-abc.js`,
                 function: 'run',
+                module: 'alice',
+                lineno: 1,
+                colno: 2,
                 in_app: true,
-              },
-              {
-                platform: 'web:javascript',
-                filename: 'app:///index.js?code=pkce-secret',
-                function: 'start',
-                in_app: true,
-              },
-              {
-                platform: 'web:javascript',
-                filename:
-                  'app:///alice@example.com/index.js?token_hash=reset-secret',
-                url: 'file:///Users/alice@example.com/token=file-secret/app.js',
-                function: 'load',
-                in_app: true,
-              },
-              {
-                platform: 'web:javascript',
-                filename: 'app:///assets/index-abc.js?x=1',
-                function: 'boot',
-                in_app: true,
+                chunk_id: 'alice',
+                context_line: 'alice',
+                pre_context: ['alice'],
+                post_context: ['alice'],
+                vars: { email: 'alice' },
+                instruction_addr: 'alice',
+                addr_mode: 'alice',
               },
             ],
           },
         },
+        {
+          type: 'Error',
+          value: 'Cause for alice@example.com',
+          mechanism: {
+            type: 'chained',
+            source: 'cause',
+            synthetic: false,
+            exception_id: 1,
+            parent_id: 0,
+          },
+        },
       ],
-      $exception_steps: [
-        { $message: 'Signed in', otp: 987654, code: 'pkce-secret' },
-      ],
-      $current_url: 'https://portal.example.com/activate?t=<masked>',
     });
 
-    const redacted = redactExceptionEvent(event)!;
+    const redacted = redactExceptionEvent(event);
 
-    expect(JSON.stringify(redacted)).not.toMatch(/secret|frag/);
-    expect(redacted.properties.$exception_source).toBe(
-      'https://portal.example.com/auth/callback',
-    );
-    const [exception] = redacted.properties.$exception_list;
-    expect(exception.type).toBe('TypeError');
-    expect(exception.value).toBe('Cannot read properties of undefined');
-    expect(exception.stacktrace.frames).toEqual([
-      expect.objectContaining({
-        filename: 'https://portal.example.com/activate',
-        function: 'activate',
-        lineno: 10,
-        colno: 5,
-      }),
-      expect.objectContaining({
-        filename: 'https://portal.example.com/assets/index-abc.js',
-        abs_path: 'https://portal.example.com/reset-password',
-      }),
-      expect.objectContaining({ filename: 'app:///index.js' }),
-      expect.objectContaining({
-        filename: 'app:///[email]/index.js',
-        url: 'file:///Users/[email]/token=***',
-      }),
-      expect.objectContaining({ filename: 'app:///assets/index-abc.js' }),
-    ]);
-    expect(redacted.properties.$exception_steps).toEqual([
-      { $message: 'Signed in', otp: '***', code: '***' },
-    ]);
-    expect(redacted.properties.$exception_level).toBe('error');
-    expect(redacted.properties.$current_url).toBe(
-      'https://portal.example.com/activate?t=<masked>',
-    );
+    expect(JSON.stringify(redacted)).not.toMatch(/alice|frag/);
+    expect(redacted).toEqual({
+      uuid: 'event-1',
+      event: '$exception',
+      properties: {
+        $current_url: `${ORIGIN}/activate?t=<masked>`,
+        $pathname: '/activate',
+        $release_id: 'release-1',
+        $exception_level: 'error',
+        $exception_capture_enabled_server_side: true,
+        $exception_list: [
+          {
+            type: 'TypeError',
+            value: 'Failed to fetch',
+            mechanism: {
+              type: 'generic',
+              handled: false,
+              synthetic: false,
+              exception_id: 0,
+            },
+            stacktrace: {
+              type: 'raw',
+              frames: [
+                {
+                  platform: 'web:javascript',
+                  filename: `${ORIGIN}/assets/index-abc.js`,
+                  abs_path: `${ORIGIN}/assets/index-abc.js`,
+                  function: 'run',
+                  lineno: 1,
+                  colno: 2,
+                  in_app: true,
+                },
+              ],
+            },
+          },
+          {
+            type: 'Error',
+            value: '[redacted]',
+            mechanism: {
+              type: 'chained',
+              source: 'cause',
+              synthetic: false,
+              exception_id: 1,
+              parent_id: 0,
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('keeps only short plain-word messages', () => {
+    const kept = [
+      'The object can not be found here.',
+      'NotFoundError: The object can not be found here.',
+      'Failed to fetch',
+      'Load failed',
+      "Cannot read properties of undefined (reading 'map')",
+      'Something went wrong!',
+      '',
+    ];
+    for (const value of kept)
+      expect(firstException({ $exception_list: [{ value }] }).value).toBe(
+        value,
+      );
+    const redacted: unknown[] = [
+      ...LEAK_MESSAGES,
+      'Invite for alice failed with code 4',
+      'User alice_smith not found',
+      'Failed for alice@example.com',
+      'Expected one of: a, b',
+      'Failed (see /activate)',
+      'Retry in a moment & try again',
+      'Fehler für Benutzer',
+      'Failed\twith a tab',
+      `Failed ${'a'.repeat(25)}`,
+      `Failed ${'word '.repeat(40)}`,
+      'Uncaught NotFoundError: The object can not be found here.',
+      'alice: The object can not be found here.',
+      `${'A'.repeat(60)}Error: The object can not be found here.`,
+      undefined,
+      null,
+      42,
+      ['Failed to fetch'],
+      { message: 'Failed to fetch' },
+    ];
+    for (const value of redacted)
+      expect(firstException({ $exception_list: [{ value }] }).value).toBe(
+        '[redacted]',
+      );
+  });
+
+  it('keeps type and function names only when they are identifiers', () => {
+    for (const name of ['TypeError', 'NotFoundError', 'submit', 'a', 'x_1'])
+      expect([
+        firstException({ $exception_list: [{ type: name }] }).type,
+        frameOf({ function: name }).function,
+      ]).toEqual([name, name]);
+    for (const name of [
+      'alice@example.com',
+      'Object.submit',
+      'token=SECRET',
+      '?',
+      '<anonymous>',
+      '1Error',
+      '',
+      'A'.repeat(65),
+      'Errör',
+      42,
+      undefined,
+    ]) {
+      expect(firstException({ $exception_list: [{ type: name }] }).type).toBe(
+        'Error',
+      );
+      expect(frameOf({ function: name })).toEqual({});
+    }
+  });
+
+  it('keeps frame locations only for bundle files on the portal origin', () => {
+    const kept: [string, string][] = [
+      [`${ORIGIN}/assets/index-abc123.js`, `${ORIGIN}/assets/index-abc123.js`],
+      [
+        `${ORIGIN}/assets/index-abc123.js?t=SECRET#access_token=SECRET`,
+        `${ORIGIN}/assets/index-abc123.js`,
+      ],
+      ['/src/lib/analytics.ts?t=1', `${ORIGIN}/src/lib/analytics.ts`],
+      [
+        `${ORIGIN}/node_modules/.vite/deps/react-dom_client.js?v=abc`,
+        `${ORIGIN}/node_modules/.vite/deps/react-dom_client.js`,
+      ],
+      [`${ORIGIN}/pdfjs/wasm/openjpeg.js`, `${ORIGIN}/pdfjs/wasm/openjpeg.js`],
+    ];
+    for (const [location, expected] of kept)
+      expect(frameOf({ filename: location, abs_path: location })).toEqual({
+        filename: expected,
+        abs_path: expected,
+      });
+    for (const location of [
+      `${ORIGIN}/activate?t=SECRET`,
+      `${ORIGIN}/reset-password`,
+      `${ORIGIN}/assets/../activate`,
+      `${ORIGIN}/assets/alice@example.com.js`,
+      `${ORIGIN}/src/alice%40example.com/reset.js`,
+      `${ORIGIN}/assets/café.js`,
+      `${ORIGIN}/assets/a b.js`,
+      'https://portal.test/assets/index-abc123.js',
+      'http://127.0.0.1:8799/assets/index-abc123.js',
+      '//evil.example/assets/index.js',
+      'app:///assets/index-abc.js',
+      'blob:http://localhost:3000/assets/index.js',
+      'file:///Users/alice/assets/index.js',
+      '[native code]',
+      '<anonymous>',
+      'http://[',
+      42,
+    ])
+      expect(frameOf({ filename: location, abs_path: location })).toEqual({});
   });
 
   it('passes other events through untouched', () => {
@@ -353,7 +591,7 @@ describe('redactExceptionEvent', () => {
     expect(redactExceptionEvent(event)).toBe(event);
   });
 
-  it('drops an exception it cannot redact instead of sending it raw', () => {
+  it('drops an exception it cannot read instead of sending it raw', () => {
     const exception = { type: 'Error' };
     Object.defineProperty(exception, 'value', {
       enumerable: true,
@@ -361,9 +599,48 @@ describe('redactExceptionEvent', () => {
         throw new Error('unreadable');
       },
     });
-    expect(
-      redactExceptionEvent(exceptionEvent({ $exception_list: [exception] })),
-    ).toBeNull();
+    for (const $exception_list of [
+      [exception],
+      undefined,
+      'Failed for alice@example.com',
+      { type: 'Error' },
+      ['Failed for alice@example.com'],
+      [null],
+    ])
+      expect(
+        redactExceptionEvent(exceptionEvent({ $exception_list })),
+      ).toBeNull();
+  });
+
+  it('reads only allowlisted fields of cyclic and very large input', () => {
+    const cyclic: Record<string, unknown> = { type: 'Error' };
+    cyclic.self = cyclic;
+    cyclic.mechanism = cyclic;
+    expect(firstException({ $exception_list: [cyclic] })).toEqual({
+      type: 'Error',
+      value: '[redacted]',
+      mechanism: { type: 'Error' },
+    });
+
+    const frames = Array.from({ length: 100_000 }, (_, i) => ({
+      platform: 'web:javascript',
+      function: `fn${i}`,
+      filename: `${ORIGIN}/activate?t=SECRET_${i}`,
+      lineno: i,
+      context_line: 'SECRET '.repeat(100),
+    }));
+    const exception = firstException({
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'SECRET '.repeat(1_000_000),
+          stacktrace: { frames },
+        },
+      ],
+    });
+    expect(exception.value).toBe('[redacted]');
+    expect(exception.stacktrace.frames).toHaveLength(100_000);
+    expect(JSON.stringify(exception)).not.toContain('SECRET');
   });
 });
 
