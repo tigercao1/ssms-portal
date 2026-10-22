@@ -6,6 +6,7 @@ const posthog = vi.hoisted(() => ({
   identify: vi.fn(),
   reset: vi.fn(),
   capture: vi.fn(),
+  captureException: vi.fn(),
 }));
 vi.mock('posthog-js', () => ({ default: posthog }));
 
@@ -29,9 +30,11 @@ describe('analytics', () => {
     analytics.identifyUser('user-1', 'instructor');
     analytics.track('profile_saved');
     analytics.resetUser();
+    analytics.captureError(new Error('boom'));
     await Promise.resolve();
 
     expect(posthog.init).not.toHaveBeenCalled();
+    expect(posthog.captureException).not.toHaveBeenCalled();
     expect(posthog.identify).not.toHaveBeenCalled();
     expect(posthog.capture).not.toHaveBeenCalled();
     expect(posthog.reset).not.toHaveBeenCalled();
@@ -50,6 +53,7 @@ describe('analytics', () => {
         disable_capture_url_hashes: true,
         mask_personal_data_properties: true,
         custom_personal_data_properties: expect.arrayContaining(['t']),
+        capture_exceptions: true,
         mask_all_text: true,
         mask_all_element_attributes: true,
         session_recording: expect.objectContaining({
@@ -74,5 +78,23 @@ describe('analytics', () => {
     expect(posthog.capture).toHaveBeenCalledWith('photo_uploaded', {
       slot: 'avatar',
     });
+  });
+
+  it('reports caught errors and never throws when reporting fails', async () => {
+    const analytics = await loadAnalytics('phc_test');
+    analytics.initAnalytics();
+    const error = new Error('boom');
+    posthog.captureException.mockImplementationOnce(() => {
+      throw new Error('posthog down');
+    });
+
+    expect(() => analytics.captureError(error)).not.toThrow();
+    await waitFor(() =>
+      expect(posthog.captureException).toHaveBeenCalledWith(error),
+    );
+    analytics.captureError(error);
+    await waitFor(() =>
+      expect(posthog.captureException).toHaveBeenCalledTimes(2),
+    );
   });
 });

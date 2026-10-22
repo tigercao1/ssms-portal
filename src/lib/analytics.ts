@@ -131,6 +131,7 @@ export const posthogConfig: Partial<PostHogConfig> = {
   disable_capture_url_hashes: true,
   mask_personal_data_properties: true,
   custom_personal_data_properties: ['t', 'token', 'token_hash', 'code'],
+  capture_exceptions: true,
   mask_all_text: true,
   mask_all_element_attributes: true,
   session_recording: {
@@ -178,4 +179,8 @@ export function track(
   properties?: Record<string, string | number | boolean>,
 ): void {
   withClient((posthog) => posthog.capture(event, properties));
+}
+
+export function captureError(error: unknown): void {
+  withClient((posthog) => posthog.captureException(error));
 }

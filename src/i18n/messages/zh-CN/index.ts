@@ -1785,5 +1785,9 @@ export const zhCN: Messages = {
     network: '网络错误，请检查连接后重试。',
     forbidden: '您没有访问该区域的权限。',
     generic: '出现错误。',
+    crashTitle: '页面出错了',
+    crashBody: '此页面无法正常运行，请重新加载后重试。',
+    reload: '重新加载',
+    goHome: '返回首页',
   },
 };

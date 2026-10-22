@@ -1728,6 +1728,10 @@ export interface Messages {
     network: string;
     forbidden: string;
     generic: string;
+    crashTitle: string;
+    crashBody: string;
+    reload: string;
+    goHome: string;
   };
 }
 

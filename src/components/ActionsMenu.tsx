@@ -333,7 +333,7 @@ function MenuItem({
     <>
       <span className="flex items-center gap-2">
         {item.loading && <ItemSpinner />}
-        {item.label}
+        <span>{item.label}</span>
       </span>
       {item.description && (
         <span id={descriptionId} className="text-xs text-slate">

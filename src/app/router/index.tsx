@@ -6,6 +6,7 @@ import {
   RequireEmailVerified,
 } from './guards';
 import { AppShell } from '@/app/shell/AppShell';
+import { RouteErrorPage } from '@/app/shell/RouteErrorPage';
 import { ProfileViewPage } from '@/features/instructor/ProfileViewPage';
 import { EditProfilePage } from '@/features/instructor/EditProfilePage';
 import { SettingsPage } from '@/features/instructor/SettingsPage';
@@ -47,206 +48,216 @@ import { AuthCallbackPage } from '@/auth/AuthCallbackPage';
  * Feature screens are still placeholders (Wave 2), tagged with their task id.
  */
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/signup', element: <SignUpPage /> },
-  { path: '/verify-email', element: <VerifyEmailPage /> },
-  { path: '/reset-password', element: <RequestResetPage /> },
-  { path: '/update-password', element: <UpdatePasswordPage /> },
-  { path: '/activate', element: <ActivatePage /> },
   {
-    path: '/activate/password',
-    element: (
-      <RequireAuth>
-        <ActivatePasswordPage />
-      </RequireAuth>
-    ),
-  },
-  { path: '/auth/callback', element: <AuthCallbackPage /> },
-
-  {
-    element: (
-      <RequireAuth>
-        <RequireEmailVerified>
-          <AppShell />
-        </RequireEmailVerified>
-      </RequireAuth>
-    ),
+    errorElement: <RouteErrorPage />,
     children: [
-      { path: '/', element: <HomeRedirect /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/signup', element: <SignUpPage /> },
+      { path: '/verify-email', element: <VerifyEmailPage /> },
+      { path: '/reset-password', element: <RequestResetPage /> },
+      { path: '/update-password', element: <UpdatePasswordPage /> },
+      { path: '/activate', element: <ActivatePage /> },
+      {
+        path: '/activate/password',
+        element: (
+          <RequireAuth>
+            <ActivatePasswordPage />
+          </RequireAuth>
+        ),
+      },
+      { path: '/auth/callback', element: <AuthCallbackPage /> },
 
-      // Instructor
-      { path: '/profile', element: <ProfileViewPage /> },
-      { path: '/profile/edit', element: <EditProfilePage /> },
-      { path: '/onboarding', element: <OnboardingPage /> },
       {
-        path: '/onboarding/:assignmentId',
-        element: <OnboardingDocumentPage />,
-      },
-      { path: '/insurance', element: <InsurancePage /> },
-      { path: '/insurance/new', element: <InsurancePage /> },
-      { path: '/insurance/new/review', element: <InsurancePage /> },
-      { path: '/lessons', element: <LessonsPayPage /> },
-      { path: '/settings', element: <SettingsPage /> },
+        element: (
+          <RequireAuth>
+            <RequireEmailVerified>
+              <AppShell />
+            </RequireEmailVerified>
+          </RequireAuth>
+        ),
+        children: [
+          {
+            errorElement: <RouteErrorPage inShell />,
+            children: [
+              { path: '/', element: <HomeRedirect /> },
 
-      // Admin (role-gated)
-      {
-        path: '/admin',
-        element: (
-          <RequireAdmin>
-            <AdminDashboard />
-          </RequireAdmin>
-        ),
+              // Instructor
+              { path: '/profile', element: <ProfileViewPage /> },
+              { path: '/profile/edit', element: <EditProfilePage /> },
+              { path: '/onboarding', element: <OnboardingPage /> },
+              {
+                path: '/onboarding/:assignmentId',
+                element: <OnboardingDocumentPage />,
+              },
+              { path: '/insurance', element: <InsurancePage /> },
+              { path: '/insurance/new', element: <InsurancePage /> },
+              { path: '/insurance/new/review', element: <InsurancePage /> },
+              { path: '/lessons', element: <LessonsPayPage /> },
+              { path: '/settings', element: <SettingsPage /> },
+
+              // Admin (role-gated)
+              {
+                path: '/admin',
+                element: (
+                  <RequireAdmin>
+                    <AdminDashboard />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/instructors',
+                element: (
+                  <RequireAdmin>
+                    <AdminListPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/instructors/:id',
+                element: (
+                  <RequireAdmin>
+                    <AdminDetailPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/reference',
+                element: (
+                  <RequireAdmin>
+                    <ReferenceManagerPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/lesson-types',
+                element: (
+                  <RequireAdmin>
+                    <LessonTypesPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/customers',
+                element: (
+                  <RequireAdmin>
+                    <CustomersPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/booking',
+                element: (
+                  <RequireAdmin>
+                    <BookLessonPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/classes',
+                element: (
+                  <RequireAdmin>
+                    <ClassesPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/payroll',
+                element: (
+                  <RequireAdmin>
+                    <PayrollPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/insurance',
+                element: (
+                  <RequireAdmin>
+                    <AdminInsurancePage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/calendar-matching',
+                element: <Navigate to="/admin/instructors" replace />,
+              },
+              {
+                path: '/admin/import-history',
+                element: (
+                  <RequireAdmin>
+                    <ImportHistoryPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/pages',
+                element: (
+                  <RequireAdmin>
+                    <PagesListPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/pages/:id',
+                element: (
+                  <RequireAdmin>
+                    <PageEditorPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/documents',
+                element: (
+                  <RequireAdmin>
+                    <DocumentsListPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/document-review',
+                element: (
+                  <RequireAdmin>
+                    <DocumentReviewPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/documents/:id/edit',
+                element: (
+                  <RequireAdmin>
+                    <FieldEditorPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/documents/:id/signed',
+                element: (
+                  <RequireAdmin>
+                    <SignedCopiesPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/shopify-sync',
+                element: (
+                  <RequireAdmin>
+                    <ShopifySyncPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/settings/google',
+                element: (
+                  <RequireAdmin>
+                    <GoogleSettingsPage />
+                  </RequireAdmin>
+                ),
+              },
+            ],
+          },
+        ],
       },
-      {
-        path: '/admin/instructors',
-        element: (
-          <RequireAdmin>
-            <AdminListPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/instructors/:id',
-        element: (
-          <RequireAdmin>
-            <AdminDetailPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/reference',
-        element: (
-          <RequireAdmin>
-            <ReferenceManagerPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/lesson-types',
-        element: (
-          <RequireAdmin>
-            <LessonTypesPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/customers',
-        element: (
-          <RequireAdmin>
-            <CustomersPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/booking',
-        element: (
-          <RequireAdmin>
-            <BookLessonPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/classes',
-        element: (
-          <RequireAdmin>
-            <ClassesPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/payroll',
-        element: (
-          <RequireAdmin>
-            <PayrollPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/insurance',
-        element: (
-          <RequireAdmin>
-            <AdminInsurancePage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/calendar-matching',
-        element: <Navigate to="/admin/instructors" replace />,
-      },
-      {
-        path: '/admin/import-history',
-        element: (
-          <RequireAdmin>
-            <ImportHistoryPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/pages',
-        element: (
-          <RequireAdmin>
-            <PagesListPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/pages/:id',
-        element: (
-          <RequireAdmin>
-            <PageEditorPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/documents',
-        element: (
-          <RequireAdmin>
-            <DocumentsListPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/document-review',
-        element: (
-          <RequireAdmin>
-            <DocumentReviewPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/documents/:id/edit',
-        element: (
-          <RequireAdmin>
-            <FieldEditorPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/documents/:id/signed',
-        element: (
-          <RequireAdmin>
-            <SignedCopiesPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/shopify-sync',
-        element: (
-          <RequireAdmin>
-            <ShopifySyncPage />
-          </RequireAdmin>
-        ),
-      },
-      {
-        path: '/admin/settings/google',
-        element: (
-          <RequireAdmin>
-            <GoogleSettingsPage />
-          </RequireAdmin>
-        ),
-      },
+
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-
-  { path: '*', element: <Navigate to="/" replace /> },
 ]);
