@@ -5,8 +5,8 @@ name: API dependency
 # .github/scripts/api-dependency.mjs and README § Changes that span the API.
 #
 # pull_request_target runs this workflow from main with a token that can post
-# statuses, and never checks out or runs code from the PR. The schedule
-# re-checks open PRs so they go green soon after the API deploys.
+# statuses, and never checks out or runs code from the PR. The API's Release
+# dispatches it after each deploy; the schedule is only a slow fallback.
 
 on:
   pull_request_target:
