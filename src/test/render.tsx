@@ -3,15 +3,19 @@ import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { I18nProvider } from '@/i18n/core/I18nProvider';
+import { bindQueryClientToAccount } from '@/lib/query';
 
 /** Wraps a component in the app providers for tests (W3.5). */
 export function renderWithProviders(
   ui: ReactElement,
   { route = '/', staleTime }: { route?: string; staleTime?: number } = {},
 ) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime } },
-  });
+  const queryClient = bindQueryClientToAccount(
+    new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime } },
+    }),
+    null,
+  );
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>

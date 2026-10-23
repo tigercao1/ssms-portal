@@ -175,6 +175,8 @@ export const en: Messages = {
       'Your Google Calendar isn’t connected yet, so booked lessons won’t appear on it. Follow the guide to connect it.',
     calendarGuide: 'How to connect your calendar',
     editTitle: 'Edit profile',
+    accountSwitched:
+      'You are now signed in as a different account, so these changes were not saved. Reload the page to edit the current account.',
     identitySection: 'Identity',
     bioSection: 'Bio',
     detailsSection: 'Details',
