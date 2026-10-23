@@ -165,6 +165,34 @@ describe('SignatureModal', () => {
       screen.getByRole('button', { name: 'Use signature' }),
     ).toBeDisabled();
   });
+
+  it('keeps Tab inside the sheet around the drawing canvas', async () => {
+    const onClose = vi.fn();
+    renderWithProviders(
+      <>
+        <button type="button">Behind</button>
+        <SignatureModal
+          open
+          kind="signature"
+          text={en.signer}
+          defaultTypedText=""
+          onAdopt={() => {}}
+          onClose={onClose}
+        />
+      </>,
+    );
+    const sheet = screen.getByRole('dialog', { name: 'Your signature' });
+    expect(sheet).toHaveFocus();
+    expect(
+      screen.getByRole('button', { name: 'Behind' }).closest('[inert]'),
+    ).not.toBeNull();
+    for (let i = 0; i < 10; i++) {
+      await userEvent.tab({ shift: i % 3 === 0 });
+      expect(sheet).toContainElement(document.activeElement as HTMLElement);
+    }
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });
 
 describe('ConsentBlock', () => {

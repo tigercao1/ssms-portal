@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
+import { useModalFocus } from '@/lib/useModalFocus';
 
 export function Drawer({
   title,
@@ -25,25 +26,17 @@ export function Drawer({
   const t = useT();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  const blockedRef = useRef(blocked);
-  blockedRef.current = blocked;
 
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !blockedRef.current) closeRef.current();
-    };
-    document.addEventListener('keydown', onKey);
     document.body.classList.add('overflow-hidden');
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.classList.remove('overflow-hidden');
-      previous?.focus?.();
-    };
+    return () => document.body.classList.remove('overflow-hidden');
   }, []);
+
+  useModalFocus(panelRef, {
+    onEscape: () => {
+      if (!blocked) onClose();
+    },
+  });
 
   return createPortal(
     <div className="fixed inset-0 z-50">

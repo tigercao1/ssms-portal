@@ -379,4 +379,36 @@ describe('ClassActions', () => {
       'busy 12:00–13:00 (Google Calendar)',
     );
   });
+
+  it('keeps focus in the top dialog and closes one dialog per Escape', async () => {
+    serve();
+    const user = userEvent.setup();
+    renderWithProviders(<ClassActions item={booked} />);
+    const trigger = screen.getByRole('button', { name: /^More actions for / });
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Move or edit…' }));
+    const move = screen.getByRole('dialog', { name: 'Move or edit lesson' });
+    expect(move).toHaveFocus();
+    expect(trigger.closest('[inert]')).not.toBeNull();
+    for (let i = 0; i < 12; i++) {
+      await user.tab({ shift: i % 4 === 0 });
+      expect(move).toContainElement(document.activeElement as HTMLElement);
+    }
+
+    const add = within(move).getByRole('button', { name: 'New customer' });
+    await user.click(add);
+    const create = screen.getByRole('dialog', { name: 'New customer' });
+    for (let i = 0; i < 6; i++) {
+      await user.tab({ shift: i % 2 === 0 });
+      expect(create).toContainElement(document.activeElement as HTMLElement);
+    }
+    await user.keyboard('{Escape}');
+    expect(create).not.toBeInTheDocument();
+    expect(add).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(move).not.toBeInTheDocument();
+    expect(trigger.closest('[inert]')).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
 });

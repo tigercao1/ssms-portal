@@ -24,6 +24,7 @@ export function useToast({ topOnPhones = false } = {}) {
           key={serial}
           role="status"
           data-private
+          data-modal-exempt
           className={cn(
             'fixed inset-x-4 z-[60] mx-auto max-w-sm break-words rounded-md border-l-[3px] border-l-status-approved bg-navy px-4 py-3 text-sm text-white shadow-pop',
             topOnPhones

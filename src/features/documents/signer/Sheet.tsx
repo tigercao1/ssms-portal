@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalFocus } from '@/lib/useModalFocus';
 
 interface SheetProps {
   open: boolean;
@@ -13,24 +14,14 @@ interface SheetProps {
 export function Sheet({ open, title, onClose, children, footer }: SheetProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-    document.addEventListener('keydown', onKeyDown);
     document.body.classList.add('overflow-hidden');
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.classList.remove('overflow-hidden');
-      previous?.focus?.();
-    };
+    return () => document.body.classList.remove('overflow-hidden');
   }, [open]);
+
+  useModalFocus(panelRef, { open, onEscape: onClose });
 
   if (!open) return null;
 

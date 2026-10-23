@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { EditProfilePage } from './EditProfilePage';
@@ -1187,15 +1187,27 @@ describe('Save changes with unsaved bio text', () => {
       usage: usage(4),
     });
 
-  async function tabToSubmit(name: string) {
-    const submit = screen.getByRole('button', { name });
-    for (let i = 0; i < 200 && document.activeElement !== submit; i++)
-      await userEvent.tab();
-    expect(submit).toHaveFocus();
-    await userEvent.keyboard('{Enter}');
-  }
+  const submitProfile = (name: string) =>
+    fireEvent.submit(screen.getByRole('button', { name }).closest('form')!);
 
-  it('blocks a keyboard save while the review window holds edited text', async () => {
+  it('keeps Tab inside the review window so Save changes never takes focus', async () => {
+    setup(zhStale, { draft: translation });
+    renderWithProviders(<EditProfilePage />);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Update translation' }),
+    );
+    await within(dialog()).findByText('更新的中文。');
+    const submit = screen.getByRole('button', { name: 'Save changes' });
+    expect(submit.closest('[inert]')).not.toBeNull();
+
+    for (let i = 0; i < 30; i++) {
+      await userEvent.tab({ shift: i >= 15 });
+      expect(dialog()).toContainElement(document.activeElement as HTMLElement);
+      expect(submit).not.toHaveFocus();
+    }
+  });
+
+  it('blocks a save while the review window holds edited text', async () => {
     const { patches } = setup(zhStale, { draft: translation });
     renderWithProviders(<EditProfilePage />);
     await userEvent.click(
@@ -1206,7 +1218,7 @@ describe('Save changes with unsaved bio text', () => {
     );
     const zh = within(dialog()).getByRole('textbox', { name: '中文' });
     await userEvent.type(zh, '！');
-    await tabToSubmit('Save changes');
+    submitProfile('Save changes');
 
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
       'You have unsaved bio changes. Press Save below to keep them, or discard them.',
@@ -1234,7 +1246,7 @@ describe('Save changes with unsaved bio text', () => {
     );
     const review = await screen.findByRole('dialog', { name: '确认您的简介' });
     await within(review).findByText('更新的中文。');
-    await tabToSubmit('保存更改');
+    submitProfile('保存更改');
 
     expect(await within(review).findByRole('alert')).toHaveTextContent(
       '简介有未保存的修改。请点击下方的“保存”保留修改，或放弃修改。',
