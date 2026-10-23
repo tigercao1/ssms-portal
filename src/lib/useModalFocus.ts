@@ -29,7 +29,7 @@ function trapTab(e: KeyboardEvent, panel: HTMLElement) {
 
 function makeBackgroundInert(panel: HTMLElement) {
   const background = [...document.body.children].filter(
-    (el) => !el.contains(panel) && !el.hasAttribute('inert'),
+    (el) => !el.contains(panel) && !el.matches('[inert], [data-modal-exempt]'),
   );
   background.forEach((el) => el.setAttribute('inert', ''));
   return () => background.forEach((el) => el.removeAttribute('inert'));
