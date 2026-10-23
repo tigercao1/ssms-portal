@@ -68,7 +68,7 @@ export function Button({
       {...rest}
     >
       {loading && <ButtonSpinner />}
-      {children}
+      <span className="contents">{children}</span>
     </button>
   );
 }

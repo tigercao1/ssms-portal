@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { translateText } from '@/test/translate';
 import { FileButton } from './FileButton';
 
 afterEach(() => vi.restoreAllMocks());
@@ -45,6 +46,23 @@ describe('FileButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Before' }));
     await userEvent.tab();
     expect(screen.getByLabelText('Upload')).toHaveFocus();
+  });
+
+  it('starts and stops loading after the browser translates its label', () => {
+    const { rerender } = render(<FileButton>Upload photo</FileButton>);
+    const label = screen.getByLabelText('Upload photo').closest('label')!;
+    translateText(label, '上传照片');
+
+    rerender(<FileButton loading>Upload photo</FileButton>);
+    expect(screen.getByLabelText('上传照片')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(label.querySelector('.animate-spin')).not.toBeNull();
+
+    rerender(<FileButton>Upload photo</FileButton>);
+    expect(screen.getByLabelText('上传照片')).not.toBeDisabled();
+    expect(label.querySelector('.animate-spin')).toBeNull();
   });
 
   it('disables the input and marks it busy while loading', () => {

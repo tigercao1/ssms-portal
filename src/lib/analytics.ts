@@ -1,4 +1,4 @@
-import type { PostHog, PostHogConfig } from 'posthog-js';
+import type { CaptureResult, PostHog, PostHogConfig } from 'posthog-js';
 import { env } from './env';
 
 export type AnalyticsRole = 'admin' | 'instructor';
@@ -125,12 +125,218 @@ export function stripRequestUrl<T extends { name: string }>(request: T): T {
   return { ...request, name: url.origin + sanitizePath(url.pathname) };
 }
 
+type Fields = Record<string, unknown>;
+type Check = (value: unknown) => unknown;
+
+const SENSITIVE_URL_PARAMS = ['t', 'token', 'token_hash', 'code'];
+const SENSITIVE_URL_PARAM = new RegExp(
+  `([?&#](?:${SENSITIVE_URL_PARAMS.join('|')})=)[^&#]*`,
+  'g',
+);
+const MASKED_URL_PARAM = '$1<masked>';
+const URL_PROPERTIES = new Set([
+  '$current_url',
+  '$referrer',
+  '$session_entry_url',
+  '$session_entry_referrer',
+  '$initial_current_url',
+  '$initial_referrer',
+]);
+const PERSON_PROPERTIES = new Set(['$set', '$set_once']);
+
+const REDACTED = '[redacted]';
+const MAX_MESSAGE_LENGTH = 200;
+const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+const ERROR_NAME_PREFIX = /^([A-Za-z]+): /;
+const STANDARD_ERROR_NAMES = new Set([
+  'Error',
+  'TypeError',
+  'RangeError',
+  'ReferenceError',
+  'SyntaxError',
+  'EvalError',
+  'URIError',
+  'AggregateError',
+  'NotFoundError',
+  'NotAllowedError',
+  'AbortError',
+  'NetworkError',
+  'SecurityError',
+  'InvalidStateError',
+  'QuotaExceededError',
+  'NotSupportedError',
+  'DataCloneError',
+  'TimeoutError',
+  'HierarchyRequestError',
+  'InvalidCharacterError',
+  'ChunkLoadError',
+]);
+const SAFE_TEXT = /^[A-Za-z .,'()!?-]*$/;
+const LONG_WORD = /[^ ]{25}/;
+const BUNDLE_PATH = /^[A-Za-z0-9._/-]+$/;
+
+function isFields(value: unknown): value is Fields {
+  return typeof value === 'object' && value !== null;
+}
+
+function maskUrls(fields: Fields): Fields {
+  let masked = fields;
+  for (const [name, value] of Object.entries(fields)) {
+    const safe =
+      typeof value === 'string' && URL_PROPERTIES.has(name)
+        ? value.replace(SENSITIVE_URL_PARAM, MASKED_URL_PARAM)
+        : PERSON_PROPERTIES.has(name) && isFields(value)
+          ? maskUrls(value)
+          : value;
+    if (safe !== value) masked = { ...masked, [name]: safe };
+  }
+  return masked;
+}
+
+export function maskUrlProperties(event: CaptureResult): CaptureResult {
+  const properties = maskUrls(event.properties);
+  const $set = event.$set && maskUrls(event.$set);
+  const $set_once = event.$set_once && maskUrls(event.$set_once);
+  return properties === event.properties &&
+    $set === event.$set &&
+    $set_once === event.$set_once
+    ? event
+    : {
+        ...event,
+        properties,
+        ...($set && { $set }),
+        ...($set_once && { $set_once }),
+      };
+}
+
+const flag: Check = (value) => (typeof value === 'boolean' ? value : undefined);
+
+const count: Check = (value) =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
+
+const identifier: Check = (value) =>
+  typeof value === 'string' && IDENTIFIER.test(value) ? value : undefined;
+
+const oneOf =
+  (...allowed: string[]): Check =>
+  (value) =>
+    typeof value === 'string' && allowed.includes(value) ? value : undefined;
+
+function safeMessage(value: unknown, type: unknown): string {
+  if (typeof value !== 'string' || value.length > MAX_MESSAGE_LENGTH)
+    return REDACTED;
+  const name = ERROR_NAME_PREFIX.exec(value)?.[1];
+  const text =
+    name !== undefined &&
+    STANDARD_ERROR_NAMES.has(name) &&
+    (name === type || type === 'DOMException')
+      ? value.slice(name.length + 2)
+      : value;
+  return SAFE_TEXT.test(text) && !LONG_WORD.test(text) ? value : REDACTED;
+}
+
+const bundleLocation: Check = (value) => {
+  if (typeof value !== 'string') return undefined;
+  let url: URL;
+  try {
+    url = new URL(value, window.location.origin);
+  } catch {
+    return undefined;
+  }
+  return url.origin === window.location.origin &&
+    STATIC_PREFIXES.some((prefix) => url.pathname.startsWith(prefix)) &&
+    BUNDLE_PATH.test(url.pathname)
+    ? url.origin + url.pathname
+    : undefined;
+};
+
+const EVENT_FIELDS: Record<string, Check> = {
+  $exception_level: oneOf('fatal', 'error', 'warning', 'log', 'info', 'debug'),
+  $exception_capture_enabled_server_side: flag,
+};
+const MECHANISM_FIELDS: Record<string, Check> = {
+  type: identifier,
+  handled: flag,
+  synthetic: flag,
+  source: oneOf('cause', 'member'),
+  exception_id: count,
+  parent_id: count,
+};
+const FRAME_FIELDS: Record<string, Check> = {
+  platform: oneOf('web:javascript', 'node:javascript', 'hermes'),
+  function: identifier,
+  filename: bundleLocation,
+  abs_path: bundleLocation,
+  lineno: count,
+  colno: count,
+  in_app: flag,
+};
+
+function pick(source: Fields, checks: Record<string, Check>): Fields {
+  const picked: Fields = {};
+  for (const [name, check] of Object.entries(checks)) {
+    const value = check(source[name]);
+    if (value !== undefined) picked[name] = value;
+  }
+  return picked;
+}
+
+function rebuildException(entry: Fields): Fields {
+  const frames = isFields(entry.stacktrace)
+    ? entry.stacktrace.frames
+    : undefined;
+  const type = identifier(entry.type) ?? 'Error';
+  return {
+    type,
+    value: safeMessage(entry.value, type),
+    ...(isFields(entry.mechanism) && {
+      mechanism: pick(entry.mechanism, MECHANISM_FIELDS),
+    }),
+    ...(Array.isArray(frames) && {
+      stacktrace: {
+        type: 'raw',
+        frames: frames
+          .filter(isFields)
+          .map((frame) => pick(frame, FRAME_FIELDS)),
+      },
+    }),
+  };
+}
+
+export function redactExceptionEvent(
+  event: CaptureResult,
+): CaptureResult | null {
+  if (event.event !== '$exception') return event;
+  try {
+    const list: unknown = event.properties.$exception_list;
+    if (!Array.isArray(list) || !list.every(isFields)) return null;
+    return {
+      ...event,
+      properties: {
+        ...Object.fromEntries(
+          Object.entries(event.properties).filter(
+            ([name]) => !name.startsWith('$exception'),
+          ),
+        ),
+        ...pick(event.properties, EVENT_FIELDS),
+        $exception_list: list.map(rebuildException),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const posthogConfig: Partial<PostHogConfig> = {
   defaults: '2026-08-30',
   person_profiles: 'identified_only',
   disable_capture_url_hashes: true,
   mask_personal_data_properties: true,
-  custom_personal_data_properties: ['t', 'token', 'token_hash', 'code'],
+  custom_personal_data_properties: SENSITIVE_URL_PARAMS,
+  capture_exceptions: true,
+  before_send: [maskUrlProperties, redactExceptionEvent],
   mask_all_text: true,
   mask_all_element_attributes: true,
   session_recording: {
@@ -178,4 +384,8 @@ export function track(
   properties?: Record<string, string | number | boolean>,
 ): void {
   withClient((posthog) => posthog.capture(event, properties));
+}
+
+export function captureError(error: unknown): void {
+  withClient((posthog) => posthog.captureException(error));
 }

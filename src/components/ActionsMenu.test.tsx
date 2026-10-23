@@ -3,6 +3,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from '@/test/render';
+import { translateText } from '@/test/translate';
 import {
   ActionsMenu,
   RowActions,
@@ -191,6 +192,26 @@ describe('ActionsMenu', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Upload' }));
     expect(run).not.toHaveBeenCalled();
     expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('shows an item spinner after the browser translates the open menu', async () => {
+    const user = userEvent.setup();
+    const items = (loading: boolean): ActionsMenuItem[] => [
+      { key: 'edit', label: 'Edit', onSelect: edit },
+      { key: 'upload', label: 'Upload', loading, onSelect: edit },
+    ];
+    const { rerender } = renderWithProviders(
+      <ActionsMenu items={items(false)} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    const menu = screen.getByRole('menu');
+    translateText(menu, '上传');
+
+    rerender(<ActionsMenu items={items(true)} />);
+    expect(menu.querySelectorAll('.animate-spin')).toHaveLength(1);
+    expect(
+      screen.getAllByRole('menuitem').map((item) => item.textContent),
+    ).toEqual(['上传', '上传']);
   });
 
   it('navigates for link items, also with Space', async () => {

@@ -1882,5 +1882,9 @@ export const en: Messages = {
     network: 'Network error — check your connection and retry.',
     forbidden: 'You don’t have access to this area.',
     generic: 'Something went wrong.',
+    crashTitle: 'Something went wrong',
+    crashBody: 'This page stopped working. Reload it to try again.',
+    reload: 'Reload',
+    goHome: 'Go to home page',
   },
 };

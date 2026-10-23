@@ -46,7 +46,7 @@ export const FileButton = forwardRef<HTMLInputElement, FileButtonProps>(
         })}
       >
         {loading && <ButtonSpinner />}
-        {children}
+        <span className="contents">{children}</span>
         <input
           ref={ref}
           type="file"
