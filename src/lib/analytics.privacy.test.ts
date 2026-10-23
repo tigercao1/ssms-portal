@@ -1,6 +1,7 @@
 import 'posthog-js/dist/exception-autocapture';
 import posthog, { type CaptureResult } from 'posthog-js';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import indexHtml from '../../index.html?raw';
 import {
   maskReplayAttribute,
   maskUrlProperties,
@@ -754,6 +755,17 @@ describe('redactExceptionEvent', () => {
     expect(exception.value).toBe('[redacted]');
     expect(exception.stacktrace.frames).toHaveLength(100_000);
     expect(JSON.stringify(exception)).not.toContain('SECRET');
+  });
+});
+
+describe('referrer policy', () => {
+  it('tells the browser never to send a page URL as the referrer', () => {
+    const page = new DOMParser().parseFromString(indexHtml, 'text/html');
+    expect(
+      [...page.querySelectorAll('meta[name="referrer"]')].map((meta) =>
+        meta.getAttribute('content'),
+      ),
+    ).toEqual(['no-referrer']);
   });
 });
 
