@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
+import { TABBABLE } from '@/lib/useModalFocus';
 import { Button } from './Button';
 import { FileButton } from './FileButton';
 
@@ -69,9 +70,6 @@ export function placeMenu(
   const height = Math.min(menu.height, above);
   return { top: trigger.top - GAP - height, left, maxHeight: above };
 }
-
-const TABBABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function focusBeside(trigger: HTMLElement | null, step: 1 | -1) {
   if (!trigger) return;

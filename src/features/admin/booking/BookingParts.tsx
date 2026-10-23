@@ -1,15 +1,18 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { api } from '@/lib/api';
 import { Banner, Button, Field, Input } from '@/components';
 import { cn } from '@/lib/cn';
+import { useModalFocus } from '@/lib/useModalFocus';
 import type { Customer } from '@/lib/types';
 import { CreateCustomerCard } from '../CustomersPage';
 import { customerName } from '../lessonRules';
@@ -39,20 +42,17 @@ export function Dialog({
 }) {
   const t = useT();
   const id = useId();
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
+  const panelRef = useRef<HTMLDivElement>(null);
+  useModalFocus(panelRef, { onEscape: onClose });
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(28,34,51,0.4)] p-4">
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
-        className="flex max-h-full w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg bg-surface p-5 shadow-pop"
+        tabIndex={-1}
+        className="flex max-h-full w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-lg bg-surface p-5 shadow-pop focus:outline-none"
       >
         <div className="flex items-center justify-between gap-4">
           <h2 id={id} className="text-xl">
@@ -69,7 +69,8 @@ export function Dialog({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
+import { useModalFocus } from '@/lib/useModalFocus';
 
-/** Centered modal dialog: Escape and the backdrop close it; focus moves in and back. */
+/** Centered modal dialog: Escape and the backdrop close it; focus moves in, stays in and goes back. */
 export function Modal({
   title,
   onClose,
@@ -22,25 +23,13 @@ export function Modal({
   const t = useT();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const panel = panelRef.current;
-    const first = panel?.querySelector<HTMLElement>(
-      'input, select, textarea, button:not([data-modal-close])',
-    );
-    (first ?? panel)?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      previous?.focus?.();
-    };
-  }, []);
+  useModalFocus(panelRef, {
+    onEscape: onClose,
+    initialFocus: (panel) =>
+      panel.querySelector<HTMLElement>(
+        'input, select, textarea, button:not([data-modal-close])',
+      ),
+  });
 
   return createPortal(
     <div
