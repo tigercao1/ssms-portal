@@ -4,8 +4,17 @@ import { http, HttpResponse } from 'msw';
 import { AdminDashboard } from './AdminDashboard';
 import { filtersFrom } from './InstructorFilters';
 import { renderWithProviders } from '@/test/render';
-import { fakeAdminList, server } from '@/test/msw';
-import type { AdminInstructorRecord, InstructorStage } from '@/lib/types';
+import {
+  adminStageCounts,
+  fakeAdminList,
+  listAdminInstructors,
+  server,
+} from '@/test/msw';
+import type {
+  AdminInstructorRecord,
+  InstructorStage,
+  InstructorStageCounts,
+} from '@/lib/types';
 
 const API = 'http://localhost:3000';
 
@@ -63,11 +72,30 @@ const roster: AdminInstructorRecord[] = [
   }),
 ];
 
-function serveRoster(rows: AdminInstructorRecord[]) {
+function serveRoster(
+  rows: AdminInstructorRecord[],
+  counts: InstructorStageCounts = adminStageCounts(rows),
+) {
+  const listed: URLSearchParams[] = [];
   server.use(
-    http.get(`${API}/admin/instructors`, () => HttpResponse.json(rows)),
+    http.get(`${API}/admin/instructors/stage-counts`, () =>
+      HttpResponse.json(counts),
+    ),
+    http.get(`${API}/admin/instructors`, ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      listed.push(params);
+      const { rows: page, total } = listAdminInstructors(rows, params);
+      return HttpResponse.json(page, {
+        headers: { 'X-Total-Count': String(total) },
+      });
+    }),
   );
+  return listed;
 }
+
+const pendingRoster = Array.from({ length: 51 }, (_, i) =>
+  instructor(`p${i}`, `Pending ${i}`, { stage: 'pending' }),
+);
 
 const expected: { stage: InstructorStage; label: string; count: number }[] = [
   { stage: 'pending', label: 'Pending', count: 1 },
@@ -98,6 +126,61 @@ describe('AdminDashboard (W2.6)', () => {
     const total = expected.reduce((sum, { count }) => sum + count, 0);
     expect(total).toBe(roster.length);
     expect(screen.queryByText('Approved')).not.toBeInTheDocument();
+  });
+
+  it('shows each stage count from the stage counts endpoint, past 1000', async () => {
+    serveRoster([jane], {
+      pending: 1203,
+      onboarding: 1500,
+      in_review: 12,
+      going_live: 3,
+      live: 1001,
+      rejected: 40,
+      deactivated: 2,
+    });
+    renderWithProviders(<AdminDashboard />);
+    for (const name of [
+      '1203 Pending',
+      '1500 Onboarding',
+      '12 In review',
+      '3 Going live',
+      '1001 Live',
+      '40 Rejected',
+      '2 Inactive',
+    ]) {
+      expect(await screen.findByRole('link', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('lists the first page of pending instructors and links to all of them', async () => {
+    const listed = serveRoster(pendingRoster);
+    renderWithProviders(<AdminDashboard />);
+    const more = await screen.findByRole('link', { name: 'View all 51' });
+    expect(more).toHaveAttribute('href', '/admin/instructors?stage=pending');
+    expect(screen.getByText('Pending 0')).toBeInTheDocument();
+    expect(screen.getByText('Pending 49')).toBeInTheDocument();
+    expect(screen.queryByText('Pending 50')).not.toBeInTheDocument();
+    expect(listed.map((params) => params.toString())).toEqual([
+      'limit=50&page=1&stage=pending',
+    ]);
+  });
+
+  it('labels the link to every pending instructor in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serveRoster(pendingRoster);
+    renderWithProviders(<AdminDashboard />);
+    expect(
+      await screen.findByRole('link', { name: '查看全部 51 位' }),
+    ).toBeInTheDocument();
+  });
+
+  it('leaves out the link when every pending instructor is listed', async () => {
+    serveRoster(roster);
+    renderWithProviders(<AdminDashboard />);
+    expect(await screen.findByText('Jane Snow')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /View all/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('links each counter to the instructor list filtered to its stage', async () => {

@@ -312,6 +312,7 @@ export const en: Messages = {
     dashboardTitle: 'Dashboard',
     needsReview: 'Needs review',
     noPending: 'No instructors awaiting review.',
+    viewAllPending: 'View all {count}',
     listTitle: 'Instructors',
     filterStatus: 'Status',
     filters: 'Filters',

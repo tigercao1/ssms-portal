@@ -287,6 +287,7 @@ export interface Messages {
     dashboardTitle: string;
     needsReview: string;
     noPending: string;
+    viewAllPending: string;
     listTitle: string;
     filterStatus: string;
     filters: string;

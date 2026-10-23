@@ -293,6 +293,7 @@ export const zhCN: Messages = {
     dashboardTitle: '仪表板',
     needsReview: '待审核',
     noPending: '没有待审核的教练。',
+    viewAllPending: '查看全部 {count} 位',
     listTitle: '教练',
     filterStatus: '状态',
     filters: '筛选',
