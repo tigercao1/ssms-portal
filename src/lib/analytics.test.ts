@@ -54,7 +54,10 @@ describe('analytics', () => {
         mask_personal_data_properties: true,
         custom_personal_data_properties: expect.arrayContaining(['t']),
         capture_exceptions: true,
-        before_send: analytics.redactExceptionEvent,
+        before_send: [
+          analytics.maskUrlProperties,
+          analytics.redactExceptionEvent,
+        ],
         mask_all_text: true,
         mask_all_element_attributes: true,
         session_recording: expect.objectContaining({

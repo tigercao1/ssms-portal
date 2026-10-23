@@ -1,8 +1,9 @@
 import 'posthog-js/dist/exception-autocapture';
 import posthog, { type CaptureResult } from 'posthog-js';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   maskReplayAttribute,
+  maskUrlProperties,
   posthogConfig,
   PRIVATE_TEXT_SELECTOR,
   redactExceptionEvent,
@@ -90,6 +91,7 @@ beforeAll(() => {
     advanced_disable_flags: true,
     error_tracking: { exceptionRateLimiterBucketSize: 100 },
     before_send: [
+      maskUrlProperties,
       redactExceptionEvent,
       (event) => {
         if (event) events.push(event);
@@ -132,7 +134,10 @@ describe('analytics privacy with the real SDK', () => {
   });
 
   it('drops every recorded leak from reported, uncaught and rejected errors and their causes', async () => {
-    expect(posthogConfig.before_send).toBe(redactExceptionEvent);
+    expect(posthogConfig.before_send).toEqual([
+      maskUrlProperties,
+      redactExceptionEvent,
+    ]);
     const error = chainOf(LEAK_MESSAGES);
     error.stack = [`Error: ${error.message}`, ...LEAK_FRAMES].join('\n');
 
@@ -338,6 +343,83 @@ describe('analytics privacy with the real SDK', () => {
       ],
     ]);
   });
+
+  it('redacts a message behind an error name that is not the standard name of the error', async () => {
+    const value = 'AbCdEfGhIjKlMnOpQrStUvWxYzError: Request failed';
+    for (const name of ['Error', 'AbCdEfGhIjKlMnOpQrStUvWxYzError']) {
+      const error = Object.assign(new Error(value), {
+        name,
+        stack: `${name}: ${value}\n    at submit (${ORIGIN}/assets/index-abc123.js:8:12)`,
+      });
+      posthog.captureException(error);
+      window.onerror?.(value, `${ORIGIN}/assets/index-abc123.js`, 8, 12, error);
+      window.dispatchEvent(
+        new CustomEvent('unhandledrejection', { detail: { reason: error } }),
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const lists: SentException[][] = sentExceptions().map(
+      (e) => e.properties.$exception_list,
+    );
+    expect(lists).toHaveLength(6);
+    for (const [entry] of lists) expect(entry?.value).toBe('[redacted]');
+  });
+});
+
+describe('URL properties after a same-origin navigation with the real SDK', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'referrer');
+    window.history.pushState({}, '', '/');
+  });
+
+  it.each([
+    [`${ORIGIN}/activate?t=SECRET_ACTIVATION`, `${ORIGIN}/activate?t=<masked>`],
+    [
+      `${ORIGIN}/reset?token_hash=SECRET_RESET&type=recovery&code=SECRET_CODE`,
+      `${ORIGIN}/reset?token_hash=<masked>&type=recovery&code=<masked>`,
+    ],
+  ])(
+    'masks the tokens of %s in every event and person property',
+    async (from, masked) => {
+      posthog.reset();
+      Object.defineProperty(document, 'referrer', {
+        configurable: true,
+        value: from,
+      });
+      window.history.pushState({}, '', '/login?lang=en');
+      posthog.identify('user-1');
+      posthog.capture('$pageview');
+      posthog.capture('activation_completed');
+      posthog.captureException(new Error('Request failed'));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(events.map((e) => e.event)).toEqual(
+        expect.arrayContaining([
+          '$identify',
+          '$pageview',
+          'activation_completed',
+          '$exception',
+        ]),
+      );
+      expect(JSON.stringify(events)).not.toContain('SECRET');
+      for (const event of events)
+        expect(event.properties).toMatchObject({
+          $current_url: `${ORIGIN}/login?lang=en`,
+          $referrer: masked,
+          $session_entry_referrer: masked,
+          $session_entry_url: `${ORIGIN}/login?lang=en`,
+        });
+      expect(
+        events.find((e) => e.event === '$identify')?.$set_once,
+      ).toMatchObject({
+        $initial_referrer: masked,
+        $initial_current_url: `${ORIGIN}/login?lang=en`,
+        $referrer: masked,
+        $current_url: `${ORIGIN}/login?lang=en`,
+      });
+    },
+  );
 });
 
 describe('redactExceptionEvent', () => {
@@ -477,7 +559,6 @@ describe('redactExceptionEvent', () => {
   it('keeps only short plain-word messages', () => {
     const kept = [
       'The object can not be found here.',
-      'NotFoundError: The object can not be found here.',
       'Failed to fetch',
       'Load failed',
       "Cannot read properties of undefined (reading 'map')",
@@ -500,6 +581,7 @@ describe('redactExceptionEvent', () => {
       'Failed\twith a tab',
       `Failed ${'a'.repeat(25)}`,
       `Failed ${'word '.repeat(40)}`,
+      'NotFoundError: The object can not be found here.',
       'Uncaught NotFoundError: The object can not be found here.',
       'alice: The object can not be found here.',
       `${'A'.repeat(60)}Error: The object can not be found here.`,
@@ -511,6 +593,37 @@ describe('redactExceptionEvent', () => {
     ];
     for (const value of redacted)
       expect(firstException({ $exception_list: [{ value }] }).value).toBe(
+        '[redacted]',
+      );
+  });
+
+  it('keeps an error name prefix only when it is the standard name of the error', () => {
+    const kept: [string, string][] = [
+      ['DOMException', 'NotFoundError: The object can not be found here.'],
+      ['NotFoundError', 'NotFoundError: The object can not be found here.'],
+      ['TypeError', 'TypeError: Failed to fetch'],
+      ['Error', 'Error: Something went wrong!'],
+      ['ChunkLoadError', 'ChunkLoadError: Loading chunk failed.'],
+    ];
+    for (const [type, value] of kept)
+      expect(firstException({ $exception_list: [{ type, value }] }).value).toBe(
+        value,
+      );
+    const redacted: [string, string][] = [
+      ['Error', 'NotFoundError: The object can not be found here.'],
+      ['TypeError', 'RangeError: Failed to fetch'],
+      ['Error', 'AbCdEfGhIjKlMnOpQrStUvWxYzError: Request failed'],
+      [
+        'AbCdEfGhIjKlMnOpQrStUvWxYzError',
+        'AbCdEfGhIjKlMnOpQrStUvWxYzError: Request failed',
+      ],
+      ['DOMException', 'AbCdEfGhIjKlMnOpQrStUvWxYzError: Request failed'],
+      ['DOMException', 'DOMException: Request failed'],
+      ['ValidationError', 'ValidationError: Request failed'],
+      ['TypeError', 'TypeError: TypeError: Failed to fetch'],
+    ];
+    for (const [type, value] of redacted)
+      expect(firstException({ $exception_list: [{ type, value }] }).value).toBe(
         '[redacted]',
       );
   });
@@ -641,6 +754,92 @@ describe('redactExceptionEvent', () => {
     expect(exception.value).toBe('[redacted]');
     expect(exception.stacktrace.frames).toHaveLength(100_000);
     expect(JSON.stringify(exception)).not.toContain('SECRET');
+  });
+});
+
+describe('maskUrlProperties', () => {
+  const RESET_URL = `${ORIGIN}/reset?token_hash=SECRET&type=recovery&code=SECRET`;
+  const MASKED_RESET_URL = `${ORIGIN}/reset?token_hash=<masked>&type=recovery&code=<masked>`;
+  const URL_KEYS = [
+    '$current_url',
+    '$referrer',
+    '$session_entry_url',
+    '$session_entry_referrer',
+    '$initial_current_url',
+    '$initial_referrer',
+  ];
+  const withUrl = (url: string) =>
+    Object.fromEntries(URL_KEYS.map((key) => [key, url]));
+
+  it('masks token parameters in every URL property, including person properties', () => {
+    const event: CaptureResult = {
+      uuid: 'event-3',
+      event: 'activation_completed',
+      properties: {
+        ...withUrl(RESET_URL),
+        $pathname: '/reset',
+        $referring_domain: 'portal.test',
+        note: 'see ?t=KEPT',
+        $set_once: withUrl(RESET_URL),
+      },
+      $set: withUrl(RESET_URL),
+      $set_once: withUrl(RESET_URL),
+    };
+
+    expect(maskUrlProperties(event)).toEqual({
+      uuid: 'event-3',
+      event: 'activation_completed',
+      properties: {
+        ...withUrl(MASKED_RESET_URL),
+        $pathname: '/reset',
+        $referring_domain: 'portal.test',
+        note: 'see ?t=KEPT',
+        $set_once: withUrl(MASKED_RESET_URL),
+      },
+      $set: withUrl(MASKED_RESET_URL),
+      $set_once: withUrl(MASKED_RESET_URL),
+    });
+  });
+
+  it('masks each token parameter wherever it sits in the URL', () => {
+    const cases: [string, string][] = [
+      [`${ORIGIN}/activate?t=SECRET`, `${ORIGIN}/activate?t=<masked>`],
+      [
+        `${ORIGIN}/activate?source=email&t=SECRET&lang=en`,
+        `${ORIGIN}/activate?source=email&t=<masked>&lang=en`,
+      ],
+      [
+        `${ORIGIN}/login?at=1&tt=2&token=SECRET`,
+        `${ORIGIN}/login?at=1&tt=2&token=<masked>`,
+      ],
+      [`${ORIGIN}/a?x=1?code=SECRET`, `${ORIGIN}/a?x=1?code=<masked>`],
+      [`${ORIGIN}/a?x=1#code=SECRET`, `${ORIGIN}/a?x=1#code=<masked>`],
+      [`${ORIGIN}/a?t=`, `${ORIGIN}/a?t=<masked>`],
+    ];
+    for (const [$referrer, expected] of cases)
+      expect(
+        maskUrlProperties({
+          uuid: 'e',
+          event: '$pageview',
+          properties: { $referrer },
+        }).properties.$referrer,
+      ).toBe(expected);
+  });
+
+  it('returns the event untouched when no URL property carries a token', () => {
+    const event: CaptureResult = {
+      uuid: 'event-4',
+      event: '$pageview',
+      properties: {
+        $current_url: `${ORIGIN}/activate?t=<masked>`,
+        $referrer: '$direct',
+        $session_entry_referrer: `${ORIGIN}/login?tab=profile`,
+        token: 'phc_test',
+        $set_once: { $initial_referrer: 'https://mail.example/inbox' },
+      },
+      $set_once: { $initial_current_url: `${ORIGIN}/activate?t=<masked>` },
+    };
+    expect(maskUrlProperties(event)).toBe(event);
   });
 });
 

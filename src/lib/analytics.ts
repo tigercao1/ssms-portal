@@ -128,17 +128,85 @@ export function stripRequestUrl<T extends { name: string }>(request: T): T {
 type Fields = Record<string, unknown>;
 type Check = (value: unknown) => unknown;
 
+const SENSITIVE_URL_PARAMS = ['t', 'token', 'token_hash', 'code'];
+const SENSITIVE_URL_PARAM = new RegExp(
+  `([?&#](?:${SENSITIVE_URL_PARAMS.join('|')})=)[^&#]*`,
+  'g',
+);
+const MASKED_URL_PARAM = '$1<masked>';
+const URL_PROPERTIES = new Set([
+  '$current_url',
+  '$referrer',
+  '$session_entry_url',
+  '$session_entry_referrer',
+  '$initial_current_url',
+  '$initial_referrer',
+]);
+const PERSON_PROPERTIES = new Set(['$set', '$set_once']);
+
 const REDACTED = '[redacted]';
 const MAX_MESSAGE_LENGTH = 200;
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
-const ERROR_NAME_PREFIX =
-  /^(?=[A-Za-z]{1,64}: )[A-Z][A-Za-z]*(?:Error|Exception): /;
+const ERROR_NAME_PREFIX = /^([A-Za-z]+): /;
+const STANDARD_ERROR_NAMES = new Set([
+  'Error',
+  'TypeError',
+  'RangeError',
+  'ReferenceError',
+  'SyntaxError',
+  'EvalError',
+  'URIError',
+  'AggregateError',
+  'NotFoundError',
+  'NotAllowedError',
+  'AbortError',
+  'NetworkError',
+  'SecurityError',
+  'InvalidStateError',
+  'QuotaExceededError',
+  'NotSupportedError',
+  'DataCloneError',
+  'TimeoutError',
+  'HierarchyRequestError',
+  'InvalidCharacterError',
+  'ChunkLoadError',
+]);
 const SAFE_TEXT = /^[A-Za-z .,'()!?-]*$/;
 const LONG_WORD = /[^ ]{25}/;
 const BUNDLE_PATH = /^[A-Za-z0-9._/-]+$/;
 
 function isFields(value: unknown): value is Fields {
   return typeof value === 'object' && value !== null;
+}
+
+function maskUrls(fields: Fields): Fields {
+  let masked = fields;
+  for (const [name, value] of Object.entries(fields)) {
+    const safe =
+      typeof value === 'string' && URL_PROPERTIES.has(name)
+        ? value.replace(SENSITIVE_URL_PARAM, MASKED_URL_PARAM)
+        : PERSON_PROPERTIES.has(name) && isFields(value)
+          ? maskUrls(value)
+          : value;
+    if (safe !== value) masked = { ...masked, [name]: safe };
+  }
+  return masked;
+}
+
+export function maskUrlProperties(event: CaptureResult): CaptureResult {
+  const properties = maskUrls(event.properties);
+  const $set = event.$set && maskUrls(event.$set);
+  const $set_once = event.$set_once && maskUrls(event.$set_once);
+  return properties === event.properties &&
+    $set === event.$set &&
+    $set_once === event.$set_once
+    ? event
+    : {
+        ...event,
+        properties,
+        ...($set && { $set }),
+        ...($set_once && { $set_once }),
+      };
 }
 
 const flag: Check = (value) => (typeof value === 'boolean' ? value : undefined);
@@ -156,10 +224,16 @@ const oneOf =
   (value) =>
     typeof value === 'string' && allowed.includes(value) ? value : undefined;
 
-function safeMessage(value: unknown): string {
+function safeMessage(value: unknown, type: unknown): string {
   if (typeof value !== 'string' || value.length > MAX_MESSAGE_LENGTH)
     return REDACTED;
-  const text = value.replace(ERROR_NAME_PREFIX, '');
+  const name = ERROR_NAME_PREFIX.exec(value)?.[1];
+  const text =
+    name !== undefined &&
+    STANDARD_ERROR_NAMES.has(name) &&
+    (name === type || type === 'DOMException')
+      ? value.slice(name.length + 2)
+      : value;
   return SAFE_TEXT.test(text) && !LONG_WORD.test(text) ? value : REDACTED;
 }
 
@@ -213,9 +287,10 @@ function rebuildException(entry: Fields): Fields {
   const frames = isFields(entry.stacktrace)
     ? entry.stacktrace.frames
     : undefined;
+  const type = identifier(entry.type) ?? 'Error';
   return {
-    type: identifier(entry.type) ?? 'Error',
-    value: safeMessage(entry.value),
+    type,
+    value: safeMessage(entry.value, type),
     ...(isFields(entry.mechanism) && {
       mechanism: pick(entry.mechanism, MECHANISM_FIELDS),
     }),
@@ -259,9 +334,9 @@ export const posthogConfig: Partial<PostHogConfig> = {
   person_profiles: 'identified_only',
   disable_capture_url_hashes: true,
   mask_personal_data_properties: true,
-  custom_personal_data_properties: ['t', 'token', 'token_hash', 'code'],
+  custom_personal_data_properties: SENSITIVE_URL_PARAMS,
   capture_exceptions: true,
-  before_send: redactExceptionEvent,
+  before_send: [maskUrlProperties, redactExceptionEvent],
   mask_all_text: true,
   mask_all_element_attributes: true,
   session_recording: {
