@@ -9,7 +9,7 @@ import {
   stageMeta,
   type InstructorStage,
 } from '@/components';
-import { useAdminInstructors } from './api';
+import { useAdminInstructorPage, useAdminStageCounts } from './api';
 
 const DASHBOARD_STAGES: readonly InstructorStage[] = [
   'pending',
@@ -61,17 +61,22 @@ function StageStat({
 export function AdminDashboard() {
   const t = useT();
   const { locale } = useLocale();
-  const { data, isLoading } = useAdminInstructors({});
+  const counts = useAdminStageCounts();
+  const queue = useAdminInstructorPage({
+    stages: ['pending'],
+    q: '',
+    page: 1,
+  });
 
-  if (isLoading)
+  if (counts.isLoading || queue.isLoading)
     return (
       <div className="flex justify-center py-16">
         <Spinner className="h-7 w-7" />
       </div>
     );
 
-  const all = data ?? [];
-  const pending = all.filter((i) => i.stage === 'pending');
+  const pending = queue.data?.instructors ?? [];
+  const pendingTotal = queue.data?.total ?? 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -82,7 +87,7 @@ export function AdminDashboard() {
           <StageStat
             key={stage}
             stage={stage}
-            value={all.filter((i) => i.stage === stage).length}
+            value={counts.data?.[stage] ?? 0}
           />
         ))}
       </div>
@@ -110,6 +115,14 @@ export function AdminDashboard() {
               </Link>
             ))}
           </Card>
+        )}
+        {pendingTotal > pending.length && (
+          <Link
+            to={stageListPath('pending')}
+            className="self-start text-sm text-navy hover:underline"
+          >
+            {t.admin.viewAllPending.replace('{count}', String(pendingTotal))}
+          </Link>
         )}
       </div>
     </div>

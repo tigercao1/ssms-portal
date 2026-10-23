@@ -17,6 +17,7 @@ import type {
   GoLiveReadiness,
   InstructorProfile,
   InstructorStage,
+  InstructorStageCounts,
   ReferenceRecord,
   ReferenceUsage,
   UpdateProfileBody,
@@ -48,6 +49,15 @@ export function useAdminInstructors(filter: AdminListFilter) {
       const suffix = qs.toString() ? `?${qs}` : '';
       return api<AdminInstructorRecord[]>(`/admin/instructors${suffix}`);
     },
+    refetchOnWindowFocus: 'always',
+  });
+}
+
+export function useAdminStageCounts() {
+  return useQuery({
+    queryKey: ['admin', 'instructors', 'stage-counts'] as const,
+    queryFn: () =>
+      api<InstructorStageCounts>('/admin/instructors/stage-counts'),
     refetchOnWindowFocus: 'always',
   });
 }

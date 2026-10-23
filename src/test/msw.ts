@@ -12,9 +12,11 @@ import type {
   PayRate,
   PublicPage,
   RefItem,
+  InstructorStageCounts,
   ShopifyInstructorSync,
   ShopifySyncStatus,
 } from '@/lib/types';
+import { INSTRUCTOR_STAGES } from '@/lib/types';
 import type { Season } from '@/features/reference/api';
 
 const API = 'http://localhost:3000';
@@ -298,6 +300,17 @@ export function listAdminInstructors(
   return { rows: matches.slice(offset, offset + size), total: matches.length };
 }
 
+export function adminStageCounts(
+  all: AdminInstructorRecord[],
+): InstructorStageCounts {
+  return Object.fromEntries(
+    INSTRUCTOR_STAGES.map((stage) => [
+      stage,
+      all.filter((r) => r.stage === stage).length,
+    ]),
+  ) as InstructorStageCounts;
+}
+
 export function listAdminClasses(
   all: AdminClass[],
   params: URLSearchParams,
@@ -364,6 +377,9 @@ export const handlers = [
       headers: { 'X-Total-Count': String(total) },
     });
   }),
+  http.get(`${API}/admin/instructors/stage-counts`, () =>
+    HttpResponse.json(adminStageCounts(fakeAdminList)),
+  ),
   http.get(`${API}/admin/instructors/:id`, () =>
     HttpResponse.json(fakeAdminList[0]),
   ),

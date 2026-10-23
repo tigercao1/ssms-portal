@@ -166,6 +166,8 @@ export interface AdminInstructorRecord {
   updatedAt: string;
 }
 
+export type InstructorStageCounts = Record<InstructorStage, number>;
+
 export interface ReferenceRecord {
   id: string;
   key: string;
