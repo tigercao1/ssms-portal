@@ -6,9 +6,9 @@
 //   Requires API: https://github.com/tigercao1/ssms-api/pull/60
 //
 // The status is success only when every listed API PR is merged and its merge
-// commit is contained in the commit currently deployed to the API's
-// `production` environment. Until then it is pending, which blocks the merge.
-// PRs with no such line pass immediately.
+// commit is contained in the commit the API's Release workflow last deployed to
+// Fly (a `production` deployment with task `deploy:app`). Until then it is
+// pending, which blocks the merge. PRs with no such line pass immediately.
 //
 // Env: GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_EVENT_NAME, GITHUB_EVENT_PATH.
 // Set PR_NUMBER to check one PR and DRY_RUN=1 to print instead of posting.
@@ -16,6 +16,7 @@
 import { readFileSync } from 'node:fs';
 
 const API_REPO = 'tigercao1/ssms-api';
+const API_DEPLOY_TASK = 'deploy:app';
 const CONTEXT = 'API dependency';
 const token = process.env.GITHUB_TOKEN;
 const repo = process.env.GITHUB_REPOSITORY;
@@ -54,7 +55,7 @@ let deployedSha;
 async function apiDeployedSha() {
   if (deployedSha !== undefined) return deployedSha;
   const deployments = await gh(
-    `repos/${API_REPO}/deployments?environment=production&per_page=20`,
+    `repos/${API_REPO}/deployments?environment=production&task=${API_DEPLOY_TASK}&per_page=20`,
   );
   deployedSha = null;
   for (const d of deployments) {

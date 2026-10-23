@@ -66,8 +66,10 @@ The API deploys first and the portal follows:
    release has stopped using them.
 2. A portal PR that needs an API change says so in its description:
    `Requires API: ssms-api#60`. The required **API dependency** check stays
-   pending until that API PR is merged and deployed to production, then turns
-   green (it re-checks every 10 minutes).
+   pending until the API's Release workflow has deployed that PR to Fly, then
+   turns green. It re-checks when the PR changes and on a schedule that GitHub
+   often runs hours late; to re-check now, run the **API dependency** workflow
+   from the Actions tab.
 3. Merge the API PR, let its Release workflow deploy it, then merge the portal PR.
 
 ## Scripts

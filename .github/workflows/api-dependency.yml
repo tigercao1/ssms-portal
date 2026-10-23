@@ -6,7 +6,7 @@ name: API dependency
 #
 # pull_request_target runs this workflow from main with a token that can post
 # statuses, and never checks out or runs code from the PR. The schedule
-# re-checks open PRs so they go green soon after the API deploys.
+# re-checks open PRs after the API deploys; GitHub often runs it hours late.
 
 on:
   pull_request_target:
