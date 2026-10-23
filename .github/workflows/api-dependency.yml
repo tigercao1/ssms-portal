@@ -6,8 +6,7 @@ name: API dependency
 #
 # pull_request_target runs this workflow from main with a token that can post
 # statuses, and never checks out or runs code from the PR. The API's Release
-# dispatches this workflow after each deploy; the schedule is a fallback that
-# GitHub often runs hours late.
+# dispatches it after each deploy; the schedule is only a slow fallback.
 
 on:
   pull_request_target:

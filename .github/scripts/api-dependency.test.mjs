@@ -4,6 +4,8 @@ import { server } from '@/test/msw';
 
 const API = 'https://api.github.com/repos/tigercao1/ssms-api';
 const MAIN = ['c1', 'c2', 'c3', 'c4'];
+const APP_DEPLOY = { environment: 'production-app-deploys', task: 'deploy:app' };
+const PRODUCTION_JOB = { environment: 'production', task: 'deploy' };
 
 let pulls;
 let deployments;
@@ -26,13 +28,8 @@ function opened(number) {
   });
 }
 
-function deployed(task, sha) {
-  deployments.unshift({
-    id: deployments.length + 1,
-    environment: 'production',
-    task,
-    sha,
-  });
+function deployed(record, sha) {
+  deployments.unshift({ id: deployments.length + 1, ...record, sha });
 }
 
 function compareStatus(base, head) {
@@ -80,7 +77,7 @@ beforeEach(() => {
 describe('API dependency', () => {
   it('passes once the Release has deployed a commit containing the merge commit', async () => {
     merged(60, 'c2');
-    deployed('deploy:app', 'c3');
+    deployed(APP_DEPLOY, 'c3');
 
     await expect(evaluate('Requires API: ssms-api#60')).resolves.toMatchObject({
       state: 'success',
@@ -90,9 +87,9 @@ describe('API dependency', () => {
 
   it('stays pending when only backup or migration jobs have run on the merge commit', async () => {
     merged(60, 'c3');
-    deployed('deploy:app', 'c1');
-    deployed('deploy', 'c3');
-    deployed('deploy', 'c3');
+    deployed(APP_DEPLOY, 'c1');
+    deployed(PRODUCTION_JOB, 'c3');
+    deployed(PRODUCTION_JOB, 'c3');
 
     await expect(evaluate('Requires API: ssms-api#60')).resolves.toMatchObject({
       state: 'pending',
@@ -103,7 +100,7 @@ describe('API dependency', () => {
 
   it('stays pending when the app has never been deployed by the Release', async () => {
     merged(60, 'c3');
-    deployed('deploy', 'c3');
+    deployed(PRODUCTION_JOB, 'c3');
 
     await expect(evaluate('Requires API: ssms-api#60')).resolves.toMatchObject({
       state: 'pending',
@@ -113,7 +110,7 @@ describe('API dependency', () => {
 
   it('stays pending while the deployed commit is older than the merge commit', async () => {
     merged(60, 'c3');
-    deployed('deploy:app', 'c2');
+    deployed(APP_DEPLOY, 'c2');
 
     await expect(evaluate('Requires API: ssms-api#60')).resolves.toMatchObject({
       state: 'pending',
@@ -124,7 +121,7 @@ describe('API dependency', () => {
 
   it('stays pending until the API PR is merged', async () => {
     opened(60);
-    deployed('deploy:app', 'c4');
+    deployed(APP_DEPLOY, 'c4');
 
     await expect(evaluate('Requires API: ssms-api#60')).resolves.toMatchObject({
       state: 'pending',
@@ -141,8 +138,8 @@ describe('API dependency', () => {
     it('stays pending while one of them is migrated but not yet deployed', async () => {
       merged(60, 'c2');
       merged(61, 'c3');
-      deployed('deploy:app', 'c2');
-      deployed('deploy', 'c3');
+      deployed(APP_DEPLOY, 'c2');
+      deployed(PRODUCTION_JOB, 'c3');
 
       await expect(evaluate(body)).resolves.toMatchObject({
         state: 'pending',
@@ -154,8 +151,8 @@ describe('API dependency', () => {
     it('passes once every one of them is deployed', async () => {
       merged(60, 'c2');
       merged(61, 'c3');
-      deployed('deploy', 'c3');
-      deployed('deploy:app', 'c3');
+      deployed(PRODUCTION_JOB, 'c3');
+      deployed(APP_DEPLOY, 'c3');
 
       await expect(evaluate(body)).resolves.toMatchObject({
         state: 'success',
