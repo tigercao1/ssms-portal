@@ -3,7 +3,13 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
 import { join, normalize } from 'node:path';
-import type { Plugin } from 'vite';
+import type { Plugin, ProxyOptions } from 'vite';
+import {
+  POSTHOG_API_ORIGIN,
+  POSTHOG_ASSETS_ORIGIN,
+  POSTHOG_PROXY_PATH,
+  posthogUpstreamPath,
+} from './src/lib/posthogProxy';
 
 const PDFJS_ASSET_DIRS = ['cmaps', 'standard_fonts', 'wasm', 'iccs'];
 const pdfjsRoot = fileURLToPath(
@@ -47,17 +53,43 @@ function pdfjsAssets(): Plugin {
   };
 }
 
+function posthogTarget(target: string): ProxyOptions {
+  return {
+    target,
+    changeOrigin: true,
+    rewrite: (path) => {
+      const queryStart = path.search(/[?#]/);
+      const pathname = queryStart === -1 ? path : path.slice(0, queryStart);
+      const query = queryStart === -1 ? '' : path.slice(queryStart);
+      return `${posthogUpstreamPath(pathname) ?? pathname}${query}`;
+    },
+    configure: (proxy) => {
+      proxy.on('proxyReq', (proxyReq) => {
+        proxyReq.removeHeader('cookie');
+        proxyReq.removeHeader('authorization');
+      });
+    },
+  };
+}
+
+const posthogDevProxy: Record<string, ProxyOptions> = {
+  [`${POSTHOG_PROXY_PATH}/static/`]: posthogTarget(POSTHOG_ASSETS_ORIGIN),
+  [`${POSTHOG_PROXY_PATH}/array/`]: posthogTarget(POSTHOG_ASSETS_ORIGIN),
+  [`${POSTHOG_PROXY_PATH}/`]: posthogTarget(POSTHOG_API_ORIGIN),
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), pdfjsAssets()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
-  server: { port: 5173 },
+  server: { port: 5173, proxy: posthogDevProxy },
+  preview: { proxy: posthogDevProxy },
   test: {
     globals: true,
     environment: 'jsdom',
-    exclude: [...configDefaults.exclude, 'docs-worker/**'],
+    exclude: [...configDefaults.exclude, 'docs-worker/**', 'worker/**'],
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     // Provide stable env so the supabase client + api base resolve in tests.

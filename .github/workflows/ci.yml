@@ -42,3 +42,9 @@ jobs:
 
       - name: Test docs Worker
         run: npm run test:docs-worker
+
+      - name: Typecheck portal Worker
+        run: npm run typecheck:worker
+
+      - name: Test portal Worker
+        run: npm run test:worker
