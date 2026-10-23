@@ -759,13 +759,18 @@ describe('redactExceptionEvent', () => {
 });
 
 describe('referrer policy', () => {
-  it('tells the browser never to send a page URL as the referrer', () => {
+  it('tells the browser never to send a page URL as the referrer, before any request', () => {
     const page = new DOMParser().parseFromString(indexHtml, 'text/html');
     expect(
       [...page.querySelectorAll('meta[name="referrer"]')].map((meta) =>
         meta.getAttribute('content'),
       ),
     ).toEqual(['no-referrer']);
+    expect(
+      page
+        .querySelector('meta[name="referrer"], link, script')
+        ?.getAttribute('name'),
+    ).toBe('referrer');
   });
 });
 
