@@ -264,6 +264,18 @@ export function useSetDisplayOrder(id: string) {
   });
 }
 
+export function useChangeInstructorEmail(id: string) {
+  const sync = useInvalidate(id);
+  return useMutation({
+    mutationFn: (body: { email: string; expectedCurrentEmail: string }) =>
+      api<AdminInstructorRecord>(`/admin/instructors/${id}/email`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSettled: (record) => sync(record),
+  });
+}
+
 const adminReferenceKey = (slug: string) =>
   ['admin', 'reference', slug] as const;
 

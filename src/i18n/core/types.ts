@@ -1004,6 +1004,31 @@ export interface Messages {
     manualHint: string;
     taken: string;
   };
+  instructorEmail: {
+    title: string;
+    change: string;
+    dialogTitle: string;
+    current: string;
+    newLabel: string;
+    newHint: string;
+    continue: string;
+    back: string;
+    from: string;
+    to: string;
+    confirmSignOut: string;
+    confirmNotify: string;
+    confirm: string;
+    retry: string;
+    invalid: string;
+    same: string;
+    taken: string;
+    stale: string;
+    incomplete: string;
+    notAllowed: string;
+    cantChangeOwn: string;
+    cantChangeAdmin: string;
+    changed: string;
+  };
   classImport: {
     title: string;
     intro: string;
