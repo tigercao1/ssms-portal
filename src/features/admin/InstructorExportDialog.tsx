@@ -90,7 +90,7 @@ export function InstructorExportDialog({
     >
       <div className="flex flex-col gap-4">
         <FilterGroup legend={t.admin.filterStatus}>
-          <div className="grid grid-cols-1 gap-x-2 min-[420px]:grid-cols-2">
+          <div className="grid gap-x-2 sm:grid-cols-2">
             {INSTRUCTOR_STAGES.map((stage) => (
               <FilterCheckbox
                 key={stage}
