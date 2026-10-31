@@ -30,6 +30,7 @@ import {
   InstructorFilters,
   type InstructorFilterState,
 } from './InstructorFilters';
+import { InstructorExportDialog } from './InstructorExportDialog';
 import type { AdminInstructorRecord } from '@/lib/types';
 
 const SEARCH_DEBOUNCE_MS = 200;
@@ -54,6 +55,7 @@ export function AdminListPage() {
   const filters = filtersFrom(params);
   const page = pageFrom(params);
   const [draft, setDraft] = useState(q);
+  const [exporting, setExporting] = useState(false);
   const committed = useRef(q);
   const results = useAdminInstructorPage({
     q,
@@ -146,7 +148,20 @@ export function AdminListPage() {
           value={filters}
           onChange={(next) => update({ filters: next })}
         />
+        <Button
+          variant="secondary"
+          aria-haspopup="dialog"
+          onClick={() => setExporting(true)}
+        >
+          {t.instructorExport.open}
+        </Button>
       </div>
+      {exporting && (
+        <InstructorExportDialog
+          initialStages={filters.stages}
+          onClose={() => setExporting(false)}
+        />
+      )}
       <AppliedFilterChips
         value={filters}
         onChange={(next) => update({ filters: next })}
