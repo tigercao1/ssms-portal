@@ -385,6 +385,22 @@ export const en: Messages = {
     displayOrder: 'Display order (lower shows first)',
     displayOrderInvalid: 'Enter a whole number, 0 or more, or leave it empty.',
   },
+  instructorExport: {
+    open: 'Export CSV',
+    title: 'Export instructors',
+    onboarding: 'Onboarding',
+    onboardingAny: 'Any',
+    onboardingComplete: 'Completed',
+    onboardingIncomplete: 'Not completed',
+    onboardingHint:
+      'Completed: approved and active, every required document done and every certification valid.',
+    noStage: 'Choose at least one status.',
+    download: 'Download',
+    downloaded: 'Downloaded {file}.',
+    nonAsciiNames:
+      'Some names have non-English characters ({n}). They are exported as entered.',
+    downloadFailed: 'Could not download the CSV: {message}',
+  },
   translation: {
     badge: 'Translated by {model}',
     editReplacesHint:

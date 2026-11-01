@@ -54,7 +54,7 @@ function chipText(group: string, value: string, t: Messages): string {
   return t.admin.filterChip.replace('{group}', group).replace('{value}', value);
 }
 
-function FilterCheckbox({
+export function FilterCheckbox({
   checked,
   onChange,
   children,
@@ -76,7 +76,7 @@ function FilterCheckbox({
   );
 }
 
-function FilterGroup({
+export function FilterGroup({
   legend,
   children,
 }: {

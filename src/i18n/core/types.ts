@@ -356,6 +356,20 @@ export interface Messages {
     displayOrder: string;
     displayOrderInvalid: string;
   };
+  instructorExport: {
+    open: string;
+    title: string;
+    onboarding: string;
+    onboardingAny: string;
+    onboardingComplete: string;
+    onboardingIncomplete: string;
+    onboardingHint: string;
+    noStage: string;
+    download: string;
+    downloaded: string;
+    nonAsciiNames: string;
+    downloadFailed: string;
+  };
   translation: {
     badge: string;
     editReplacesHint: string;

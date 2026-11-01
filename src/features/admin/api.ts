@@ -116,6 +116,35 @@ export function useAdminInstructorPage({
   });
 }
 
+export type OnboardingFilter = 'complete' | 'incomplete';
+
+export interface InstructorExportQuery {
+  stages: InstructorStage[];
+  onboarding?: OnboardingFilter;
+}
+
+export interface InstructorExport {
+  text: string;
+  nonAsciiNames: number;
+}
+
+export async function fetchInstructorExport({
+  stages,
+  onboarding,
+}: InstructorExportQuery): Promise<InstructorExport> {
+  const qs = new URLSearchParams();
+  for (const stage of stages) qs.append('stage', stage);
+  if (onboarding) qs.set('onboarding', onboarding);
+  const { data, headers } = await apiWithHeaders<string>(
+    `/admin/instructors/export.csv?${qs.toString()}`,
+    { responseType: 'text' },
+  );
+  return {
+    text: data.startsWith('\uFEFF') ? data : `\uFEFF${data}`,
+    nonAsciiNames: Number(headers.get('X-Export-Non-Ascii-Names')) || 0,
+  };
+}
+
 /** W2.8 — single instructor detail. */
 export function useAdminInstructor(id: string) {
   return useQuery({
