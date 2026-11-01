@@ -26,6 +26,7 @@ import {
 import { AdminProfileEditor } from './AdminProfileEditor';
 import { ShopifyInstructorPanel } from './ShopifyInstructorPanel';
 import { InstructorCalendarCard } from './InstructorCalendarCard';
+import { InstructorEmailCard } from './InstructorEmailCard';
 import { InstructorDocumentsSection } from '@/features/documents/admin/InstructorDocumentsSection';
 import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 
@@ -142,6 +143,7 @@ function ActionsRail({ rec }: { rec: AdminInstructorRecord }) {
         <VisibilityAction rec={rec} />
       </Card>
 
+      <InstructorEmailCard rec={rec} />
       <DisplayOrderCard rec={rec} />
       <InstructorCalendarCard instructorId={rec.id} />
       <RoleCard authUserId={rec.authUserId} />

@@ -1112,6 +1112,42 @@ export const en: Messages = {
     manualHint: "The calendar this instructor's bookings go into.",
     taken: 'This calendar is already linked to another instructor.',
   },
+  instructorEmail: {
+    title: 'Email',
+    change: 'Change email',
+    dialogTitle: 'Change sign-in email',
+    current: 'Current email',
+    newLabel: 'New email',
+    newHint:
+      'The instructor signs in with this address and gets club emails there.',
+    continue: 'Continue',
+    back: 'Back',
+    from: 'From',
+    to: 'To',
+    confirmSignOut:
+      'The instructor is signed out on every device and has to sign in again with the new address.',
+    confirmNotify:
+      'Both addresses get an email about the change. An invite that is not activated yet is sent again to the new address.',
+    confirm: 'Change email',
+    retry: 'Try again',
+    invalid: 'Enter a valid email address.',
+    same: "This is already the instructor's email.",
+    taken: 'Another account already uses this email address.',
+    stale:
+      "This instructor's email changed while this window was open. Close it and try again.",
+    incomplete:
+      "The email was changed, but signing the instructor out or moving their invite didn't finish. Try again to finish it.",
+    notAllowed: "This account's email can't be changed here.",
+    cantChangeOwn: "You can't change your own email here.",
+    cantChangeAdmin: "An admin's email can't be changed here.",
+    changed:
+      'Email changed. The instructor was signed out and both addresses were notified.',
+    unfinished: "The change to {email} didn't finish.",
+    finishChange: 'Finish the change',
+    finishIntro:
+      'Finish the change to {email}. This sends the same change again and completes whatever is left of it.',
+    forget: "Don't finish",
+  },
   classImport: {
     title: 'Import history',
     intro:
