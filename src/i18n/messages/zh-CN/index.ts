@@ -364,6 +364,21 @@ export const zhCN: Messages = {
     displayOrder: '显示顺序（数字越小越靠前）',
     displayOrderInvalid: '请输入 0 或更大的整数，或留空。',
   },
+  instructorExport: {
+    open: '导出 CSV',
+    title: '导出教练',
+    onboarding: '入职资料',
+    onboardingAny: '不限',
+    onboardingComplete: '已完成',
+    onboardingIncomplete: '未完成',
+    onboardingHint:
+      '已完成：已通过且在职，所有必需资料已完成，所有证书均有效。',
+    noStage: '请至少选择一个状态。',
+    download: '下载',
+    downloaded: '已下载 {file}。',
+    nonAsciiNames: '部分姓名含非英文字符（{n} 个），已按原样导出。',
+    downloadFailed: '无法下载 CSV：{message}',
+  },
   translation: {
     badge: '由 {model} 翻译',
     editReplacesHint: '此内容为机器翻译。编辑后将替换机器翻译。',
