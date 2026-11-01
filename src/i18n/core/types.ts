@@ -1042,6 +1042,10 @@ export interface Messages {
     cantChangeOwn: string;
     cantChangeAdmin: string;
     changed: string;
+    unfinished: string;
+    finishChange: string;
+    finishIntro: string;
+    forget: string;
   };
   classImport: {
     title: string;

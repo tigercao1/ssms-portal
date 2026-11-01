@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { InstructorEmailCard } from './InstructorEmailCard';
@@ -12,6 +12,7 @@ import type { AdminInstructorRecord, UserRole } from '@/lib/types';
 const API = 'http://localhost:3000';
 const OLD = 'jane@example.com';
 const NEW = 'jane.snow@example.org';
+const MEMORY_KEY = 'ssms.unfinishedEmailChange.inst-1';
 
 const session = vi.hoisted(() => ({ userId: 'admin-self' }));
 
@@ -23,15 +24,20 @@ vi.mock('@/auth/SessionProvider', () => ({
   }),
 }));
 
-type Reply = { status: number; body: Record<string, unknown> };
+type Reply = {
+  status: number;
+  body: Record<string, unknown>;
+  applied?: boolean;
+};
 
 function serve({
   role = 'instructor',
   replies = [],
-}: { role?: UserRole; replies?: Reply[] } = {}) {
+  email = OLD,
+}: { role?: UserRole; replies?: Reply[]; email?: string } = {}) {
   let record: AdminInstructorRecord = {
     ...(fakeAdminList[0] as AdminInstructorRecord),
-    email: OLD,
+    email,
   };
   const bodies: unknown[] = [];
   let detailLoads = 0;
@@ -46,7 +52,7 @@ function serve({
       bodies.push(body);
       const reply = replies.shift();
       if (reply && reply.status !== 200) {
-        if (reply.body.code === 'email_change_incomplete')
+        if (reply.applied ?? reply.body.code === 'email_change_incomplete')
           record = { ...record, email: body.email };
         return HttpResponse.json(reply.body, { status: reply.status });
       }
@@ -81,7 +87,22 @@ async function reviewNewEmail(value: string) {
 
 beforeEach(() => {
   session.userId = 'admin-self';
+  sessionStorage.clear();
 });
+
+function rememberUnfinished() {
+  sessionStorage.setItem(
+    MEMORY_KEY,
+    JSON.stringify({ email: NEW, expectedCurrentEmail: OLD }),
+  );
+}
+
+async function openFinish() {
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Finish the change' }),
+  );
+  return screen.getByRole('dialog', { name: 'Change sign-in email' });
+}
 
 describe('InstructorEmailCard', () => {
   it('shows the current email, masked in session replay', async () => {
@@ -257,5 +278,169 @@ describe('InstructorEmailCard', () => {
     expect(
       screen.queryByRole('button', { name: 'Change email' }),
     ).not.toBeInTheDocument();
+  });
+
+  describe('an unfinished change', () => {
+    it('is remembered after the dialog closes and finished with the same request', async () => {
+      const { bodies } = serve({
+        replies: [
+          {
+            status: 500,
+            body: { statusCode: 500, code: 'email_change_incomplete' },
+          },
+        ],
+      });
+      const dialog = await reviewNewEmail(NEW);
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Change email' }),
+      );
+      await within(dialog).findByRole('alert');
+      await userEvent.keyboard('{Escape}');
+
+      const notice = await screen.findByText(
+        `The change to ${NEW} didn't finish.`,
+      );
+      expectMaskedInReplay(notice);
+      const finish = await openFinish();
+      expect(
+        within(finish).getByText(new RegExp(`Finish the change to ${NEW}`)),
+      ).toBeInTheDocument();
+      const summary = within(finish).getByTestId('email-change-summary');
+      expect(within(summary).getByText(OLD)).toBeInTheDocument();
+      expect(within(summary).getByText(NEW)).toBeInTheDocument();
+      expect(within(finish).queryByLabelText('New email')).toBeNull();
+
+      await userEvent.click(
+        within(finish).getByRole('button', { name: 'Finish the change' }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('dialog', { name: 'Change sign-in email' }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(bodies).toEqual([
+        { email: NEW, expectedCurrentEmail: OLD },
+        { email: NEW, expectedCurrentEmail: OLD },
+      ]);
+      expect(sessionStorage.getItem(MEMORY_KEY)).toBeNull();
+      expect(
+        screen.queryByText(`The change to ${NEW} didn't finish.`),
+      ).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Change email' }),
+      ).toBeInTheDocument();
+    });
+
+    it('is offered after a reload when the request got no answer but the address moved', async () => {
+      const { bodies } = serve({
+        replies: [
+          { status: 502, body: { message: 'Bad gateway' }, applied: true },
+        ],
+      });
+      const dialog = await reviewNewEmail(NEW);
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Change email' }),
+      );
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'Something went wrong',
+      );
+      expect(JSON.parse(sessionStorage.getItem(MEMORY_KEY)!)).toEqual({
+        email: NEW,
+        expectedCurrentEmail: OLD,
+      });
+      cleanup();
+
+      renderWithProviders(<Harness />);
+      const finish = await openFinish();
+      await userEvent.click(
+        within(finish).getByRole('button', { name: 'Finish the change' }),
+      );
+
+      await waitFor(() => expect(bodies).toHaveLength(2));
+      expect(bodies[1]).toEqual({ email: NEW, expectedCurrentEmail: OLD });
+    });
+
+    it('is forgotten on request, leaving the normal form for the address shown', async () => {
+      rememberUnfinished();
+      const { bodies } = serve({ email: NEW });
+      renderWithProviders(<Harness />);
+      const finish = await openFinish();
+
+      await userEvent.click(
+        within(finish).getByRole('button', { name: "Don't finish" }),
+      );
+
+      expect(sessionStorage.getItem(MEMORY_KEY)).toBeNull();
+      expect(within(finish).getByLabelText('New email')).toBeInTheDocument();
+      expect(within(finish).getByText(NEW)).toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      expect(
+        screen.getByRole('button', { name: 'Change email' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/didn't finish/)).toBeNull();
+      expect(bodies).toEqual([]);
+    });
+
+    it('is cleared with the stale message when someone else changed the email meanwhile', async () => {
+      rememberUnfinished();
+      serve({
+        email: 'someone.else@example.com',
+        replies: [
+          { status: 409, body: { statusCode: 409, code: 'stale_email' } },
+        ],
+      });
+      renderWithProviders(<Harness />);
+      const finish = await openFinish();
+
+      await userEvent.click(
+        within(finish).getByRole('button', { name: 'Finish the change' }),
+      );
+
+      expect(await within(finish).findByRole('alert')).toHaveTextContent(
+        "This instructor's email changed while this window was open.",
+      );
+      expect(sessionStorage.getItem(MEMORY_KEY)).toBeNull();
+      expect(
+        within(finish).queryByRole('button', { name: 'Finish the change' }),
+      ).toBeNull();
+      expect(within(finish).getAllByRole('button')).toHaveLength(1);
+      await userEvent.click(
+        within(finish).getByRole('button', { name: 'Close' }),
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Change email' }),
+      ).toBeInTheDocument();
+    });
+
+    it('is not offered while the instructor still has the old address', async () => {
+      rememberUnfinished();
+      serve();
+      renderWithProviders(<Harness />);
+      expect(
+        await screen.findByRole('button', { name: 'Change email' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/didn't finish/)).toBeNull();
+    });
+
+    it('is not offered for an admin account or the admin themself', async () => {
+      rememberUnfinished();
+      serve({ role: 'admin', email: NEW });
+      renderWithProviders(<Harness />);
+      expect(
+        await screen.findByText("An admin's email can't be changed here."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/didn't finish/)).toBeNull();
+      expect(screen.queryByRole('button')).toBeNull();
+      cleanup();
+
+      session.userId = 'auth-1';
+      serve({ email: NEW });
+      renderWithProviders(<Harness />);
+      expect(
+        await screen.findByText("You can't change your own email here."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/didn't finish/)).toBeNull();
+    });
   });
 });

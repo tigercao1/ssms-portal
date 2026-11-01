@@ -1076,6 +1076,11 @@ export const zhCN: Messages = {
     cantChangeOwn: '不能在此更改您自己的邮箱。',
     cantChangeAdmin: '无法在此更改管理员的邮箱。',
     changed: '邮箱已更改。该教练已退出登录，新旧邮箱都已收到通知。',
+    unfinished: '更改为 {email} 的操作没有完成。',
+    finishChange: '完成更改',
+    finishIntro:
+      '完成更改为 {email} 的操作。这会再次发送同一更改，并完成剩下的步骤。',
+    forget: '不完成',
   },
   classImport: {
     title: '导入历史',

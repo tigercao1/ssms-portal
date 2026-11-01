@@ -1142,6 +1142,11 @@ export const en: Messages = {
     cantChangeAdmin: "An admin's email can't be changed here.",
     changed:
       'Email changed. The instructor was signed out and both addresses were notified.',
+    unfinished: "The change to {email} didn't finish.",
+    finishChange: 'Finish the change',
+    finishIntro:
+      'Finish the change to {email}. This sends the same change again and completes whatever is left of it.',
+    forget: "Don't finish",
   },
   classImport: {
     title: 'Import history',
