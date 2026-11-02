@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  checkHtmlFile,
-  isValidSlug,
-  MAX_PAGE_BYTES,
-  suggestSlug,
-} from './pageRules';
+import { checkHtmlFile, isValidSlug, suggestSlug } from './pageRules';
+
+const MIB = 1024 * 1024;
 
 describe('suggestSlug', () => {
   it('lowercases and joins ASCII words with hyphens', () => {
@@ -49,18 +46,21 @@ describe('isValidSlug', () => {
 });
 
 describe('checkHtmlFile', () => {
-  it('accepts .html and .htm files up to 2 MiB', () => {
+  it('accepts .html and .htm files up to 10 MiB', () => {
     expect(checkHtmlFile(new File(['<p>hi</p>'], 'a.html'))).toBeNull();
     expect(checkHtmlFile(new File(['<p>hi</p>'], 'A.HTM'))).toBeNull();
     expect(
-      checkHtmlFile(new File([new Uint8Array(MAX_PAGE_BYTES)], 'max.html')),
+      checkHtmlFile(new File([new Uint8Array(2 * MIB + 1)], 'old-max.html')),
+    ).toBeNull();
+    expect(
+      checkHtmlFile(new File([new Uint8Array(10 * MIB)], 'max.html')),
     ).toBeNull();
   });
 
   it('rejects other extensions and oversize files', () => {
     expect(checkHtmlFile(new File(['x'], 'notes.txt'))).toBe('type');
     expect(
-      checkHtmlFile(new File([new Uint8Array(MAX_PAGE_BYTES + 1)], 'big.html')),
+      checkHtmlFile(new File([new Uint8Array(10 * MIB + 1)], 'big.html')),
     ).toBe('size');
   });
 });
