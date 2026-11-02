@@ -22,8 +22,10 @@ import {
   useUpdatePageTitle,
   useUploadPageContent,
 } from './pagesApi';
-import { checkHtmlFile, MAX_TITLE_LENGTH } from './pageRules';
+import { checkHtmlFile, MAX_PAGE_BYTES, MAX_TITLE_LENGTH } from './pageRules';
 import { CopyLinkButton, formatBytes, PageStatusPill } from './PageParts';
+
+const MAX_PAGE_MB = String(MAX_PAGE_BYTES / 1024 / 1024);
 
 function errorText(error: unknown, fallback: string) {
   return error instanceof ApiError ? error.message : fallback;
@@ -328,7 +330,9 @@ function ContentCard({ page }: { page: PublicPage }) {
   const [uploaded, setUploaded] = useState<string | null>(null);
 
   function sizeError(file: File) {
-    return t.pages.fileSizeError.replace('{size}', formatBytes(file.size));
+    return t.pages.fileSizeError
+      .replace('{size}', formatBytes(file.size))
+      .replace('{mb}', MAX_PAGE_MB);
   }
 
   function choose(e: ChangeEvent<HTMLInputElement>) {
@@ -364,7 +368,9 @@ function ContentCard({ page }: { page: PublicPage }) {
     <Card className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg">{t.pages.contentTitle}</h2>
-        <p className="text-sm text-slate">{t.pages.contentHint}</p>
+        <p className="text-sm text-slate">
+          {t.pages.contentHint.replace('{mb}', MAX_PAGE_MB)}
+        </p>
         {page.sizeBytes !== null && (
           <p className="text-sm text-slate">
             {t.pages.draftSize.replace('{size}', formatBytes(page.sizeBytes))}

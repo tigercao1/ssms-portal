@@ -1,12 +1,9 @@
 // Tests for the docs Worker fetch handler against an in-memory R2 bucket.
 import { beforeEach, describe, expect, it } from 'vitest';
-import worker, {
-  applyQueryState,
-  MAX_OBJECT_BYTES,
-  type Env,
-} from '../src/index';
+import worker, { applyQueryState, type Env } from '../src/index';
 
 const TOKEN = 'test-internal-token-0123456789abcdef';
+const MIB = 1024 * 1024;
 const ORIGIN = 'https://docs.ssnow.club';
 const PAGE_HTML = '<!doctype html><title>Lessons</title><h1>Lessons</h1>';
 const CSP =
@@ -232,22 +229,22 @@ describe('internal object API', () => {
     expect(new TextDecoder().decode(stored?.bytes)).toBe(PAGE_HTML);
   });
 
-  it('accepts a body of exactly 2 MiB', async () => {
+  it('accepts a body of exactly 10 MiB', async () => {
     const response = await internal('published/big.html', {
       method: 'PUT',
-      body: new Uint8Array(MAX_OBJECT_BYTES),
+      body: new Uint8Array(10 * MIB),
     });
 
     expect(response.status).toBe(204);
     expect(bucket.objects.get('published/big.html')?.bytes.byteLength).toBe(
-      MAX_OBJECT_BYTES,
+      10 * MIB,
     );
   });
 
-  it('rejects a body over 2 MiB with 413', async () => {
+  it('rejects a body over 10 MiB with 413', async () => {
     const response = await internal('drafts/big.html', {
       method: 'PUT',
-      body: new Uint8Array(MAX_OBJECT_BYTES + 1),
+      body: new Uint8Array(10 * MIB + 1),
     });
 
     expect(response.status).toBe(413);
@@ -256,10 +253,10 @@ describe('internal object API', () => {
   });
 
   it('rejects an over-limit streamed body without a Content-Length', async () => {
-    const chunk = new Uint8Array(1024 * 1024);
+    const chunk = new Uint8Array(MIB);
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        for (let i = 0; i < 3; i++) controller.enqueue(chunk);
+        for (let i = 0; i < 11; i++) controller.enqueue(chunk);
         controller.close();
       },
     });
