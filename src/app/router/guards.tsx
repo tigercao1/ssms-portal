@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSession } from '@/auth/SessionProvider';
 import { Spinner } from '@/components';
@@ -18,7 +18,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (loading) return <FullPageLoader />;
   if (!session)
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  return <>{children}</>;
+  return <Fragment key={session.user.id}>{children}</Fragment>;
 }
 
 /** Redirects to /verify-email until the email is confirmed (W1.4). */

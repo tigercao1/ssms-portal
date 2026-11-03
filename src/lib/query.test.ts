@@ -1,12 +1,15 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api';
-import { queryClient } from './query';
+import { createQueryClient } from './query';
 
 async function attemptsFor(error: Error): Promise<number> {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { ...queryClient.getDefaultOptions().queries, retryDelay: 0 },
+      queries: {
+        ...createQueryClient().getDefaultOptions().queries,
+        retryDelay: 0,
+      },
     },
   });
   const queryFn = vi.fn().mockRejectedValue(error);

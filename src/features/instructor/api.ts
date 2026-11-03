@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '@/lib/api';
+import { AccountSwitchedError, api, ApiError } from '@/lib/api';
+import { queryClientAccount } from '@/lib/query';
+import { getSessionSnapshot } from '@/lib/supabase';
 import type {
   AllowedAvatarMime,
   AvatarUploadTicket,
@@ -67,12 +69,21 @@ export function useMyGoLive(enabled: boolean) {
   });
 }
 
-/** W2.2 — patch the caller's profile. */
+/** W2.2 — patch the caller's profile; refuses unless the session still owns the cached data. */
 export function useUpdateProfile() {
   const qc = useQueryClient();
+  const owner = queryClientAccount(qc);
   return useMutation({
-    mutationFn: (body: UpdateProfileBody) =>
-      api<InstructorProfile>('/me/instructor', { method: 'PATCH', body }),
+    mutationFn: async (body: UpdateProfileBody) => {
+      const current = await getSessionSnapshot();
+      if (owner === undefined || owner !== current.userId)
+        throw new AccountSwitchedError();
+      return api<InstructorProfile>('/me/instructor', {
+        method: 'PATCH',
+        body,
+        accessToken: current.accessToken,
+      });
+    },
     onSuccess: (profile) => {
       qc.setQueryData(PROFILE_KEY, profile);
       void qc.invalidateQueries({ queryKey: MY_GO_LIVE_KEY });

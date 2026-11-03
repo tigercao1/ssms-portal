@@ -56,6 +56,10 @@ export function setSession(session: Session | null) {
   listeners.forEach((l) => l(session ? 'SIGNED_IN' : 'SIGNED_OUT', session));
 }
 
+export function setStoredSession(session: Session | null) {
+  current = session;
+}
+
 /** Clears the session and every mock between tests. */
 export function resetAuth() {
   current = null;
@@ -72,6 +76,10 @@ export function resetAuth() {
 
 export const supabase = { auth };
 
-export async function getAccessToken() {
-  return current?.access_token ?? null;
+export async function getSessionSnapshot() {
+  const { data } = await auth.getSession();
+  return {
+    userId: data.session?.user.id ?? null,
+    accessToken: data.session?.access_token ?? null,
+  };
 }
