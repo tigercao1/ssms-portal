@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
+import { api } from '@/lib/api';
 import { fakePdf } from '../testing/fakePdfPages';
 import {
   createFormsState,
@@ -78,7 +79,7 @@ function attachPdf() {
   state.forms[0]!.languages.zh.draft!.originalPdf = fakeOriginalPdf();
 }
 
-function hold(method: 'put', url: string) {
+function hold(method: 'put' | 'post', url: string) {
   let release!: () => void;
   const held = new Promise<void>((r) => (release = r));
   let started = false;
@@ -513,5 +514,45 @@ describe('Original PDF on a signing form', () => {
     expect(screen.getByLabelText(/Title signers see/)).toHaveValue(
       'Liability waiver',
     );
+  });
+});
+
+describe('Original PDF revision across language switches', () => {
+  it('saves positions with the revision of an upload that returned after switching language and back', async () => {
+    const confirm = hold(
+      'post',
+      'http://localhost:3000/admin/documents/forms/:id/versions/zh/source/confirm',
+    );
+    const user = await openChinese();
+    await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
+    await waitFor(() => expect(confirm.started()).toBe(true));
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+    confirm.release();
+    await waitFor(() =>
+      expect(state.forms[0]!.languages.zh.draft!.originalPdf).not.toBeNull(),
+    );
+    const uploaded = state.forms[0]!.languages.zh.draft!.updatedAt;
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Place 日期 on the PDF' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save positions' }));
+
+    expect(await screen.findByText('Field positions saved.')).toBeVisible();
+    expect(placementPuts()[0]!.expectedUpdatedAt).toBe(uploaded);
+  });
+
+  it('refuses a null positions revision, like the API', async () => {
+    attachPdf();
+    const placed = [{ key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 }];
+    state.forms[0]!.languages.zh.draft!.placements = placed;
+    await expect(
+      api('/admin/documents/forms/form-waiver/versions/zh/placements', {
+        method: 'PUT',
+        body: { placements: [], expectedUpdatedAt: null },
+      }),
+    ).rejects.toMatchObject({ status: 500 });
+    expect(state.forms[0]!.languages.zh.draft!.placements).toBe(placed);
   });
 });

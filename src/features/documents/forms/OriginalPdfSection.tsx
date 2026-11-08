@@ -10,7 +10,6 @@ import {
   MAX_FORM_PDF_BYTES,
   MAX_FORM_PDF_PAGES,
   isConflict,
-  revisionBody,
   useRemoveFormPdf,
   useSaveFormPlacements,
   useUploadFormPdf,
@@ -42,7 +41,6 @@ export function OriginalPdfSection({
   writing,
   placementsDirty,
   onDirtyChange,
-  onWritten,
   onConflict,
 }: {
   form: FormTemplate;
@@ -53,7 +51,6 @@ export function OriginalPdfSection({
   writing: boolean;
   placementsDirty: boolean;
   onDirtyChange: (dirty: boolean) => void;
-  onWritten: (form: FormTemplate) => void;
   onConflict: () => void;
 }) {
   const t = useT();
@@ -68,13 +65,17 @@ export function OriginalPdfSection({
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const busy = writing || placementsDirty;
   const written = {
-    onSuccess: onWritten,
     onError: (err: unknown) => {
       if (isConflict(err)) onConflict();
     },
   };
   const savePlacements = (list: FormPlacement[]) =>
-    placements.mutate({ placements: list, ...revisionBody(revision) }, written);
+    revision === null
+      ? onConflict()
+      : placements.mutate(
+          { placements: list, expectedUpdatedAt: revision },
+          written,
+        );
 
   const reset = () => {
     upload.reset();

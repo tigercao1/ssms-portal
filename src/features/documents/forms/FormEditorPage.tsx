@@ -488,7 +488,6 @@ function LanguageEditor({
         writing={writing}
         placementsDirty={placementsDirty}
         onDirtyChange={setPlacementsDirty}
-        onWritten={(next) => setRevision(revisionOf(next, lang))}
         onConflict={() => void reloadAfterConflict(() => textDirty.current)}
       />
 

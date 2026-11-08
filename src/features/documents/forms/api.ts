@@ -151,10 +151,6 @@ export function revisionOf(
   return form.languages[lang].draft?.updatedAt ?? null;
 }
 
-export function revisionBody(revision: string | null): Partial<FormRevision> {
-  return revision === null ? {} : { expectedUpdatedAt: revision };
-}
-
 export function isConflict(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409;
 }
@@ -294,7 +290,7 @@ export function usePublishForm(id: string, lang: DocumentLanguage) {
 }
 
 export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
-  const sync = useFormSync();
+  const sync = useDraftSync(id, lang);
   const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
@@ -318,7 +314,7 @@ export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
 }
 
 export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
-  const sync = useFormSync();
+  const sync = useDraftSync(id, lang);
   const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
@@ -332,13 +328,14 @@ export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
 }
 
 export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
-  const sync = useFormSync();
+  const sync = useDraftSync(id, lang);
   const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
-    mutationFn: (
-      body: { placements: FormPlacement[] } & Partial<FormRevision>,
-    ) =>
+    mutationFn: (body: {
+      placements: FormPlacement[];
+      expectedUpdatedAt: string;
+    }) =>
       api<FormTemplate>(`${versionPath(id, lang)}/placements`, {
         method: 'PUT',
         body,
