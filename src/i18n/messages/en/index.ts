@@ -1350,6 +1350,7 @@ export const en: Messages = {
     removeConfirm: 'Remove the PDF and its field positions from this draft?',
     removeFailed: 'Could not remove the PDF: {reason}',
     pdfNeedsDraft: 'Save a draft in this language to attach or change its PDF.',
+    pdfSavePositionsFirst: 'Save the field positions before changing the PDF.',
     pdfUploaded: 'PDF uploaded. Place the fields on it next.',
     placementsCleared:
       'PDF replaced. The pages changed, so the field positions were cleared; place the fields again.',

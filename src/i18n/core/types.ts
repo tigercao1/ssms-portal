@@ -1229,6 +1229,7 @@ export interface Messages {
     removeConfirm: string;
     removeFailed: string;
     pdfNeedsDraft: string;
+    pdfSavePositionsFirst: string;
     pdfUploaded: string;
     placementsCleared: string;
     pdfRemoved: string;

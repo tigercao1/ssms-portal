@@ -414,7 +414,7 @@ export function formsHandlers(
           url: `${MOCK_STORAGE_ORIGIN}/forms/${form.id}/${l}-v${draft.version}.pdf?sig=mock`,
         });
         if (placementsCleared) draft.placements = [];
-        draft.updatedAt = new Date().toISOString();
+        draft.updatedAt = stamp(draft);
         return HttpResponse.json({ ...form, placementsCleared });
       },
     ),
@@ -432,6 +432,7 @@ export function formsHandlers(
           return bad('This draft has no original PDF', 404);
         draft.originalPdf = null;
         draft.placements = [];
+        draft.updatedAt = stamp(draft);
         return HttpResponse.json(form);
       },
     ),
@@ -445,16 +446,18 @@ export function formsHandlers(
         if (!form || !l) return notFound();
         if (!draft) return bad('There is no draft in this language');
         if (!draft.originalPdf) return bad('This draft has no original PDF');
-        const { placements } = (await request.json()) as {
+        const body = (await request.json()) as {
           placements: FormPlacement[];
         };
+        if (stale(draft, body)) return changed();
+        const { placements } = body;
         for (const placement of placements) {
           const problem = placementProblem(placement, draft);
           if (problem)
             return bad(`The field positions are not valid: ${problem}`);
         }
         draft.placements = placements;
-        draft.updatedAt = new Date().toISOString();
+        draft.updatedAt = stamp(draft);
         return HttpResponse.json(form);
       },
     ),

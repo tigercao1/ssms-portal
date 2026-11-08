@@ -1277,6 +1277,7 @@ export const zhCN: Messages = {
     removeConfirm: '要从此草稿中移除 PDF 及其字段位置吗？',
     removeFailed: '无法移除 PDF：{reason}',
     pdfNeedsDraft: '请先保存此语言的草稿，才能添加或更改 PDF。',
+    pdfSavePositionsFirst: '请先保存字段位置，再更改 PDF。',
     pdfUploaded: 'PDF 已上传，接下来请在上面放置字段。',
     placementsCleared:
       'PDF 已替换。页面发生了变化，字段位置已清除，请重新放置。',

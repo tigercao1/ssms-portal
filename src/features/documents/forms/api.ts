@@ -151,6 +151,10 @@ export function revisionOf(
   return form.languages[lang].draft?.updatedAt ?? null;
 }
 
+export function revisionBody(revision: string | null): Partial<FormRevision> {
+  return revision === null ? {} : { expectedUpdatedAt: revision };
+}
+
 export function isConflict(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409;
 }
@@ -293,6 +297,7 @@ export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
   const refresh = useRefreshOnConflict(id);
   return useMutation({
+    mutationKey: formsKeys.writes(id, lang),
     mutationFn: async (file: File) => {
       if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name))
         throw new ApiError(415, 'not-pdf');
@@ -316,6 +321,7 @@ export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
   const refresh = useRefreshOnConflict(id);
   return useMutation({
+    mutationKey: formsKeys.writes(id, lang),
     mutationFn: () =>
       api<FormTemplate>(`${versionPath(id, lang)}/source`, {
         method: 'DELETE',
@@ -329,10 +335,13 @@ export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
   const refresh = useRefreshOnConflict(id);
   return useMutation({
-    mutationFn: (placements: FormPlacement[]) =>
+    mutationKey: formsKeys.writes(id, lang),
+    mutationFn: (
+      body: { placements: FormPlacement[] } & Partial<FormRevision>,
+    ) =>
       api<FormTemplate>(`${versionPath(id, lang)}/placements`, {
         method: 'PUT',
-        body: { placements },
+        body,
       }),
     onSuccess: sync,
     onError: refresh,

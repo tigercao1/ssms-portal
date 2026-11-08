@@ -288,13 +288,16 @@ function LanguageEditor({
   const [reloaded, setReloaded] = useState<{ mine: FormDraft | null } | null>(
     null,
   );
+  const [reloads, setReloads] = useState(0);
   const latest = useRef(values);
   latest.current = values;
+  const textDirty = useRef(false);
   const save = useSaveFormDraft(form.id, lang);
   const publish = usePublishForm(form.id, lang);
   const reload = useReloadForm(form.id);
   const writing = useFormWriting(form.id, lang);
   const dirty = !sameDraft(values, baseline);
+  textDirty.current = dirty;
   const [placementsDirty, setPlacementsDirty] = useState(false);
   const unsaved = dirty || placementsDirty || !!reloaded?.mine;
   const problem = fieldsProblem(values.fields, t);
@@ -340,6 +343,7 @@ function LanguageEditor({
         setRevision(revisionOf(fresh, lang));
         setValues(baselineOf(fresh, lang));
         setReloaded({ mine: keepMine(mine) ? mine : null });
+        setReloads((n) => n + 1);
       },
       () => undefined,
     );
@@ -479,7 +483,13 @@ function LanguageEditor({
         form={form}
         lang={lang}
         sourceRecovery={sourceRecovery}
+        revision={revision}
+        reloads={reloads}
+        writing={writing}
+        placementsDirty={placementsDirty}
         onDirtyChange={setPlacementsDirty}
+        onWritten={(next) => setRevision(revisionOf(next, lang))}
+        onConflict={() => void reloadAfterConflict(() => textDirty.current)}
       />
 
       {reloaded && (

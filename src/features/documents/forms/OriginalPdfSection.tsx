@@ -9,9 +9,12 @@ import { errorText, formatBytes, pagesText, shortHash } from '../admin/format';
 import {
   MAX_FORM_PDF_BYTES,
   MAX_FORM_PDF_PAGES,
+  isConflict,
+  revisionBody,
   useRemoveFormPdf,
   useSaveFormPlacements,
   useUploadFormPdf,
+  type FormPlacement,
   type FormTemplate,
 } from './api';
 import { PlacementEditor } from './PlacementEditor';
@@ -34,12 +37,24 @@ export function OriginalPdfSection({
   form,
   lang,
   sourceRecovery,
+  revision,
+  reloads,
+  writing,
+  placementsDirty,
   onDirtyChange,
+  onWritten,
+  onConflict,
 }: {
   form: FormTemplate;
   lang: DocumentLanguage;
   sourceRecovery: SourceRecovery;
+  revision: string | null;
+  reloads: number;
+  writing: boolean;
+  placementsDirty: boolean;
   onDirtyChange: (dirty: boolean) => void;
+  onWritten: (form: FormTemplate) => void;
+  onConflict: () => void;
 }) {
   const t = useT();
   const s = t.signingForms;
@@ -51,7 +66,15 @@ export function OriginalPdfSection({
   const remove = useRemoveFormPdf(form.id, lang);
   const placements = useSaveFormPlacements(form.id, lang);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
-  const busy = upload.isPending || remove.isPending;
+  const busy = writing || placementsDirty;
+  const written = {
+    onSuccess: onWritten,
+    onError: (err: unknown) => {
+      if (isConflict(err)) onConflict();
+    },
+  };
+  const savePlacements = (list: FormPlacement[]) =>
+    placements.mutate({ placements: list, ...revisionBody(revision) }, written);
 
   const reset = () => {
     upload.reset();
@@ -65,7 +88,7 @@ export function OriginalPdfSection({
     if (!file) return;
     reset();
     setConfirmingRemove(false);
-    upload.mutate(file);
+    upload.mutate(file, written);
   }
 
   return (
@@ -120,9 +143,11 @@ export function OriginalPdfSection({
                   size="sm"
                   variant="danger"
                   loading={remove.isPending}
+                  disabled={busy}
                   onClick={() => {
                     reset();
                     remove.mutate(undefined, {
+                      ...written,
                       onSettled: () => setConfirmingRemove(false),
                     });
                   }}
@@ -151,6 +176,9 @@ export function OriginalPdfSection({
       ) : (
         <p className="text-sm text-slate">{s.pdfNeedsDraft}</p>
       )}
+      {draft && pdf && placementsDirty && (
+        <p className="text-sm text-slate">{s.pdfSavePositionsFirst}</p>
+      )}
 
       {upload.isError && (
         <Banner tone="error">{uploadError(upload.error, t)}</Banner>
@@ -172,14 +200,16 @@ export function OriginalPdfSection({
 
       {pdf && version && (
         <PlacementEditor
-          key={`${pdf.sha256}:${JSON.stringify(version.placements)}`}
+          key={`${pdf.sha256}:${reloads}`}
           pdf={pdf}
           fields={version.fields}
           placements={version.placements}
           editable={draft !== null}
           sourceRecovery={sourceRecovery}
+          writing={writing}
           onDirtyChange={onDirtyChange}
           save={placements}
+          onSave={savePlacements}
         />
       )}
     </Card>

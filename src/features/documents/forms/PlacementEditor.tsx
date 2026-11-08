@@ -52,32 +52,49 @@ function withoutIds(items: Placed[]): FormPlacement[] {
   return items.map(({ key, page, x, y, w, h }) => ({ key, page, x, y, w, h }));
 }
 
+function samePlacements(a: FormPlacement[], b: FormPlacement[]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function PlacementEditor({
   pdf,
   fields,
   placements,
   editable,
   sourceRecovery,
+  writing,
   onDirtyChange,
   save,
+  onSave,
 }: {
   pdf: FormOriginalPdf;
   fields: FormField[];
   placements: FormPlacement[];
   editable: boolean;
   sourceRecovery: SourceRecovery;
+  writing: boolean;
   onDirtyChange: (dirty: boolean) => void;
   save: ReturnType<typeof useSaveFormPlacements>;
+  onSave: (placements: FormPlacement[]) => void;
 }) {
   const t = useT();
   const s = t.signingForms;
   const pdfRef = useRef<PdfPagesHandle>(null);
   const boxes = useRef(new Map<string, HTMLElement>());
   const [items, setItems] = useState<Placed[]>(() => withIds(placements));
+  const [synced, setSynced] = useState(placements);
+  if (synced !== placements) {
+    setSynced(placements);
+    const keys = new Set(fields.map((f) => f.key));
+    setItems(
+      samePlacements(withoutIds(items), synced)
+        ? withIds(placements)
+        : items.filter((p) => keys.has(p.key)),
+    );
+  }
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activePage, setActivePage] = useState(1);
-  const dirty =
-    JSON.stringify(withoutIds(items)) !== JSON.stringify(placements);
+  const dirty = !samePlacements(withoutIds(items), placements);
   const selected = items.find((p) => p.id === selectedId) ?? null;
   const labelOf = (key: string) =>
     fields.find((f) => f.key === key)?.label ?? key;
@@ -103,7 +120,7 @@ export function PlacementEditor({
 
   const change = (next: Placed[]) => {
     setItems(next);
-    save.reset();
+    if (!save.isPending) save.reset();
   };
 
   const replace = (item: Placed) =>
@@ -139,7 +156,7 @@ export function PlacementEditor({
 
   function onBoxKey(e: KeyboardEvent, item: Placed) {
     const g = geometry(item.page);
-    if (!g) return;
+    if (!g || !editable) return;
     const move = arrowDelta(e, scaleOf(g));
     if (move) {
       e.preventDefault();
@@ -288,8 +305,8 @@ export function PlacementEditor({
           {editable && (
             <Button
               loading={save.isPending}
-              disabled={!dirty}
-              onClick={() => save.mutate(withoutIds(items))}
+              disabled={!dirty || writing}
+              onClick={() => onSave(withoutIds(items))}
             >
               {s.savePlacements}
             </Button>
