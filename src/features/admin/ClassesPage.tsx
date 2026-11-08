@@ -22,10 +22,24 @@ import {
   customerName,
   dateInputValue,
   groupClassesByDay,
+  localDayKey,
+  NOT_CANCELLED_STATUSES,
+  schoolDayKey,
   type ClassTab,
   type ClassView,
 } from './lessonRules';
 import { ClassFilters, STATUS_KEYS, type ClassFilterKey } from './ClassFilters';
+import { ClassesCalendar, ToggleGroup } from './ClassesCalendar';
+import {
+  calendarAnchorFrom,
+  calendarFilterFor,
+  calendarModeFrom,
+  classesLayoutFrom,
+  stepAnchor,
+  type CalendarMode,
+  type ClassesLayout,
+} from './calendarRules';
+import { schoolParts } from './booking/bookingRules';
 import { errorText } from './payroll/payrollFormat';
 import { PromoBadge } from './LessonTypesPage';
 import { ClassActions } from './booking/ClassActions';
@@ -105,9 +119,13 @@ export function ClassesPage() {
     status: classStatusFrom(params.get('status')),
   };
   const page = pageFrom(params);
+  const layout = classesLayoutFrom(params.get('view'));
+  const calendar = layout === 'calendar';
+  const mode = calendarModeFrom(params.get('cal'));
+  const anchor = calendarAnchorFrom(params.get('date'), today);
   const instructors = useAdminInstructors({});
   const filter = classFilterFor(view, now);
-  const classes = useAdminClasses(filter, page);
+  const classes = useAdminClasses(calendar ? null : filter, page);
   const exportCsv = useMutation({
     mutationFn: fetchClassesExport,
     onSuccess: ({ blob, filename }) =>
@@ -122,7 +140,7 @@ export function ClassesPage() {
     view.instructorId ||
     view.lessonTypeId ||
     view.locationId ||
-    (view.tab === 'all' && (view.status || view.day)),
+    (calendar ? view.status : view.tab === 'all' && (view.status || view.day)),
   );
 
   function update(change: (out: URLSearchParams) => void) {
@@ -163,7 +181,37 @@ export function ClassesPage() {
 
   function clearFilters() {
     update((out) => {
-      for (const key of [...out.keys()]) if (key !== 'tab') out.delete(key);
+      for (const key of [...out.keys()])
+        if (!['tab', 'view', 'cal', 'date'].includes(key)) out.delete(key);
+    });
+  }
+
+  function setLayout(next: ClassesLayout) {
+    update((out) => {
+      if (next === 'calendar') out.set('view', next);
+      else out.delete('view');
+    });
+  }
+
+  function setMode(next: CalendarMode) {
+    update((out) => {
+      if (next === 'week') out.set('cal', next);
+      else out.delete('cal');
+    });
+  }
+
+  function moveAnchor(step: number | null) {
+    update((out) => {
+      if (step === null) out.delete('date');
+      else out.set('date', stepAnchor(mode, anchor, step));
+    });
+  }
+
+  function openDay(day: string) {
+    update((out) => {
+      for (const key of ['view', 'tab', 'from', 'to']) out.delete(key);
+      out.set('day', day);
+      out.set('status', view.status || NOT_CANCELLED_STATUSES);
     });
   }
 
@@ -198,14 +246,27 @@ export function ClassesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl">{t.lessons.classesTitle}</h1>
-        <Button
-          variant="secondary"
-          disabled={filter === null}
-          loading={exportCsv.isPending}
-          onClick={() => filter && exportCsv.mutate(filter)}
-        >
-          {t.lessons.exportCsv}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <ToggleGroup
+            label={t.lessons.layoutLabel}
+            value={layout}
+            options={[
+              ['list', t.lessons.layoutList],
+              ['calendar', t.lessons.layoutCalendar],
+            ]}
+            onChange={setLayout}
+          />
+          {!calendar && (
+            <Button
+              variant="secondary"
+              disabled={filter === null}
+              loading={exportCsv.isPending}
+              onClick={() => filter && exportCsv.mutate(filter)}
+            >
+              {t.lessons.exportCsv}
+            </Button>
+          )}
+        </div>
       </div>
       <SyncIssuesBanner />
       <SyncToastHost />
@@ -227,9 +288,21 @@ export function ClassesPage() {
         onFilter={setFilter}
         onDayMode={setDayMode}
         onClear={clearFilters}
+        calendar={calendar}
       />
 
-      {filter === null ? null : classes.isLoading ? (
+      {calendar ? (
+        <ClassesCalendar
+          mode={mode}
+          anchor={anchor}
+          today={schoolParts(today).date}
+          filter={calendarFilterFor(view, mode, anchor)}
+          instructorName={instructorName}
+          onMode={setMode}
+          onAnchor={moveAnchor}
+          onOpenDay={openDay}
+        />
+      ) : filter === null ? null : classes.isLoading ? (
         <div className="flex justify-center py-16">
           <Spinner className="h-7 w-7" />
         </div>
@@ -278,7 +351,10 @@ export function ClassesPage() {
                 ))}
               </Card>
             ) : (
-              groupClassesByDay(items).map((group) => (
+              groupClassesByDay(
+                items,
+                view.tab === 'all' && view.day ? schoolDayKey : localDayKey,
+              ).map((group) => (
                 <section
                   key={group.day}
                   aria-label={formatDay(group.day, locale)}

@@ -643,6 +643,7 @@ export interface Messages {
     allLocations: string;
     filterStatus: string;
     allStatuses: string;
+    notCancelledStatuses: string;
     clearFilters: string;
     dateModeLabel: string;
     rangeMode: string;
@@ -653,6 +654,21 @@ export interface Messages {
     bookedAt: string;
     exportCsv: string;
     exportFailed: string;
+    layoutLabel: string;
+    layoutList: string;
+    layoutCalendar: string;
+    calendarModeLabel: string;
+    calendarMonth: string;
+    calendarWeek: string;
+    calendarPrev: string;
+    calendarNext: string;
+    calendarToday: string;
+    calendarMore: string;
+    calendarDayLabel: string;
+    calendarNoBookings: string;
+    calendarTruncated: string;
+    calendarCustomers: string;
+    calendarCancelledHint: string;
   };
   lessonTypes: {
     title: string;

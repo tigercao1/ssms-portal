@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fakeClass } from '@/test/msw';
 import {
   classFilterFor,
+  classStatusFrom,
   customerName,
   filenameFromDisposition,
   formatRate,
@@ -103,6 +104,18 @@ describe('rangeToIso', () => {
   });
 });
 
+describe('classStatusFrom', () => {
+  it.each([
+    ['cancelled', 'cancelled'],
+    ['scheduled,completed,no_show', 'scheduled,completed,no_show'],
+    ['scheduled,cancelled', ''],
+    ['bogus', ''],
+    [null, ''],
+  ])('%j -> %j', (input, expected) => {
+    expect(classStatusFrom(input)).toBe(expected);
+  });
+});
+
 describe('classFilterFor', () => {
   const now = new Date('2026-12-01T12:00:00');
   const view: ClassView = {
@@ -125,7 +138,8 @@ describe('classFilterFor', () => {
     expect(filter).toEqual({
       instructorId: 'i1',
       status: 'completed',
-      ...rangeToIso('2026-12-05', '2026-12-05'),
+      from: '2026-12-05T05:00:00.000Z',
+      to: '2026-12-06T05:00:00.000Z',
     });
   });
 

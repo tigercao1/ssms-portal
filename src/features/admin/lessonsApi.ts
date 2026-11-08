@@ -126,6 +126,28 @@ export function useAdminClasses(filter: ClassFilter | null, page: number) {
   });
 }
 
+export interface CalendarClasses {
+  classes: AdminClass[];
+  total: number;
+}
+
+export function useCalendarClasses(filter: ClassFilter) {
+  return useQuery({
+    queryKey: ['admin', 'classes', 'calendar', filter] as const,
+    queryFn: async (): Promise<CalendarClasses> => {
+      const { data, headers } = await apiWithHeaders<AdminClass[]>(
+        `/admin/classes?${classFilterParams(filter)}`,
+      );
+      const total = Number(headers.get('X-Total-Count') ?? Number.NaN);
+      return {
+        classes: data,
+        total: Number.isFinite(total) ? total : data.length,
+      };
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
 export interface ClassesExport {
   blob: Blob;
   filename: string | null;
