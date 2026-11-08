@@ -187,10 +187,16 @@ export function formsHandlers(
   const notFound = () => bad('Form not found', 404);
   const changed = () =>
     bad('This form was changed by someone else; reload it and try again', 409);
-  const stale = (current: { updatedAt: string } | null, body: unknown) => {
+  const stale = (
+    current: { updatedAt: string } | null,
+    body: unknown,
+    nullMeansNoDraft = false,
+  ) => {
     const expected = (body as { expectedUpdatedAt?: string | null } | undefined)
       ?.expectedUpdatedAt;
     if (expected === undefined) return false;
+    if (expected === null && !nullMeansNoDraft)
+      throw new Error('expectedUpdatedAt: null is only valid on a draft save');
     return expected === null
       ? current !== null
       : current?.updatedAt !== expected;
@@ -239,7 +245,7 @@ export function formsHandlers(
       const form = find(params.id);
       if (!form) return notFound();
       const { expectedUpdatedAt, ...patch } = (await request.json()) as {
-        expectedUpdatedAt?: string;
+        expectedUpdatedAt?: string | null;
       };
       if (stale(form, { expectedUpdatedAt })) return changed();
       Object.assign(form, patch, { updatedAt: stamp(form) });
@@ -252,7 +258,7 @@ export function formsHandlers(
       if (!form || !l) return notFound();
       const body = (await request.json()) as FormDraft;
       const slot = form.languages[l];
-      if (stale(slot.draft, body)) return changed();
+      if (stale(slot.draft, body, true)) return changed();
       const fields =
         body.fields ??
         slot.draft?.fields ??

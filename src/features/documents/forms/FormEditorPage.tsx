@@ -26,7 +26,9 @@ import {
   isConflict,
   publicFormUrl,
   revisionOf,
+  useDraftRevision,
   useForm,
+  useFormWriting,
   usePublishForm,
   useReloadForm,
   useSaveFormDraft,
@@ -269,7 +271,7 @@ function LanguageEditor({
   const baseline = baselineOf(form, lang);
   const [values, setValues] = useState<FormDraft>(baseline);
   const [mode, setMode] = useState<'write' | 'preview'>('write');
-  const [revision, setRevision] = useState(() => revisionOf(form, lang));
+  const [revision, setRevision] = useDraftRevision(form, lang);
   const [reloaded, setReloaded] = useState<{ mine: FormDraft | null } | null>(
     null,
   );
@@ -278,6 +280,7 @@ function LanguageEditor({
   const save = useSaveFormDraft(form.id, lang);
   const publish = usePublishForm(form.id, lang);
   const reload = useReloadForm(form.id);
+  const writing = useFormWriting(form.id, lang);
   const dirty = !sameDraft(values, baseline);
   const unsaved = dirty || !!reloaded?.mine;
   const problem = fieldsProblem(values.fields, t);
@@ -331,10 +334,8 @@ function LanguageEditor({
         expectedUpdatedAt: revision,
       },
       {
-        onSuccess: (next) => {
-          setRevision(revisionOf(next, lang));
-          setValues((v) => (v === sent ? baselineOf(next, lang) : v));
-        },
+        onSuccess: (next) =>
+          setValues((v) => (v === sent ? baselineOf(next, lang) : v)),
         onError: (err) => {
           if (isConflict(err)) void reloadAfterConflict(() => true);
         },
@@ -515,7 +516,7 @@ function LanguageEditor({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           loading={save.isPending}
-          disabled={!dirty || incomplete || problem !== null}
+          disabled={!dirty || incomplete || problem !== null || writing}
           onClick={saveDraft}
         >
           {s.saveDraft}
@@ -523,13 +524,16 @@ function LanguageEditor({
         <Button
           variant="secondary"
           loading={publish.isPending}
-          disabled={publishBlocked !== null || save.isPending}
+          disabled={publishBlocked !== null || writing}
           onClick={() => {
             const sent = values;
             save.reset();
             setReloaded(null);
+            if (revision === null) {
+              void reloadAfterConflict(() => false);
+              return;
+            }
             publish.mutate(revision, {
-              onSuccess: (next) => setRevision(revisionOf(next, lang)),
               onError: (err) => {
                 if (isConflict(err))
                   void reloadAfterConflict((mine) => !sameDraft(mine, sent));

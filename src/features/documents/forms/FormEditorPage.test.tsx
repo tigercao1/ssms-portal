@@ -5,6 +5,7 @@ import { http } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
+import { api } from '@/lib/api';
 import {
   createFormsState,
   formsHandlers,
@@ -629,5 +630,204 @@ describe('FormEditorPage saves and other admins', () => {
       '2026-11-08T20:00:00.123456+00:00',
     ]);
     expect(slot.draft.title).toBe('My first draft');
+  });
+});
+
+describe('FormEditorPage revision across language switches', () => {
+  const EN_PUT = 'http://localhost:3000/admin/documents/forms/:id/versions/en';
+  const title = () => screen.getByLabelText(/Title signers see/);
+  const enDraft = () => state.forms[0]!.languages.en.draft!;
+  const publishes = () =>
+    state.requests.filter((r) => r.path.endsWith('/publish'));
+
+  function holdFirstEnglishSave() {
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    const bodies: string[] = [];
+    server.use(
+      http.put(EN_PUT, async ({ request }) => {
+        bodies.push(await request.clone().text());
+        if (bodies.length === 1) await held;
+      }),
+    );
+    return { release, bodies };
+  }
+
+  async function saveFirstEnglishDraftThenLeave() {
+    const user = userEvent.setup();
+    const hold = holdFirstEnglishSave();
+    await renderEditor();
+    fireEvent.change(title(), { target: { value: 'EN FIRST' } });
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(hold.bodies).toHaveLength(1));
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Leave without saving',
+      }),
+    );
+    expect(title()).toHaveValue('免责声明');
+    return { user, hold };
+  }
+
+  it('does not publish a newer draft by another admin after returning during the first save and discarding', async () => {
+    const { user, hold } = await saveFirstEnglishDraftThenLeave();
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    hold.release();
+    await waitFor(() => expect(enDraft().title).toBe('EN FIRST'));
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(title()).toHaveValue('EN FIRST');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled(),
+    );
+    const loaded = enDraft().updatedAt;
+    enDraft().title = 'UNSEEN SAM DRAFT';
+    enDraft().updatedAt = '2026-11-08T22:00:00.123456+00:00';
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(publishes().map((r) => r.body)).toEqual([
+      { expectedUpdatedAt: loaded },
+    ]);
+    expect(state.forms[0]!.languages.en.published!.title).toBe(
+      'Liability waiver',
+    );
+    expect(enDraft().title).toBe('UNSEEN SAM DRAFT');
+    expect(title()).toHaveValue('UNSEEN SAM DRAFT');
+  });
+
+  it('keeps Save disabled when returning before the first save ends, then chains its revision', async () => {
+    const { user, hold } = await saveFirstEnglishDraftThenLeave();
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    fireEvent.change(title(), { target: { value: 'EN NEXT' } });
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+
+    hold.release();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled(),
+    );
+    const returned = enDraft().updatedAt;
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(hold.bodies).toHaveLength(2));
+
+    expect(JSON.parse(hold.bodies[0]!)).toHaveProperty(
+      'expectedUpdatedAt',
+      null,
+    );
+    expect(JSON.parse(hold.bodies[1]!)).toMatchObject({
+      title: 'EN NEXT',
+      expectedUpdatedAt: returned,
+    });
+    await waitFor(() => expect(enDraft().title).toBe('EN NEXT'));
+  });
+
+  it('shows the saved draft when returning after the first save ends and chains its revision', async () => {
+    const { user, hold } = await saveFirstEnglishDraftThenLeave();
+    hold.release();
+    await waitFor(() => expect(enDraft().title).toBe('EN FIRST'));
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    expect(title()).toHaveValue('EN FIRST');
+    const returned = enDraft().updatedAt;
+
+    fireEvent.change(title(), { target: { value: 'EN NEXT' } });
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v2 saved.');
+
+    expect(JSON.parse(hold.bodies[1]!)).toHaveProperty(
+      'expectedUpdatedAt',
+      returned,
+    );
+  });
+
+  it('publishes the saved draft after Discard once the first save returned', async () => {
+    const { user, hold } = await saveFirstEnglishDraftThenLeave();
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    hold.release();
+    await waitFor(() => expect(enDraft().title).toBe('EN FIRST'));
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    const returned = enDraft().updatedAt;
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+
+    await screen.findByText(/Published version 2 in English/);
+    expect(publishes().map((r) => r.body)).toEqual([
+      { expectedUpdatedAt: returned },
+    ]);
+    expect(state.forms[0]!.languages.en.published!.title).toBe('EN FIRST');
+  });
+
+  it('sends the draft revision string exactly as received in the publish request', async () => {
+    state.forms[0]!.languages.zh.draft!.updatedAt =
+      '2026-11-08T18:30:00.123456+00:00';
+    const raw: string[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/publish'))
+        void request
+          .clone()
+          .text()
+          .then((t) => raw.push(t));
+    });
+    const user = userEvent.setup();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText(/Published version 1 in Chinese/);
+    server.events.removeAllListeners();
+
+    expect(raw).toEqual([
+      '{"expectedUpdatedAt":"2026-11-08T18:30:00.123456+00:00"}',
+    ]);
+  });
+
+  it('reloads instead of publishing a draft whose revision it never loaded', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+    state.forms[0]!.languages.en.draft = {
+      ...state.forms[0]!.languages.en.published!,
+      version: 2,
+      publishedAt: null,
+      title: 'Draft by Sam',
+      updatedAt: '2026-11-08T20:00:00.123456+00:00',
+    };
+    fireEvent.change(title(), { target: { value: '免责声明 2' } });
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v1 saved.');
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    expect(title()).toHaveValue('Draft by Sam');
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(publishes()).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText(/Published version 2 in English/);
+    expect(publishes().map((r) => r.body)).toEqual([
+      { expectedUpdatedAt: '2026-11-08T20:00:00.123456+00:00' },
+    ]);
+  });
+
+  it('refuses a null revision outside the draft save, like the API', async () => {
+    const path = '/admin/documents/forms/form-waiver';
+    await expect(
+      api(path, {
+        method: 'PATCH',
+        body: { emailCopy: false, expectedUpdatedAt: null },
+      }),
+    ).rejects.toMatchObject({ status: 500 });
+    await expect(
+      api(`${path}/versions/zh/publish`, {
+        method: 'POST',
+        body: { expectedUpdatedAt: null },
+      }),
+    ).rejects.toMatchObject({ status: 500 });
+    expect(state.forms[0]!.emailCopy).toBe(true);
+    expect(state.forms[0]!.languages.zh.published).toBeNull();
   });
 });

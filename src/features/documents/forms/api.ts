@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import { env } from '@/lib/env';
 import type { DocumentLanguage } from '../api';
@@ -108,13 +114,17 @@ export interface FormDraft {
 }
 
 export interface FormRevision {
-  expectedUpdatedAt?: string | null;
+  expectedUpdatedAt: string | null;
 }
 
 export const formsKeys = {
   all: ['admin', 'documents', 'forms'] as const,
   list: ['admin', 'documents', 'forms', 'list'] as const,
   form: (id: string) => ['admin', 'documents', 'forms', 'form', id] as const,
+  revision: (id: string, lang: DocumentLanguage) =>
+    ['admin', 'documents', 'forms', 'revision', id, lang] as const,
+  writes: (id: string, lang: DocumentLanguage) =>
+    ['admin', 'documents', 'forms', 'writes', id, lang] as const,
 };
 
 const enc = encodeURIComponent;
@@ -131,10 +141,6 @@ export function revisionOf(
   lang: DocumentLanguage,
 ): string | null {
   return form.languages[lang].draft?.updatedAt ?? null;
-}
-
-export function revisionBody(revision: string | null): FormRevision {
-  return revision === null ? {} : { expectedUpdatedAt: revision };
 }
 
 export function isConflict(err: unknown): boolean {
@@ -162,6 +168,35 @@ export function useForm(id: string) {
     queryFn: () => api<FormTemplate>(formPath(id)),
     staleTime: 60_000,
   });
+}
+
+export function useFormWriting(id: string, lang: DocumentLanguage): boolean {
+  return useIsMutating({ mutationKey: formsKeys.writes(id, lang) }) > 0;
+}
+
+export function useDraftRevision(form: FormTemplate, lang: DocumentLanguage) {
+  const qc = useQueryClient();
+  const key = formsKeys.revision(form.id, lang);
+  const { data = null } = useQuery({
+    queryKey: key,
+    queryFn: () => qc.getQueryData<string | null>(key) ?? null,
+    initialData: () => revisionOf(form, lang),
+    staleTime: Infinity,
+  });
+  const setRevision = useCallback(
+    (revision: string | null) => qc.setQueryData(key, revision),
+    [qc, key],
+  );
+  return [data, setRevision] as const;
+}
+
+function useDraftSync(id: string, lang: DocumentLanguage) {
+  const qc = useQueryClient();
+  const sync = useFormSync();
+  return (form: FormTemplate) => {
+    qc.setQueryData(formsKeys.revision(id, lang), revisionOf(form, lang));
+    return sync(form);
+  };
 }
 
 export function useReloadForm(id: string) {
@@ -204,8 +239,9 @@ export function useUpdateForm(id: string) {
 }
 
 export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
-  const sync = useFormSync();
+  const sync = useDraftSync(id, lang);
   return useMutation({
+    mutationKey: formsKeys.writes(id, lang),
     mutationFn: (body: FormDraft & FormRevision) =>
       api<FormTemplate>(versionPath(id, lang), { method: 'PUT', body }),
     onSuccess: sync,
@@ -213,12 +249,13 @@ export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
 }
 
 export function usePublishForm(id: string, lang: DocumentLanguage) {
-  const sync = useFormSync();
+  const sync = useDraftSync(id, lang);
   return useMutation({
-    mutationFn: (revision: string | null) =>
+    mutationKey: formsKeys.writes(id, lang),
+    mutationFn: (expectedUpdatedAt: string) =>
       api<FormTemplate>(`${versionPath(id, lang)}/publish`, {
         method: 'POST',
-        body: revisionBody(revision),
+        body: { expectedUpdatedAt },
       }),
     onSuccess: sync,
   });
