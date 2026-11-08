@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn';
 import { downloadPresigned, getAssignmentSignedUrl } from '../api';
 import { errorText, languageName, templateTitle } from '../admin/format';
 import {
+  SEARCH_QUERY_MAX,
   SIGNATURE_QUERY_MIN,
   useDebounced,
   useSignatureLookup,
@@ -43,6 +44,7 @@ export function SignaturesPage() {
                 {...p}
                 type="search"
                 autoComplete="off"
+                maxLength={SEARCH_QUERY_MAX}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
               />

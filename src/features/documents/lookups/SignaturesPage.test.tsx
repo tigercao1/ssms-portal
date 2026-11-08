@@ -9,7 +9,12 @@ import {
   lookupsHandlers,
   type LookupsMockState,
 } from './fixtures';
+import { SEARCH_QUERY_MAX } from './api';
 import { SignaturesPage } from './SignaturesPage';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({ user: { id: 'auth-1' } }),
+}));
 
 const API = 'http://localhost:3000';
 
@@ -49,6 +54,16 @@ describe('SignaturesPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Search to see who signed what.')).toBeVisible();
     expect(state.signatureQueries).toEqual([]);
+  });
+
+  it('caps the search at the API maximum length', async () => {
+    await search('j'.repeat(SEARCH_QUERY_MAX + 5));
+    expect(
+      screen.getByRole('searchbox', { name: 'Name or email' }),
+    ).toHaveValue('j'.repeat(SEARCH_QUERY_MAX));
+    await waitFor(() =>
+      expect(state.signatureQueries).toEqual(['j'.repeat(SEARCH_QUERY_MAX)]),
+    );
   });
 
   it('waits for at least 2 characters', async () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -9,7 +9,12 @@ import {
   lookupsHandlers,
   type LookupsMockState,
 } from './fixtures';
+import { SEARCH_QUERY_MAX } from './api';
 import { MyStudentsPage } from './MyStudentsPage';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({ user: { id: 'auth-1' } }),
+}));
 
 const API = 'http://localhost:3000';
 
@@ -71,6 +76,21 @@ describe('MyStudentsPage', () => {
     );
     expect(student('Wang Fang')).toBeVisible();
     expect(state.studentQueries).toEqual([null, 'wang']);
+  });
+
+  it('caps the search at the API maximum length', async () => {
+    const user = userEvent.setup();
+    setup();
+    await screen.findByRole('list', { name: 'Students' });
+    const box = screen.getByRole('searchbox', { name: 'Search by name' });
+    await user.type(box, 'w'.repeat(SEARCH_QUERY_MAX + 5));
+    expect(box).toHaveValue('w'.repeat(SEARCH_QUERY_MAX));
+    await waitFor(() =>
+      expect(state.studentQueries).toEqual([
+        null,
+        'w'.repeat(SEARCH_QUERY_MAX),
+      ]),
+    );
   });
 
   it('says when no student matches the search', async () => {

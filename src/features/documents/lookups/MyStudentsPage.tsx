@@ -14,6 +14,7 @@ import { cn } from '@/lib/cn';
 import { Chip } from '../admin/badges';
 import { LockedBanner, lockReasonOf } from '../onboarding/Locked';
 import {
+  SEARCH_QUERY_MAX,
   STUDENT_LOOKUP_LIMIT,
   useDebounced,
   useMyStudentSignatures,
@@ -49,6 +50,7 @@ export function MyStudentsPage() {
                     {...p}
                     type="search"
                     autoComplete="off"
+                    maxLength={SEARCH_QUERY_MAX}
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                   />

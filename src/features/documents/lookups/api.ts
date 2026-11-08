@@ -1,10 +1,12 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useSession } from '@/auth/SessionProvider';
 import { api } from '@/lib/api';
 import type { DocumentLanguage } from '../api';
 
 export const SIGNATURE_QUERY_MIN = 2;
 export const SEARCH_DEBOUNCE_MS = 300;
+export const SEARCH_QUERY_MAX = 100;
 export const STUDENT_LOOKUP_LIMIT = 100;
 
 export interface SignedDocumentEntry {
@@ -42,20 +44,31 @@ export function useDebounced(value: string, ms = SEARCH_DEBOUNCE_MS) {
   return debounced;
 }
 
+function sameUserPlaceholder<T>(userId: string | null) {
+  return (previous: T | undefined, query?: { queryKey: readonly unknown[] }) =>
+    query?.queryKey[1] === userId ? previous : undefined;
+}
+
 export function useSignatureLookup(q: string) {
+  const userId = useSession().user?.id ?? null;
   return useQuery({
-    queryKey: ['admin', 'signatures', q] as const,
-    enabled: q.length >= SIGNATURE_QUERY_MIN,
-    placeholderData: keepPreviousData,
+    queryKey: ['admin', userId, 'signatures', q] as const,
+    enabled:
+      userId !== null &&
+      q.length >= SIGNATURE_QUERY_MIN &&
+      q.length <= SEARCH_QUERY_MAX,
+    placeholderData: sameUserPlaceholder<Signer[]>(userId),
     queryFn: () =>
       api<Signer[]>(`/admin/signatures?${new URLSearchParams({ q })}`),
   });
 }
 
 export function useMyStudentSignatures(q: string) {
+  const userId = useSession().user?.id ?? null;
   return useQuery({
-    queryKey: ['me', 'students', 'signatures', q] as const,
-    placeholderData: keepPreviousData,
+    queryKey: ['me', userId, 'students', 'signatures', q] as const,
+    enabled: userId !== null && q.length <= SEARCH_QUERY_MAX,
+    placeholderData: sameUserPlaceholder<StudentSignature[]>(userId),
     queryFn: () =>
       api<StudentSignature[]>(
         q
