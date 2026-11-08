@@ -16,6 +16,7 @@ import type {
   PayRateCreate,
   PayRatePatch,
 } from '@/lib/types';
+import { filenameFromDisposition } from './lessonRules';
 
 const lessonTypesKey = ['admin', 'lesson-types'] as const;
 const payRatesKey = ['admin', 'pay-rates'] as const;
@@ -24,9 +25,22 @@ const googleCalendarKey = (instructorId: string) =>
   ['admin', 'instructor', instructorId, 'google-calendar'] as const;
 
 export interface ClassFilter {
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   instructorId?: string;
+  q?: string;
+  status?: string;
+  lessonTypeId?: string;
+  locationId?: string;
+  createdFrom?: string;
+  sort?: 'startsAt' | 'createdAt';
+}
+
+function classFilterParams(filter: ClassFilter): URLSearchParams {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter))
+    if (value) qs.set(key, value);
+  return qs;
 }
 
 export function useLessonTypes() {
@@ -93,13 +107,9 @@ export function useAdminClasses(filter: ClassFilter | null, page: number) {
     enabled: filter !== null,
     queryFn: async (): Promise<AdminClassPage> => {
       if (!filter) return { classes: [], total: 0, page };
-      const qs = new URLSearchParams({
-        from: filter.from,
-        to: filter.to,
-        limit: String(CLASSES_PAGE_SIZE),
-        page: String(page),
-      });
-      if (filter.instructorId) qs.set('instructorId', filter.instructorId);
+      const qs = classFilterParams(filter);
+      qs.set('limit', String(CLASSES_PAGE_SIZE));
+      qs.set('page', String(page));
       const { data, headers } = await apiWithHeaders<AdminClass[]>(
         `/admin/classes?${qs}`,
       );
@@ -114,6 +124,24 @@ export function useAdminClasses(filter: ClassFilter | null, page: number) {
     },
     placeholderData: keepPreviousData,
   });
+}
+
+export interface ClassesExport {
+  blob: Blob;
+  filename: string | null;
+}
+
+export async function fetchClassesExport(
+  filter: ClassFilter,
+): Promise<ClassesExport> {
+  const { data, headers } = await apiWithHeaders<Blob>(
+    `/admin/classes/export?${classFilterParams(filter)}`,
+    { responseType: 'blob' },
+  );
+  return {
+    blob: data,
+    filename: filenameFromDisposition(headers.get('Content-Disposition')),
+  };
 }
 
 export function useInstructorGoogleCalendar(instructorId: string) {
