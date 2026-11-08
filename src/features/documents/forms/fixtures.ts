@@ -2,6 +2,9 @@ import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { DocumentLanguage } from '../api';
 import {
   FORM_LANGUAGES,
+  SIGNER_EMAIL_KEY,
+  SIGNER_NAME_KEY,
+  type FormDraft,
   type FormField,
   type FormTemplate,
   type FormTemplateSummary,
@@ -144,6 +147,21 @@ export function toSummary(form: FormTemplate): FormTemplateSummary {
   };
 }
 
+export function fieldsInvalid(fields: FormField[]): string | null {
+  const keys = new Set<string>();
+  for (const f of fields) {
+    if (keys.has(f.key)) return `${f.key} appears twice`;
+    keys.add(f.key);
+  }
+  const has = (key: string, type: FormField['type']) =>
+    fields.some((f) => f.key === key && f.type === type && f.required);
+  if (!has(SIGNER_NAME_KEY, 'text') || !has(SIGNER_EMAIL_KEY, 'email'))
+    return 'it needs a required participant_name text field and a required email field';
+  if (!fields.some((f) => f.type === 'signature' && f.required))
+    return 'it needs a required signature field';
+  return null;
+}
+
 const bad = (message: string, status = 400) =>
   HttpResponse.json(
     { statusCode: status, message, error: 'Bad Request' },
@@ -167,6 +185,10 @@ export function formsHandlers(
     });
   };
   const notFound = () => bad('Form not found', 404);
+  const lang = (value: unknown) =>
+    FORM_LANGUAGES.includes(value as DocumentLanguage)
+      ? (value as DocumentLanguage)
+      : null;
 
   return [
     http.get(base, () => HttpResponse.json(state.forms.map(toSummary))),
@@ -198,5 +220,61 @@ export function formsHandlers(
       const form = find(params.id);
       return form ? HttpResponse.json(form) : notFound();
     }),
+    http.patch(`${base}/:id`, async ({ params, request }) => {
+      await log(request);
+      const form = find(params.id);
+      if (!form) return notFound();
+      Object.assign(form, await request.json(), {
+        updatedAt: new Date().toISOString(),
+      });
+      return HttpResponse.json(form);
+    }),
+    http.put(`${base}/:id/versions/:lang`, async ({ params, request }) => {
+      await log(request);
+      const form = find(params.id);
+      const l = lang(params.lang);
+      if (!form || !l) return notFound();
+      const body = (await request.json()) as FormDraft;
+      const slot = form.languages[l];
+      const fields =
+        body.fields ??
+        slot.draft?.fields ??
+        slot.published?.fields ??
+        defaultFormFields[l];
+      const problem = fieldsInvalid(fields);
+      if (problem) return bad(`The field list is not valid: ${problem}`);
+      const source = slot.draft ?? slot.published;
+      const keys = new Set(fields.map((f) => f.key));
+      slot.draft = {
+        ...(source ?? fakeFormVersion()),
+        version: slot.draft?.version ?? (slot.published?.version ?? 0) + 1,
+        title: body.title,
+        bodyMarkdown: body.bodyMarkdown,
+        fields,
+        originalPdf: source?.originalPdf ?? null,
+        placements: (source?.placements ?? []).filter((p) => keys.has(p.key)),
+        publishedAt: null,
+        updatedAt: new Date().toISOString(),
+      };
+      return HttpResponse.json(form);
+    }),
+    http.post(
+      `${base}/:id/versions/:lang/publish`,
+      async ({ params, request }) => {
+        await log(request);
+        const form = find(params.id);
+        const l = lang(params.lang);
+        if (!form || !l) return notFound();
+        const slot = form.languages[l];
+        if (!slot.draft)
+          return bad('There is no draft to publish in this language');
+        slot.published = {
+          ...slot.draft,
+          publishedAt: new Date().toISOString(),
+        };
+        slot.draft = null;
+        return HttpResponse.json(form);
+      },
+    ),
   ];
 }

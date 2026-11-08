@@ -43,6 +43,9 @@ describe('FormsListPage', () => {
         name: 'https://sign.ssnow.club/w/waiver',
       }),
     ).toHaveAttribute('href', 'https://sign.ssnow.club/w/waiver');
+    expect(
+      within(waiver).getByRole('link', { name: 'Edit Liability waiver' }),
+    ).toHaveAttribute('href', '/admin/signing-forms/form-waiver');
 
     const rental = row('Equipment rental agreement');
     expect(within(rental).getByText('English · Not published')).toBeVisible();

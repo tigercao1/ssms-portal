@@ -7,6 +7,9 @@ export const FORM_LANGUAGES: readonly DocumentLanguage[] = ['en', 'zh'];
 export const FORM_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const FORM_SLUG_MAX = 60;
 export const FORM_TITLE_MAX = 200;
+export const FORM_BODY_MAX = 50_000;
+export const SIGNER_NAME_KEY = 'participant_name';
+export const SIGNER_EMAIL_KEY = 'email';
 
 export type FormFieldType = 'text' | 'email' | 'date' | 'signature';
 
@@ -91,20 +94,53 @@ export interface FormCreate {
   titleZh?: string | null;
 }
 
+export interface FormPatch {
+  titleEn?: string;
+  titleZh?: string | null;
+  emailCopy?: boolean;
+}
+
+export interface FormDraft {
+  title: string;
+  bodyMarkdown: string;
+  fields: FormField[];
+}
+
 export const formsKeys = {
   all: ['admin', 'documents', 'forms'] as const,
   list: ['admin', 'documents', 'forms', 'list'] as const,
   form: (id: string) => ['admin', 'documents', 'forms', 'form', id] as const,
 };
 
+const enc = encodeURIComponent;
+const formPath = (id: string) => `/admin/documents/forms/${enc(id)}`;
+const versionPath = (id: string, lang: DocumentLanguage) =>
+  `${formPath(id)}/versions/${lang}`;
+
 export function publicFormUrl(slug: string): string {
   return `${env.signSiteUrl.replace(/\/+$/, '')}/w/${slug}`;
+}
+
+export function editableVersion(
+  form: FormTemplate,
+  lang: DocumentLanguage,
+): FormVersion | null {
+  const { draft, published } = form.languages[lang];
+  return draft ?? published;
 }
 
 export function useForms() {
   return useQuery({
     queryKey: formsKeys.list,
     queryFn: () => api<FormTemplateSummary[]>('/admin/documents/forms'),
+  });
+}
+
+export function useForm(id: string) {
+  return useQuery({
+    queryKey: formsKeys.form(id),
+    queryFn: () => api<FormTemplate>(formPath(id)),
+    staleTime: 60_000,
   });
 }
 
@@ -121,6 +157,35 @@ export function useCreateForm() {
   return useMutation({
     mutationFn: (body: FormCreate) =>
       api<FormTemplate>('/admin/documents/forms', { method: 'POST', body }),
+    onSuccess: sync,
+  });
+}
+
+export function useUpdateForm(id: string) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: (body: FormPatch) =>
+      api<FormTemplate>(formPath(id), { method: 'PATCH', body }),
+    onSuccess: sync,
+  });
+}
+
+export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: (body: FormDraft) =>
+      api<FormTemplate>(versionPath(id, lang), { method: 'PUT', body }),
+    onSuccess: sync,
+  });
+}
+
+export function usePublishForm(id: string, lang: DocumentLanguage) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: () =>
+      api<FormTemplate>(`${versionPath(id, lang)}/publish`, {
+        method: 'POST',
+      }),
     onSuccess: sync,
   });
 }
