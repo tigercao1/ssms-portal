@@ -10,6 +10,7 @@ import { useLessonTypes } from './lessonsApi';
 import {
   CLASS_STATUSES,
   CLASS_TABS,
+  NOT_CANCELLED_STATUSES,
   type ClassTab,
   type ClassView,
 } from './lessonRules';
@@ -51,6 +52,7 @@ export function ClassFilters({
   onFilter,
   onDayMode,
   onClear,
+  calendar = false,
 }: {
   view: ClassView;
   instructors: [string, string][];
@@ -60,38 +62,41 @@ export function ClassFilters({
   onFilter: (key: ClassFilterKey, value: string) => void;
   onDayMode: (on: boolean) => void;
   onClear: () => void;
+  calendar?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const lessonTypes = useLessonTypes();
   const locations = useTeachingLocations();
-  const all = view.tab === 'all';
+  const all = view.tab === 'all' && !calendar;
 
   return (
     <>
-      <div
-        role="tablist"
-        aria-label={t.lessons.tabsLabel}
-        className="grid grid-cols-2 gap-1 border-b border-grey/60 sm:flex"
-      >
-        {CLASS_TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={view.tab === tab}
-            onClick={() => onTab(tab)}
-            className={cn(
-              'min-h-11 border-b-2 px-3 text-sm transition-colors',
-              view.tab === tab
-                ? 'border-red font-medium text-navy'
-                : 'border-transparent text-slate hover:text-navy',
-            )}
-          >
-            {t.lessons[TAB_KEYS[tab]]}
-          </button>
-        ))}
-      </div>
+      {!calendar && (
+        <div
+          role="tablist"
+          aria-label={t.lessons.tabsLabel}
+          className="grid grid-cols-2 gap-1 border-b border-grey/60 sm:flex"
+        >
+          {CLASS_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={view.tab === tab}
+              onClick={() => onTab(tab)}
+              className={cn(
+                'min-h-11 border-b-2 px-3 text-sm transition-colors',
+                view.tab === tab
+                  ? 'border-red font-medium text-navy'
+                  : 'border-transparent text-slate hover:text-navy',
+              )}
+            >
+              {t.lessons[TAB_KEYS[tab]]}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Card className="flex flex-col gap-4">
         <SearchField value={view.q} onSearch={(q) => onFilter('q', q)} />
@@ -144,8 +149,15 @@ export function ClassFilters({
               </Select>
             )}
           </Field>
-          {all && (
-            <Field label={t.lessons.filterStatus}>
+          {(all || calendar) && (
+            <Field
+              label={t.lessons.filterStatus}
+              hint={
+                calendar && !view.status
+                  ? t.lessons.calendarCancelledHint
+                  : undefined
+              }
+            >
               {(p) => (
                 <Select
                   {...p}
@@ -153,6 +165,9 @@ export function ClassFilters({
                   onChange={(e) => onFilter('status', e.target.value)}
                 >
                   <option value="">{t.lessons.allStatuses}</option>
+                  <option value={NOT_CANCELLED_STATUSES}>
+                    {t.lessons.notCancelledStatuses}
+                  </option>
                   {CLASS_STATUSES.map((status) => (
                     <option key={status} value={status}>
                       {t.lessons[STATUS_KEYS[status]]}

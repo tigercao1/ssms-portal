@@ -276,16 +276,16 @@ describe('ClassesPage tabs, search and filters', () => {
         instructorId: 'inst-2',
         instructorName: 'Eddie Lee',
         notes: 'Afternoon',
-        startsAt: '2026-12-05T14:00:00',
-        endsAt: '2026-12-05T15:00:00',
+        startsAt: '2026-12-05T14:00:00-05:00',
+        endsAt: '2026-12-05T15:00:00-05:00',
       }),
       fakeClass({
         id: 'early',
         instructorId: 'inst-2',
         instructorName: 'Eddie Lee',
         notes: 'Morning',
-        startsAt: '2026-12-05T09:00:00',
-        endsAt: '2026-12-05T10:00:00',
+        startsAt: '2026-12-05T09:00:00-05:00',
+        endsAt: '2026-12-05T10:00:00-05:00',
       }),
     ]);
     const user = userEvent.setup();
@@ -310,12 +310,8 @@ describe('ClassesPage tabs, search and filters', () => {
       expect(last(queries).get('instructorId')).toBe('inst-2'),
     );
     const q = last(queries);
-    expect(new Date(q.get('from') as string)).toEqual(
-      new Date('2026-12-05T00:00:00'),
-    );
-    expect(new Date(q.get('to') as string)).toEqual(
-      new Date('2026-12-06T00:00:00'),
-    );
+    expect(q.get('from')).toBe('2026-12-05T05:00:00.000Z');
+    expect(q.get('to')).toBe('2026-12-06T05:00:00.000Z');
     expect(
       screen.queryByText('Pick an instructor to see their day in time order.'),
     ).not.toBeInTheDocument();

@@ -1,6 +1,7 @@
 import type { Locale } from '@/i18n/core/types';
 import type { AdminClass, ClassStatus } from '@/lib/types';
 import type { ClassFilter } from './lessonsApi';
+import { schoolInstant, schoolParts, shiftDate } from './booking/bookingRules';
 
 export function parsePositiveInt(value: string): number | null | 'invalid' {
   const trimmed = value.trim();
@@ -55,15 +56,20 @@ export function localDayKey(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+export function schoolDayKey(iso: string): string {
+  return schoolParts(iso).date;
+}
+
 export function groupClassesByDay(
   classes: AdminClass[],
+  dayKey: (iso: string) => string = localDayKey,
 ): { day: string; classes: AdminClass[] }[] {
   const sorted = [...classes].sort(
     (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
   );
   const groups = new Map<string, AdminClass[]>();
   for (const c of sorted) {
-    const day = localDayKey(c.startsAt);
+    const day = dayKey(c.startsAt);
     const list = groups.get(day) ?? [];
     list.push(c);
     groups.set(day, list);
@@ -90,6 +96,13 @@ export function rangeToIso(
   return { from: start.toISOString(), to: end.toISOString() };
 }
 
+export function schoolDayRange(day: string): { from: string; to: string } {
+  return {
+    from: schoolInstant(day, '00:00'),
+    to: schoolInstant(shiftDate(day, 1), '00:00'),
+  };
+}
+
 export const CLASS_TABS = ['upcoming', 'recent', 'cancelled', 'all'] as const;
 export type ClassTab = (typeof CLASS_TABS)[number];
 
@@ -106,7 +119,15 @@ export function classTabFrom(value: string | null): ClassTab {
   return CLASS_TABS.find((tab) => tab === value) ?? 'all';
 }
 
-export function classStatusFrom(value: string | null): ClassStatus | '' {
+export const NOT_CANCELLED_STATUSES = 'scheduled,completed,no_show';
+
+export type ClassStatusFilter =
+  | ClassStatus
+  | typeof NOT_CANCELLED_STATUSES
+  | '';
+
+export function classStatusFrom(value: string | null): ClassStatusFilter {
+  if (value === NOT_CANCELLED_STATUSES) return value;
   return CLASS_STATUSES.find((status) => status === value) ?? '';
 }
 
@@ -119,7 +140,7 @@ export interface ClassView {
   instructorId: string;
   lessonTypeId: string;
   locationId: string;
-  status: ClassStatus | '';
+  status: ClassStatusFilter;
 }
 
 export function classFilterFor(view: ClassView, now: Date): ClassFilter | null {
@@ -141,13 +162,11 @@ export function classFilterFor(view: ClassView, now: Date): ClassFilter | null {
     case 'cancelled':
       return { ...shared, status: 'cancelled' };
     case 'all': {
-      const [from, to] = view.day ? [view.day, view.day] : [view.from, view.to];
-      if (!from || !to || from > to) return null;
-      return {
-        ...shared,
-        ...rangeToIso(from, to),
-        ...(view.status && { status: view.status }),
-      };
+      const status = view.status && { status: view.status };
+      if (view.day)
+        return { ...shared, ...schoolDayRange(view.day), ...status };
+      if (!view.from || !view.to || view.from > view.to) return null;
+      return { ...shared, ...rangeToIso(view.from, view.to), ...status };
     }
   }
 }
