@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { formatDateTime } from '@/lib/date';
 import {
@@ -87,6 +88,13 @@ function FormRow({ row }: { row: FormTemplateSummary }) {
             )}
             <p className="font-mono text-xs text-slate">{row.slug}</p>
           </div>
+          <Link
+            to={`/admin/signing-forms/${row.id}`}
+            aria-label={s.editFor.replace('{title}', title)}
+            className="rounded-md border border-grey px-3 py-1.5 text-sm font-medium text-navy hover:border-navy hover:bg-navy-tint"
+          >
+            {s.edit}
+          </Link>
         </div>
 
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -267,7 +275,13 @@ function CreateForm() {
       )}
       {create.isSuccess && (
         <Banner tone="approved">
-          {s.created.replace('{title}', create.data.titleEn)}
+          {s.created.replace('{title}', create.data.titleEn)}{' '}
+          <Link
+            to={`/admin/signing-forms/${create.data.id}`}
+            className="font-medium text-navy underline"
+          >
+            {s.edit}
+          </Link>
         </Banner>
       )}
     </Card>

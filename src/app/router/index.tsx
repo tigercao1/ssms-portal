@@ -37,6 +37,7 @@ import { DocumentReviewPage } from '@/features/documents/admin/review/DocumentRe
 import { SignaturesPage } from '@/features/documents/lookups/SignaturesPage';
 import { MyStudentsPage } from '@/features/documents/lookups/MyStudentsPage';
 import { FormsListPage } from '@/features/documents/forms/FormsListPage';
+import { FormEditorPage } from '@/features/documents/forms/FormEditorPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -230,6 +231,14 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireAdmin>
                     <FormsListPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/signing-forms/:id',
+                element: (
+                  <RequireAdmin>
+                    <FormEditorPage />
                   </RequireAdmin>
                 ),
               },

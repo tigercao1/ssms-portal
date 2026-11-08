@@ -1,5 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useCallback } from 'react';
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { api, ApiError } from '@/lib/api';
 import { env } from '@/lib/env';
 import type { DocumentLanguage } from '../api';
 
@@ -7,6 +13,9 @@ export const FORM_LANGUAGES: readonly DocumentLanguage[] = ['en', 'zh'];
 export const FORM_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const FORM_SLUG_MAX = 60;
 export const FORM_TITLE_MAX = 200;
+export const FORM_BODY_MAX = 50_000;
+export const SIGNER_NAME_KEY = 'participant_name';
+export const SIGNER_EMAIL_KEY = 'email';
 
 export type FormFieldType = 'text' | 'email' | 'date' | 'signature';
 
@@ -91,14 +100,59 @@ export interface FormCreate {
   titleZh?: string | null;
 }
 
+export interface FormPatch {
+  titleEn?: string;
+  titleZh?: string | null;
+  emailCopy?: boolean;
+  expectedUpdatedAt: string;
+}
+
+export interface FormDraft {
+  title: string;
+  bodyMarkdown: string;
+  fields: FormField[];
+}
+
+export interface FormRevision {
+  expectedUpdatedAt: string | null;
+}
+
 export const formsKeys = {
   all: ['admin', 'documents', 'forms'] as const,
   list: ['admin', 'documents', 'forms', 'list'] as const,
   form: (id: string) => ['admin', 'documents', 'forms', 'form', id] as const,
+  revision: (id: string, lang: DocumentLanguage) =>
+    ['admin', 'documents', 'forms', 'revision', id, lang] as const,
+  writes: (id: string, lang: DocumentLanguage) =>
+    ['admin', 'documents', 'forms', 'writes', id, lang] as const,
 };
+
+const enc = encodeURIComponent;
+const formPath = (id: string) => `/admin/documents/forms/${enc(id)}`;
+const versionPath = (id: string, lang: DocumentLanguage) =>
+  `${formPath(id)}/versions/${lang}`;
 
 export function publicFormUrl(slug: string): string {
   return `${env.signSiteUrl.replace(/\/+$/, '')}/w/${slug}`;
+}
+
+export function revisionOf(
+  form: FormTemplate,
+  lang: DocumentLanguage,
+): string | null {
+  return form.languages[lang].draft?.updatedAt ?? null;
+}
+
+export function isConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409;
+}
+
+export function editableVersion(
+  form: FormTemplate,
+  lang: DocumentLanguage,
+): FormVersion | null {
+  const { draft, published } = form.languages[lang];
+  return draft ?? published;
 }
 
 export function useForms() {
@@ -106,6 +160,56 @@ export function useForms() {
     queryKey: formsKeys.list,
     queryFn: () => api<FormTemplateSummary[]>('/admin/documents/forms'),
   });
+}
+
+export function useForm(id: string) {
+  return useQuery({
+    queryKey: formsKeys.form(id),
+    queryFn: () => api<FormTemplate>(formPath(id)),
+    staleTime: 60_000,
+  });
+}
+
+export function useFormWriting(id: string, lang: DocumentLanguage): boolean {
+  return useIsMutating({ mutationKey: formsKeys.writes(id, lang) }) > 0;
+}
+
+export function useDraftRevision(form: FormTemplate, lang: DocumentLanguage) {
+  const qc = useQueryClient();
+  const key = formsKeys.revision(form.id, lang);
+  const { data = null } = useQuery({
+    queryKey: key,
+    queryFn: () => qc.getQueryData<string | null>(key) ?? null,
+    initialData: () => revisionOf(form, lang),
+    staleTime: Infinity,
+  });
+  const setRevision = useCallback(
+    (revision: string | null) => qc.setQueryData(key, revision),
+    [qc, key],
+  );
+  return [data, setRevision] as const;
+}
+
+function useDraftSync(id: string, lang: DocumentLanguage) {
+  const qc = useQueryClient();
+  const sync = useFormSync();
+  return (form: FormTemplate) => {
+    qc.setQueryData(formsKeys.revision(id, lang), revisionOf(form, lang));
+    return sync(form);
+  };
+}
+
+export function useReloadForm(id: string) {
+  const qc = useQueryClient();
+  return async () => {
+    const form = await qc.fetchQuery({
+      queryKey: formsKeys.form(id),
+      queryFn: () => api<FormTemplate>(formPath(id)),
+      staleTime: 0,
+    });
+    void qc.invalidateQueries({ queryKey: formsKeys.list, exact: true });
+    return form;
+  };
 }
 
 export function useFormSync() {
@@ -121,6 +225,38 @@ export function useCreateForm() {
   return useMutation({
     mutationFn: (body: FormCreate) =>
       api<FormTemplate>('/admin/documents/forms', { method: 'POST', body }),
+    onSuccess: sync,
+  });
+}
+
+export function useUpdateForm(id: string) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: (body: FormPatch) =>
+      api<FormTemplate>(formPath(id), { method: 'PATCH', body }),
+    onSuccess: sync,
+  });
+}
+
+export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
+  const sync = useDraftSync(id, lang);
+  return useMutation({
+    mutationKey: formsKeys.writes(id, lang),
+    mutationFn: (body: FormDraft & FormRevision) =>
+      api<FormTemplate>(versionPath(id, lang), { method: 'PUT', body }),
+    onSuccess: sync,
+  });
+}
+
+export function usePublishForm(id: string, lang: DocumentLanguage) {
+  const sync = useDraftSync(id, lang);
+  return useMutation({
+    mutationKey: formsKeys.writes(id, lang),
+    mutationFn: (expectedUpdatedAt: string) =>
+      api<FormTemplate>(`${versionPath(id, lang)}/publish`, {
+        method: 'POST',
+        body: { expectedUpdatedAt },
+      }),
     onSuccess: sync,
   });
 }
