@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { fakeClass } from '@/test/msw';
 import {
+  classFilterFor,
   customerName,
+  filenameFromDisposition,
   formatRate,
   groupClassesByDay,
   parsePositiveInt,
   parseRate,
   rangeToIso,
   rateIsCurrent,
+  type ClassView,
 } from './lessonRules';
 
 describe('parsePositiveInt', () => {
@@ -97,5 +100,58 @@ describe('rangeToIso', () => {
     const { from, to } = rangeToIso('2026-12-01', '2026-12-03');
     expect(new Date(from)).toEqual(new Date('2026-12-01T00:00:00'));
     expect(new Date(to)).toEqual(new Date('2026-12-04T00:00:00'));
+  });
+});
+
+describe('classFilterFor', () => {
+  const now = new Date('2026-12-01T12:00:00');
+  const view: ClassView = {
+    tab: 'all',
+    from: '2026-12-01',
+    to: '2026-12-03',
+    day: '',
+    q: '',
+    instructorId: '',
+    lessonTypeId: '',
+    locationId: '',
+    status: '',
+  };
+
+  it('uses the day instead of the range when one is picked', () => {
+    const filter = classFilterFor(
+      { ...view, day: '2026-12-05', instructorId: 'i1', status: 'completed' },
+      now,
+    );
+    expect(filter).toEqual({
+      instructorId: 'i1',
+      status: 'completed',
+      ...rangeToIso('2026-12-05', '2026-12-05'),
+    });
+  });
+
+  it('has no filter for a reversed or empty range', () => {
+    expect(classFilterFor({ ...view, to: '2026-11-30' }, now)).toBeNull();
+    expect(classFilterFor({ ...view, from: '' }, now)).toBeNull();
+  });
+
+  it('ignores the range and status outside All bookings', () => {
+    expect(
+      classFilterFor({ ...view, tab: 'cancelled', status: 'completed' }, now),
+    ).toEqual({ status: 'cancelled' });
+  });
+});
+
+describe('filenameFromDisposition', () => {
+  it.each([
+    ['attachment; filename="classes.csv"', 'classes.csv'],
+    ['attachment; filename=classes.csv', 'classes.csv'],
+    [
+      `attachment; filename="x.csv"; filename*=UTF-8''%E8%AF%BE%E7%A8%8B.csv`,
+      '课程.csv',
+    ],
+    ['attachment', null],
+    [null, null],
+  ])('%s -> %s', (header, name) => {
+    expect(filenameFromDisposition(header)).toBe(name);
   });
 });
