@@ -7,9 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Rnd } from 'react-rnd';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
-import { cn } from '@/lib/cn';
 import { Banner, Button, Card, Spinner } from '@/components';
 import {
   FIELD_TYPES,
@@ -43,6 +41,7 @@ import {
   useSourceRecovery,
 } from '../../pdf/presignedSource';
 import { PropertiesPanel } from './PropertiesPanel';
+import { arrowDelta, PlacedFieldBox } from './PlacedFieldBox';
 import { SignerPreviewField } from './SignerPreviewField';
 import { FIELD_ICONS, useFieldTypeLabel } from './labels';
 
@@ -231,14 +230,7 @@ function Editor({
   function onFieldKey(e: KeyboardEvent, field: Field) {
     const g = geometry(field.page);
     if (!g) return;
-    const step = (e.shiftKey ? 10 : 1) * scaleOf(g);
-    const moves: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      ArrowUp: [0, -step],
-      ArrowDown: [0, step],
-    };
-    const move = moves[e.key];
+    const move = arrowDelta(e, scaleOf(g));
     if (move) {
       e.preventDefault();
       updateField(nudgeField(field, g, move[0], move[1]));
@@ -293,66 +285,29 @@ function Editor({
             return <SignerPreviewField key={field.id} field={field} rect={s} />;
           const isSelected = field.id === selectedId;
           return (
-            <Rnd
+            <PlacedFieldBox
               key={field.id}
-              bounds="parent"
-              size={{ width: s.width, height: s.height }}
-              position={{ x: s.left, y: s.top }}
-              minWidth={4}
-              minHeight={4}
-              disableDragging={!canPlace}
-              enableResizing={canPlace}
-              onDragStart={() => setSelectedId(field.id)}
-              onDragStop={(_e, d) =>
+              rect={s}
+              editable={canPlace}
+              selected={isSelected}
+              icon={FIELD_ICONS[field.type]}
+              label={`${field.labelEn}${field.required ? ' *' : ''}`}
+              ariaLabel={t.documents.fieldAria
+                .replace('{type}', typeLabel(field.type))
+                .replace('{label}', field.labelEn)
+                .replace('{page}', String(field.page))}
+              elementRef={(el) => {
+                if (el) fieldEls.current.set(field.id, el);
+                else fieldEls.current.delete(field.id);
+              }}
+              onSelect={() => setSelectedId(field.id)}
+              onPlace={(left, top, width, height) =>
                 updateField(
-                  placeField(field, info.geometry, d.x, d.y, s.width, s.height),
+                  placeField(field, info.geometry, left, top, width, height),
                 )
               }
-              onResizeStart={() => setSelectedId(field.id)}
-              onResizeStop={(_e, _dir, el, _delta, pos) =>
-                updateField(
-                  placeField(
-                    field,
-                    info.geometry,
-                    pos.x,
-                    pos.y,
-                    el.offsetWidth || Number.parseFloat(el.style.width),
-                    el.offsetHeight || Number.parseFloat(el.style.height),
-                  ),
-                )
-              }
-              className={cn('group', isSelected ? 'z-20' : 'z-10')}
-            >
-              <div
-                ref={(el) => {
-                  if (el) fieldEls.current.set(field.id, el);
-                  else fieldEls.current.delete(field.id);
-                }}
-                role="button"
-                tabIndex={0}
-                aria-pressed={isSelected}
-                aria-label={t.documents.fieldAria
-                  .replace('{type}', typeLabel(field.type))
-                  .replace('{label}', field.labelEn)
-                  .replace('{page}', String(field.page))}
-                onClick={() => setSelectedId(field.id)}
-                onKeyDown={(e) => onFieldKey(e, field)}
-                className={cn(
-                  'flex h-full w-full cursor-move items-center gap-1 overflow-hidden rounded-sm border px-1 text-[11px] leading-none outline-none',
-                  isSelected
-                    ? 'border-red bg-red/10 text-red ring-2 ring-red/40'
-                    : 'border-navy/70 bg-navy-tint/80 text-navy hover:border-navy',
-                )}
-              >
-                <span aria-hidden className="shrink-0">
-                  {FIELD_ICONS[field.type]}
-                </span>
-                <span className="truncate">
-                  {field.labelEn}
-                  {field.required && ' *'}
-                </span>
-              </div>
-            </Rnd>
+              onKeyDown={(e) => onFieldKey(e, field)}
+            />
           );
         })}
       </div>

@@ -76,6 +76,24 @@ export function fitToPage(rect: PdfRect, g: PageGeometry): PdfRect {
   return roundPdfRect(clampPdfRect(sized, pdfPageBox(g)));
 }
 
+export function rectAt(
+  size: { w: number; h: number },
+  g: PageGeometry,
+  scale: number,
+  screenX: number,
+  screenY: number,
+): PdfRect {
+  const width = size.w * scale;
+  const height = size.h * scale;
+  const rect = screenRectToPdf(g, {
+    left: screenX - width / 2,
+    top: screenY - height / 2,
+    width,
+    height,
+  });
+  return fitToPage(rect, g);
+}
+
 /** A new field of `type` centred on a CSS-pixel point of a rendered page. */
 export function createFieldAt(
   type: FieldType,
@@ -86,20 +104,11 @@ export function createFieldAt(
   screenY: number,
   existingIds: Iterable<string>,
 ): Field {
-  const size = DEFAULT_SIZE[type];
-  const width = size.w * scale;
-  const height = size.h * scale;
-  const rect = screenRectToPdf(g, {
-    left: screenX - width / 2,
-    top: screenY - height / 2,
-    width,
-    height,
-  });
   return {
     id: newFieldId(existingIds),
     type,
     page,
-    ...fitToPage(rect, g),
+    ...rectAt(DEFAULT_SIZE[type], g, scale, screenX, screenY),
     required: true,
     labelEn: DEFAULT_LABELS[type].en,
     labelZh: DEFAULT_LABELS[type].zh,
@@ -108,12 +117,12 @@ export function createFieldAt(
 }
 
 /** Moves a field by CSS pixels in the rendered page's (rotated) frame. */
-export function nudgeField(
-  field: Field,
+export function nudgeField<T extends PdfRect>(
+  field: T,
   g: PageGeometry,
   dxPx: number,
   dyPx: number,
-): Field {
+): T {
   const s = pdfRectToScreen(g, field);
   const moved = screenRectToPdf(g, {
     ...s,
@@ -124,14 +133,14 @@ export function nudgeField(
 }
 
 /** Applies a react-rnd drag/resize result (CSS pixels) to a field. */
-export function placeField(
-  field: Field,
+export function placeField<T extends PdfRect>(
+  field: T,
   g: PageGeometry,
   left: number,
   top: number,
   width: number,
   height: number,
-): Field {
+): T {
   return {
     ...field,
     ...fitToPage(screenRectToPdf(g, { left, top, width, height }), g),

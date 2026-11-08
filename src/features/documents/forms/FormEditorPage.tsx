@@ -16,6 +16,7 @@ import {
 import { CopyLinkButton } from '@/features/admin/PageParts';
 import { Markdown } from '@/sign/Markdown';
 import type { DocumentLanguage } from '../api';
+import { useSourceRecovery, type SourceRecovery } from '../pdf/presignedSource';
 import { Chip } from '../admin/badges';
 import { errorText, languageName, templateTitle } from '../admin/format';
 import {
@@ -26,6 +27,7 @@ import {
   isConflict,
   publicFormUrl,
   revisionOf,
+  unplacedRequired,
   useDraftRevision,
   useForm,
   useFormWriting,
@@ -37,11 +39,13 @@ import {
   type FormTemplate,
 } from './api';
 import { FieldList, fieldsProblem } from './FieldList';
+import { OriginalPdfSection } from './OriginalPdfSection';
 
 export function FormEditorPage() {
   const { id = '' } = useParams();
   const t = useT();
   const form = useForm(id);
+  const sourceRecovery = useSourceRecovery(form);
   if (form.isLoading)
     return (
       <div className="flex justify-center py-16">
@@ -57,10 +61,16 @@ export function FormEditorPage() {
         )}
       </Banner>
     );
-  return <Editor form={form.data} />;
+  return <Editor form={form.data} sourceRecovery={sourceRecovery} />;
 }
 
-function Editor({ form }: { form: FormTemplate }) {
+function Editor({
+  form,
+  sourceRecovery,
+}: {
+  form: FormTemplate;
+  sourceRecovery: SourceRecovery;
+}) {
   const t = useT();
   const s = t.signingForms;
   const { locale } = useLocale();
@@ -160,6 +170,7 @@ function Editor({ form }: { form: FormTemplate }) {
           key={lang}
           form={form}
           lang={lang}
+          sourceRecovery={sourceRecovery}
           onDirtyChange={setDirty}
         />
       </div>
@@ -259,10 +270,12 @@ function sameDraft(a: FormDraft, b: FormDraft): boolean {
 function LanguageEditor({
   form,
   lang,
+  sourceRecovery,
   onDirtyChange,
 }: {
   form: FormTemplate;
   lang: DocumentLanguage;
+  sourceRecovery: SourceRecovery;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const t = useT();
@@ -282,14 +295,23 @@ function LanguageEditor({
   const reload = useReloadForm(form.id);
   const writing = useFormWriting(form.id, lang);
   const dirty = !sameDraft(values, baseline);
-  const unsaved = dirty || !!reloaded?.mine;
+  const [placementsDirty, setPlacementsDirty] = useState(false);
+  const unsaved = dirty || placementsDirty || !!reloaded?.mine;
   const problem = fieldsProblem(values.fields, t);
   const incomplete = !values.title.trim() || !values.bodyMarkdown.trim();
+  const unplaced = draft ? unplacedRequired(draft) : [];
   const publishBlocked = dirty
     ? s.publishUnsaved
     : !draft
       ? s.publishNeedsDraft
-      : null;
+      : placementsDirty
+        ? s.publishPlacementsUnsaved
+        : unplaced.length > 0
+          ? s.publishNeedsPlacements.replace(
+              '{fields}',
+              unplaced.map((f) => f.label).join(', '),
+            )
+          : null;
 
   useEffect(() => {
     onDirtyChange(unsaved);
@@ -453,6 +475,13 @@ function LanguageEditor({
         )}
       </Card>
 
+      <OriginalPdfSection
+        form={form}
+        lang={lang}
+        sourceRecovery={sourceRecovery}
+        onDirtyChange={setPlacementsDirty}
+      />
+
       {reloaded && (
         <Banner tone="pending">
           <div className="flex flex-col gap-2">
@@ -513,7 +542,7 @@ function LanguageEditor({
         </Banner>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="sticky bottom-0 z-30 -mx-1 flex flex-wrap items-center gap-3 border-t border-grey/60 bg-canvas px-1 py-3">
         <Button
           loading={save.isPending}
           disabled={!dirty || incomplete || problem !== null || writing}

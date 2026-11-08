@@ -7,13 +7,19 @@ import {
 } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import { env } from '@/lib/env';
-import type { DocumentLanguage } from '../api';
+import {
+  putToPresignedUrl,
+  type DocumentLanguage,
+  type UploadUrl,
+} from '../api';
 
 export const FORM_LANGUAGES: readonly DocumentLanguage[] = ['en', 'zh'];
 export const FORM_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const FORM_SLUG_MAX = 60;
 export const FORM_TITLE_MAX = 200;
 export const FORM_BODY_MAX = 50_000;
+export const MAX_FORM_PDF_BYTES = 10 * 1024 * 1024;
+export const MAX_FORM_PDF_PAGES = 30;
 export const SIGNER_NAME_KEY = 'participant_name';
 export const SIGNER_EMAIL_KEY = 'email';
 
@@ -117,6 +123,8 @@ export interface FormRevision {
   expectedUpdatedAt: string | null;
 }
 
+export type ConfirmedFormPdf = FormTemplate & { placementsCleared: boolean };
+
 export const formsKeys = {
   all: ['admin', 'documents', 'forms'] as const,
   list: ['admin', 'documents', 'forms', 'list'] as const,
@@ -153,6 +161,12 @@ export function editableVersion(
 ): FormVersion | null {
   const { draft, published } = form.languages[lang];
   return draft ?? published;
+}
+
+export function unplacedRequired(version: FormVersion): FormField[] {
+  if (!version.originalPdf) return [];
+  const placed = new Set(version.placements.map((p) => p.key));
+  return version.fields.filter((f) => f.required && !placed.has(f.key));
 }
 
 export function useForms() {
@@ -256,6 +270,50 @@ export function usePublishForm(id: string, lang: DocumentLanguage) {
       api<FormTemplate>(`${versionPath(id, lang)}/publish`, {
         method: 'POST',
         body: { expectedUpdatedAt },
+      }),
+    onSuccess: sync,
+  });
+}
+
+export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name))
+        throw new ApiError(415, 'not-pdf');
+      if (file.size > MAX_FORM_PDF_BYTES) throw new ApiError(413, 'too-large');
+      const sourcePath = `${versionPath(id, lang)}/source`;
+      const { uploadUrl } = await api<UploadUrl>(`${sourcePath}/upload-url`, {
+        method: 'POST',
+        body: { contentLength: file.size },
+      });
+      await putToPresignedUrl(uploadUrl, file, 'application/pdf');
+      return api<ConfirmedFormPdf>(`${sourcePath}/confirm`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: sync,
+  });
+}
+
+export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: () =>
+      api<FormTemplate>(`${versionPath(id, lang)}/source`, {
+        method: 'DELETE',
+      }),
+    onSuccess: sync,
+  });
+}
+
+export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
+  const sync = useFormSync();
+  return useMutation({
+    mutationFn: (placements: FormPlacement[]) =>
+      api<FormTemplate>(`${versionPath(id, lang)}/placements`, {
+        method: 'PUT',
+        body: { placements },
       }),
     onSuccess: sync,
   });

@@ -1,11 +1,14 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { DocumentLanguage } from '../api';
+import { MOCK_STORAGE_ORIGIN } from '../api/fixtures';
 import {
   FORM_LANGUAGES,
   SIGNER_EMAIL_KEY,
   SIGNER_NAME_KEY,
   type FormDraft,
   type FormField,
+  type FormOriginalPdf,
+  type FormPlacement,
   type FormTemplate,
   type FormTemplateSummary,
   type FormVersion,
@@ -90,6 +93,23 @@ export function fakeForm(overrides: Partial<FormTemplate> = {}): FormTemplate {
   };
 }
 
+export function fakeOriginalPdf(
+  overrides: Partial<FormOriginalPdf> = {},
+): FormOriginalPdf {
+  return {
+    sha256: 'e5f6a7b8'.repeat(8),
+    sizeBytes: 182_000,
+    pageCount: 2,
+    pages: [
+      { width: 612, height: 792, rotate: 0, x: 0, y: 0 },
+      { width: 612, height: 792, rotate: 0, x: 0, y: 0 },
+    ],
+    url: `${MOCK_STORAGE_ORIGIN}/forms/waiver/original.pdf?sig=mock`,
+    urlExpiresAt: '2026-11-08T20:00:00Z',
+    ...overrides,
+  };
+}
+
 export const sampleForms: FormTemplate[] = [
   fakeForm(),
   fakeForm({
@@ -108,6 +128,8 @@ export const sampleForms: FormTemplate[] = [
 
 export interface FormsMockState {
   forms: FormTemplate[];
+  uploads: Map<string, { bytes: number; pageCount: number }>;
+  nextPageCount: number;
   requests: { method: string; path: string; body?: unknown }[];
 }
 
@@ -116,6 +138,8 @@ export function createFormsState(
 ): FormsMockState {
   return {
     forms: structuredClone(sampleForms),
+    uploads: new Map(),
+    nextPageCount: 2,
     requests: [],
     ...overrides,
   };
@@ -160,6 +184,24 @@ export function fieldsInvalid(fields: FormField[]): string | null {
   if (!fields.some((f) => f.type === 'signature' && f.required))
     return 'it needs a required signature field';
   return null;
+}
+
+function placementProblem(
+  placement: FormPlacement,
+  version: FormVersion,
+): string | null {
+  const pdf = version.originalPdf!;
+  const page = pdf.pages[placement.page - 1];
+  if (!version.fields.some((f) => f.key === placement.key))
+    return `${placement.key} is not a field of this version`;
+  if (!page)
+    return `${placement.key} is on page ${placement.page}, but the PDF has ${pdf.pages.length} page(s)`;
+  const inside =
+    placement.x >= page.x &&
+    placement.y >= page.y &&
+    placement.x + placement.w <= page.x + page.width &&
+    placement.y + placement.h <= page.y + page.height;
+  return inside ? null : `${placement.key} is outside page ${placement.page}`;
 }
 
 const bad = (message: string, status = 400) =>
@@ -289,19 +331,128 @@ export function formsHandlers(
         const l = lang(params.lang);
         if (!form || !l) return notFound();
         const slot = form.languages[l];
-        if (!slot.draft)
-          return bad('There is no draft to publish in this language');
+        const draft = slot.draft;
+        if (!draft) return bad('There is no draft to publish in this language');
         const body: unknown = request.headers
           .get('content-type')
           ?.includes('json')
           ? await request.json()
           : undefined;
-        if (stale(slot.draft, body)) return changed();
+        if (stale(draft, body)) return changed();
+        const placed = new Set(draft.placements.map((p) => p.key));
+        const missing = draft.originalPdf
+          ? draft.fields.filter((f) => f.required && !placed.has(f.key))
+          : [];
+        if (missing.length > 0)
+          return bad(
+            `Place these required fields on the PDF before publishing: ${missing.map((f) => f.key).join(', ')}`,
+          );
         slot.published = {
-          ...slot.draft,
+          ...draft,
           publishedAt: new Date().toISOString(),
         };
         slot.draft = null;
+        return HttpResponse.json(form);
+      },
+    ),
+    http.post(
+      `${base}/:id/versions/:lang/source/upload-url`,
+      async ({ params, request }) => {
+        await log(request);
+        const form = find(params.id);
+        const l = lang(params.lang);
+        if (!form || !l) return notFound();
+        if (!form.languages[l].draft)
+          return bad('Save a draft in this language before changing its PDF');
+        return HttpResponse.json({
+          uploadUrl: `${MOCK_STORAGE_ORIGIN}/upload/forms/${form.id}/${l}.pdf?sig=mock`,
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        });
+      },
+    ),
+    http.put(
+      `${MOCK_STORAGE_ORIGIN}/upload/forms/:id/:file`,
+      async ({ params, request }) => {
+        state.uploads.set(`${params.id}/${params.file}`, {
+          bytes: (await request.arrayBuffer()).byteLength,
+          pageCount: state.nextPageCount,
+        });
+        return new HttpResponse(null, { status: 200 });
+      },
+    ),
+    http.post(
+      `${base}/:id/versions/:lang/source/confirm`,
+      async ({ params, request }) => {
+        await log(request);
+        const form = find(params.id);
+        const l = lang(params.lang);
+        const draft = l && form?.languages[l].draft;
+        if (!form || !l) return notFound();
+        if (!draft)
+          return bad('Save a draft in this language before changing its PDF');
+        const upload = state.uploads.get(`${form.id}/${l}.pdf`);
+        if (!upload)
+          return bad('No uploaded PDF found; upload the file and try again');
+        state.uploads.delete(`${form.id}/${l}.pdf`);
+        const pages = Array.from({ length: upload.pageCount }, () => ({
+          width: 612,
+          height: 792,
+          rotate: 0 as const,
+          x: 0,
+          y: 0,
+        }));
+        const placementsCleared =
+          draft.placements.length > 0 &&
+          JSON.stringify(draft.originalPdf?.pages) !== JSON.stringify(pages);
+        draft.originalPdf = fakeOriginalPdf({
+          sha256: `${upload.bytes}`.padStart(64, '0'),
+          sizeBytes: upload.bytes,
+          pageCount: pages.length,
+          pages,
+          url: `${MOCK_STORAGE_ORIGIN}/forms/${form.id}/${l}-v${draft.version}.pdf?sig=mock`,
+        });
+        if (placementsCleared) draft.placements = [];
+        draft.updatedAt = new Date().toISOString();
+        return HttpResponse.json({ ...form, placementsCleared });
+      },
+    ),
+    http.delete(
+      `${base}/:id/versions/:lang/source`,
+      async ({ params, request }) => {
+        await log(request);
+        const form = find(params.id);
+        const l = lang(params.lang);
+        const draft = l && form?.languages[l].draft;
+        if (!form || !l) return notFound();
+        if (!draft)
+          return bad('Save a draft in this language before changing its PDF');
+        if (!draft.originalPdf)
+          return bad('This draft has no original PDF', 404);
+        draft.originalPdf = null;
+        draft.placements = [];
+        return HttpResponse.json(form);
+      },
+    ),
+    http.put(
+      `${base}/:id/versions/:lang/placements`,
+      async ({ params, request }) => {
+        await log(request);
+        const form = find(params.id);
+        const l = lang(params.lang);
+        const draft = l && form?.languages[l].draft;
+        if (!form || !l) return notFound();
+        if (!draft) return bad('There is no draft in this language');
+        if (!draft.originalPdf) return bad('This draft has no original PDF');
+        const { placements } = (await request.json()) as {
+          placements: FormPlacement[];
+        };
+        for (const placement of placements) {
+          const problem = placementProblem(placement, draft);
+          if (problem)
+            return bad(`The field positions are not valid: ${problem}`);
+        }
+        draft.placements = placements;
+        draft.updatedAt = new Date().toISOString();
         return HttpResponse.json(form);
       },
     ),
