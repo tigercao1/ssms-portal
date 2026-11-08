@@ -15,3 +15,5 @@ coverage
 
 # lean-ctx local cache
 .lean-ctx/
+dist-sign
+.wrangler

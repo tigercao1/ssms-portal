@@ -37,6 +37,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build signing site
+        run: npm run build:sign
+
+      - name: Check the signing site has no portal code
+        run: npm run check:sign-bundle
+
       - name: Typecheck docs Worker
         run: npm run typecheck:docs-worker
 
