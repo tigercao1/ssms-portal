@@ -23,10 +23,10 @@ import {
   FORM_BODY_MAX,
   FORM_LANGUAGES,
   FORM_TITLE_MAX,
-  editableVersion,
+  baselineOf,
   isConflict,
   publicFormUrl,
-  revisionOf,
+  sameDraft,
   unplacedRequired,
   useDraftRevision,
   useForm,
@@ -252,21 +252,6 @@ function EmailCopySetting({ form }: { form: FormTemplate }) {
   );
 }
 
-function baselineOf(form: FormTemplate, lang: DocumentLanguage): FormDraft {
-  const version = editableVersion(form, lang);
-  return {
-    title:
-      version?.title ??
-      (lang === 'zh' ? (form.titleZh ?? form.titleEn) : form.titleEn),
-    bodyMarkdown: version?.bodyMarkdown ?? '',
-    fields: version?.fields ?? form.defaultFields[lang],
-  };
-}
-
-function sameDraft(a: FormDraft, b: FormDraft): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 function LanguageEditor({
   form,
   lang,
@@ -284,13 +269,18 @@ function LanguageEditor({
   const baseline = baselineOf(form, lang);
   const [values, setValues] = useState<FormDraft>(baseline);
   const [mode, setMode] = useState<'write' | 'preview'>('write');
-  const [revision, setRevision] = useDraftRevision(form, lang);
+  const [{ updatedAt: revision, text: loaded }, setRevision] = useDraftRevision(
+    form,
+    lang,
+  );
   const [reloaded, setReloaded] = useState<{ mine: FormDraft | null } | null>(
     null,
   );
   const [reloads, setReloads] = useState(0);
   const latest = useRef(values);
   latest.current = values;
+  const loadedText = useRef(loaded);
+  loadedText.current = loaded;
   const textDirty = useRef(false);
   const save = useSaveFormDraft(form.id, lang);
   const publish = usePublishForm(form.id, lang);
@@ -334,19 +324,31 @@ function LanguageEditor({
     if (!publish.isPending) publish.reset();
   };
 
+  const showFresh = (fresh: FormTemplate) => {
+    save.reset();
+    publish.reset();
+    setRevision(fresh);
+    setValues(baselineOf(fresh, lang));
+    setReloads((n) => n + 1);
+  };
+
   const reloadAfterConflict = (keepMine: (mine: FormDraft) => boolean) =>
     reload().then(
       (fresh) => {
         const mine = latest.current;
-        save.reset();
-        publish.reset();
-        setRevision(revisionOf(fresh, lang));
-        setValues(baselineOf(fresh, lang));
+        showFresh(fresh);
         setReloaded({ mine: keepMine(mine) ? mine : null });
-        setReloads((n) => n + 1);
       },
       () => undefined,
     );
+
+  const adoptPdfWrite = (next: FormTemplate) => {
+    const known = loadedText.current;
+    if (sameDraft(baselineOf(next, lang), known)) return;
+    const mine = latest.current;
+    showFresh(next);
+    if (!sameDraft(mine, known)) setReloaded({ mine });
+  };
 
   const saveDraft = () => {
     const sent = values;
@@ -489,6 +491,7 @@ function LanguageEditor({
         placementsDirty={placementsDirty}
         onDirtyChange={setPlacementsDirty}
         onConflict={() => void reloadAfterConflict(() => textDirty.current)}
+        onWritten={adoptPdfWrite}
       />
 
       {reloaded && (

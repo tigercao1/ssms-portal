@@ -123,6 +123,11 @@ export interface FormRevision {
   expectedUpdatedAt: string | null;
 }
 
+export interface DraftRevision {
+  updatedAt: string | null;
+  text: FormDraft;
+}
+
 export type ConfirmedFormPdf = FormTemplate & { placementsCleared: boolean };
 
 export const formsKeys = {
@@ -149,6 +154,31 @@ export function revisionOf(
   lang: DocumentLanguage,
 ): string | null {
   return form.languages[lang].draft?.updatedAt ?? null;
+}
+
+export function baselineOf(
+  form: FormTemplate,
+  lang: DocumentLanguage,
+): FormDraft {
+  const version = editableVersion(form, lang);
+  return {
+    title:
+      version?.title ??
+      (lang === 'zh' ? (form.titleZh ?? form.titleEn) : form.titleEn),
+    bodyMarkdown: version?.bodyMarkdown ?? '',
+    fields: version?.fields ?? form.defaultFields[lang],
+  };
+}
+
+export function sameDraft(a: FormDraft, b: FormDraft): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function draftRevisionOf(
+  form: FormTemplate,
+  lang: DocumentLanguage,
+): DraftRevision {
+  return { updatedAt: revisionOf(form, lang), text: baselineOf(form, lang) };
 }
 
 export function isConflict(err: unknown): boolean {
@@ -191,24 +221,33 @@ export function useFormWriting(id: string, lang: DocumentLanguage): boolean {
 export function useDraftRevision(form: FormTemplate, lang: DocumentLanguage) {
   const qc = useQueryClient();
   const key = formsKeys.revision(form.id, lang);
-  const { data = null } = useQuery({
+  const { data } = useQuery({
     queryKey: key,
-    queryFn: () => qc.getQueryData<string | null>(key) ?? null,
-    initialData: () => revisionOf(form, lang),
+    queryFn: () =>
+      qc.getQueryData<DraftRevision>(key) ?? draftRevisionOf(form, lang),
+    initialData: () => draftRevisionOf(form, lang),
     staleTime: Infinity,
   });
   const setRevision = useCallback(
-    (revision: string | null) => qc.setQueryData(key, revision),
-    [qc, key],
+    (fresh: FormTemplate) => qc.setQueryData(key, draftRevisionOf(fresh, lang)),
+    [qc, key, lang],
   );
   return [data, setRevision] as const;
 }
 
-function useDraftSync(id: string, lang: DocumentLanguage) {
+function useDraftSync(
+  id: string,
+  lang: DocumentLanguage,
+  onlyWithSameText = false,
+) {
   const qc = useQueryClient();
   const sync = useFormSync();
   return (form: FormTemplate) => {
-    qc.setQueryData(formsKeys.revision(id, lang), revisionOf(form, lang));
+    const key = formsKeys.revision(id, lang);
+    const known = qc.getQueryData<DraftRevision>(key);
+    const next = draftRevisionOf(form, lang);
+    if (!onlyWithSameText || (known && sameDraft(known.text, next.text)))
+      qc.setQueryData(key, next);
     return sync(form);
   };
 }
@@ -290,7 +329,7 @@ export function usePublishForm(id: string, lang: DocumentLanguage) {
 }
 
 export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
-  const sync = useDraftSync(id, lang);
+  const sync = useDraftSync(id, lang, true);
   const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
@@ -314,7 +353,7 @@ export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
 }
 
 export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
-  const sync = useDraftSync(id, lang);
+  const sync = useDraftSync(id, lang, true);
   const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
@@ -328,7 +367,7 @@ export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
 }
 
 export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
-  const sync = useDraftSync(id, lang);
+  const sync = useDraftSync(id, lang, true);
   const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),

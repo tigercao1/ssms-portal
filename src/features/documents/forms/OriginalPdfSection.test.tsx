@@ -14,6 +14,7 @@ import {
   formsHandlers,
   type FormsMockState,
 } from './fixtures';
+import type { FormPlacement } from './api';
 import { FormEditorPage } from './FormEditorPage';
 
 vi.mock('../pdf/PdfPages', async () => {
@@ -554,5 +555,136 @@ describe('Original PDF revision across language switches', () => {
       }),
     ).rejects.toMatchObject({ status: 500 });
     expect(state.forms[0]!.languages.zh.draft!.placements).toBe(placed);
+  });
+});
+
+describe('PDF writes that return text changed by another admin', () => {
+  const other = 'UNSEEN OTHER ADMIN';
+  const otherAdminSaves = () => {
+    const draft = state.forms[0]!.languages.zh.draft!;
+    draft.title = other;
+    draft.updatedAt = '2026-11-08T22:00:00.123456+00:00';
+  };
+  const title = () => screen.getByLabelText(/Title signers see/);
+  const savedTitle = () => state.forms[0]!.languages.zh.draft!.title;
+  const removePdf = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: 'Remove PDF' }));
+    await user.click(screen.getByRole('button', { name: 'Remove PDF' }));
+    await screen.findByText('PDF removed from this draft.');
+  };
+
+  async function expectSaveKeepsTheirText(
+    user: ReturnType<typeof userEvent.setup>,
+  ) {
+    await waitFor(() => expect(title()).toHaveValue(other));
+    await user.type(title(), ' 2');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
+    expect(savedTitle()).toBe(`${other} 2`);
+  }
+
+  it('does not let Save draft overwrite their text after Remove PDF', async () => {
+    attachPdf();
+    const user = await openChinese();
+    otherAdminSaves();
+
+    await removePdf(user);
+
+    await expectSaveKeepsTheirText(user);
+  });
+
+  it('does not let Save draft overwrite their text after Upload PDF', async () => {
+    const user = await openChinese();
+    otherAdminSaves();
+
+    await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
+    await screen.findByText('PDF uploaded. Place the fields on it next.');
+
+    await expectSaveKeepsTheirText(user);
+  });
+
+  it('does not let Save draft overwrite their text after Save positions', async () => {
+    attachPdf();
+    server.use(
+      http.put(
+        PLACEMENTS_URL,
+        async ({ request }) => {
+          const draft = state.forms[0]!.languages.zh.draft!;
+          draft.placements = (
+            (await request.json()) as { placements: FormPlacement[] }
+          ).placements;
+          otherAdminSaves();
+          return HttpResponse.json(state.forms[0]);
+        },
+        { once: true },
+      ),
+    );
+    const user = await openChinese();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Place 日期 on the PDF' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save positions' }));
+
+    await expectSaveKeepsTheirText(user);
+  });
+
+  it('shows their text quietly when nothing was edited', async () => {
+    attachPdf();
+    const user = await openChinese();
+    otherAdminSaves();
+
+    await removePdf(user);
+
+    await waitFor(() => expect(title()).toHaveValue(other));
+    expect(
+      screen.queryByText(/changed by someone else/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+  });
+
+  it('sets unsaved text aside behind Put my text back', async () => {
+    attachPdf();
+    const user = await openChinese();
+    await user.type(title(), ' mine');
+    otherAdminSaves();
+
+    await removePdf(user);
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(title()).toHaveValue(other);
+    await user.click(screen.getByRole('button', { name: 'Put my text back' }));
+    expect(title()).toHaveValue('免责声明 mine');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
+    expect(savedTitle()).toBe('免责声明 mine');
+  });
+
+  it('reloads instead of saving over their text when an upload returns after switching language and back', async () => {
+    const confirm = hold(
+      'post',
+      'http://localhost:3000/admin/documents/forms/:id/versions/zh/source/confirm',
+    );
+    const user = await openChinese();
+    await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
+    await waitFor(() => expect(confirm.started()).toBe(true));
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+    otherAdminSaves();
+    confirm.release();
+    await waitFor(() =>
+      expect(state.forms[0]!.languages.zh.draft!.originalPdf).not.toBeNull(),
+    );
+
+    await user.type(title(), ' 2');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(savedTitle()).toBe(other);
   });
 });

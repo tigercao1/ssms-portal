@@ -42,6 +42,7 @@ export function OriginalPdfSection({
   placementsDirty,
   onDirtyChange,
   onConflict,
+  onWritten,
 }: {
   form: FormTemplate;
   lang: DocumentLanguage;
@@ -52,6 +53,7 @@ export function OriginalPdfSection({
   placementsDirty: boolean;
   onDirtyChange: (dirty: boolean) => void;
   onConflict: () => void;
+  onWritten: (next: FormTemplate) => void;
 }) {
   const t = useT();
   const s = t.signingForms;
@@ -65,6 +67,7 @@ export function OriginalPdfSection({
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const busy = writing || placementsDirty;
   const written = {
+    onSuccess: onWritten,
     onError: (err: unknown) => {
       if (isConflict(err)) onConflict();
     },
