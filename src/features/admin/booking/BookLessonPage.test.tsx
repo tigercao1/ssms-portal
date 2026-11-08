@@ -1,3 +1,4 @@
+import { onlineManager } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -12,13 +13,20 @@ import {
 import { renderWithProviders } from '@/test/render';
 import { BookLessonPage } from './BookLessonPage';
 import { hideSyncToast } from './syncToast';
+import type { DraftBooking } from './bookingDrafts';
 import type {
   Availability,
+  BatchBookingInput,
+  BatchBookingResult,
   BookingSettings,
   CreateBookingInput,
   LastClass,
 } from './types';
 import { expectMaskedInReplay } from '@/test/replayPrivacy';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({ user: { id: 'admin-1' } }),
+}));
 
 const API = 'http://localhost:3000';
 
@@ -704,5 +712,692 @@ describe('BookLessonPage', () => {
       await screen.findByRole('button', { name: '预约 简雪 10:00' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/日历为只读/)).toBeInTheDocument();
+  });
+});
+
+const DRAFTS_KEY = 'ssms.bookingDrafts.v1:admin-1';
+
+function draftRow(overrides: Partial<DraftBooking> = {}): DraftBooking {
+  return {
+    id: 'd1',
+    customers: [
+      {
+        id: 'cu1',
+        firstName: 'Lily',
+        lastName: 'Chen',
+        email: null,
+        phone: null,
+      },
+    ],
+    lessonTypeId: 'lt1',
+    lessonTypeNameEn: 'Private 1h',
+    lessonTypeNameZh: '私教 1 小时',
+    durationMin: 60,
+    instructorId: 'inst-1',
+    instructorNameEn: 'Jane Snow',
+    instructorNameZh: '简雪',
+    startsAt: '2026-12-12T15:00:00.000Z',
+    notes: '',
+    locationId: '',
+    ...overrides,
+  };
+}
+
+function seedDrafts(
+  rows: DraftBooking[],
+  batchId = 'batch-1',
+  extra: Record<string, unknown> = {},
+) {
+  localStorage.setItem(
+    DRAFTS_KEY,
+    JSON.stringify({ version: 1, batchId, rows, ...extra }),
+  );
+}
+
+function storedCart(): {
+  batchId: string;
+  rows: DraftBooking[];
+  outcomeUnknown?: boolean;
+} | null {
+  const raw = localStorage.getItem(DRAFTS_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function serveBatch(
+  ...responses: ((body: BatchBookingInput) => Response | Promise<Response>)[]
+): BatchBookingInput[] {
+  const sent: BatchBookingInput[] = [];
+  server.use(
+    http.post(`${API}/admin/booking/classes/batch`, async ({ request }) => {
+      const body = (await request.json()) as BatchBookingInput;
+      sent.push(body);
+      const respond = responses[sent.length - 1] ?? responses.at(-1);
+      return respond ? respond(body) : HttpResponse.error();
+    }),
+  );
+  return sent;
+}
+
+function createdAll(body: BatchBookingInput): BatchBookingResult {
+  return {
+    batchId: body.batchId,
+    results: body.bookings.map((b, index) => ({
+      index,
+      status: 'created' as const,
+      classes: [
+        {
+          ...fakeClass({ id: `c${index}`, startsAt: b.startsAt }),
+          calendarSync: 'ok' as const,
+          calendarSyncError: null,
+        },
+      ],
+    })),
+  };
+}
+
+function draftList() {
+  return screen.getByRole('list', { name: 'Booking list' });
+}
+
+describe('BookLessonPage booking list', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-10T17:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    hideSyncToast();
+  });
+
+  it('adds a booking to the list and resets the form for the next one', async () => {
+    const recorded = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
+    });
+    await chooseLesson(user);
+    await user.click(
+      await screen.findByRole('button', { name: 'Book Jane Snow at 10:00' }),
+    );
+    const form = screen.getByRole('form', { name: 'Confirm booking' });
+    await user.type(within(form).getByLabelText('Notes'), ' bring skis ');
+    await user.click(within(form).getByRole('button', { name: 'Add to list' }));
+
+    const row = within(draftList()).getByRole('listitem');
+    expect(row).toHaveTextContent('Lily Chen');
+    expect(row).toHaveTextContent('Private 1h · Jane Snow');
+    expect(row).toHaveTextContent(/Dec 12, 2026.*10:00/);
+    expect(row).toHaveTextContent('Notes: bring skis');
+    expect(recorded.bookings).toEqual([]);
+    expect(
+      screen.queryByRole('form', { name: 'Confirm booking' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Selected customers' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Date')).toHaveValue('2026-12-12');
+    expect(screen.getByLabelText('Lesson type')).toHaveValue('lt1');
+
+    const cart = storedCart();
+    expect(cart?.batchId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(cart?.rows).toMatchObject([
+      {
+        instructorId: 'inst-1',
+        startsAt: '2026-12-12T15:00:00.000Z',
+        notes: 'bring skis',
+        customers: [{ id: 'cu1' }],
+      },
+    ]);
+  });
+
+  it('does not let a repeating booking go on the list', async () => {
+    serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    await chooseLesson(user);
+    await user.click(
+      await screen.findByRole('button', { name: 'Book Jane Snow at 10:00' }),
+    );
+    const form = screen.getByRole('form', { name: 'Confirm booking' });
+    await user.selectOptions(within(form).getByLabelText('Repeat'), '3');
+    expect(
+      within(form).getByRole('button', { name: 'Add to list' }),
+    ).toBeDisabled();
+    expect(
+      within(form).getByText(/Repeating bookings can't go on the list/),
+    ).toBeInTheDocument();
+    expect(
+      within(form).getByRole('button', { name: 'Book lesson' }),
+    ).toBeEnabled();
+  });
+
+  it('removes a row and keeps the list across a remount', async () => {
+    seedDrafts([
+      draftRow(),
+      draftRow({
+        id: 'd2',
+        startsAt: '2026-12-12T16:00:00.000Z',
+        customers: [
+          {
+            ...draftRow().customers[0]!,
+            id: 'cu2',
+            firstName: 'Max',
+            lastName: 'Wu',
+          },
+        ],
+      }),
+    ]);
+    serve();
+    const user = userEvent.setup();
+    const view = renderWithProviders(<BookLessonPage />);
+    expect(within(draftList()).getAllByRole('listitem')).toHaveLength(2);
+    await user.click(
+      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+    );
+    expect(within(draftList()).getAllByRole('listitem')).toHaveLength(1);
+    view.unmount();
+
+    renderWithProviders(<BookLessonPage />);
+    const rows = within(draftList()).getAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('Max Wu');
+    expect(storedCart()?.batchId).toBe('batch-1');
+  });
+
+  it('loads a row back into the form and replaces it on save', async () => {
+    seedDrafts([
+      draftRow({ notes: 'old note' }),
+      draftRow({ id: 'd2', startsAt: '2026-12-13T15:00:00.000Z' }),
+    ]);
+    serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(
+      screen.getAllByRole('button', { name: /^Edit Lily Chen, / })[0]!,
+    );
+
+    const form = await screen.findByRole('form', { name: 'Confirm booking' });
+    expect(screen.getByLabelText('Date')).toHaveValue('2026-12-12');
+    expect(within(form).getByLabelText('Notes')).toHaveValue('old note');
+    expect(within(form).queryByLabelText('Repeat')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Book all/ })).toBeDisabled();
+    await user.click(
+      await screen.findByRole('button', { name: 'Book Jane Snow at 11:00' }),
+    );
+    const moved = screen.getByRole('form', { name: 'Confirm booking' });
+    await user.clear(within(moved).getByLabelText('Notes'));
+    await user.type(within(moved).getByLabelText('Notes'), 'new note');
+    await user.click(
+      within(moved).getByRole('button', { name: 'Update in list' }),
+    );
+
+    const rows = within(draftList()).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent(/Dec 12, 2026.*11:00/);
+    expect(rows[0]).toHaveTextContent('Notes: new note');
+    expect(storedCart()?.rows.map((r) => r.id)).toEqual(['d1', 'd2']);
+  });
+
+  it('edits a past-lesson row in past mode', async () => {
+    seedDrafts([
+      draftRow({
+        startsAt: '2025-12-01T15:00:00.000Z',
+        status: 'no_show',
+        addToCalendar: true,
+      }),
+    ]);
+    serve();
+    server.use(
+      http.get(`${API}/admin/instructors`, () =>
+        HttpResponse.json(fakeAdminList),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: /^Edit Lily Chen, / }));
+
+    expect(
+      screen.getByRole('button', { name: 'Add a past lesson' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Date')).toHaveValue('2025-12-01');
+    expect(screen.getByLabelText('Start time')).toHaveValue('10:00');
+    expect(screen.getByLabelText('Status')).toHaveValue('no_show');
+    await user.selectOptions(screen.getByLabelText('Status'), 'completed');
+    await user.click(
+      await screen.findByRole('button', { name: 'Update in list' }),
+    );
+
+    expect(storedCart()?.rows).toMatchObject([
+      {
+        id: 'd1',
+        startsAt: '2025-12-01T15:00:00.000Z',
+        status: 'completed',
+        addToCalendar: true,
+      },
+    ]);
+    expect(within(draftList()).getByRole('listitem')).toHaveTextContent(
+      'Completed',
+    );
+  });
+
+  it('discards corrupt or old stored lists', async () => {
+    serve();
+    localStorage.setItem(DRAFTS_KEY, '{not json');
+    const view = renderWithProviders(<BookLessonPage />);
+    await screen.findByRole('option', { name: /Private 1h/ });
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+    view.unmount();
+
+    localStorage.setItem(
+      DRAFTS_KEY,
+      JSON.stringify({ version: 0, batchId: 'b', rows: [draftRow()] }),
+    );
+    renderWithProviders(<BookLessonPage />);
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+
+    seedDrafts([
+      { ...draftRow(), customers: 'Lily' } as unknown as DraftBooking,
+    ]);
+    window.dispatchEvent(new StorageEvent('storage', { key: DRAFTS_KEY }));
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+  });
+
+  it('books every row at once and shows what was booked', async () => {
+    seedDrafts([
+      draftRow({ notes: ' first ', locationId: 'l1' }),
+      draftRow({
+        id: 'd2',
+        startsAt: '2025-12-01T15:00:00.000Z',
+        status: 'completed',
+        addToCalendar: false,
+      }),
+    ]);
+    serve();
+    const sent = serveBatch((body) => HttpResponse.json(createdAll(body)));
+    renderWithProviders(<BookLessonPage />);
+    const bookAll = screen.getByRole('button', { name: 'Book all (2)' });
+    fireEvent.click(bookAll);
+    fireEvent.click(bookAll);
+
+    expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
+    expect(sent).toEqual([
+      {
+        batchId: 'batch-1',
+        bookings: [
+          {
+            instructorId: 'inst-1',
+            lessonTypeId: 'lt1',
+            startsAt: '2026-12-12T15:00:00.000Z',
+            customerIds: ['cu1'],
+            notes: 'first',
+            locationId: 'l1',
+          },
+          {
+            instructorId: 'inst-1',
+            lessonTypeId: 'lt1',
+            startsAt: '2025-12-01T15:00:00.000Z',
+            customerIds: ['cu1'],
+            status: 'completed',
+            addToCalendar: false,
+          },
+        ],
+      },
+    ]);
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+  });
+
+  it('keeps failed rows with their reason and gives the rest a new batch id', async () => {
+    seedDrafts([
+      draftRow(),
+      draftRow({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
+      draftRow({ id: 'd3', startsAt: '2026-12-12T17:00:00.000Z' }),
+    ]);
+    serve();
+    const sent = serveBatch(() =>
+      HttpResponse.json({
+        batchId: 'batch-1',
+        results: [
+          {
+            index: 0,
+            status: 'created',
+            classes: [
+              {
+                ...fakeClass({ id: 'c0' }),
+                calendarSync: 'ok',
+                calendarSyncError: null,
+              },
+            ],
+          },
+          {
+            index: 1,
+            status: 'failed',
+            code: 'INSTRUCTOR_BUSY',
+            message: 'The instructor is not free at that time',
+          },
+          {
+            index: 2,
+            status: 'failed',
+            code: 'SOMETHING_NEW',
+            message: 'Server says no',
+          },
+        ],
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Book all (3)' }));
+
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(
+      screen.getByText(/2 booking\(s\) could not be booked/),
+    ).toBeInTheDocument();
+    const rows = within(draftList()).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent(
+      'The instructor is not free at that time.',
+    );
+    expect(rows[1]).toHaveTextContent('Server says no');
+    const cart = storedCart();
+    expect(cart?.rows.map((r) => r.id)).toEqual(['d2', 'd3']);
+    expect(cart?.batchId).not.toBe('batch-1');
+    expect(cart?.batchId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(sent).toHaveLength(1);
+  });
+
+  it.each([
+    ['a lost connection', () => HttpResponse.error()],
+    [
+      'a server error',
+      () => HttpResponse.json({ message: 'boom' }, { status: 503 }),
+    ],
+  ])(
+    'keeps the list and batch id after %s and retries safely',
+    async (_, fail) => {
+      seedDrafts([draftRow()]);
+      serve();
+      const sent = serveBatch(fail, (body) =>
+        HttpResponse.json(createdAll(body)),
+      );
+      const user = userEvent.setup();
+      renderWithProviders(<BookLessonPage />);
+      await user.click(screen.getByRole('button', { name: 'Book all (1)' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'We could not confirm whether this list was booked',
+      );
+      expect(within(draftList()).getAllByRole('listitem')).toHaveLength(1);
+      expect(storedCart()?.batchId).toBe('batch-1');
+      await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+      expect(sent.map((b) => b.batchId)).toEqual(['batch-1', 'batch-1']);
+      expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+    },
+  );
+
+  it('tells the admin the outcome is unknown when the browser is offline', async () => {
+    const online = vi
+      .spyOn(window.navigator, 'onLine', 'get')
+      .mockReturnValue(false);
+    onlineManager.setOnline(false);
+    seedDrafts([draftRow()]);
+    serve();
+    serveBatch(
+      () => HttpResponse.error(),
+      (body) => HttpResponse.json(createdAll(body)),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Book all (1)' }));
+
+    expect(
+      await screen.findByText(
+        /We could not confirm whether this list was booked/,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
+    online.mockRestore();
+    onlineManager.setOnline(true);
+  });
+
+  it('locks the list after an unknown outcome and retries it unchanged', async () => {
+    seedDrafts([
+      draftRow({ notes: 'skis' }),
+      draftRow({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
+    ]);
+    serve();
+    const sent = serveBatch(
+      () => HttpResponse.error(),
+      () =>
+        HttpResponse.json({
+          batchId: 'batch-1',
+          results: [
+            {
+              index: 0,
+              status: 'created',
+              classes: [
+                {
+                  ...fakeClass({ id: 'c0' }),
+                  calendarSync: 'ok',
+                  calendarSyncError: null,
+                },
+              ],
+            },
+            {
+              index: 1,
+              status: 'failed',
+              code: 'INSTRUCTOR_BUSY',
+              message: 'busy',
+            },
+          ],
+        }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The list is locked until Try again gets an answer',
+    );
+    expect(storedCart()?.outcomeUnknown).toBe(true);
+    for (const button of [
+      ...screen.getAllByRole('button', { name: /^Remove Lily Chen, / }),
+      ...screen.getAllByRole('button', { name: /^Edit Lily Chen, / }),
+    ])
+      expect(button).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: 'Clear list' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^Book all/ }),
+    ).not.toBeInTheDocument();
+
+    await pickLily(user);
+    await chooseLesson(user);
+    await user.click(
+      await screen.findByRole('button', { name: 'Book Jane Snow at 10:00' }),
+    );
+    const form = screen.getByRole('form', { name: 'Confirm booking' });
+    expect(
+      within(form).getByRole('button', { name: 'Add to list' }),
+    ).toBeDisabled();
+    expect(
+      within(form).getByText(/The booking list is locked/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    expect(sent[0]?.batchId).toBe('batch-1');
+    const cart = storedCart();
+    expect(cart?.outcomeUnknown).toBe(false);
+    expect(cart?.rows.map((r) => r.id)).toEqual(['d2']);
+    expect(cart?.batchId).not.toBe('batch-1');
+    expect(
+      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Book all (1)' })).toBeEnabled();
+  });
+
+  it('saves the lock before sending so a reload mid-request stays locked', async () => {
+    seedDrafts([draftRow()]);
+    serve();
+    let release: () => void = () => {};
+    const sent = serveBatch(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(HttpResponse.error());
+        }),
+    );
+    const user = userEvent.setup();
+    const view = renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Book all (1)' }));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(storedCart()?.outcomeUnknown).toBe(true);
+    expect(
+      screen.queryByRole('button', { name: 'Try again' }),
+    ).not.toBeInTheDocument();
+    view.unmount();
+    release();
+
+    renderWithProviders(<BookLessonPage />);
+    expect(
+      await screen.findByRole('button', { name: 'Try again' }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /^Edit Lily Chen, / }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: 'Clear list' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('unlocks the list when the whole request is rejected as invalid', async () => {
+    seedDrafts([draftRow()], 'batch-1', { outcomeUnknown: true });
+    serve();
+    serveBatch(() =>
+      HttpResponse.json(
+        { message: 'bookings must be an array' },
+        { status: 400 },
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'bookings must be an array',
+    );
+    expect(
+      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Clear list' })).toBeEnabled();
+    expect(storedCart()).toMatchObject({
+      batchId: 'batch-1',
+      outcomeUnknown: false,
+    });
+  });
+
+  it('discards a locked list only after a warning', async () => {
+    seedDrafts([draftRow()], 'batch-1', { outcomeUnknown: true });
+    serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Discard list' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Discard the booking list?',
+    });
+    expect(dialog).toHaveTextContent(/may already exist/);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Discard list' }),
+    );
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+  });
+
+  it('discards a stored list whose lock flag is corrupt', async () => {
+    seedDrafts([draftRow()], 'batch-1', { outcomeUnknown: 'yes' });
+    serve();
+    renderWithProviders(<BookLessonPage />);
+    await screen.findByRole('option', { name: /Private 1h/ });
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+  });
+
+  it('holds the list to 20 bookings', async () => {
+    const twenty = Array.from({ length: 20 }, (_, i) =>
+      draftRow({
+        id: `d${i}`,
+        startsAt: `2026-12-${String(11 + (i % 9)).padStart(2, '0')}T${String(13 + Math.floor(i / 9)).padStart(2, '0')}:00:00.000Z`,
+      }),
+    );
+    seedDrafts(twenty);
+    serve();
+    const user = userEvent.setup();
+    const view = renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    await chooseLesson(user);
+    await user.click(
+      await screen.findByRole('button', { name: 'Book Jane Snow at 10:00' }),
+    );
+    const form = screen.getByRole('form', { name: 'Confirm booking' });
+    expect(
+      within(form).getByRole('button', { name: 'Add to list' }),
+    ).toBeDisabled();
+    expect(within(form).getByText(/The list is full/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Book all (20)' })).toBeEnabled();
+    view.unmount();
+
+    seedDrafts([...twenty, draftRow({ id: 'd20' })]);
+    const sent = serveBatch(() => HttpResponse.json({}));
+    renderWithProviders(<BookLessonPage />);
+    const bookAll = screen.getByRole('button', { name: 'Book all (21)' });
+    expect(bookAll).toBeDisabled();
+    expect(
+      screen.getByText(/Book all takes up to 20 bookings; this list has 21/),
+    ).toBeInTheDocument();
+    fireEvent.click(bookAll);
+    expect(sent).toEqual([]);
+  });
+
+  it('asks before clearing the list', async () => {
+    seedDrafts([draftRow()]);
+    serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Clear list' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Clear the booking list?',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Clear list' }),
+    );
+    expect(
+      screen.queryByRole('list', { name: 'Booking list' }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 });

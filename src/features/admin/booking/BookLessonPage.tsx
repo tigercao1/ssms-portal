@@ -1,6 +1,13 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import { useSession } from '@/auth/SessionProvider';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import {
@@ -37,11 +44,24 @@ import {
   schoolInstant,
   schoolParts,
 } from './bookingRules';
+import { BookingDraftList } from './BookingDraftList';
+import {
+  MAX_DRAFTS,
+  useBookingDrafts,
+  type DraftBooking,
+  type DraftInput,
+} from './bookingDrafts';
 import { BookingSettingsCard } from './BookingSettingsCard';
 import { SyncToastHost } from './CalendarSync';
 import type { BookableStatus, CreateBookingInput } from './types';
 
 type Mode = 'grid' | 'past';
+
+interface InstructorRef {
+  id: string;
+  nameEn: string;
+  nameZh: string | null;
+}
 
 interface Preferred {
   instructorId: string;
@@ -61,6 +81,11 @@ export function BookLessonPage() {
   const [slot, setSlot] = useState<SlotChoice | null>(null);
   const [preferred, setPreferred] = useState<Preferred | null>(null);
   const [booked, setBooked] = useState<AdminClass[] | null>(null);
+  const [editing, setEditing] = useState<DraftBooking | null>(null);
+  const top = useRef<HTMLDivElement>(null);
+  const { user } = useSession();
+  const drafts = useBookingDrafts(user?.id ?? 'anonymous');
+  const listFull = drafts.rows.length >= MAX_DRAFTS;
   const lessonTypes = useLessonTypes();
   const activeTypes = (lessonTypes.data ?? []).filter((l) => l.active);
   const lessonType = activeTypes.find((l) => l.id === lessonTypeId) ?? null;
@@ -111,6 +136,38 @@ export function BookLessonPage() {
     setSlot(null);
   }
 
+  function listed(input: DraftInput) {
+    if (editing) drafts.replace(editing.id, input);
+    else drafts.add(input);
+    setEditing(null);
+    setSlot(null);
+    setBooked(null);
+    setCustomers([]);
+    last.reset();
+  }
+
+  function startEdit(row: DraftBooking) {
+    setEditing(row);
+    setBooked(null);
+    setCustomers(row.customers);
+    setLessonTypeId(row.lessonTypeId);
+    last.reset();
+    if (row.status) {
+      setMode('past');
+      setSlot(null);
+    } else {
+      setMode('grid');
+      setDate(schoolParts(row.startsAt).date);
+      setSlot({ instructorId: row.instructorId, startsAt: row.startsAt });
+    }
+    top.current?.scrollIntoView?.({ block: 'start' });
+  }
+
+  function stopEdit() {
+    setEditing(null);
+    setSlot(null);
+  }
+
   const lessonHeader = (
     <>
       <h2 className="text-lg">{t.booking.lessonStep}</h2>
@@ -128,6 +185,7 @@ export function BookLessonPage() {
               onClick={() => {
                 setMode(m);
                 reset();
+                setEditing(null);
               }}
               className={cn(
                 'min-h-11 px-4 py-1 text-sm leading-tight transition-colors',
@@ -172,7 +230,7 @@ export function BookLessonPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={top} className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl">{t.booking.title}</h1>
         <p className="max-w-3xl text-slate">{t.booking.intro}</p>
@@ -296,39 +354,61 @@ export function BookLessonPage() {
           </Card>
           {slot && lessonType && (
             <ConfirmBooking
-              key={`${slot.instructorId}-${slot.startsAt}`}
+              key={`${editing?.id ?? 'new'}-${slot.instructorId}-${slot.startsAt}`}
               customers={customers}
               lessonType={lessonType}
-              instructorId={slot.instructorId}
-              instructorName={
+              instructor={
                 chosenRow
-                  ? localizeField(
-                      chosenRow.displayNameEn,
-                      chosenRow.displayNameZh,
-                      locale,
-                    ) || chosenRow.displayNameEn
-                  : '—'
+                  ? {
+                      id: chosenRow.instructorId,
+                      nameEn: chosenRow.displayNameEn,
+                      nameZh: chosenRow.displayNameZh,
+                    }
+                  : editing?.instructorId === slot.instructorId
+                    ? {
+                        id: editing.instructorId,
+                        nameEn: editing.instructorNameEn,
+                        nameZh: editing.instructorNameZh,
+                      }
+                    : { id: slot.instructorId, nameEn: '—', nameZh: null }
               }
               startsAt={slot.startsAt}
               past={false}
+              editing={editing}
+              listFull={listFull}
+              listLocked={drafts.outcomeUnknown}
               onDone={(classes) => {
                 setBooked(classes);
                 setSlot(null);
               }}
-              onCancel={() => setSlot(null)}
+              onAdd={listed}
+              onCancel={editing ? stopEdit : () => setSlot(null)}
             />
           )}
         </>
       ) : (
         <PastLessonForm
+          key={editing?.id ?? 'new'}
           header={lessonHeader}
           lessonTypeField={lessonTypeField}
           customers={customers}
           lessonType={lessonType}
           today={today}
+          editing={editing}
+          listFull={listFull}
+          listLocked={drafts.outcomeUnknown}
           onDone={setBooked}
+          onAdd={listed}
+          onCancelEdit={stopEdit}
         />
       )}
+
+      <BookingDraftList
+        drafts={drafts}
+        editingId={editing?.id ?? null}
+        onEdit={startEdit}
+        onCancelEdit={stopEdit}
+      />
 
       <BookingSettingsCard />
     </div>
@@ -338,38 +418,69 @@ export function BookLessonPage() {
 function ConfirmBooking({
   customers,
   lessonType,
-  instructorId,
-  instructorName,
+  instructor,
   startsAt,
   past,
   status,
   addToCalendar,
+  editing,
+  listFull,
+  listLocked,
   onDone,
+  onAdd,
   onCancel,
 }: {
   customers: PickedCustomer[];
   lessonType: LessonType;
-  instructorId: string;
-  instructorName: string;
+  instructor: InstructorRef;
   startsAt: string;
   past: boolean;
   status?: BookableStatus;
   addToCalendar?: boolean;
+  editing: DraftBooking | null;
+  listFull: boolean;
+  listLocked: boolean;
   onDone: (classes: AdminClass[]) => void;
+  onAdd: (draft: DraftInput) => void;
   onCancel?: () => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const create = useCreateBooking();
   const locations = useTeachingLocations();
-  const [notes, setNotes] = useState('');
-  const [locationId, setLocationId] = useState('');
+  const [notes, setNotes] = useState(editing?.notes ?? '');
+  const [locationId, setLocationId] = useState(editing?.locationId ?? '');
   const [repeat, setRepeat] = useState(1);
   const ready = customers.length > 0;
+  const instructorId = instructor.id;
+  const instructorName =
+    localizeField(instructor.nameEn, instructor.nameZh, locale) ||
+    instructor.nameEn;
+  const repeating = repeat > 1;
+  const canList =
+    ready && !repeating && !listLocked && (editing !== null || !listFull);
+
+  function addToList() {
+    if (!canList) return;
+    onAdd({
+      customers,
+      lessonTypeId: lessonType.id,
+      lessonTypeNameEn: lessonType.nameEn,
+      lessonTypeNameZh: lessonType.nameZh,
+      durationMin: lessonType.durationMin,
+      instructorId,
+      instructorNameEn: instructor.nameEn,
+      instructorNameZh: instructor.nameZh,
+      startsAt,
+      notes: notes.trim(),
+      locationId,
+      ...(past && { status, addToCalendar }),
+    });
+  }
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!ready || create.isPending) return;
+    if (!ready || create.isPending || editing) return;
     const body: CreateBookingInput = {
       instructorId,
       lessonTypeId: lessonType.id,
@@ -431,7 +542,7 @@ function ConfirmBooking({
               )}
             </Field>
           </div>
-          {!past && (
+          {!past && !editing && (
             <Field label={t.booking.repeat}>
               {(p) => (
                 <Select
@@ -462,15 +573,46 @@ function ConfirmBooking({
         </Field>
         {!ready && <Banner tone="pending">{t.booking.needCustomer}</Banner>}
         {create.isError && <BookingErrorBanner error={create.error} />}
+        {repeating && (
+          <p className="text-sm text-slate">{t.booking.repeatNotListable}</p>
+        )}
+        {listLocked && (
+          <p className="text-sm text-slate">{t.booking.listLocked}</p>
+        )}
+        {listFull && !editing && !listLocked && (
+          <p className="text-sm text-slate">
+            {t.booking.listFull.replace('{n}', String(MAX_DRAFTS))}
+          </p>
+        )}
         <div className="flex flex-wrap justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="ghost" onClick={onCancel}>
               {t.common.cancel}
             </Button>
           )}
-          <Button type="submit" loading={create.isPending} disabled={!ready}>
-            {past ? t.booking.savePast : t.booking.book}
-          </Button>
+          {editing ? (
+            <Button type="button" disabled={!canList} onClick={addToList}>
+              {t.booking.updateInList}
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!canList || create.isPending}
+                onClick={addToList}
+              >
+                {t.booking.addToList}
+              </Button>
+              <Button
+                type="submit"
+                loading={create.isPending}
+                disabled={!ready}
+              >
+                {past ? t.booking.savePast : t.booking.book}
+              </Button>
+            </>
+          )}
         </div>
       </form>
     </Card>
@@ -483,28 +625,45 @@ function PastLessonForm({
   customers,
   lessonType,
   today,
+  editing,
+  listFull,
+  listLocked,
   onDone,
+  onAdd,
+  onCancelEdit,
 }: {
   header: ReactNode;
   lessonTypeField: ReactNode;
   customers: PickedCustomer[];
   lessonType: LessonType | null;
   today: string;
+  editing: DraftBooking | null;
+  listFull: boolean;
+  listLocked: boolean;
   onDone: (classes: AdminClass[]) => void;
+  onAdd: (draft: DraftInput) => void;
+  onCancelEdit: () => void;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const instructors = useAdminInstructors({});
-  const [date, setDate] = useState(today);
-  const [time, setTime] = useState('');
-  const [instructorId, setInstructorId] = useState('');
-  const [status, setStatus] = useState<BookableStatus>('completed');
-  const [addToCalendar, setAddToCalendar] = useState(false);
+  const initial = editing ? schoolParts(editing.startsAt) : null;
+  const [date, setDate] = useState(initial?.date ?? today);
+  const [time, setTime] = useState(initial?.time ?? '');
+  const [instructorId, setInstructorId] = useState(editing?.instructorId ?? '');
+  const [status, setStatus] = useState<BookableStatus>(
+    editing?.status ?? 'completed',
+  );
+  const [addToCalendar, setAddToCalendar] = useState(
+    editing?.addToCalendar ?? false,
+  );
   const startsAt = date && time ? schoolInstant(date, time) : null;
   const inPast = startsAt !== null && Date.parse(startsAt) < Date.now();
   const options = (instructors.data ?? [])
     .map((i) => ({
       id: i.id,
+      nameEn: i.displayNameEn || i.email,
+      nameZh: i.displayNameZh,
       name: localizeField(i.displayNameEn, i.displayNameZh, locale) || i.email,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -588,16 +747,23 @@ function PastLessonForm({
           key={`${instructor.id}-${startsAt}-${status}-${addToCalendar}`}
           customers={customers}
           lessonType={lessonType}
-          instructorId={instructor.id}
-          instructorName={instructor.name}
+          instructor={instructor}
           startsAt={startsAt}
           past
           status={status}
           addToCalendar={addToCalendar}
+          editing={editing}
+          listFull={listFull}
+          listLocked={listLocked}
           onDone={(classes) => {
             onDone(classes);
             setTime('');
           }}
+          onAdd={(draft) => {
+            onAdd(draft);
+            setTime('');
+          }}
+          onCancel={editing ? onCancelEdit : undefined}
         />
       )}
     </>

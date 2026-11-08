@@ -3,6 +3,8 @@ import { api } from '@/lib/api';
 import { warnIfSyncFailed } from './syncToast';
 import type {
   Availability,
+  BatchBookingInput,
+  BatchBookingResult,
   BookableStatus,
   BookedClass,
   BookingSettings,
@@ -69,6 +71,24 @@ export function useCreateBooking() {
     mutationFn: (body: CreateBookingInput) =>
       api<BookedClass[]>('/admin/booking/classes', { method: 'POST', body }),
     onSuccess: refresh,
+  });
+}
+
+export function useBookBatch() {
+  const refresh = useRefreshBookings();
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: (body: BatchBookingInput) =>
+      api<BatchBookingResult>('/admin/booking/classes/batch', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (result) =>
+      refresh(
+        result.results.flatMap((r) =>
+          r.status === 'created' ? r.classes : [],
+        ),
+      ),
   });
 }
 
