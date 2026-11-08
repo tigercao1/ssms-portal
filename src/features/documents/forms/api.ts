@@ -1,9 +1,4 @@
-import {
-  useMutation,
-  useQueries,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { env } from '@/lib/env';
 import type { DocumentLanguage } from '../api';
@@ -85,6 +80,8 @@ export interface FormTemplateSummary {
   emailCopy: boolean;
   publishedVersions: Record<DocumentLanguage, number | null>;
   hasDraft: Record<DocumentLanguage, boolean>;
+  hasOriginalPdf: Record<DocumentLanguage, boolean>;
+  lastChangedAt: string;
   updatedAt: string;
 }
 
@@ -100,45 +97,14 @@ export const formsKeys = {
   form: (id: string) => ['admin', 'documents', 'forms', 'form', id] as const,
 };
 
-const enc = encodeURIComponent;
-const formPath = (id: string) => `/admin/documents/forms/${enc(id)}`;
-
 export function publicFormUrl(slug: string): string {
   return `${env.signSiteUrl.replace(/\/+$/, '')}/w/${slug}`;
-}
-
-export function editableVersion(
-  form: FormTemplate,
-  lang: DocumentLanguage,
-): FormVersion | null {
-  const { draft, published } = form.languages[lang];
-  return draft ?? published;
-}
-
-export function lastChange(form: FormTemplate): string {
-  return FORM_LANGUAGES.flatMap((lang) => {
-    const { draft, published } = form.languages[lang];
-    return [draft?.updatedAt, published?.updatedAt];
-  }).reduce<string>(
-    (latest, at) => (at && at > latest ? at : latest),
-    form.updatedAt,
-  );
 }
 
 export function useForms() {
   return useQuery({
     queryKey: formsKeys.list,
     queryFn: () => api<FormTemplateSummary[]>('/admin/documents/forms'),
-  });
-}
-
-export function useFormDetails(ids: string[]) {
-  return useQueries({
-    queries: ids.map((id) => ({
-      queryKey: formsKeys.form(id),
-      queryFn: () => api<FormTemplate>(formPath(id)),
-      staleTime: 60_000,
-    })),
   });
 }
 

@@ -23,6 +23,7 @@ export function SignatureCheckBox() {
     const valid = EMAIL_SHAPE.test(next);
     setInvalid(!valid);
     setEmail(valid ? next : null);
+    if (valid && next === email) void check.refetch();
   }
 
   return (

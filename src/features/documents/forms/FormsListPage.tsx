@@ -19,13 +19,9 @@ import {
   FORM_SLUG_MAX,
   FORM_SLUG_PATTERN,
   FORM_TITLE_MAX,
-  editableVersion,
-  lastChange,
   publicFormUrl,
   useCreateForm,
-  useFormDetails,
   useForms,
-  type FormTemplate,
   type FormTemplateSummary,
 } from './api';
 
@@ -36,7 +32,6 @@ export function FormsListPage() {
   const rows = [...(forms.data ?? [])].sort((a, b) =>
     a.slug.localeCompare(b.slug),
   );
-  const details = useFormDetails(rows.map((row) => row.id));
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,8 +54,8 @@ export function FormsListPage() {
           className="flex flex-col gap-3"
           data-public
         >
-          {rows.map((row, i) => (
-            <FormRow key={row.id} row={row} detail={details[i]?.data} />
+          {rows.map((row) => (
+            <FormRow key={row.id} row={row} />
           ))}
         </ul>
       )}
@@ -70,22 +65,14 @@ export function FormsListPage() {
   );
 }
 
-function FormRow({
-  row,
-  detail,
-}: {
-  row: FormTemplateSummary;
-  detail: FormTemplate | undefined;
-}) {
+function FormRow({ row }: { row: FormTemplateSummary }) {
   const t = useT();
   const s = t.signingForms;
   const { locale } = useLocale();
   const title = templateTitle(row, locale);
   const url = publicFormUrl(row.slug);
   const live = FORM_LANGUAGES.some((l) => row.publishedVersions[l] !== null);
-  const pdfLanguages = detail
-    ? FORM_LANGUAGES.filter((l) => editableVersion(detail, l)?.originalPdf)
-    : null;
+  const pdfLanguages = FORM_LANGUAGES.filter((l) => row.hasOriginalPdf[l]);
 
   return (
     <li aria-label={row.titleEn}>
@@ -112,17 +99,12 @@ function FormRow({
           </Fact>
           <Fact label={s.colEmailCopy}>{row.emailCopy ? s.on : s.off}</Fact>
           <Fact label={s.colPdf}>
-            {pdfLanguages === null
-              ? '…'
-              : pdfLanguages.length === 0
-                ? s.pdfNone
-                : pdfLanguages.map((l) => languageName(l, t)).join(' · ')}
+            {pdfLanguages.length === 0
+              ? s.pdfNone
+              : pdfLanguages.map((l) => languageName(l, t)).join(' · ')}
           </Fact>
           <Fact label={s.colChanged}>
-            {formatDateTime(
-              detail ? lastChange(detail) : row.updatedAt,
-              locale,
-            )}
+            {formatDateTime(row.lastChangedAt, locale)}
           </Fact>
         </dl>
 

@@ -132,6 +132,14 @@ export function toSummary(form: FormTemplate): FormTemplateSummary {
     emailCopy: form.emailCopy,
     publishedVersions: by((l) => form.languages[l].published?.version ?? null),
     hasDraft: by((l) => form.languages[l].draft !== null),
+    hasOriginalPdf: by((l) => !!form.languages[l].published?.originalPdf),
+    lastChangedAt: FORM_LANGUAGES.flatMap((l) => [
+      form.languages[l].draft?.updatedAt,
+      form.languages[l].published?.updatedAt,
+    ]).reduce<string>(
+      (latest, at) => (at && at > latest ? at : latest),
+      form.updatedAt,
+    ),
     updatedAt: form.updatedAt,
   };
 }

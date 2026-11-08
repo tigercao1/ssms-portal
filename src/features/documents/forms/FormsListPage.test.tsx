@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
+import { formatDateTime } from '@/lib/date';
 import {
   createFormsState,
   fakeFormVersion,
@@ -63,27 +64,37 @@ describe('FormsListPage', () => {
     ).toBeVisible();
   });
 
-  it('shows which languages have an original PDF', async () => {
-    state.forms[0]!.languages.zh.draft = fakeFormVersion({
-      publishedAt: null,
-      originalPdf: {
-        sha256: 'c'.repeat(64),
-        sizeBytes: 120_000,
-        pageCount: 2,
-        pages: [],
-        url: 'https://storage.mock/forms/waiver-zh.pdf',
-        urlExpiresAt: '2026-11-08T20:00:00Z',
-      },
-    });
+  it('shows which published languages have an original PDF and the last change, from the list alone', async () => {
+    let detailRequests = 0;
+    server.use(
+      http.get('http://localhost:3000/admin/documents/forms/:id', () => {
+        detailRequests += 1;
+        return HttpResponse.json(
+          { message: 'Form not found' },
+          { status: 404 },
+        );
+      }),
+    );
+    state.forms[0]!.languages.en.published!.originalPdf = {
+      sha256: 'c'.repeat(64),
+      sizeBytes: 120_000,
+      pageCount: 2,
+      pages: [],
+      url: 'https://storage.mock/forms/waiver-en.pdf',
+      urlExpiresAt: '2026-11-08T20:00:00Z',
+    };
     renderWithProviders(<FormsListPage />);
     await screen.findByRole('list', { name: 'Signing forms' });
 
+    const waiver = row('Liability waiver');
+    expect(within(waiver).getByText('English')).toBeVisible();
     expect(
-      await within(row('Liability waiver')).findByText('Chinese'),
+      within(waiver).getByText(formatDateTime('2026-11-07T18:30:00Z', 'en')),
     ).toBeVisible();
     expect(
-      await within(row('Equipment rental agreement')).findByText('None'),
+      within(row('Equipment rental agreement')).getByText('None'),
     ).toBeVisible();
+    expect(detailRequests).toBe(0);
   });
 
   it('copies the public link of a form', async () => {
