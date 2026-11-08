@@ -1309,6 +1309,9 @@ export const en: Messages = {
     emailCopyHint:
       'Applies to both languages and takes effect at once. Signers still enter an email when it is off.',
     emailCopyFailed: 'Could not change the email copy setting: {reason}',
+    emailCopyMineOn: 'Your choice to turn the email copy on was not saved.',
+    emailCopyMineOff: 'Your choice to turn the email copy off was not saved.',
+    emailCopyApply: 'Save my choice',
     legalNote:
       'When an original PDF is attached, it is the legal copy. The text, the fields and the PDF of a language are published together as one version.',
     unsaved: 'Unsaved changes',

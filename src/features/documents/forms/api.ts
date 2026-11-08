@@ -98,6 +98,7 @@ export interface FormPatch {
   titleEn?: string;
   titleZh?: string | null;
   emailCopy?: boolean;
+  expectedUpdatedAt: string;
 }
 
 export interface FormDraft {
@@ -107,7 +108,7 @@ export interface FormDraft {
 }
 
 export interface FormRevision {
-  expectedUpdatedAt?: string;
+  expectedUpdatedAt?: string | null;
 }
 
 export const formsKeys = {

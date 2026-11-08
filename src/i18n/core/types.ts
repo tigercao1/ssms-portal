@@ -1194,6 +1194,9 @@ export interface Messages {
     emailCopy: string;
     emailCopyHint: string;
     emailCopyFailed: string;
+    emailCopyMineOn: string;
+    emailCopyMineOff: string;
+    emailCopyApply: string;
     legalNote: string;
     unsaved: string;
     leaveTitle: string;

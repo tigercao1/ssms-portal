@@ -187,14 +187,17 @@ export function formsHandlers(
   const notFound = () => bad('Form not found', 404);
   const changed = () =>
     bad('This form was changed by someone else; reload it and try again', 409);
-  const stale = (draft: FormVersion | null, body: unknown) => {
-    const expected = (body as { expectedUpdatedAt?: string } | undefined)
+  const stale = (current: { updatedAt: string } | null, body: unknown) => {
+    const expected = (body as { expectedUpdatedAt?: string | null } | undefined)
       ?.expectedUpdatedAt;
-    return expected !== undefined && draft?.updatedAt !== expected;
+    if (expected === undefined) return false;
+    return expected === null
+      ? current !== null
+      : current?.updatedAt !== expected;
   };
-  const stamp = (draft: FormVersion | null) =>
+  const stamp = (current: { updatedAt: string } | null) =>
     new Date(
-      Math.max(Date.now(), Date.parse(draft?.updatedAt ?? '') + 1 || 0),
+      Math.max(Date.now(), Date.parse(current?.updatedAt ?? '') + 1 || 0),
     ).toISOString();
   const lang = (value: unknown) =>
     FORM_LANGUAGES.includes(value as DocumentLanguage)
@@ -235,9 +238,11 @@ export function formsHandlers(
       await log(request);
       const form = find(params.id);
       if (!form) return notFound();
-      Object.assign(form, await request.json(), {
-        updatedAt: new Date().toISOString(),
-      });
+      const { expectedUpdatedAt, ...patch } = (await request.json()) as {
+        expectedUpdatedAt?: string;
+      };
+      if (stale(form, { expectedUpdatedAt })) return changed();
+      Object.assign(form, patch, { updatedAt: stamp(form) });
       return HttpResponse.json(form);
     }),
     http.put(`${base}/:id/versions/:lang`, async ({ params, request }) => {

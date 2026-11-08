@@ -328,7 +328,7 @@ describe('FormEditorPage', () => {
     expect(state.requests).toContainEqual({
       method: 'PATCH',
       path: '/admin/documents/forms/form-waiver',
-      body: { emailCopy: false },
+      body: { emailCopy: false, expectedUpdatedAt: '2026-11-01T15:00:00Z' },
     });
     await expect.poll(() => toggle.getAttribute('aria-checked')).toBe('false');
   });
@@ -340,7 +340,9 @@ describe('FormEditorPage saves and other admins', () => {
   const puts = () =>
     state.requests
       .filter((r) => r.method === 'PUT')
-      .map((r) => r.body as { title: string; expectedUpdatedAt?: string });
+      .map(
+        (r) => r.body as { title: string; expectedUpdatedAt?: string | null },
+      );
 
   function holdFirstSave() {
     let release!: () => void;
@@ -460,5 +462,140 @@ describe('FormEditorPage saves and other admins', () => {
     expect(
       screen.queryByRole('button', { name: 'Put my text back' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('sends the form revision with the email copy switch exactly as received and chains it', async () => {
+    const user = userEvent.setup();
+    state.forms[0]!.updatedAt = '2026-11-08T18:30:00.123456+00:00';
+    await renderEditor();
+    const toggle = screen.getByRole('switch', { name: 'Email signers a copy' });
+
+    await user.click(toggle);
+    await expect.poll(() => toggle.getAttribute('aria-checked')).toBe('false');
+    await waitFor(() => expect(toggle).toBeEnabled());
+    const afterFirst = state.forms[0]!.updatedAt;
+    await user.click(toggle);
+    await expect.poll(() => toggle.getAttribute('aria-checked')).toBe('true');
+
+    expect(
+      state.requests.filter((r) => r.method === 'PATCH').map((r) => r.body),
+    ).toEqual([
+      {
+        emailCopy: false,
+        expectedUpdatedAt: '2026-11-08T18:30:00.123456+00:00',
+      },
+      { emailCopy: true, expectedUpdatedAt: afterFirst },
+    ]);
+  });
+
+  it('reloads the form when another admin changed it and keeps the email copy choice to save again', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
+    state.forms[0]!.titleEn = 'Renamed by Sam';
+    state.forms[0]!.updatedAt = '2026-11-08T10:00:00.000Z';
+
+    await user.click(
+      screen.getByRole('switch', { name: 'Email signers a copy' }),
+    );
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        /Your choice to turn the email copy off was not saved\./,
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Renamed by Sam' }),
+    ).toBeVisible();
+    expect(state.forms[0]!.emailCopy).toBe(true);
+    expect(screen.queryByText(/Could not change/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save my choice' }));
+    await waitFor(() => expect(state.forms[0]!.emailCopy).toBe(false));
+    expect(state.requests.at(-1)).toMatchObject({
+      method: 'PATCH',
+      body: { emailCopy: false, expectedUpdatedAt: '2026-11-08T10:00:00.000Z' },
+    });
+    expect(screen.queryByText(/so it was reloaded/)).not.toBeInTheDocument();
+  });
+
+  it('keeps text typed while a publish request returns 409 and offers it back', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    let started = false;
+    server.use(
+      http.post(`${DRAFT_PUT}/publish`, async () => {
+        started = true;
+        await held;
+      }),
+    );
+    const user = userEvent.setup();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+    const title = screen.getByLabelText(/Title signers see/);
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(started).toBe(true));
+    fireEvent.change(title, { target: { value: 'TYPED WHILE PUBLISHING' } });
+    changedByAnotherAdmin();
+    release();
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(title).toHaveValue('Changed by Sam');
+    await user.click(screen.getByRole('button', { name: 'Put my text back' }));
+    expect(title).toHaveValue('TYPED WHILE PUBLISHING');
+    expect(state.forms[0]!.languages.zh.published).toBeNull();
+  });
+
+  it('sends a null revision on the first draft of a published-only language, then chains the returned one', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
+    const title = screen.getByLabelText(/Title signers see/);
+
+    await user.type(title, ' 1');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v2 saved.');
+    const afterFirst = state.forms[0]!.languages.en.draft!.updatedAt;
+    await user.type(title, ' 2');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    await screen.findByText('Draft v2 saved.');
+
+    expect(puts().map((b) => b.expectedUpdatedAt)).toEqual([null, afterFirst]);
+  });
+
+  it('does not overwrite a draft another admin created from the same published-only version', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
+    const slot = state.forms[0]!.languages.en;
+    slot.draft = {
+      ...slot.published!,
+      version: 2,
+      publishedAt: null,
+      title: 'Draft by Sam',
+      updatedAt: '2026-11-08T20:00:00.123456+00:00',
+    };
+    const title = screen.getByLabelText(/Title signers see/);
+
+    fireEvent.change(title, { target: { value: 'My first draft' } });
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(slot.draft.title).toBe('Draft by Sam');
+    expect(title).toHaveValue('Draft by Sam');
+    await user.click(screen.getByRole('button', { name: 'Put my text back' }));
+    expect(title).toHaveValue('My first draft');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v2 saved.');
+    expect(puts().map((b) => b.expectedUpdatedAt)).toEqual([
+      null,
+      '2026-11-08T20:00:00.123456+00:00',
+    ]);
+    expect(slot.draft.title).toBe('My first draft');
   });
 });

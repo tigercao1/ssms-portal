@@ -1239,6 +1239,9 @@ export const zhCN: Messages = {
     emailCopy: '向签署人发送邮件副本',
     emailCopyHint: '适用于两种语言，立即生效。关闭后签署人仍需填写邮箱。',
     emailCopyFailed: '无法更改邮件副本设置：{reason}',
+    emailCopyMineOn: '你开启邮件副本的选择尚未保存。',
+    emailCopyMineOff: '你关闭邮件副本的选择尚未保存。',
+    emailCopyApply: '保存我的选择',
     legalNote:
       '附有原始 PDF 时，以 PDF 为法律文本。同一语言的正文、字段和 PDF 作为同一版本一起发布。',
     unsaved: '有未保存的更改',

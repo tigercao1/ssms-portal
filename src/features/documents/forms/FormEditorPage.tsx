@@ -25,7 +25,6 @@ import {
   editableVersion,
   isConflict,
   publicFormUrl,
-  revisionBody,
   revisionOf,
   useForm,
   usePublishForm,
@@ -170,6 +169,30 @@ function EmailCopySetting({ form }: { form: FormTemplate }) {
   const t = useT();
   const s = t.signingForms;
   const update = useUpdateForm(form.id);
+  const reload = useReloadForm(form.id);
+  const [reloaded, setReloaded] = useState<{ mine: boolean | null } | null>(
+    null,
+  );
+  const change = (emailCopy: boolean) => {
+    setReloaded(null);
+    update.mutate(
+      { emailCopy, expectedUpdatedAt: form.updatedAt },
+      {
+        onError: (err) => {
+          if (!isConflict(err)) return;
+          void reload().then(
+            (fresh) => {
+              update.reset();
+              setReloaded({
+                mine: fresh.emailCopy === emailCopy ? null : emailCopy,
+              });
+            },
+            () => undefined,
+          );
+        },
+      },
+    );
+  };
   return (
     <Card className="flex flex-col gap-2 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -178,10 +201,32 @@ function EmailCopySetting({ form }: { form: FormTemplate }) {
           checked={update.isPending ? !form.emailCopy : form.emailCopy}
           disabled={update.isPending}
           label={s.emailCopy}
-          onChange={(emailCopy) => update.mutate({ emailCopy })}
+          onChange={change}
         />
       </div>
       <p className="text-sm text-slate">{s.emailCopyHint}</p>
+      {reloaded && (
+        <Banner tone="pending">
+          <div className="flex flex-col gap-2">
+            <p>
+              {s.conflictReloaded}
+              {reloaded.mine !== null &&
+                ` ${reloaded.mine ? s.emailCopyMineOn : s.emailCopyMineOff}`}
+            </p>
+            {reloaded.mine !== null && (
+              <div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => change(reloaded.mine ?? form.emailCopy)}
+                >
+                  {s.emailCopyApply}
+                </Button>
+              </div>
+            )}
+          </div>
+        </Banner>
+      )}
       {update.isError && (
         <p role="alert" className="text-sm text-status-rejected">
           {s.emailCopyFailed.replace(
@@ -282,7 +327,7 @@ function LanguageEditor({
         title: sent.title.trim(),
         bodyMarkdown: sent.bodyMarkdown,
         fields: sent.fields.map((f) => ({ ...f, label: f.label.trim() })),
-        ...revisionBody(revision),
+        expectedUpdatedAt: revision,
       },
       {
         onSuccess: (next) => {
@@ -479,12 +524,15 @@ function LanguageEditor({
           loading={publish.isPending}
           disabled={publishBlocked !== null || save.isPending}
           onClick={() => {
+            const sent = values;
             save.reset();
             setReloaded(null);
             publish.mutate(revision, {
               onSuccess: (next) => setRevision(revisionOf(next, lang)),
               onError: (err) => {
-                if (isConflict(err)) void reloadAfterConflict(null);
+                if (!isConflict(err)) return;
+                const mine = latest.current;
+                void reloadAfterConflict(sameDraft(mine, sent) ? null : mine);
               },
             });
           }}
