@@ -71,7 +71,9 @@ its height changes.
 
 `npm run dev:sign` serves it at http://localhost:5174 against a built-in mock API
 (the slugs `missing`, `stale`, `invalid` and `throttled` return 404, 409, 400 and
-429). `npm run build:sign` builds it to `dist-sign/`.
+429). `npm run build:sign` builds it to `dist-sign/`, calling the signing API at
+`VITE_SIGN_API_BASE_URL` (deploys read the GitHub variable `SIGN_API_BASE_URL`;
+production builds default to `https://sign-api.ssnow.club`).
 
 ## Changes that span the API
 

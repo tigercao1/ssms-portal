@@ -69,7 +69,7 @@ async function errorReasons(res: Response): Promise<string[]> {
   }
 }
 
-const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+const apiBase = import.meta.env.VITE_SIGN_API_BASE_URL ?? '';
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   let res: Response;

@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
@@ -14,6 +14,7 @@ const SIGN_CONTENT = [
   './src/components/Input.tsx',
 ];
 const MOCK_API_PATH = '/mock-api';
+const PRODUCTION_SIGN_API_BASE_URL = 'https://sign-api.ssnow.club';
 const MOCK_SUBMIT_STATUS: Record<string, number> = {
   stale: 409,
   invalid: 400,
@@ -58,15 +59,25 @@ function signMockApi(): Plugin {
   };
 }
 
+const ENV_DIR = fileURLToPath(new URL('.', import.meta.url));
+
+function signApiBaseUrl(mode: string) {
+  if (mode === 'mock') return MOCK_API_PATH;
+  const { VITE_SIGN_API_BASE_URL } = loadEnv(mode, ENV_DIR, 'VITE_SIGN_');
+  if (VITE_SIGN_API_BASE_URL) return VITE_SIGN_API_BASE_URL;
+  return mode === 'production' ? PRODUCTION_SIGN_API_BASE_URL : '';
+}
+
 export default defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('./sign', import.meta.url)),
-  envDir: fileURLToPath(new URL('.', import.meta.url)),
+  envDir: ENV_DIR,
   publicDir: 'public',
   plugins: [react(), ...(mode === 'mock' ? [signMockApi()] : [])],
-  define:
-    mode === 'mock'
-      ? { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(MOCK_API_PATH) }
-      : {},
+  define: {
+    'import.meta.env.VITE_SIGN_API_BASE_URL': JSON.stringify(
+      signApiBaseUrl(mode),
+    ),
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

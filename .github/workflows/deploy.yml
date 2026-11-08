@@ -52,11 +52,12 @@ jobs:
       - name: Build signing site
         run: npm run build:sign
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_SIGN_API_BASE_URL: ${{ vars.SIGN_API_BASE_URL || 'https://sign-api.ssnow.club' }}
 
       - name: Check the bundle points at production
         env:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_SIGN_API_BASE_URL: ${{ vars.SIGN_API_BASE_URL || 'https://sign-api.ssnow.club' }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
         run: |
           set -euo pipefail
@@ -64,7 +65,6 @@ jobs:
             [ -n "$v" ] || { echo "::error::a VITE_* variable is empty"; exit 1; }
             grep -rqF "$v" dist/assets || { echo "::error::$v not found in the build"; exit 1; }
           done
-          grep -rqF "$VITE_API_BASE_URL" dist-sign/assets || { echo "::error::$VITE_API_BASE_URL not found in the signing site build"; exit 1; }
           npm run check:sign-bundle
 
       - name: Deploy
