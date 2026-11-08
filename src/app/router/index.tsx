@@ -26,6 +26,7 @@ import { CustomersPage } from '@/features/admin/CustomersPage';
 import { ClassesPage } from '@/features/admin/ClassesPage';
 import { BookLessonPage } from '@/features/admin/booking/BookLessonPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
+import { ApiTokensPage } from '@/features/admin/apiTokens/ApiTokensPage';
 import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
 import { AdminInsurancePage } from '@/features/admin/insurance/AdminInsurancePage';
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
@@ -249,6 +250,14 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireAdmin>
                     <GoogleSettingsPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/settings/api-tokens',
+                element: (
+                  <RequireAdmin>
+                    <ApiTokensPage />
                   </RequireAdmin>
                 ),
               },

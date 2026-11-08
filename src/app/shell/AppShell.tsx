@@ -86,6 +86,7 @@ export function AppShell() {
         { to: '/admin/insurance', label: t.nav.adminInsurance },
         { to: '/admin/import-history', label: t.nav.importHistory },
         { to: '/admin/settings/google', label: t.nav.google },
+        { to: '/admin/settings/api-tokens', label: t.nav.apiTokens },
       ]
     : [
         { to: '/profile', label: t.nav.profile },
