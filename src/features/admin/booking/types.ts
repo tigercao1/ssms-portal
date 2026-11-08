@@ -93,6 +93,22 @@ export interface CreateBookingInput {
   addToCalendar?: boolean;
 }
 
+export type BatchBookingRow = Omit<CreateBookingInput, 'repeat'>;
+
+export interface BatchBookingInput {
+  batchId: string;
+  bookings: BatchBookingRow[];
+}
+
+export type BatchRowResult =
+  | { index: number; status: 'created'; classes: BookedClass[] }
+  | { index: number; status: 'failed'; code: string; message: string };
+
+export interface BatchBookingResult {
+  batchId: string;
+  results: BatchRowResult[];
+}
+
 export interface UpdateBookingInput {
   startsAt?: string;
   instructorId?: string;

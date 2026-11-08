@@ -1563,6 +1563,51 @@ export const en: Messages = {
     instructorSearch: 'Find instructor',
     instructorSearchPlaceholder: 'Type a name',
     instructorSearchEmpty: 'No instructor matches “{q}”.',
+    addToList: 'Add to list',
+    updateInList: 'Update in list',
+    repeatNotListable:
+      "Repeating bookings can't go on the list. Book them on their own.",
+    listFull: 'The list is full ({n} bookings). Book or remove some first.',
+    draftsTitle: 'Booking list',
+    draftsCount: '{n} booking(s) waiting. Kept on this device until booked.',
+    draftsTooMany:
+      'Book all takes up to {max} bookings; this list has {n}. Remove some first.',
+    draftsNotes: 'Notes: {notes}',
+    edit: 'Edit',
+    remove: 'Remove',
+    editDraft: 'Edit {name}, {when}',
+    removeDraft: 'Remove {name}, {when}',
+    bookAll: 'Book all ({n})',
+    clearList: 'Clear list',
+    clearListTitle: 'Clear the booking list?',
+    clearListBody:
+      '{n} booking(s) not booked yet will be removed from this device.',
+    keepList: 'Keep list',
+    finishEditing: 'Finish editing the row first.',
+    batchBookedTitle: 'Booked {n} lesson(s)',
+    batchFailedSome:
+      '{n} booking(s) could not be booked. They stay in the list with the reason.',
+    batchOffline:
+      'We could not confirm whether this list was booked, and some bookings may already exist. The list is locked until Try again gets an answer. Trying again will not book anything twice.',
+    listLocked:
+      'The booking list is locked until Try again finishes. Add this booking after that.',
+    discardList: 'Discard list',
+    discardListTitle: 'Discard the booking list?',
+    discardListBody:
+      'Some of these {n} booking(s) may already exist. Check Classes before booking them again. The list will be removed from this device.',
+    retry: 'Try again',
+    errInstructorBusy: 'The instructor is not free at that time.',
+    errCustomerNotFound: 'A customer on this booking no longer exists.',
+    errLessonTypeInactive: 'This lesson type is turned off.',
+    errFutureStatus:
+      'A future lesson can only be scheduled, not completed or no-show.',
+    errBatchRowConflict:
+      'This row was already booked with different details. Check Classes before adding it again.',
+    errCalendarUnavailable:
+      "The instructor's Google calendar could not be checked.",
+    errGoogleNotConnected: 'Google Calendar is not connected.',
+    errGoogleNotConfigured: 'Google Calendar is not set up on the server.',
+    errGoogleWriteFailed: 'The lesson could not be written to Google Calendar.',
   },
   myLessons: {
     title: 'My lessons & pay',
