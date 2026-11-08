@@ -1,0 +1,11 @@
+// Public signing site: serves sign.ssnow.club from the signing Vite build (dist-sign). Static assets only, no Worker code.
+{
+  "name": "ssms-sign",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": false,
+  "routes": [{ "pattern": "sign.ssnow.club", "custom_domain": true }],
+  "assets": {
+    "directory": "../dist-sign/",
+    "not_found_handling": "single-page-application"
+  }
+}
