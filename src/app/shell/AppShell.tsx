@@ -76,6 +76,7 @@ export function AppShell() {
         { to: '/admin/documents', label: t.nav.documents },
         { to: '/admin/document-review', label: t.nav.documentReview },
         { to: '/admin/signatures', label: t.nav.signatures },
+        { to: '/admin/signing-forms', label: t.nav.signingForms },
         { to: '/admin/reference', label: t.nav.reference },
         { to: '/admin/pages', label: t.nav.pages },
         { to: '/admin/shopify-sync', label: t.nav.shopifySync },

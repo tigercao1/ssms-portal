@@ -7,6 +7,7 @@ interface PortalEnv {
   supabaseUrl: string;
   supabasePublishableKey: string;
   posthogKey: string;
+  signSiteUrl: string;
 }
 
 function required(value: string | undefined, name: string): string {
@@ -25,4 +26,5 @@ export const env: PortalEnv = {
     'VITE_SUPABASE_PUBLISHABLE_KEY',
   ),
   posthogKey: import.meta.env.VITE_POSTHOG_KEY ?? '',
+  signSiteUrl: import.meta.env.VITE_SIGN_SITE_URL || 'https://sign.ssnow.club',
 };

@@ -189,3 +189,103 @@ describe('SignaturesPage', () => {
     ).toHaveTextContent('下载 PDF');
   });
 });
+
+describe('Check by email', () => {
+  async function check(email: string) {
+    const user = userEvent.setup();
+    renderWithProviders(<SignaturesPage />);
+    await user.type(screen.getByLabelText('Email address'), email);
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+  }
+
+  it('shows whether an exact email signed, when, and the document titles', async () => {
+    await check('  Lily@Example.com ');
+
+    expect(
+      await screen.findByText(
+        'lily@example.com has signed. Last signed Nov 7, 2026.',
+      ),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole('list', { name: 'Signed documents' })).getByText(
+        'Liability waiver',
+      ),
+    ).toBeVisible();
+    expect(state.checkEmails).toEqual(['lily@example.com']);
+    expect(state.signatureQueries).toEqual([]);
+  });
+
+  it('says so when nothing was signed with that email', async () => {
+    await check('janet.park@example.com');
+    expect(
+      await screen.findByText('Nothing signed with janet.park@example.com.'),
+    ).toBeVisible();
+  });
+
+  it('asks for a full email before calling the API', async () => {
+    await check('lily@');
+    expect(screen.getByText('Enter a full email address.')).toBeVisible();
+    expect(state.checkEmails).toEqual([]);
+  });
+
+  it('checks the same email again on a second click', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SignaturesPage />);
+    await user.type(
+      screen.getByLabelText('Email address'),
+      'janet.park@example.com',
+    );
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+    expect(
+      await screen.findByText('Nothing signed with janet.park@example.com.'),
+    ).toBeVisible();
+
+    state.signers.find((s) => s.email === 'lily@example.com')!.email =
+      'janet.park@example.com';
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+
+    expect(
+      await screen.findByText(/janet\.park@example\.com has signed/),
+    ).toBeVisible();
+    expect(state.checkEmails).toEqual([
+      'janet.park@example.com',
+      'janet.park@example.com',
+    ]);
+  });
+
+  it('retries a failed check for the same email', async () => {
+    server.use(
+      http.get(
+        `${API}/admin/signatures/check`,
+        () =>
+          HttpResponse.json({ message: 'Too many requests' }, { status: 429 }),
+        { once: true },
+      ),
+    );
+    await check('lily@example.com');
+    expect(
+      await screen.findByText('Could not check: Too many requests'),
+    ).toBeVisible();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check' }));
+
+    expect(
+      await screen.findByText(
+        'lily@example.com has signed. Last signed Nov 7, 2026.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/Could not check/)).not.toBeInTheDocument();
+  });
+
+  it('shows the API error', async () => {
+    server.use(
+      http.get(`${API}/admin/signatures/check`, () =>
+        HttpResponse.json({ message: 'Too many requests' }, { status: 429 }),
+      ),
+    );
+    await check('lily@example.com');
+    expect(
+      await screen.findByText('Could not check: Too many requests'),
+    ).toBeVisible();
+  });
+});
