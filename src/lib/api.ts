@@ -1,5 +1,5 @@
 import { env } from './env';
-import { getAccessToken, supabase } from './supabase';
+import { getSessionSnapshot, supabase } from './supabase';
 
 /** Normalized API error thrown by {@link api}. */
 export class ApiError extends Error {
@@ -13,6 +13,19 @@ export class ApiError extends Error {
   }
 }
 
+export class AccountSwitchedError extends Error {
+  constructor() {
+    super('Signed-in account changed since this page was loaded');
+    this.name = 'AccountSwitchedError';
+  }
+}
+
+let boundAccount: string | null | undefined;
+
+export function bindRequestsToAccount(userId: string | null | undefined) {
+  boundAccount = userId;
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -22,14 +35,15 @@ interface RequestOptions {
   responseType?: 'json' | 'text' | 'blob';
   /** Skip attaching the bearer token (public/health calls). */
   anonymous?: boolean;
+  accessToken?: string | null;
   signal?: AbortSignal;
 }
 
 /**
  * Single API entry point (W0.3). Attaches the Supabase JWT as
- * `Authorization: Bearer`, sends/receives JSON (or raw text when asked), and
- * normalizes errors. A 401 signs the user out so the route guards bounce them
- * to /login.
+ * `Authorization: Bearer` (only if it belongs to the bound account), sends and
+ * receives JSON (or raw text when asked), and normalizes errors. A 401 signs
+ * the user out so the route guards bounce them to /login.
  *
  * The NestJS API must allow-list this origin (CORS_ALLOWED_ORIGINS) for these
  * calls to succeed from the browser.
@@ -56,6 +70,7 @@ export async function apiWithHeaders<T>(
     contentType,
     responseType = 'json',
     anonymous = false,
+    accessToken,
     signal,
   } = options;
 
@@ -71,7 +86,8 @@ export async function apiWithHeaders<T>(
   if (body !== undefined && !isForm)
     headers['Content-Type'] = contentType ?? 'application/json';
   if (!anonymous) {
-    const token = await getAccessToken();
+    const token =
+      accessToken === undefined ? await boundAccessToken() : accessToken;
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
@@ -108,6 +124,13 @@ export async function apiWithHeaders<T>(
   }
 
   return { data: data as T, headers: res.headers };
+}
+
+async function boundAccessToken(): Promise<string | null> {
+  const session = await getSessionSnapshot();
+  if (boundAccount !== undefined && session.userId !== boundAccount)
+    throw new AccountSwitchedError();
+  return session.accessToken;
 }
 
 async function refreshSessionQuietly(): Promise<void> {
