@@ -1,0 +1,10 @@
+{
+  "name": "ssms-sign",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": false,
+  "routes": [{ "pattern": "sign.ssnow.club", "custom_domain": true }],
+  "assets": {
+    "directory": "../dist-sign/",
+    "not_found_handling": "single-page-application"
+  }
+}

@@ -57,6 +57,24 @@ camp page uses `?lang=en` for English.
 `npm run typecheck:docs-worker` and `npm run test:docs-worker` check it locally
 and in CI.
 
+## Signing site
+
+`sign/` is the public signing site at `https://sign.ssnow.club/w/<slug>?lang=en|zh`
+(Chinese by default), a separate Vite entry (`vite.sign.config.ts`, source in
+`src/sign/`) deployed as the static-assets Worker `ssms-sign`
+(`sign/wrangler.jsonc`) right after the portal. It has no login and no portal
+code; `npm run check:sign-bundle` fails the build if any portal code gets in.
+Response headers, including the CSP `frame-ancestors` that lets
+`https://ssnow.club` embed it, are in `sign/public/_headers`. Inside an iframe it
+posts `{ type: 'ssnow-sign-height', height }` to `https://ssnow.club` whenever
+its height changes.
+
+`npm run dev:sign` serves it at http://localhost:5174 against a built-in mock API
+(the slugs `missing`, `stale`, `invalid` and `throttled` return 404, 409, 400 and
+429). `npm run build:sign` builds it to `dist-sign/`, calling the signing API at
+`VITE_SIGN_API_BASE_URL` (deploys read the GitHub variable `SIGN_API_BASE_URL`;
+production builds default to `https://sign-api.ssnow.club`).
+
 ## Changes that span the API
 
 The API deploys first and the portal follows:
