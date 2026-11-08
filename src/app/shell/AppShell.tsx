@@ -75,6 +75,7 @@ export function AppShell() {
         { to: '/admin/instructors', label: t.nav.instructors },
         { to: '/admin/documents', label: t.nav.documents },
         { to: '/admin/document-review', label: t.nav.documentReview },
+        { to: '/admin/signatures', label: t.nav.signatures },
         { to: '/admin/reference', label: t.nav.reference },
         { to: '/admin/pages', label: t.nav.pages },
         { to: '/admin/shopify-sync', label: t.nav.shopifySync },
@@ -102,6 +103,11 @@ export function AppShell() {
           locked: onboardingLock.locked || (checklist.data?.locked ?? false),
         },
         { to: '/lessons', label: t.nav.lessonsPay, ...onboardingLock },
+        {
+          to: '/students',
+          label: t.nav.myStudents,
+          locked: checklist.data?.locked ?? false,
+        },
         { to: '/settings', label: t.nav.settings },
       ];
 

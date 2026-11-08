@@ -206,6 +206,20 @@ describe('AppShell admin nav', () => {
     );
   });
 
+  it('links to Signatures right after the document pages', () => {
+    renderShell();
+    const links = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(links.indexOf('/admin/signatures')).toBe(
+      links.indexOf('/admin/document-review') + 1,
+    );
+    expect(screen.getByRole('link', { name: 'Signatures' })).toHaveAttribute(
+      'href',
+      '/admin/signatures',
+    );
+  });
+
   it('links to Pages after Reference data', () => {
     renderShell();
     const links = screen
@@ -338,6 +352,7 @@ describe('AppShell instructor nav', () => {
       '/onboarding',
       '/insurance',
       '/lessons',
+      '/students',
       '/settings',
     ]);
     const lessons = screen.getByRole('link', { name: 'Lessons & pay' });
@@ -351,6 +366,25 @@ describe('AppShell instructor nav', () => {
         name: 'Lessons & pay Locked until your profile is approved',
       }),
     ).toHaveAttribute('href', '/lessons');
+  });
+
+  it('locks My students and waivers until the profile is approved', async () => {
+    renderInstructorShell('pending');
+    expect(
+      await screen.findByRole('link', {
+        name: 'My students and waivers Locked until your profile is approved',
+      }),
+    ).toHaveAttribute('href', '/students');
+  });
+
+  it('unlocks My students and waivers once approved, before onboarding is done', async () => {
+    renderInstructorShell('approved', {});
+    await screen.findByRole('link', {
+      name: 'Lessons & pay Locked until you finish onboarding',
+    });
+    expect(
+      screen.getByRole('link', { name: 'My students and waivers' }),
+    ).toHaveAttribute('href', '/students');
   });
 
   it('shows Lessons & pay without a lock for a rejected instructor', async () => {
