@@ -329,7 +329,6 @@ function LanguageEditor({
     publish.reset();
     setRevision(fresh);
     setValues(baselineOf(fresh, lang));
-    setReloads((n) => n + 1);
   };
 
   const reloadAfterConflict = (keepMine: (mine: FormDraft) => boolean) =>
@@ -337,6 +336,7 @@ function LanguageEditor({
       (fresh) => {
         const mine = latest.current;
         showFresh(fresh);
+        setReloads((n) => n + 1);
         setReloaded({ mine: keepMine(mine) ? mine : null });
       },
       () => undefined,

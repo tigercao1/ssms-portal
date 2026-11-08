@@ -663,6 +663,89 @@ describe('PDF writes that return text changed by another admin', () => {
     expect(savedTitle()).toBe('免责声明 mine');
   });
 
+  it('keeps boxes placed while a positions save that returns their text was in flight', async () => {
+    attachPdf();
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    server.use(
+      http.put(
+        PLACEMENTS_URL,
+        async ({ request }) => {
+          const draft = state.forms[0]!.languages.zh.draft!;
+          draft.placements = (
+            (await request.json()) as { placements: FormPlacement[] }
+          ).placements;
+          await held;
+          otherAdminSaves();
+          return HttpResponse.json(state.forms[0]);
+        },
+        { once: true },
+      ),
+    );
+    const user = await openChinese();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Place 日期 on the PDF' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save positions' }));
+    await waitFor(() =>
+      expect(state.forms[0]!.languages.zh.draft!.placements).toHaveLength(1),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Place 姓名缩写 on the PDF' }),
+    );
+    release();
+
+    await waitFor(() => expect(title()).toHaveValue(other));
+    expect(
+      screen.getByRole('button', { name: '姓名缩写 on page 1' }),
+    ).toBeVisible();
+    expect(publish()).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Save positions' }));
+    expect(await screen.findByText('Field positions saved.')).toBeVisible();
+    expect(
+      placementPuts()
+        .at(-1)!
+        .placements.map((p) => p.key),
+    ).toEqual(['date', 'initials']);
+    expect(placementPuts().at(-1)!.expectedUpdatedAt).toBe(
+      '2026-11-08T22:00:00.123456+00:00',
+    );
+    expect(savedTitle()).toBe(other);
+  });
+
+  it('keeps boxes placed while a re-upload of the same PDF that returns their text was in flight', async () => {
+    state.forms[0]!.languages.zh.draft!.originalPdf = fakeOriginalPdf({
+      sha256: '15'.padStart(64, '0'),
+    });
+    const confirm = hold(
+      'post',
+      'http://localhost:3000/admin/documents/forms/:id/versions/zh/source/confirm',
+    );
+    const user = await openChinese();
+
+    await user.upload(screen.getByLabelText('Replace PDF'), pdfFile());
+    await waitFor(() => expect(confirm.started()).toBe(true));
+    await user.click(
+      screen.getByRole('button', { name: 'Place 姓名缩写 on the PDF' }),
+    );
+    otherAdminSaves();
+    confirm.release();
+
+    await waitFor(() => expect(title()).toHaveValue(other));
+    expect(
+      screen.getByRole('button', { name: '姓名缩写 on page 1' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Save positions' }));
+    expect(await screen.findByText('Field positions saved.')).toBeVisible();
+    expect(
+      placementPuts()
+        .at(-1)!
+        .placements.map((p) => p.key),
+    ).toEqual(['initials']);
+    expect(savedTitle()).toBe(other);
+  });
+
   it('reloads instead of saving over their text when an upload returns after switching language and back', async () => {
     const confirm = hold(
       'post',
