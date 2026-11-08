@@ -392,7 +392,9 @@ export function formsHandlers(
           return bad('Save a draft in this language before changing its PDF');
         const upload = state.uploads.get(`${form.id}/${l}.pdf`);
         if (!upload)
-          return bad('No uploaded PDF found; request an upload URL and upload the file first');
+          return bad(
+            'No uploaded PDF found; request an upload URL and upload the file first',
+          );
         state.uploads.delete(`${form.id}/${l}.pdf`);
         const pages = Array.from({ length: upload.pageCount }, () => ({
           width: 612,
