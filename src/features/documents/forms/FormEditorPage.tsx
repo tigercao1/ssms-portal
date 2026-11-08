@@ -288,6 +288,14 @@ function LanguageEditor({
   const writing = useFormWriting(form.id, lang);
   const dirty = !sameDraft(values, baseline);
   textDirty.current = dirty;
+  const savedOther = useRef(false);
+  savedOther.current =
+    save.isSuccess &&
+    !sameDraft(baselineOf(save.data, lang), {
+      title: save.variables.title,
+      bodyMarkdown: save.variables.bodyMarkdown,
+      fields: save.variables.fields,
+    });
   const [placementsDirty, setPlacementsDirty] = useState(false);
   const unsaved = dirty || placementsDirty || !!reloaded?.mine;
   const problem = fieldsProblem(values.fields, t);
@@ -344,8 +352,13 @@ function LanguageEditor({
 
   const adoptPdfWrite = (next: FormTemplate) => {
     const known = loadedText.current;
-    if (sameDraft(baselineOf(next, lang), known)) return;
+    const fresh = baselineOf(next, lang);
     const mine = latest.current;
+    if (
+      sameDraft(fresh, known) &&
+      (!savedOther.current || sameDraft(mine, fresh))
+    )
+      return;
     showFresh(next);
     if (!sameDraft(mine, known)) setReloaded({ mine });
   };
