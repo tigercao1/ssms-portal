@@ -1312,7 +1312,17 @@ export const en: Messages = {
     legalNote:
       'When an original PDF is attached, it is the legal copy. The text, the fields and the PDF of a language are published together as one version.',
     unsaved: 'Unsaved changes',
-    switchUnsaved: 'Save or discard your changes before switching language.',
+    leaveTitle: 'Leave without saving?',
+    leaveBody:
+      'Your changes to this form are not saved yet. They are lost if you leave.',
+    leaveStay: 'Keep editing',
+    leaveDiscard: 'Leave without saving',
+    conflictReloaded:
+      'This form was changed by someone else, so it was reloaded with their version.',
+    conflictMineKept:
+      'Your unsaved text was set aside: put it back to review it and save over their version.',
+    conflictPutBack: 'Put my text back',
+    conflictDismiss: 'Dismiss',
     discard: 'Discard changes',
     saveDraft: 'Save draft',
     saved: 'Draft v{n} saved.',

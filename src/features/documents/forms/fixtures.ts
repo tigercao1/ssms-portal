@@ -185,6 +185,17 @@ export function formsHandlers(
     });
   };
   const notFound = () => bad('Form not found', 404);
+  const changed = () =>
+    bad('This form was changed by someone else; reload it and try again', 409);
+  const stale = (draft: FormVersion | null, body: unknown) => {
+    const expected = (body as { expectedUpdatedAt?: string } | undefined)
+      ?.expectedUpdatedAt;
+    return expected !== undefined && draft?.updatedAt !== expected;
+  };
+  const stamp = (draft: FormVersion | null) =>
+    new Date(
+      Math.max(Date.now(), Date.parse(draft?.updatedAt ?? '') + 1 || 0),
+    ).toISOString();
   const lang = (value: unknown) =>
     FORM_LANGUAGES.includes(value as DocumentLanguage)
       ? (value as DocumentLanguage)
@@ -236,6 +247,7 @@ export function formsHandlers(
       if (!form || !l) return notFound();
       const body = (await request.json()) as FormDraft;
       const slot = form.languages[l];
+      if (stale(slot.draft, body)) return changed();
       const fields =
         body.fields ??
         slot.draft?.fields ??
@@ -254,7 +266,7 @@ export function formsHandlers(
         originalPdf: source?.originalPdf ?? null,
         placements: (source?.placements ?? []).filter((p) => keys.has(p.key)),
         publishedAt: null,
-        updatedAt: new Date().toISOString(),
+        updatedAt: stamp(slot.draft),
       };
       return HttpResponse.json(form);
     }),
@@ -268,6 +280,12 @@ export function formsHandlers(
         const slot = form.languages[l];
         if (!slot.draft)
           return bad('There is no draft to publish in this language');
+        const body: unknown = request.headers
+          .get('content-type')
+          ?.includes('json')
+          ? await request.json()
+          : undefined;
+        if (stale(slot.draft, body)) return changed();
         slot.published = {
           ...slot.draft,
           publishedAt: new Date().toISOString(),

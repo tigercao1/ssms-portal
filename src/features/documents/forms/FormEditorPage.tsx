@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useBlocker, useParams, useSearchParams } from 'react-router-dom';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import {
@@ -8,6 +8,7 @@ import {
   Card,
   Field,
   Input,
+  Modal,
   Spinner,
   Textarea,
   Toggle,
@@ -22,9 +23,13 @@ import {
   FORM_LANGUAGES,
   FORM_TITLE_MAX,
   editableVersion,
+  isConflict,
   publicFormUrl,
+  revisionBody,
+  revisionOf,
   useForm,
   usePublishForm,
+  useReloadForm,
   useSaveFormDraft,
   useUpdateForm,
   type FormDraft,
@@ -63,9 +68,33 @@ function Editor({ form }: { form: FormTemplate }) {
   const [dirty, setDirty] = useState(false);
   const title = templateTitle(form, locale);
   const url = publicFormUrl(form.slug);
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty &&
+      (currentLocation.pathname !== nextLocation.pathname ||
+        currentLocation.search !== nextLocation.search),
+  );
 
   return (
     <div className="flex flex-col gap-5">
+      {blocker.state === 'blocked' && (
+        <Modal
+          title={s.leaveTitle}
+          onClose={() => blocker.reset()}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => blocker.reset()}>
+                {s.leaveStay}
+              </Button>
+              <Button variant="danger" onClick={() => blocker.proceed()}>
+                {s.leaveDiscard}
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm text-ink">{s.leaveBody}</p>
+        </Modal>
+      )}
       <div className="flex flex-col gap-1">
         <Link
           to="/admin/signing-forms"
@@ -98,7 +127,6 @@ function Editor({ form }: { form: FormTemplate }) {
       <div
         role="tablist"
         aria-label={s.tabsLabel}
-        title={dirty ? s.switchUnsaved : undefined}
         className="flex gap-1 border-b border-grey/60"
       >
         {FORM_LANGUAGES.map((l) => (
@@ -109,10 +137,9 @@ function Editor({ form }: { form: FormTemplate }) {
             id={`form-tab-${l}`}
             aria-controls={`form-panel-${l}`}
             aria-selected={lang === l}
-            disabled={dirty && lang !== l}
             onClick={() => setParams(l === 'en' ? {} : { lang: l })}
             className={cn(
-              'min-h-11 border-b-2 px-4 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              'min-h-11 border-b-2 px-4 text-sm transition-colors',
               lang === l
                 ? 'border-red font-medium text-navy'
                 : 'border-transparent text-slate hover:text-navy',
@@ -122,7 +149,6 @@ function Editor({ form }: { form: FormTemplate }) {
           </button>
         ))}
       </div>
-      {dirty && <p className="-mt-3 text-xs text-slate">{s.switchUnsaved}</p>}
 
       <div
         role="tabpanel"
@@ -198,9 +224,17 @@ function LanguageEditor({
   const baseline = baselineOf(form, lang);
   const [values, setValues] = useState<FormDraft>(baseline);
   const [mode, setMode] = useState<'write' | 'preview'>('write');
+  const [revision, setRevision] = useState(() => revisionOf(form, lang));
+  const [reloaded, setReloaded] = useState<{ mine: FormDraft | null } | null>(
+    null,
+  );
+  const latest = useRef(values);
+  latest.current = values;
   const save = useSaveFormDraft(form.id, lang);
   const publish = usePublishForm(form.id, lang);
+  const reload = useReloadForm(form.id);
   const dirty = !sameDraft(values, baseline);
+  const unsaved = dirty || !!reloaded?.mine;
   const problem = fieldsProblem(values.fields, t);
   const incomplete = !values.title.trim() || !values.bodyMarkdown.trim();
   const publishBlocked = dirty
@@ -210,22 +244,56 @@ function LanguageEditor({
       : null;
 
   useEffect(() => {
-    onDirtyChange(dirty);
-  }, [dirty, onDirtyChange]);
+    onDirtyChange(unsaved);
+  }, [unsaved, onDirtyChange]);
 
   useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
   useEffect(() => {
-    if (!dirty) return;
+    if (!unsaved) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [dirty]);
+  }, [unsaved]);
 
   const edit = (patch: Partial<FormDraft>) => {
     setValues((v) => ({ ...v, ...patch }));
-    save.reset();
+    if (!publish.isPending) publish.reset();
+  };
+
+  const reloadAfterConflict = (mine: FormDraft | null) =>
+    reload().then(
+      (fresh) => {
+        save.reset();
+        publish.reset();
+        setRevision(revisionOf(fresh, lang));
+        setValues(baselineOf(fresh, lang));
+        setReloaded({ mine });
+      },
+      () => undefined,
+    );
+
+  const saveDraft = () => {
+    const sent = values;
     publish.reset();
+    setReloaded(null);
+    save.mutate(
+      {
+        title: sent.title.trim(),
+        bodyMarkdown: sent.bodyMarkdown,
+        fields: sent.fields.map((f) => ({ ...f, label: f.label.trim() })),
+        ...revisionBody(revision),
+      },
+      {
+        onSuccess: (next) => {
+          setRevision(revisionOf(next, lang));
+          setValues((v) => (v === sent ? baselineOf(next, lang) : v));
+        },
+        onError: (err) => {
+          if (isConflict(err)) void reloadAfterConflict(latest.current);
+        },
+      },
+    );
   };
 
   return (
@@ -338,6 +406,37 @@ function LanguageEditor({
         )}
       </Card>
 
+      {reloaded && (
+        <Banner tone="pending">
+          <div className="flex flex-col gap-2">
+            <p>
+              {s.conflictReloaded}
+              {reloaded.mine && ` ${s.conflictMineKept}`}
+            </p>
+            {reloaded.mine && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setValues(reloaded.mine ?? baseline);
+                    setReloaded(null);
+                  }}
+                >
+                  {s.conflictPutBack}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setReloaded(null)}
+                >
+                  {s.conflictDismiss}
+                </Button>
+              </div>
+            )}
+          </div>
+        </Banner>
+      )}
       {save.isError && (
         <Banner tone="error">
           {s.saveFailed.replace(
@@ -371,30 +470,23 @@ function LanguageEditor({
         <Button
           loading={save.isPending}
           disabled={!dirty || incomplete || problem !== null}
-          onClick={() => {
-            publish.reset();
-            save.mutate(
-              {
-                title: values.title.trim(),
-                bodyMarkdown: values.bodyMarkdown,
-                fields: values.fields.map((f) => ({
-                  ...f,
-                  label: f.label.trim(),
-                })),
-              },
-              { onSuccess: (next) => setValues(baselineOf(next, lang)) },
-            );
-          }}
+          onClick={saveDraft}
         >
           {s.saveDraft}
         </Button>
         <Button
           variant="secondary"
           loading={publish.isPending}
-          disabled={publishBlocked !== null}
+          disabled={publishBlocked !== null || save.isPending}
           onClick={() => {
             save.reset();
-            publish.mutate();
+            setReloaded(null);
+            publish.mutate(revision, {
+              onSuccess: (next) => setRevision(revisionOf(next, lang)),
+              onError: (err) => {
+                if (isConflict(err)) void reloadAfterConflict(null);
+              },
+            });
           }}
         >
           {s.publish}
@@ -404,7 +496,7 @@ function LanguageEditor({
             variant="ghost"
             onClick={() => {
               setValues(baseline);
-              save.reset();
+              if (!save.isPending) save.reset();
             }}
           >
             {s.discard}

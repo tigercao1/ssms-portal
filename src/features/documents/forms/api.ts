@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { env } from '@/lib/env';
 import type { DocumentLanguage } from '../api';
 
@@ -106,6 +106,10 @@ export interface FormDraft {
   fields: FormField[];
 }
 
+export interface FormRevision {
+  expectedUpdatedAt?: string;
+}
+
 export const formsKeys = {
   all: ['admin', 'documents', 'forms'] as const,
   list: ['admin', 'documents', 'forms', 'list'] as const,
@@ -119,6 +123,21 @@ const versionPath = (id: string, lang: DocumentLanguage) =>
 
 export function publicFormUrl(slug: string): string {
   return `${env.signSiteUrl.replace(/\/+$/, '')}/w/${slug}`;
+}
+
+export function revisionOf(
+  form: FormTemplate,
+  lang: DocumentLanguage,
+): string | null {
+  return form.languages[lang].draft?.updatedAt ?? null;
+}
+
+export function revisionBody(revision: string | null): FormRevision {
+  return revision === null ? {} : { expectedUpdatedAt: revision };
+}
+
+export function isConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409;
 }
 
 export function editableVersion(
@@ -142,6 +161,19 @@ export function useForm(id: string) {
     queryFn: () => api<FormTemplate>(formPath(id)),
     staleTime: 60_000,
   });
+}
+
+export function useReloadForm(id: string) {
+  const qc = useQueryClient();
+  return async () => {
+    const form = await qc.fetchQuery({
+      queryKey: formsKeys.form(id),
+      queryFn: () => api<FormTemplate>(formPath(id)),
+      staleTime: 0,
+    });
+    void qc.invalidateQueries({ queryKey: formsKeys.list, exact: true });
+    return form;
+  };
 }
 
 export function useFormSync() {
@@ -173,7 +205,7 @@ export function useUpdateForm(id: string) {
 export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
   return useMutation({
-    mutationFn: (body: FormDraft) =>
+    mutationFn: (body: FormDraft & FormRevision) =>
       api<FormTemplate>(versionPath(id, lang), { method: 'PUT', body }),
     onSuccess: sync,
   });
@@ -182,9 +214,10 @@ export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
 export function usePublishForm(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
   return useMutation({
-    mutationFn: () =>
+    mutationFn: (revision: string | null) =>
       api<FormTemplate>(`${versionPath(id, lang)}/publish`, {
         method: 'POST',
+        body: revisionBody(revision),
       }),
     onSuccess: sync,
   });

@@ -1196,7 +1196,14 @@ export interface Messages {
     emailCopyFailed: string;
     legalNote: string;
     unsaved: string;
-    switchUnsaved: string;
+    leaveTitle: string;
+    leaveBody: string;
+    leaveStay: string;
+    leaveDiscard: string;
+    conflictReloaded: string;
+    conflictMineKept: string;
+    conflictPutBack: string;
+    conflictDismiss: string;
     discard: string;
     saveDraft: string;
     saved: string;

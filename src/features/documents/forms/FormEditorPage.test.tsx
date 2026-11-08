@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
@@ -22,8 +23,9 @@ function renderEditor(route = '/admin/signing-forms/form-waiver') {
   renderWithProviders(
     <Routes>
       <Route path="/admin/signing-forms/:id" element={<FormEditorPage />} />
+      <Route path="/admin/signing-forms" element={<p>Forms list</p>} />
     </Routes>,
-    { route },
+    { route, dataRouter: true },
   );
   return screen.findByRole('tab', { name: 'English' });
 }
@@ -137,17 +139,62 @@ describe('FormEditorPage', () => {
     });
   });
 
-  it('keeps the other language tab closed while there are unsaved changes', async () => {
+  it('asks before the Back link leaves unsaved changes', async () => {
     const user = userEvent.setup();
     await renderEditor();
+    const title = screen.getByLabelText(/Title signers see/);
+    await user.type(title, ' NEW');
 
+    await user.click(screen.getByRole('link', { name: /Signing forms/ }));
+    const ask = await screen.findByRole('dialog', {
+      name: 'Leave without saving?',
+    });
+    await user.click(within(ask).getByRole('button', { name: 'Keep editing' }));
+    expect(title).toHaveValue('Liability waiver NEW');
+
+    await user.click(screen.getByRole('link', { name: /Signing forms/ }));
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Leave without saving?' }),
+      ).getByRole('button', { name: 'Leave without saving' }),
+    );
+    expect(await screen.findByText('Forms list')).toBeVisible();
+    expect(state.requests).toEqual([]);
+  });
+
+  it('asks before switching language with unsaved changes', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
     await user.type(screen.getByLabelText(/Title signers see/), '!');
-    expect(screen.getByRole('tab', { name: 'Chinese' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
-    expect(screen.getByRole('tab', { name: 'Chinese' })).toBeEnabled();
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+    const ask = await screen.findByRole('dialog', {
+      name: 'Leave without saving?',
+    });
+    await user.click(within(ask).getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByRole('tab', { name: 'English' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByLabelText(/Title signers see/)).toHaveValue(
+      'Liability waiver!',
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+    await user.click(
+      within(
+        await screen.findByRole('dialog', { name: 'Leave without saving?' }),
+      ).getByRole('button', { name: 'Leave without saving' }),
+    );
+    expect(screen.getByLabelText(/Title signers see/)).toHaveValue('免责声明');
+  });
+
+  it('switches language without asking when nothing changed', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
     await user.click(screen.getByRole('tab', { name: 'Chinese' }));
     expect(screen.getByLabelText(/Title signers see/)).toHaveValue('免责声明');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('starts a form with no version from the default fields', async () => {
@@ -284,5 +331,134 @@ describe('FormEditorPage', () => {
       body: { emailCopy: false },
     });
     await expect.poll(() => toggle.getAttribute('aria-checked')).toBe('false');
+  });
+});
+
+describe('FormEditorPage saves and other admins', () => {
+  const DRAFT_PUT =
+    'http://localhost:3000/admin/documents/forms/:id/versions/zh';
+  const puts = () =>
+    state.requests
+      .filter((r) => r.method === 'PUT')
+      .map((r) => r.body as { title: string; expectedUpdatedAt?: string });
+
+  function holdFirstSave() {
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    let calls = 0;
+    server.use(
+      http.put(DRAFT_PUT, async () => {
+        calls += 1;
+        if (calls === 1) await held;
+      }),
+    );
+    return { release, calls: () => calls };
+  }
+
+  function changedByAnotherAdmin() {
+    const draft = state.forms[0]!.languages.zh.draft!;
+    draft.title = 'Changed by Sam';
+    draft.updatedAt = '2026-11-08T10:00:00.000Z';
+  }
+
+  it('keeps one draft save in flight and keeps edits made meanwhile for the next save', async () => {
+    const user = userEvent.setup();
+    const hold = holdFirstSave();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+    const title = screen.getByLabelText(/Title signers see/);
+
+    fireEvent.change(title, { target: { value: 'FIRST' } });
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(hold.calls()).toBe(1));
+    fireEvent.change(title, { target: { value: 'SECOND' } });
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+
+    hold.release();
+    await waitFor(() =>
+      expect(state.forms[0]!.languages.zh.draft!.title).toBe('FIRST'),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled(),
+    );
+    expect(title).toHaveValue('SECOND');
+    expect(screen.getByText('Unsaved changes')).toBeVisible();
+    expect(hold.calls()).toBe(1);
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v1 saved.');
+    expect(state.forms[0]!.languages.zh.draft!.title).toBe('SECOND');
+    expect(puts().map((b) => b.title)).toEqual(['FIRST', 'SECOND']);
+  });
+
+  it('sends the revision it loaded and chains the one each write returns', async () => {
+    const user = userEvent.setup();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+    const title = screen.getByLabelText(/Title signers see/);
+
+    await user.type(title, ' 1');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v1 saved.');
+    const afterFirst = state.forms[0]!.languages.zh.draft!.updatedAt;
+    await user.type(title, ' 2');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(puts()).toHaveLength(2));
+    await screen.findByText('Draft v1 saved.');
+    const afterSecond = state.forms[0]!.languages.zh.draft!.updatedAt;
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText(/Published version 1 in Chinese/);
+
+    expect(puts().map((b) => b.expectedUpdatedAt)).toEqual([
+      '2026-11-07T18:30:00Z',
+      afterFirst,
+    ]);
+    expect(afterSecond).not.toBe(afterFirst);
+    expect(state.requests.at(-1)).toMatchObject({
+      method: 'POST',
+      body: { expectedUpdatedAt: afterSecond },
+    });
+  });
+
+  it('reloads a draft another admin changed and offers the unsaved text back', async () => {
+    const user = userEvent.setup();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+    changedByAnotherAdmin();
+    const title = screen.getByLabelText(/Title signers see/);
+
+    await user.type(title, ' mine');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(title).toHaveValue('Changed by Sam');
+    expect(state.forms[0]!.languages.zh.draft!.title).toBe('Changed by Sam');
+
+    await user.click(screen.getByRole('button', { name: 'Put my text back' }));
+    expect(title).toHaveValue('免责声明 mine');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft v1 saved.');
+    expect(puts().at(-1)).toMatchObject({
+      title: '免责声明 mine',
+      expectedUpdatedAt: '2026-11-08T10:00:00.000Z',
+    });
+  });
+
+  it('does not publish a draft another admin changed, and reloads it', async () => {
+    const user = userEvent.setup();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+    changedByAnotherAdmin();
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(screen.getByLabelText(/Title signers see/)).toHaveValue(
+      'Changed by Sam',
+    );
+    expect(state.forms[0]!.languages.zh.published).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Put my text back' }),
+    ).not.toBeInTheDocument();
   });
 });

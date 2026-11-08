@@ -1039,7 +1039,8 @@ export const zhCN: Messages = {
   },
   documentReview: {
     title: '资料审核',
-    intro: '教练提交、需要人工审核的文件。在这里通过或驳回，与在教练详情页操作效果相同。',
+    intro:
+      '教练提交、需要人工审核的文件。在这里通过或驳回，与在教练详情页操作效果相同。',
     filterLabel: '显示',
     filterPending: '待审核',
     filterDecided: '最近已处理',
@@ -1241,7 +1242,15 @@ export const zhCN: Messages = {
     legalNote:
       '附有原始 PDF 时，以 PDF 为法律文本。同一语言的正文、字段和 PDF 作为同一版本一起发布。',
     unsaved: '有未保存的更改',
-    switchUnsaved: '切换语言前请先保存或放弃更改。',
+    leaveTitle: '不保存就离开？',
+    leaveBody: '你对此表单的修改尚未保存，离开后将丢失。',
+    leaveStay: '继续编辑',
+    leaveDiscard: '不保存并离开',
+    conflictReloaded: '其他人修改了此表单，已重新载入他们的版本。',
+    conflictMineKept:
+      '你未保存的文字已暂存：可以恢复后检查，再覆盖保存他们的版本。',
+    conflictPutBack: '恢复我的文字',
+    conflictDismiss: '关闭',
     discard: '放弃更改',
     saveDraft: '保存草稿',
     saved: '草稿第 {n} 版已保存。',
