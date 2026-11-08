@@ -198,6 +198,14 @@ describe('AppShell admin nav', () => {
     ).toHaveAttribute('href', '/admin/settings/google');
   });
 
+  it('links to the API tokens page', () => {
+    renderShell();
+    expect(screen.getByRole('link', { name: 'API tokens' })).toHaveAttribute(
+      'href',
+      '/admin/settings/api-tokens',
+    );
+  });
+
   it('links to Pages after Reference data', () => {
     renderShell();
     const links = screen
