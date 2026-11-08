@@ -29,6 +29,12 @@ export interface Signer {
   signatures: SignedDocumentEntry[];
 }
 
+export interface SignatureCheck {
+  signed: boolean;
+  signedAt: string | null;
+  templateTitles: string[];
+}
+
 export interface StudentSignature {
   name: string | null;
   signed: boolean;
@@ -60,6 +66,18 @@ export function useSignatureLookup(q: string) {
     placeholderData: sameUserPlaceholder<Signer[]>(userId),
     queryFn: () =>
       api<Signer[]>(`/admin/signatures?${new URLSearchParams({ q })}`),
+  });
+}
+
+export function useSignatureCheck(email: string | null) {
+  const userId = useSession().user?.id ?? null;
+  return useQuery({
+    queryKey: ['admin', userId, 'signatures', 'check', email] as const,
+    enabled: userId !== null && email !== null,
+    queryFn: () =>
+      api<SignatureCheck>(
+        `/admin/signatures/check?${new URLSearchParams({ email: email ?? '' })}`,
+      ),
   });
 }
 

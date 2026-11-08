@@ -75,6 +75,10 @@ its height changes.
 `VITE_SIGN_API_BASE_URL` (deploys read the GitHub variable `SIGN_API_BASE_URL`;
 production builds default to `https://sign-api.ssnow.club`).
 
+The portal's Signing forms page shows each form's public link as
+`<VITE_SIGN_SITE_URL>/w/<slug>`; `VITE_SIGN_SITE_URL` defaults to
+`https://sign.ssnow.club`.
+
 ## Changes that span the API
 
 The API deploys first and the portal follows:

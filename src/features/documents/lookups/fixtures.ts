@@ -1,6 +1,6 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { MOCK_STORAGE_ORIGIN } from '../api/fixtures';
-import type { Signer, StudentSignature } from './api';
+import type { SignatureCheck, Signer, StudentSignature } from './api';
 
 export const sampleSigners: Signer[] = [
   {
@@ -73,6 +73,7 @@ export interface LookupsMockState {
   meStatus: 'approved' | 'pending' | 'rejected' | 'deactivated' | 'none';
   signatureQueries: string[];
   studentQueries: (string | null)[];
+  checkEmails: string[];
 }
 
 export function createLookupsState(
@@ -84,6 +85,7 @@ export function createLookupsState(
     meStatus: 'approved',
     signatureQueries: [],
     studentQueries: [],
+    checkEmails: [],
     ...overrides,
   };
 }
@@ -109,6 +111,28 @@ export function lookupsHandlers(
           (s) => includes(s.name, q) || includes(s.email, q),
         ),
       );
+    }),
+    http.get(`${apiBase}/admin/signatures/check`, ({ request }) => {
+      const email = (new URL(request.url).searchParams.get('email') ?? '')
+        .trim()
+        .toLowerCase();
+      state.checkEmails.push(email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        return HttpResponse.json(
+          { message: ['email must be an email'] },
+          { status: 400 },
+        );
+      const entries = state.signers
+        .filter((s) => s.email?.toLowerCase() === email)
+        .flatMap((s) => s.signatures)
+        .filter((e) => e.kind === 'sign')
+        .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+      const result: SignatureCheck = {
+        signed: entries.length > 0,
+        signedAt: entries[0]?.signedAt ?? null,
+        templateTitles: [...new Set(entries.map((e) => e.titleEn))],
+      };
+      return HttpResponse.json(result);
     }),
     http.get(`${apiBase}/me/students/signatures`, ({ request }) => {
       const q = new URL(request.url).searchParams.get('q');

@@ -21,6 +21,7 @@ import {
   type Signer,
 } from './api';
 import { formatSignedDate } from './format';
+import { SignatureCheckBox } from './SignatureCheckBox';
 
 export function SignaturesPage() {
   const t = useT();
@@ -36,22 +37,25 @@ export function SignaturesPage() {
         <h1 className="text-3xl">{s.title}</h1>
         <p className="text-slate">{s.intro}</p>
       </div>
-      <Card>
-        <form role="search" onSubmit={(e: FormEvent) => e.preventDefault()}>
-          <Field label={s.searchLabel} hint={s.searchHint}>
-            {(p) => (
-              <Input
-                {...p}
-                type="search"
-                autoComplete="off"
-                maxLength={SEARCH_QUERY_MAX}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-            )}
-          </Field>
-        </form>
-      </Card>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Card>
+          <form role="search" onSubmit={(e: FormEvent) => e.preventDefault()}>
+            <Field label={s.searchLabel} hint={s.searchHint}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type="search"
+                  autoComplete="off"
+                  maxLength={SEARCH_QUERY_MAX}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+              )}
+            </Field>
+          </form>
+        </Card>
+        <SignatureCheckBox />
+      </div>
       {short ? (
         <p role="status" className="text-sm text-slate">
           {q ? s.tooShort : s.start}

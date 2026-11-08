@@ -220,6 +220,20 @@ describe('AppShell admin nav', () => {
     );
   });
 
+  it('links to Signing forms right after Signatures', () => {
+    renderShell();
+    const links = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(screen.getByRole('link', { name: 'Signing forms' })).toHaveAttribute(
+      'href',
+      '/admin/signing-forms',
+    );
+    expect(links.indexOf('/admin/signing-forms')).toBe(
+      links.indexOf('/admin/signatures') + 1,
+    );
+  });
+
   it('links to Pages after Reference data', () => {
     renderShell();
     const links = screen
