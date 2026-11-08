@@ -111,6 +111,8 @@ export interface Messages {
     importHistory: string;
     google: string;
     apiTokens: string;
+    signatures: string;
+    myStudents: string;
     payroll: string;
     documents: string;
     onboarding: string;
@@ -1080,6 +1082,39 @@ export interface Messages {
     downloadZip: string;
     downloadZipFor: string;
     downloadZipFailed: string;
+  };
+  signatures: {
+    title: string;
+    intro: string;
+    searchLabel: string;
+    searchHint: string;
+    start: string;
+    tooShort: string;
+    empty: string;
+    resultsLabel: string;
+    noName: string;
+    instructor: string;
+    customer: string;
+    noSignatures: string;
+    version: string;
+    signedOn: string;
+    readOn: string;
+    download: string;
+    downloadFor: string;
+    downloadFailed: string;
+  };
+  myStudents: {
+    title: string;
+    intro: string;
+    searchLabel: string;
+    listLabel: string;
+    empty: string;
+    noMatches: string;
+    noName: string;
+    signed: string;
+    notSigned: string;
+    capped: string;
+    loadFailed: string;
   };
   instructorCalendar: {
     title: string;

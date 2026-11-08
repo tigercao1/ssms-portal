@@ -34,6 +34,8 @@ import { DocumentsListPage } from '@/features/documents/admin/DocumentsListPage'
 import { FieldEditorPage } from '@/features/documents/admin/editor/FieldEditorPage';
 import { SignedCopiesPage } from '@/features/documents/admin/signed/SignedCopiesPage';
 import { DocumentReviewPage } from '@/features/documents/admin/review/DocumentReviewPage';
+import { SignaturesPage } from '@/features/documents/lookups/SignaturesPage';
+import { MyStudentsPage } from '@/features/documents/lookups/MyStudentsPage';
 import { LoginPage } from '@/auth/LoginPage';
 import { SignUpPage } from '@/auth/SignUpPage';
 import { VerifyEmailPage } from '@/auth/VerifyEmailPage';
@@ -94,6 +96,7 @@ export const router = createBrowserRouter([
               { path: '/insurance/new', element: <InsurancePage /> },
               { path: '/insurance/new/review', element: <InsurancePage /> },
               { path: '/lessons', element: <LessonsPayPage /> },
+              { path: '/students', element: <MyStudentsPage /> },
               { path: '/settings', element: <SettingsPage /> },
 
               // Admin (role-gated)
@@ -210,6 +213,14 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireAdmin>
                     <DocumentsListPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/signatures',
+                element: (
+                  <RequireAdmin>
+                    <SignaturesPage />
                   </RequireAdmin>
                 ),
               },
