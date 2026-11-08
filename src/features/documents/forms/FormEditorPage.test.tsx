@@ -550,6 +550,38 @@ describe('FormEditorPage saves and other admins', () => {
     expect(state.forms[0]!.languages.zh.published).toBeNull();
   });
 
+  it('keeps text typed while the reload after a publish 409 is loading', async () => {
+    const user = userEvent.setup();
+    await renderEditor('/admin/signing-forms/form-waiver?lang=zh');
+    const title = screen.getByLabelText(/Title signers see/);
+    changedByAnotherAdmin();
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    let reloading = false;
+    server.use(
+      http.get(
+        'http://localhost:3000/admin/documents/forms/:id',
+        async () => {
+          reloading = true;
+          await held;
+        },
+        { once: true },
+      ),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(reloading).toBe(true));
+    fireEvent.change(title, { target: { value: 'TYPED WHILE RELOADING' } });
+    release();
+
+    expect(
+      await screen.findByText(/changed by someone else, so it was reloaded/),
+    ).toBeVisible();
+    expect(title).toHaveValue('Changed by Sam');
+    await user.click(screen.getByRole('button', { name: 'Put my text back' }));
+    expect(title).toHaveValue('TYPED WHILE RELOADING');
+  });
+
   it('sends a null revision on the first draft of a published-only language, then chains the returned one', async () => {
     const user = userEvent.setup();
     await renderEditor();

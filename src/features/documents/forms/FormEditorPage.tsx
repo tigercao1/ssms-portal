@@ -306,14 +306,15 @@ function LanguageEditor({
     if (!publish.isPending) publish.reset();
   };
 
-  const reloadAfterConflict = (mine: FormDraft | null) =>
+  const reloadAfterConflict = (keepMine: (mine: FormDraft) => boolean) =>
     reload().then(
       (fresh) => {
+        const mine = latest.current;
         save.reset();
         publish.reset();
         setRevision(revisionOf(fresh, lang));
         setValues(baselineOf(fresh, lang));
-        setReloaded({ mine });
+        setReloaded({ mine: keepMine(mine) ? mine : null });
       },
       () => undefined,
     );
@@ -335,7 +336,7 @@ function LanguageEditor({
           setValues((v) => (v === sent ? baselineOf(next, lang) : v));
         },
         onError: (err) => {
-          if (isConflict(err)) void reloadAfterConflict(latest.current);
+          if (isConflict(err)) void reloadAfterConflict(() => true);
         },
       },
     );
@@ -530,9 +531,8 @@ function LanguageEditor({
             publish.mutate(revision, {
               onSuccess: (next) => setRevision(revisionOf(next, lang)),
               onError: (err) => {
-                if (!isConflict(err)) return;
-                const mine = latest.current;
-                void reloadAfterConflict(sameDraft(mine, sent) ? null : mine);
+                if (isConflict(err))
+                  void reloadAfterConflict((mine) => !sameDraft(mine, sent));
               },
             });
           }}
