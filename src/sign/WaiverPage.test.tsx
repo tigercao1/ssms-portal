@@ -10,6 +10,8 @@ import { mockSignForm } from './mock/fixtures';
 const API = 'http://localhost:3000';
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
+const encoder = vi.hoisted(() => ({ png: '' }));
+
 const pads = vi.hoisted(() => [] as Array<{ draw: () => void }>);
 
 vi.mock('signature_pad', () => ({
@@ -94,14 +96,28 @@ async function fillRequired(
   await user.click(screen.getByRole('checkbox', { name: labels.consent }));
 }
 
+function pngOfBytes(bytes: number) {
+  return `data:image/png;base64,${'A'.repeat(Math.ceil(bytes / 3) * 4)}`;
+}
+
 beforeEach(() => {
   pads.length = 0;
+  encoder.png = PNG;
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    scale: () => {},
+    drawImage: () => {},
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(
+    () => encoder.png,
+  );
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-08T03:30:00Z'));
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
+  window.history.replaceState(null, '', '/');
 });
 
 describe('signing site waiver page', () => {
@@ -154,10 +170,11 @@ describe('signing site waiver page', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Witness name (optional)')).not.toBeRequired();
-    expect(screen.getByRole('link', { name: 'our FAQ' })).toHaveAttribute(
-      'href',
-      'https://ssnow.club/pages/faq',
-    );
+    expect(
+      screen.getByText(
+        'Questions? See our FAQ at https://ssnow.club/pages/faq.',
+      ),
+    ).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('en');
   });
 
@@ -341,6 +358,200 @@ describe('signing site waiver page', () => {
     await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
     await screen.findByText('Signed, a copy has been emailed to you.');
     expect(sent.map((body) => body.version)).toEqual([3, 4]);
+  });
+
+  it('signs in the language the API served when the requested one has no published version', async () => {
+    server.use(
+      http.get(`${API}/sign/forms/waiver`, () =>
+        HttpResponse.json(mockSignForm('en', 7)),
+      ),
+    );
+    const sent = captureSubmit();
+    const user = userEvent.setup();
+    renderSign('?lang=zh');
+
+    await user.type(
+      await screen.findByLabelText('Participant name'),
+      'Ada Snow',
+    );
+    await user.type(screen.getByLabelText('Email'), 'ada@example.com');
+    act(() => pads[0]!.draw());
+    await user.click(screen.getByRole('checkbox', { name: /我已阅读并同意/ }));
+    await user.click(screen.getByRole('button', { name: '签署并提交' }));
+
+    await screen.findByText('已签署，副本已发送至您的邮箱。');
+    expect(sent.map(({ lang, version }) => ({ lang, version }))).toEqual([
+      { lang: 'en', version: 7 },
+    ]);
+  });
+
+  it.each([
+    [400, 'Field Email (email) must be an email'],
+    [400, ['Field Email (email) must be an email']],
+    [422, 'Field Email (email) must be an email'],
+  ])(
+    'shows the reason from a %i validation error and marks the rejected field',
+    async (status, message) => {
+      serveForm('en');
+      captureSubmit(status, {
+        statusCode: status,
+        message,
+        error: 'Bad Request',
+      });
+      const user = userEvent.setup();
+      renderSign('?lang=en');
+
+      await fillRequired(user, 'en');
+      await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(
+        'Some answers were not accepted. Please check them and try again.',
+      );
+      expect(alert).toHaveTextContent('Field Email (email) must be an email');
+      expect(screen.getByLabelText('Email')).toHaveAccessibleDescription(
+        'Email was not accepted. Please check it.',
+      );
+      expect(screen.getByLabelText('Participant name')).toBeValid();
+    },
+  );
+
+  it('stops an answer longer than 500 characters before submitting', async () => {
+    serveForm('en');
+    const sent = captureSubmit();
+    const user = userEvent.setup();
+    renderSign('?lang=en');
+
+    await fillRequired(user, 'en');
+    await user.click(screen.getByLabelText('ID number (optional)'));
+    await user.paste('雪'.repeat(501));
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+
+    expect(
+      screen.getByLabelText('ID number (optional)'),
+    ).toHaveAccessibleDescription('ID number must be 500 characters or fewer.');
+    expect(screen.getByLabelText('ID number (optional)')).toHaveValue(
+      '雪'.repeat(501),
+    );
+    expect(sent).toHaveLength(0);
+
+    await user.keyboard('{Backspace}');
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    await screen.findByText('Signed, a copy has been emailed to you.');
+    expect(sent[0]!.answers.id_number).toBe('雪'.repeat(500));
+  });
+
+  it('asks to sign again when a signature cannot be exported under the size limit', async () => {
+    serveForm('en');
+    const sent = captureSubmit();
+    encoder.png = pngOfBytes(160 * 1024);
+    const user = userEvent.setup();
+    renderSign('?lang=en');
+
+    await fillRequired(user, 'en');
+
+    const participant = screen.getByRole('group', {
+      name: 'Participant signature',
+    });
+    expect(participant).toHaveAccessibleDescription(
+      'This signature is too detailed to save. Please clear it and sign again.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    expect(sent).toHaveLength(0);
+
+    encoder.png = PNG;
+    await user.click(
+      within(participant).getByRole('button', { name: 'Clear' }),
+    );
+    act(() => pads[0]!.draw());
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    await screen.findByText('Signed, a copy has been emailed to you.');
+    expect(sent[0]!.signatures.participant_signature).toBe(PNG);
+  });
+
+  it('does not send signatures that together exceed the request limit', async () => {
+    const form = mockSignForm('en');
+    server.use(
+      http.get(`${API}/sign/forms/waiver`, () =>
+        HttpResponse.json({
+          ...form,
+          fields: [
+            ...form.fields,
+            ...Array.from({ length: 25 }, (_, index) => ({
+              key: `extra_signature_${index}`,
+              type: 'signature',
+              label: `Extra signature ${index}`,
+              required: false,
+            })),
+          ],
+        }),
+      ),
+    );
+    const sent = captureSubmit();
+    encoder.png = pngOfBytes(140 * 1024);
+    const user = userEvent.setup();
+    renderSign('?lang=en');
+
+    await fillRequired(user, 'en');
+    act(() => pads.forEach((pad) => pad.draw()));
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Your signatures are too large to send together.',
+    );
+    expect(sent).toHaveLength(0);
+  });
+
+  it('switches between English and Chinese and keeps what was entered', async () => {
+    server.use(
+      http.get(`${API}/sign/forms/waiver`, ({ request }) =>
+        HttpResponse.json(
+          mockSignForm(
+            new URL(request.url).searchParams.get('lang') === 'en'
+              ? 'en'
+              : 'zh',
+          ),
+        ),
+      ),
+    );
+    const sent = captureSubmit();
+    const user = userEvent.setup();
+    renderSign();
+
+    const switcher = within(await screen.findByRole('group', { name: '语言' }));
+    expect(switcher.getByRole('button', { name: '中文' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.type(screen.getByLabelText('参与者姓名'), 'Ada Snow');
+    act(() => pads[0]!.draw());
+
+    await user.click(switcher.getByRole('button', { name: 'English' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Release of liability and assumption of risk',
+      }),
+    ).toBeInTheDocument();
+    expect(new URL(window.location.href).searchParams.get('lang')).toBe('en');
+    expect(screen.getByLabelText('Participant name')).toHaveValue('Ada Snow');
+    expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.type(screen.getByLabelText('Email'), 'ada@example.com');
+    await user.click(
+      screen.getByRole('checkbox', { name: /I have read and agree/ }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+
+    await screen.findByText('Signed, a copy has been emailed to you.');
+    expect(sent[0]).toMatchObject({
+      lang: 'en',
+      signatures: { participant_signature: PNG },
+    });
   });
 
   it.each([

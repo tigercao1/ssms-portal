@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { SignLang } from './api';
 import { SIGN_MESSAGES } from './messages';
 import { useParentHeight } from './parentHeight';
@@ -26,12 +26,25 @@ export function SignApp({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   useParentHeight(rootRef);
-  const { slug, lang, returnUrl } = parseSignLocation(location);
+  const [initial] = useState(() => parseSignLocation(location));
+  const { slug, returnUrl } = initial;
+  const [lang, setLang] = useState(initial.lang);
+  const changeLang = (next: SignLang) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', next);
+    window.history.replaceState(window.history.state, '', url);
+    setLang(next);
+  };
   return (
     <div ref={rootRef} lang={SIGN_MESSAGES[lang].htmlLang}>
       <main className="mx-auto w-full max-w-xl px-4 py-6 sm:px-6">
         {slug ? (
-          <WaiverPage slug={slug} lang={lang} returnUrl={returnUrl} />
+          <WaiverPage
+            slug={slug}
+            lang={lang}
+            returnUrl={returnUrl}
+            onLangChange={changeLang}
+          />
         ) : (
           <p role="alert" className="py-10 text-center">
             {SIGN_MESSAGES[lang].notFound}

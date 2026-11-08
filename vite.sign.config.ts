@@ -16,7 +16,7 @@ const SIGN_CONTENT = [
 const MOCK_API_PATH = '/mock-api';
 const MOCK_SUBMIT_STATUS: Record<string, number> = {
   stale: 409,
-  invalid: 422,
+  invalid: 400,
   throttled: 429,
 };
 
@@ -47,7 +47,11 @@ function signMockApi(): Plugin {
           });
         const status = MOCK_SUBMIT_STATUS[slug];
         return status
-          ? send(status, { message: 'Mock error' })
+          ? send(status, {
+              statusCode: status,
+              message: 'Field Email (email) must be an email',
+              error: 'Mock error',
+            })
           : send(201, { status: 'signed', emailed: true });
       });
     },

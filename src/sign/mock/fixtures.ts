@@ -50,7 +50,7 @@ const BODY: Record<SignLang, { title: string; bodyMarkdown: string }> = {
       '- I take part voluntarily and accept these risks.',
       '- I will follow my instructor and the resort rules.',
       '- I am in good health to take part in lessons.',
-      'Questions? See [our FAQ](https://ssnow.club/pages/faq).',
+      'Questions? See our FAQ at https://ssnow.club/pages/faq.',
     ].join('\n\n'),
   },
   zh: {
@@ -62,7 +62,7 @@ const BODY: Record<SignLang, { title: string; bodyMarkdown: string }> = {
       '- 我自愿参加并接受上述风险。',
       '- 我会听从教练指导并遵守雪场规定。',
       '- 我的身体状况适合参加课程。',
-      '有疑问？请查看[常见问题](https://ssnow.club/pages/faq)。',
+      '有疑问？请查看常见问题：https://ssnow.club/pages/faq',
     ].join('\n\n'),
   },
 };

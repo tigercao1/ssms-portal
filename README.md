@@ -70,7 +70,7 @@ posts `{ type: 'ssnow-sign-height', height }` to `https://ssnow.club` whenever
 its height changes.
 
 `npm run dev:sign` serves it at http://localhost:5174 against a built-in mock API
-(the slugs `missing`, `stale`, `invalid` and `throttled` return 404, 409, 422 and
+(the slugs `missing`, `stale`, `invalid` and `throttled` return 404, 409, 400 and
 429). `npm run build:sign` builds it to `dist-sign/`.
 
 ## Changes that span the API

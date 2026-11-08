@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import SignaturePad, { type PointGroup } from 'signature_pad';
 import type { SignMessages } from './messages';
+import { exportSignaturePng } from './signatureExport';
 
 interface SignaturePadFieldProps {
   label: string;
   text: SignMessages;
   invalid: boolean;
-  onChange: (png: string | null) => void;
+  onChange: (png: string | null, tooLarge: boolean) => void;
 }
 
 interface CanvasSize {
   width: number;
   height: number;
   ratio: number;
+}
+
+function emitSignature(
+  pad: SignaturePad,
+  canvas: HTMLCanvasElement,
+  onChange: SignaturePadFieldProps['onChange'],
+) {
+  if (pad.isEmpty()) return onChange(null, false);
+  const png = exportSignaturePng(canvas);
+  onChange(png, png === null);
 }
 
 function scaleGroups(groups: PointGroup[], factor: number): PointGroup[] {
@@ -54,7 +65,7 @@ export function SignaturePadField({
     const emit = () => {
       setStrokes(pad.toData().length);
       setRedoable(redoRef.current.length);
-      onChangeRef.current(pad.isEmpty() ? null : pad.toDataURL('image/png'));
+      emitSignature(pad, canvas, onChangeRef.current);
     };
     const startStroke = () => {
       redoRef.current = [];
@@ -109,12 +120,13 @@ export function SignaturePadField({
 
   const replaceStrokes = (data: PointGroup[]) => {
     const pad = padRef.current;
-    if (!pad) return;
+    const canvas = canvasRef.current;
+    if (!pad || !canvas) return;
     pad.fromData(data);
     if (!data.length) pad.clear();
     setStrokes(data.length);
     setRedoable(redoRef.current.length);
-    onChangeRef.current(data.length ? pad.toDataURL('image/png') : null);
+    emitSignature(pad, canvas, onChangeRef.current);
   };
 
   const undo = () => {

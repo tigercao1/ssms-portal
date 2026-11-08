@@ -8,6 +8,11 @@ export interface SignMessages {
   retry: string;
   required: (label: string) => string;
   invalidEmail: string;
+  tooLong: (label: string, max: number) => string;
+  notAccepted: (label: string) => string;
+  signatureTooLarge: string;
+  payloadTooLarge: string;
+  language: string;
   signatureRequired: (label: string) => string;
   optional: string;
   signHere: (label: string) => string;
@@ -38,6 +43,13 @@ const en: SignMessages = {
   retry: 'Try again',
   required: (label) => `${label} is required.`,
   invalidEmail: 'Enter a valid email address.',
+  tooLong: (label, max) => `${label} must be ${max} characters or fewer.`,
+  notAccepted: (label) => `${label} was not accepted. Please check it.`,
+  signatureTooLarge:
+    'This signature is too detailed to save. Please clear it and sign again.',
+  payloadTooLarge:
+    'Your signatures are too large to send together. Please clear one and sign it again.',
+  language: 'Language',
   signatureRequired: (label) => `Please sign in the ${label} box.`,
   optional: 'optional',
   signHere: (label) => `${label}, draw your signature here`,
@@ -70,6 +82,11 @@ const zh: SignMessages = {
   retry: '重试',
   required: (label) => `请填写${label}。`,
   invalidEmail: '请输入有效的电子邮箱地址。',
+  tooLong: (label, max) => `${label}不能超过${max}个字符。`,
+  notAccepted: (label) => `“${label}”未通过校验，请检查。`,
+  signatureTooLarge: '此签名过于复杂，无法保存。请清除后重新签名。',
+  payloadTooLarge: '签名数据过大，无法一起提交。请清除其中一个签名后重新签名。',
+  language: '语言',
   signatureRequired: (label) => `请在“${label}”框内签名。`,
   optional: '选填',
   signHere: (label) => `${label}，请在此处签名`,

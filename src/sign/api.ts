@@ -42,6 +42,7 @@ export class SignApiError extends Error {
   constructor(
     readonly kind: SignErrorKind,
     readonly status: number,
+    readonly reasons: string[] = [],
   ) {
     super(`Sign API request failed with ${status}`);
     this.name = 'SignApiError';
@@ -49,11 +50,24 @@ export class SignApiError extends Error {
 }
 
 const KIND_BY_STATUS: Record<number, SignErrorKind> = {
+  400: 'invalid',
   404: 'not_found',
   409: 'stale',
   422: 'invalid',
   429: 'throttled',
 };
+
+async function errorReasons(res: Response): Promise<string[]> {
+  try {
+    const { message } = (await res.json()) as { message?: unknown };
+    const messages = Array.isArray(message) ? message : [message];
+    return messages.filter(
+      (item): item is string => typeof item === 'string' && item.trim() !== '',
+    );
+  } catch {
+    return [];
+  }
+}
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -69,7 +83,11 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     throw new SignApiError('failed', 0);
   }
   if (!res.ok)
-    throw new SignApiError(KIND_BY_STATUS[res.status] ?? 'failed', res.status);
+    throw new SignApiError(
+      KIND_BY_STATUS[res.status] ?? 'failed',
+      res.status,
+      await errorReasons(res),
+    );
   return (await res.json()) as T;
 }
 

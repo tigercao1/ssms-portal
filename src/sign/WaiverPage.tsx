@@ -25,6 +25,12 @@ interface WaiverPageProps {
   slug: string;
   lang: SignLang;
   returnUrl: string | null;
+  onLangChange: (lang: SignLang) => void;
+}
+
+interface Notice {
+  message: string;
+  reasons: string[];
 }
 
 type LoadState =
@@ -34,6 +40,12 @@ type LoadState =
   | { status: 'signed'; emailed: boolean };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_ANSWER_LENGTH = 500;
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const LANGUAGES: { lang: SignLang; label: string }[] = [
+  { lang: 'en', label: 'English' },
+  { lang: 'zh', label: '中文' },
+];
 
 const SUBMIT_NOTICE: Partial<
   Record<SignErrorKind, 'stale' | 'invalid' | 'throttled'>
@@ -47,6 +59,10 @@ function errorKind(error: unknown): SignErrorKind {
   return error instanceof SignApiError ? error.kind : 'failed';
 }
 
+function errorReasons(error: unknown): string[] {
+  return error instanceof SignApiError ? error.reasons : [];
+}
+
 function fieldId(key: string) {
   return `field-${key}`;
 }
@@ -55,35 +71,45 @@ function validate(
   fields: SignField[],
   answers: Record<string, string>,
   signatures: Record<string, string | null>,
+  oversized: Record<string, boolean>,
   text: SignMessages,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const field of fields) {
     if (field.type === 'signature') {
-      if (field.required && !signatures[field.key])
+      if (oversized[field.key]) errors[field.key] = text.signatureTooLarge;
+      else if (field.required && !signatures[field.key])
         errors[field.key] = text.signatureRequired(field.label);
       continue;
     }
     const value = (answers[field.key] ?? '').trim();
     if (field.required && !value)
       errors[field.key] = text.required(field.label);
+    else if ([...value].length > MAX_ANSWER_LENGTH)
+      errors[field.key] = text.tooLong(field.label, MAX_ANSWER_LENGTH);
     else if (field.type === 'email' && value && !EMAIL.test(value))
       errors[field.key] = text.invalidEmail;
   }
   return errors;
 }
 
-export function WaiverPage({ slug, lang, returnUrl }: WaiverPageProps) {
+export function WaiverPage({
+  slug,
+  lang,
+  returnUrl,
+  onLangChange,
+}: WaiverPageProps) {
   const text = SIGN_MESSAGES[lang];
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [signatures, setSignatures] = useState<Record<string, string | null>>(
     {},
   );
+  const [oversized, setOversized] = useState<Record<string, boolean>>({});
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [consentError, setConsentError] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const signedRef = useRef<HTMLHeadingElement>(null);
 
@@ -130,21 +156,38 @@ export function WaiverPage({ slug, lang, returnUrl }: WaiverPageProps) {
     setErrors(({ [key]: _cleared, ...rest }) => rest);
   };
 
-  const setSignature = (key: string, png: string | null) => {
+  const setSignature = (key: string, png: string | null, tooLarge: boolean) => {
     setSignatures((current) => ({ ...current, [key]: png }));
-    if (png) setErrors(({ [key]: _cleared, ...rest }) => rest);
+    setOversized((current) => ({ ...current, [key]: tooLarge }));
+    if (tooLarge)
+      setErrors((current) => ({ ...current, [key]: text.signatureTooLarge }));
+    else if (png) setErrors(({ [key]: _cleared, ...rest }) => rest);
+  };
+
+  const switchLang = (next: SignLang) => {
+    if (next === lang) return;
+    setErrors({});
+    setConsentError(false);
+    setNotice(null);
+    onLangChange(next);
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (state.status !== 'ready' || submitting) return;
     const { form } = state;
-    const nextErrors = validate(form.fields, answers, signatures, text);
+    const nextErrors = validate(
+      form.fields,
+      answers,
+      signatures,
+      oversized,
+      text,
+    );
     setErrors(nextErrors);
     setConsentError(!consent);
     const firstInvalid = form.fields.find((field) => nextErrors[field.key]);
     if (firstInvalid || !consent) {
-      setNotice(text.fixErrors);
+      setNotice({ message: text.fixErrors, reasons: [] });
       document
         .getElementById(firstInvalid ? fieldId(firstInvalid.key) : 'consent')
         ?.focus();
@@ -161,21 +204,36 @@ export function WaiverPage({ slug, lang, returnUrl }: WaiverPageProps) {
         if (value) answerValues[field.key] = value;
       }
     }
+    const body = {
+      lang: form.lang,
+      version: form.version,
+      answers: answerValues,
+      signatures: signatureValues,
+      consent: true as const,
+    };
+    if (
+      new TextEncoder().encode(JSON.stringify(body)).length > MAX_BODY_BYTES
+    ) {
+      setNotice({ message: text.payloadTooLarge, reasons: [] });
+      return;
+    }
     setNotice(null);
     setSubmitting(true);
     try {
-      const result = await completeSignForm(slug, {
-        lang,
-        version: form.version,
-        answers: answerValues,
-        signatures: signatureValues,
-        consent: true,
-      });
+      const result = await completeSignForm(slug, body);
       setState({ status: 'signed', emailed: result.emailed });
     } catch (error) {
       const kind = errorKind(error);
       const key = SUBMIT_NOTICE[kind];
-      setNotice(key ? text[key] : text.submitFailed);
+      const reasons = kind === 'invalid' ? errorReasons(error) : [];
+      setNotice({ message: key ? text[key] : text.submitFailed, reasons });
+      if (reasons.length) {
+        const rejected: Record<string, string> = {};
+        for (const field of form.fields)
+          if (reasons.some((reason) => reason.includes(`(${field.key})`)))
+            rejected[field.key] = text.notAccepted(field.label);
+        setErrors(rejected);
+      }
       if (kind === 'stale') await load();
     } finally {
       setSubmitting(false);
@@ -236,6 +294,24 @@ export function WaiverPage({ slug, lang, returnUrl }: WaiverPageProps) {
   const { form } = state;
   return (
     <form noValidate onSubmit={submit} className="flex flex-col gap-6">
+      <div
+        role="group"
+        aria-label={text.language}
+        className="flex justify-end gap-1"
+      >
+        {LANGUAGES.map((option) => (
+          <button
+            key={option.lang}
+            type="button"
+            lang={option.lang}
+            aria-pressed={option.lang === lang}
+            onClick={() => switchLang(option.lang)}
+            className={`min-h-11 rounded-md px-3 text-sm font-medium ${option.lang === lang ? 'bg-navy text-white' : 'text-navy hover:bg-navy-tint'}`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       <h1 className="text-2xl leading-tight">{form.title}</h1>
       <Markdown source={form.bodyMarkdown} />
       <div className="flex flex-col gap-5 border-t border-grey pt-5">
@@ -271,7 +347,9 @@ export function WaiverPage({ slug, lang, returnUrl }: WaiverPageProps) {
                     label={field.label}
                     text={text}
                     invalid={Boolean(error)}
-                    onChange={(png) => setSignature(field.key, png)}
+                    onChange={(png, tooLarge) =>
+                      setSignature(field.key, png, tooLarge)
+                    }
                   />
                 </div>
               ) : (
@@ -330,7 +408,12 @@ export function WaiverPage({ slug, lang, returnUrl }: WaiverPageProps) {
           role="alert"
           className="rounded-md bg-red-tint px-3 py-2 text-sm text-ink"
         >
-          {notice}
+          {notice.message}
+          {notice.reasons.map((reason) => (
+            <span key={reason} className="mt-1 block text-slate">
+              {reason}
+            </span>
+          ))}
         </p>
       )}
       <button

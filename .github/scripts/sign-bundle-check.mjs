@@ -1,5 +1,3 @@
-// Fails when the signing site build (dist-sign) contains portal code: auth, analytics, the PDF viewer, routing or portal routes.
-
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
