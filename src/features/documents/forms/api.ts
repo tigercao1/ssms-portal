@@ -234,6 +234,14 @@ export function useFormSync() {
   };
 }
 
+function useRefreshOnConflict(id: string) {
+  const qc = useQueryClient();
+  return (err: unknown) => {
+    if (err instanceof ApiError && err.status === 409)
+      void qc.invalidateQueries({ queryKey: formsKeys.form(id) });
+  };
+}
+
 export function useCreateForm() {
   const sync = useFormSync();
   return useMutation({
@@ -245,25 +253,30 @@ export function useCreateForm() {
 
 export function useUpdateForm(id: string) {
   const sync = useFormSync();
+  const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationFn: (body: FormPatch) =>
       api<FormTemplate>(formPath(id), { method: 'PATCH', body }),
     onSuccess: sync,
+    onError: refresh,
   });
 }
 
 export function useSaveFormDraft(id: string, lang: DocumentLanguage) {
   const sync = useDraftSync(id, lang);
+  const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
     mutationFn: (body: FormDraft & FormRevision) =>
       api<FormTemplate>(versionPath(id, lang), { method: 'PUT', body }),
     onSuccess: sync,
+    onError: refresh,
   });
 }
 
 export function usePublishForm(id: string, lang: DocumentLanguage) {
   const sync = useDraftSync(id, lang);
+  const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationKey: formsKeys.writes(id, lang),
     mutationFn: (expectedUpdatedAt: string) =>
@@ -272,11 +285,13 @@ export function usePublishForm(id: string, lang: DocumentLanguage) {
         body: { expectedUpdatedAt },
       }),
     onSuccess: sync,
+    onError: refresh,
   });
 }
 
 export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
+  const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationFn: async (file: File) => {
       if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name))
@@ -293,22 +308,26 @@ export function useUploadFormPdf(id: string, lang: DocumentLanguage) {
       });
     },
     onSuccess: sync,
+    onError: refresh,
   });
 }
 
 export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
+  const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationFn: () =>
       api<FormTemplate>(`${versionPath(id, lang)}/source`, {
         method: 'DELETE',
       }),
     onSuccess: sync,
+    onError: refresh,
   });
 }
 
 export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
   const sync = useFormSync();
+  const refresh = useRefreshOnConflict(id);
   return useMutation({
     mutationFn: (placements: FormPlacement[]) =>
       api<FormTemplate>(`${versionPath(id, lang)}/placements`, {
@@ -316,5 +335,6 @@ export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
         body: { placements },
       }),
     onSuccess: sync,
+    onError: refresh,
   });
 }

@@ -279,6 +279,36 @@ describe('Original PDF on a signing form', () => {
     ).toBeVisible();
   });
 
+  it('reloads the form when the draft changed meanwhile', async () => {
+    attachPdf();
+    const user = await openChinese();
+    server.use(
+      http.delete(
+        'http://localhost:3000/admin/documents/forms/:id/versions/:lang/source',
+        () =>
+          HttpResponse.json(
+            {
+              statusCode: 409,
+              message:
+                'This form was changed by someone else; reload it and try again',
+            },
+            { status: 409 },
+          ),
+      ),
+    );
+    state.forms[0]!.languages.zh.published = state.forms[0]!.languages.zh.draft;
+    state.forms[0]!.languages.zh.draft = null;
+
+    await user.click(screen.getByRole('button', { name: 'Remove PDF' }));
+    await user.click(screen.getByRole('button', { name: 'Remove PDF' }));
+
+    expect(
+      await screen.findByText(
+        'Save a draft in this language to attach or change its PDF.',
+      ),
+    ).toBeVisible();
+  });
+
   it('shows a published PDF read-only until there is a draft', async () => {
     state.forms[0]!.languages.en.published!.originalPdf = fakeOriginalPdf();
     state.forms[0]!.languages.en.published!.placements = [
