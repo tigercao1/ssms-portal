@@ -26,7 +26,7 @@ import { useTeachingLocations } from '@/features/reference/api';
 import { useAdminInstructors } from '../api';
 import { errorText } from '../LessonTypesPage';
 import { useLessonTypes } from '../lessonsApi';
-import { AvailabilityGrid, type SlotChoice } from './AvailabilityGrid';
+import { SlotPicker, type SlotChoice } from './SlotPicker';
 import {
   useAvailability,
   useCreateBooking,
@@ -39,7 +39,9 @@ import {
   type PickedCustomer,
 } from './BookingParts';
 import {
+  addMinutes,
   formatSchoolDateTime,
+  formatSchoolTime,
   nextWeekday,
   schoolInstant,
   schoolParts,
@@ -79,6 +81,7 @@ export function BookLessonPage() {
   const [date, setDate] = useState(today);
   const [mode, setMode] = useState<Mode>('grid');
   const [slot, setSlot] = useState<SlotChoice | null>(null);
+  const [instructorId, setInstructorId] = useState<string | null>(null);
   const [preferred, setPreferred] = useState<Preferred | null>(null);
   const [booked, setBooked] = useState<AdminClass[] | null>(null);
   const [editing, setEditing] = useState<DraftBooking | null>(null);
@@ -104,6 +107,7 @@ export function BookLessonPage() {
       }
       setMode('grid');
       setSlot(null);
+      setInstructorId(null);
       setDate(nextWeekday(today, previous.weekday));
       setPreferred({
         instructorId: previous.instructorId,
@@ -120,6 +124,7 @@ export function BookLessonPage() {
     const match = row?.freeSlots.find(
       (s) => schoolParts(s).time === preferred.time,
     );
+    if (row && row.freeSlots.length > 0) setInstructorId(row.instructorId);
     if (row && match)
       setSlot({ instructorId: row.instructorId, startsAt: match });
     setPreferred(null);
@@ -158,6 +163,7 @@ export function BookLessonPage() {
     } else {
       setMode('grid');
       setDate(schoolParts(row.startsAt).date);
+      setInstructorId(row.instructorId);
       setSlot({ instructorId: row.instructorId, startsAt: row.startsAt });
     }
     top.current?.scrollIntoView?.({ block: 'start' });
@@ -185,6 +191,7 @@ export function BookLessonPage() {
               onClick={() => {
                 setMode(m);
                 reset();
+                setInstructorId(null);
                 setEditing(null);
               }}
               className={cn(
@@ -342,12 +349,17 @@ export function BookLessonPage() {
                 {errorText(availability.error, t.errors.generic)}
               </Banner>
             ) : availability.data ? (
-              <AvailabilityGrid
+              <SlotPicker
                 availability={availability.data}
+                instructorId={instructorId}
+                onInstructor={(id) => {
+                  setInstructorId(id);
+                  setSlot(null);
+                }}
                 selected={slot}
                 onSelect={(choice) => {
                   setSlot(choice);
-                  setBooked(null);
+                  if (choice) setBooked(null);
                 }}
               />
             ) : null}
@@ -518,7 +530,11 @@ function ConfirmBooking({
           <dd className="text-ink">{instructorName}</dd>
           <dt className="text-slate">{t.booking.summaryWhen}</dt>
           <dd className="text-ink">
-            {formatSchoolDateTime(startsAt, locale)}
+            {formatSchoolDateTime(startsAt, locale)}–
+            {formatSchoolTime(
+              addMinutes(startsAt, lessonType.durationMin),
+              locale,
+            )}
             {repeat > 1 &&
               ` · ${t.booking.repeatSummary.replace('{n}', String(repeat))}`}
           </dd>
