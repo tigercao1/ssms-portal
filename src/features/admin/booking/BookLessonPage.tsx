@@ -1,569 +1,375 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
 import { useSession } from '@/auth/SessionProvider';
-import { useLocale, useT } from '@/i18n/core/I18nProvider';
-import { localizeField } from '@/i18n/core/localize';
-import {
-  Banner,
-  Button,
-  Card,
-  Field,
-  Input,
-  Select,
-  Spinner,
-  Textarea,
-} from '@/components';
-import { cn } from '@/lib/cn';
-import type { AdminClass, LessonType } from '@/lib/types';
-import { useTeachingLocations } from '@/features/reference/api';
-import { useAdminInstructors } from '../api';
+import { useT } from '@/i18n/core/I18nProvider';
+import { Banner, Button, Card, Field, Select } from '@/components';
+import { ApiError } from '@/lib/api';
+import type { AdminClass } from '@/lib/types';
 import { errorText } from '../LessonTypesPage';
-import { useLessonTypes } from '../lessonsApi';
-import { SlotPicker, type SlotChoice } from './SlotPicker';
+import { useBookBatch, useCreateBooking } from './bookingApi';
+import { BookingErrorBanner, Dialog } from './BookingParts';
 import {
-  useAvailability,
-  useCreateBooking,
-  fetchLastClass,
-} from './bookingApi';
-import {
-  BookingErrorBanner,
-  CustomerPicker,
-  pickedName,
-  type PickedCustomer,
-} from './BookingParts';
-import {
-  addMinutes,
-  formatSchoolDateTime,
-  formatSchoolTime,
-  nextWeekday,
-  schoolInstant,
-  schoolParts,
-} from './bookingRules';
-import { BookingDraftList } from './BookingDraftList';
+  BookedCardLine,
+  CardEditor,
+  CardSummary,
+  gapsText,
+} from './BookingCard';
 import {
   MAX_DRAFTS,
+  blankCard,
+  cardGaps,
+  newId,
+  toBatchRow,
+  toCreateInput,
   useBookingDrafts,
-  type DraftBooking,
-  type DraftInput,
+  type DraftCard,
 } from './bookingDrafts';
+import { schoolParts } from './bookingRules';
 import { BookingSettingsCard } from './BookingSettingsCard';
 import { SyncToastHost } from './CalendarSync';
-import type { BookableStatus, CreateBookingInput } from './types';
-
-type Mode = 'grid' | 'past';
-
-interface InstructorRef {
-  id: string;
-  nameEn: string;
-  nameZh: string | null;
-}
-
-interface Preferred {
-  instructorId: string;
-  time: string;
-}
 
 const REPEAT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+interface BookedCard {
+  card: DraftCard;
+  classes: AdminClass[];
+}
+
+interface Outcome {
+  booked: BookedCard[];
+  failed: number;
+}
+
+function provesNothingBooked(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 400;
+}
+
 export function BookLessonPage() {
   const t = useT();
-  const { locale } = useLocale();
   const today = schoolParts(Date.now()).date;
-  const [customers, setCustomers] = useState<PickedCustomer[]>([]);
-  const [lessonTypeId, setLessonTypeId] = useState('');
-  const [date, setDate] = useState(today);
-  const [mode, setMode] = useState<Mode>('grid');
-  const [slot, setSlot] = useState<SlotChoice | null>(null);
-  const [instructorId, setInstructorId] = useState<string | null>(null);
-  const [preferred, setPreferred] = useState<Preferred | null>(null);
-  const [booked, setBooked] = useState<AdminClass[] | null>(null);
-  const [editing, setEditing] = useState<DraftBooking | null>(null);
-  const top = useRef<HTMLDivElement>(null);
+  const now = Date.now();
   const { user } = useSession();
   const drafts = useBookingDrafts(user?.id ?? 'anonymous');
-  const listFull = drafts.rows.length >= MAX_DRAFTS;
-  const lessonTypes = useLessonTypes();
-  const activeTypes = (lessonTypes.data ?? []).filter((l) => l.active);
-  const lessonType = activeTypes.find((l) => l.id === lessonTypeId) ?? null;
-  const availability = useAvailability(
-    mode === 'grid' && lessonTypeId && date ? { date, lessonTypeId } : null,
-  );
-  const last = useMutation({
-    mutationFn: (customerId: string) => fetchLastClass(customerId),
-    onSuccess: ({ last: previous }) => {
-      if (!previous) return;
-      if (
-        previous.lessonTypeId &&
-        activeTypes.some((l) => l.id === previous.lessonTypeId)
-      ) {
-        setLessonTypeId(previous.lessonTypeId);
-      }
-      setMode('grid');
-      setSlot(null);
-      setInstructorId(null);
-      setDate(nextWeekday(today, previous.weekday));
-      setPreferred({
-        instructorId: previous.instructorId,
-        time: previous.time,
-      });
-    },
+  const { outcomeUnknown, batchId, update, edit, clear } = drafts;
+  const [blank, setBlank] = useState(() => blankCard(today));
+  const cards = drafts.cards.length > 0 ? drafts.cards : [blank];
+  const [openId, setOpenId] = useState<string | null>(() => {
+    if (cards.length === 1) return cards[0]?.id ?? null;
+    return cards.find((c) => cardGaps(c, now).length > 0)?.id ?? null;
   });
+  const [focus, setFocus] = useState<{ target: string; seq: number } | null>(
+    null,
+  );
+  const [repeat, setRepeat] = useState(1);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
+  const [firstSend, setFirstSend] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const sending = useRef(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const create = useCreateBooking();
+  const batch = useBookBatch();
 
-  useEffect(() => {
-    if (!preferred || !availability.data) return;
-    const row = availability.data.instructors.find(
-      (i) => i.instructorId === preferred.instructorId,
-    );
-    const match = row?.freeSlots.find(
-      (s) => schoolParts(s).time === preferred.time,
-    );
-    if (row && row.freeSlots.length > 0) setInstructorId(row.instructorId);
-    if (row && match)
-      setSlot({ instructorId: row.instructorId, startsAt: match });
-    setPreferred(null);
-  }, [preferred, availability.data]);
+  const busy = batch.isPending || create.isPending;
+  const frozen = outcomeUnknown || busy;
+  const locked = outcomeUnknown && !firstSend;
+  const open = outcomeUnknown || batch.isPending ? null : openId;
+  const gaps = new Map(cards.map((c) => [c.id, cardGaps(c, now)]));
+  const incomplete = cards
+    .map((card, index) => ({ card, index, gaps: gaps.get(card.id) ?? [] }))
+    .filter((c) => c.gaps.length > 0);
+  const single = cards.length === 1;
+  const singleCard = single ? cards[0] : undefined;
+  const canRepeat = !outcomeUnknown && singleCard?.mode === 'grid';
+  const tooMany = cards.length > MAX_DRAFTS;
+  const full = cards.length >= MAX_DRAFTS;
+  const ready = incomplete.length === 0 && !tooMany;
+  if (!canRepeat && repeat !== 1) setRepeat(1);
 
-  const chosenRow = slot
-    ? availability.data?.instructors.find(
-        (i) => i.instructorId === slot.instructorId,
-      )
-    : undefined;
-  const lastResult = last.data;
+  const patch = useCallback(
+    (id: string, change: Partial<DraftCard>) =>
+      edit((stored) =>
+        (stored.length > 0 ? stored : [blank]).map((c) =>
+          c.id === id ? { ...c, ...change, id, error: undefined } : c,
+        ),
+      ),
+    [edit, blank],
+  );
 
-  function reset() {
-    setSlot(null);
+  function focusOn(target: string) {
+    setFocus((f) => ({ target, seq: (f?.seq ?? 0) + 1 }));
   }
 
-  function listed(input: DraftInput) {
-    if (editing) drafts.replace(editing.id, input);
-    else drafts.add(input);
-    setEditing(null);
-    setSlot(null);
-    setBooked(null);
-    setCustomers([]);
-    last.reset();
+  const focusToken = (target: string) =>
+    focus?.target === target ? focus.seq : 0;
+
+  function freshCard(from?: DraftCard) {
+    const next = blankCard(today, from);
+    setBlank(next);
+    setOpenId(next.id);
+    return next;
   }
 
-  function startEdit(row: DraftBooking) {
-    setEditing(row);
-    setBooked(null);
-    setCustomers(row.customers);
-    setLessonTypeId(row.lessonTypeId);
-    last.reset();
-    if (row.status) {
-      setMode('past');
-      setSlot(null);
+  function showStatus() {
+    statusRef.current?.focus();
+  }
+
+  function addCard() {
+    if (frozen || full) return;
+    const next = blankCard(today, cards.at(-1));
+    edit((stored) => [...(stored.length > 0 ? stored : [blank]), next]);
+    setOpenId(next.id);
+    focusOn(`edit:${next.id}`);
+  }
+
+  function removeCard(id: string) {
+    if (frozen) return;
+    const rest = cards.filter((c) => c.id !== id);
+    edit((stored) => stored.filter((c) => c.id !== id));
+    if (rest.length === 0) {
+      const next = freshCard();
+      focusOn(`edit:${next.id}`);
     } else {
-      setMode('grid');
-      setDate(schoolParts(row.startsAt).date);
-      setInstructorId(row.instructorId);
-      setSlot({ instructorId: row.instructorId, startsAt: row.startsAt });
+      if (openId === id) setOpenId(null);
+      focusOn('add');
     }
-    top.current?.scrollIntoView?.({ block: 'start' });
   }
 
-  function stopEdit() {
-    setEditing(null);
-    setSlot(null);
+  function openCard(id: string) {
+    setOpenId(id);
+    focusOn(`edit:${id}`);
   }
 
-  const lessonHeader = (
-    <>
-      <h2 className="text-lg">{t.booking.lessonStep}</h2>
-      <div className="flex flex-col gap-1.5">
-        <div
-          role="group"
-          aria-label={t.booking.modeLabel}
-          className="grid w-full grid-cols-2 overflow-hidden rounded-md border border-navy sm:inline-grid sm:w-fit"
-        >
-          {(['grid', 'past'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              onClick={() => {
-                setMode(m);
-                reset();
-                setInstructorId(null);
-                setEditing(null);
-              }}
-              className={cn(
-                'min-h-11 px-4 py-1 text-sm leading-tight transition-colors',
-                m === 'past' && 'border-l border-navy',
-                mode === m
-                  ? 'bg-navy text-white'
-                  : 'text-navy hover:bg-navy-tint',
-              )}
-            >
-              {m === 'grid' ? t.booking.modeGrid : t.booking.modePast}
-            </button>
-          ))}
-        </div>
-        {mode === 'past' && (
-          <p className="text-sm text-slate">{t.booking.pastBody}</p>
-        )}
-      </div>
-    </>
-  );
+  function foldCard(id: string) {
+    setOpenId(null);
+    focusOn(`fold:${id}`);
+  }
 
-  const lessonTypeField = (
-    <Field label={t.booking.lessonType}>
-      {(p) => (
-        <Select
-          {...p}
-          value={lessonTypeId}
-          onChange={(e) => {
-            setLessonTypeId(e.target.value);
-            reset();
-          }}
-        >
-          <option value="">{t.booking.chooseLessonType}</option>
-          {activeTypes.map((l) => (
-            <option key={l.id} value={l.id}>
-              {localizeField(l.nameEn, l.nameZh, locale)} ·{' '}
-              {t.lessons.minutes.replace('{n}', String(l.durationMin))}
-            </option>
-          ))}
-        </Select>
-      )}
-    </Field>
-  );
+  function bookOne(card: DraftCard) {
+    if (sending.current || create.isPending) return;
+    sending.current = true;
+    setOutcome(null);
+    setFailure(null);
+    create.mutate(toCreateInput(card, canRepeat ? repeat : 1), {
+      onSuccess: (classes) => {
+        edit((stored) => stored.filter((c) => c.id !== card.id));
+        freshCard(card);
+        setRepeat(1);
+        setOutcome({ booked: [{ card, classes }], failed: 0 });
+      },
+      onSettled: () => {
+        sending.current = false;
+        showStatus();
+      },
+    });
+  }
+
+  async function bookAll() {
+    if (sending.current || !batchId || tooMany) return;
+    const sent = drafts.cards;
+    if (sent.length === 0) return;
+    sending.current = true;
+    setFirstSend(!outcomeUnknown);
+    setOutcome(null);
+    setFailure(null);
+    create.reset();
+    update((cart) => ({ ...cart, outcomeUnknown: true }));
+    try {
+      const result = await batch.mutateAsync({
+        batchId,
+        bookings: sent.map(toBatchRow),
+      });
+      const byId = new Map(
+        result.results.flatMap((r) => {
+          const card = sent[r.index];
+          return card ? [[card.id, r] as const] : [];
+        }),
+      );
+      const booked = sent.flatMap((card) => {
+        const r = byId.get(card.id);
+        return r?.status === 'created' ? [{ card, classes: r.classes }] : [];
+      });
+      const remaining = sent.length - booked.length;
+      update((cart) => ({
+        ...cart,
+        outcomeUnknown: false,
+        batchId: booked.length > 0 ? newId() : cart.batchId,
+        cards: cart.cards.flatMap((card) => {
+          const r = byId.get(card.id);
+          if (r?.status === 'created') return [];
+          if (r?.status === 'failed')
+            return [{ ...card, error: { code: r.code, message: r.message } }];
+          return [card];
+        }),
+      }));
+      if (remaining === 0) freshCard(sent.at(-1));
+      else setOpenId(null);
+      setOutcome({ booked, failed: remaining });
+    } catch (error) {
+      if (provesNothingBooked(error))
+        update((cart) => ({ ...cart, outcomeUnknown: false }));
+      setFailure(error);
+    } finally {
+      sending.current = false;
+      setFirstSend(false);
+      showStatus();
+    }
+  }
+
+  function commit() {
+    if (!ready || busy) return;
+    if (single && singleCard && !outcomeUnknown) bookOne(singleCard);
+    else void bookAll();
+  }
+
+  const commitLabel =
+    single && !outcomeUnknown
+      ? singleCard?.mode === 'past'
+        ? t.booking.savePast
+        : t.booking.book
+      : t.booking.bookAll.replace('{n}', String(cards.length));
+  const bookedCount = outcome?.booked.reduce((n, b) => n + b.classes.length, 0);
 
   return (
-    <div ref={top} className="flex flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl">{t.booking.title}</h1>
         <p className="max-w-3xl text-slate">{t.booking.intro}</p>
       </div>
       <SyncToastHost />
 
-      {booked && (
-        <Banner tone="approved" title={t.booking.bookedTitle}>
-          <p>
-            {t.booking.bookedBody
-              .replace('{count}', String(booked.length))
-              .replace(
-                '{when}',
-                booked[0]
-                  ? formatSchoolDateTime(booked[0].startsAt, locale)
-                  : '',
-              )}{' '}
-            <Link to="/admin/classes" className="underline">
-              {t.booking.viewClasses}
-            </Link>
-          </p>
-        </Banner>
+      {outcome && outcome.booked.length > 0 && (
+        <ul
+          aria-label={t.booking.bookedListLabel}
+          className="flex flex-col gap-2"
+        >
+          {outcome.booked.map((b) => (
+            <BookedCardLine
+              key={`booked-${b.card.id}`}
+              card={b.card}
+              classes={b.classes}
+            />
+          ))}
+        </ul>
       )}
 
-      <Card className="flex flex-col gap-4">
-        <h2 className="text-lg">{t.booking.customerStep}</h2>
-        <CustomerPicker
-          selected={customers}
-          onChange={(next) => {
-            setCustomers(next);
-            last.reset();
-          }}
-        />
-        {customers[0] && (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="secondary"
-              loading={last.isPending}
-              onClick={() => customers[0] && last.mutate(customers[0].id)}
+      <div className="flex min-w-0 flex-col gap-4">
+        {cards.map((card, index) =>
+          card.id === open ? (
+            <CardEditor
+              key={card.id}
+              card={card}
+              number={index + 1}
+              gaps={gaps.get(card.id) ?? []}
+              today={today}
+              focusFirst={focusToken(`edit:${card.id}`)}
+              onChange={(change) => patch(card.id, change)}
+              onFold={() => foldCard(card.id)}
+              onRemove={() => removeCard(card.id)}
+            />
+          ) : (
+            <CardSummary
+              key={card.id}
+              card={card}
+              number={index + 1}
+              gaps={gaps.get(card.id) ?? []}
+              disabled={frozen}
+              focusEdit={focusToken(`fold:${card.id}`)}
+              onEdit={() => openCard(card.id)}
+              onRemove={() => removeCard(card.id)}
+            />
+          ),
+        )}
+      </div>
+
+      <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
+        <div
+          ref={statusRef}
+          tabIndex={-1}
+          aria-live="polite"
+          className="flex flex-col gap-3 focus:outline-none"
+        >
+          {outcome && outcome.booked.length > 0 && (
+            <Banner
+              tone="approved"
+              title={t.booking.batchBookedTitle.replace(
+                '{n}',
+                String(bookedCount),
+              )}
             >
-              {t.booking.sameAsLast}
-            </Button>
-            {lastResult && !lastResult.last && (
-              <span className="text-sm text-slate">{t.booking.noHistory}</span>
-            )}
-            {lastResult?.last && (
-              <span data-private className="text-sm text-slate">
-                {t.booking.lastWas
-                  .replace(
-                    '{lesson}',
-                    localizeField(
-                      lastResult.last.lessonTypeNameEn,
-                      lastResult.last.lessonTypeNameZh,
-                      locale,
-                    ) || t.lessons.noLessonType,
-                  )
-                  .replace(
-                    '{instructor}',
-                    localizeField(
-                      lastResult.last.instructorName,
-                      lastResult.last.instructorNameZh,
-                      locale,
-                    ) || '—',
-                  )
-                  .replace(
-                    '{when}',
-                    formatSchoolDateTime(lastResult.last.startsAt, locale),
-                  )}
-              </span>
-            )}
-            {last.isError && (
-              <span className="text-sm text-status-rejected">
-                {errorText(last.error, t.errors.generic)}
-              </span>
-            )}
+              <Link to="/admin/classes" className="underline">
+                {t.booking.viewClasses}
+              </Link>
+            </Banner>
+          )}
+          {outcome && outcome.failed > 0 && (
+            <Banner tone="pending">
+              {t.booking.batchFailedSome.replace('{n}', String(outcome.failed))}
+            </Banner>
+          )}
+          {create.isError && <BookingErrorBanner error={create.error} />}
+          {locked ? (
+            <Banner tone="error">
+              <p>{t.booking.batchOffline}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() => void bookAll()}
+                >
+                  {t.booking.retry}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setConfirmClear(true)}
+                >
+                  {t.booking.discardList}
+                </Button>
+              </div>
+            </Banner>
+          ) : (
+            failure !== null && (
+              <Banner tone="error">
+                {errorText(failure, t.errors.generic)}
+              </Banner>
+            )
+          )}
+        </div>
+        {!outcomeUnknown && incomplete.length > 0 && (
+          <div className="flex flex-col gap-1 text-sm">
+            <p className="font-medium text-ink">{t.booking.cardsBlocked}</p>
+            <ul className="list-disc pl-5 text-slate">
+              {incomplete.map((c) => (
+                <li key={c.card.id} className="break-words">
+                  {t.booking.cardsBlockedLine
+                    .replace('{n}', String(c.index + 1))
+                    .replace('{items}', gapsText(t, c.gaps))}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-      </Card>
-
-      {mode === 'grid' ? (
-        <>
-          <Card className="flex flex-col gap-4">
-            {lessonHeader}
-            <div className="grid gap-4 sm:grid-cols-2">
-              {lessonTypeField}
-              <Field label={t.booking.date}>
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="date"
-                    min={today}
-                    value={date}
-                    onChange={(e) => {
-                      setDate(e.target.value);
-                      reset();
-                    }}
-                  />
-                )}
-              </Field>
-            </div>
-            {!lessonType ? (
-              <p className="text-sm text-slate">{t.booking.pickLessonFirst}</p>
-            ) : availability.isLoading ? (
-              <div className="flex justify-center py-10">
-                <Spinner />
-              </div>
-            ) : availability.isError ? (
-              <Banner tone="error">
-                {errorText(availability.error, t.errors.generic)}
-              </Banner>
-            ) : availability.data ? (
-              <SlotPicker
-                availability={availability.data}
-                instructorId={instructorId}
-                onInstructor={(id) => {
-                  setInstructorId(id);
-                  setSlot(null);
-                }}
-                selected={slot}
-                onSelect={(choice) => {
-                  setSlot(choice);
-                  if (choice) setBooked(null);
-                }}
-              />
-            ) : null}
-          </Card>
-          {slot && lessonType && (
-            <ConfirmBooking
-              key={`${editing?.id ?? 'new'}-${slot.instructorId}-${slot.startsAt}`}
-              customers={customers}
-              lessonType={lessonType}
-              instructor={
-                chosenRow
-                  ? {
-                      id: chosenRow.instructorId,
-                      nameEn: chosenRow.displayNameEn,
-                      nameZh: chosenRow.displayNameZh,
-                    }
-                  : editing?.instructorId === slot.instructorId
-                    ? {
-                        id: editing.instructorId,
-                        nameEn: editing.instructorNameEn,
-                        nameZh: editing.instructorNameZh,
-                      }
-                    : { id: slot.instructorId, nameEn: '—', nameZh: null }
-              }
-              startsAt={slot.startsAt}
-              past={false}
-              editing={editing}
-              listFull={listFull}
-              listLocked={drafts.outcomeUnknown}
-              onDone={(classes) => {
-                setBooked(classes);
-                setSlot(null);
-              }}
-              onAdd={listed}
-              onCancel={editing ? stopEdit : () => setSlot(null)}
-            />
-          )}
-        </>
-      ) : (
-        <PastLessonForm
-          key={editing?.id ?? 'new'}
-          header={lessonHeader}
-          lessonTypeField={lessonTypeField}
-          customers={customers}
-          lessonType={lessonType}
-          today={today}
-          editing={editing}
-          listFull={listFull}
-          listLocked={drafts.outcomeUnknown}
-          onDone={setBooked}
-          onAdd={listed}
-          onCancelEdit={stopEdit}
-        />
-      )}
-
-      <BookingDraftList
-        drafts={drafts}
-        editingId={editing?.id ?? null}
-        onEdit={startEdit}
-        onCancelEdit={stopEdit}
-      />
-
-      <BookingSettingsCard />
-    </div>
-  );
-}
-
-function ConfirmBooking({
-  customers,
-  lessonType,
-  instructor,
-  startsAt,
-  past,
-  status,
-  addToCalendar,
-  editing,
-  listFull,
-  listLocked,
-  onDone,
-  onAdd,
-  onCancel,
-}: {
-  customers: PickedCustomer[];
-  lessonType: LessonType;
-  instructor: InstructorRef;
-  startsAt: string;
-  past: boolean;
-  status?: BookableStatus;
-  addToCalendar?: boolean;
-  editing: DraftBooking | null;
-  listFull: boolean;
-  listLocked: boolean;
-  onDone: (classes: AdminClass[]) => void;
-  onAdd: (draft: DraftInput) => void;
-  onCancel?: () => void;
-}) {
-  const t = useT();
-  const { locale } = useLocale();
-  const create = useCreateBooking();
-  const locations = useTeachingLocations();
-  const [notes, setNotes] = useState(editing?.notes ?? '');
-  const [locationId, setLocationId] = useState(editing?.locationId ?? '');
-  const [repeat, setRepeat] = useState(1);
-  const ready = customers.length > 0;
-  const instructorId = instructor.id;
-  const instructorName =
-    localizeField(instructor.nameEn, instructor.nameZh, locale) ||
-    instructor.nameEn;
-  const repeating = repeat > 1;
-  const canList =
-    ready && !repeating && !listLocked && (editing !== null || !listFull);
-
-  function addToList() {
-    if (!canList) return;
-    onAdd({
-      customers,
-      lessonTypeId: lessonType.id,
-      lessonTypeNameEn: lessonType.nameEn,
-      lessonTypeNameZh: lessonType.nameZh,
-      durationMin: lessonType.durationMin,
-      instructorId,
-      instructorNameEn: instructor.nameEn,
-      instructorNameZh: instructor.nameZh,
-      startsAt,
-      notes: notes.trim(),
-      locationId,
-      ...(past && { status, addToCalendar }),
-    });
-  }
-
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!ready || create.isPending || editing) return;
-    const body: CreateBookingInput = {
-      instructorId,
-      lessonTypeId: lessonType.id,
-      startsAt,
-      customerIds: customers.map((c) => c.id),
-      ...(notes.trim() && { notes: notes.trim() }),
-      ...(locationId && { locationId }),
-      ...(repeat > 1 && { repeat: { weekly: true as const, count: repeat } }),
-      ...(past && { status, addToCalendar }),
-    };
-    create.mutate(body, { onSuccess: onDone });
-  }
-
-  return (
-    <Card>
-      <form
-        onSubmit={submit}
-        aria-label={t.booking.confirmTitle}
-        className="flex flex-col gap-4"
-      >
-        <h2 className="text-lg">{t.booking.confirmTitle}</h2>
-        <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
-          <dt className="text-slate">{t.booking.summaryCustomers}</dt>
-          <dd className="text-ink">
-            {customers.length > 0
-              ? customers.map(pickedName).join(', ')
-              : t.booking.noCustomerYet}
-          </dd>
-          <dt className="text-slate">{t.booking.summaryLesson}</dt>
-          <dd className="text-ink">
-            {localizeField(lessonType.nameEn, lessonType.nameZh, locale)} ·{' '}
-            {t.lessons.minutes.replace('{n}', String(lessonType.durationMin))}
-          </dd>
-          <dt className="text-slate">{t.booking.summaryInstructor}</dt>
-          <dd className="text-ink">{instructorName}</dd>
-          <dt className="text-slate">{t.booking.summaryWhen}</dt>
-          <dd className="text-ink">
-            {formatSchoolDateTime(startsAt, locale)}–
-            {formatSchoolTime(
-              addMinutes(startsAt, lessonType.durationMin),
-              locale,
-            )}
-            {repeat > 1 &&
-              ` · ${t.booking.repeatSummary.replace('{n}', String(repeat))}`}
-          </dd>
-        </dl>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className={cn(past && 'sm:col-span-2')}>
-            <Field label={t.booking.location}>
-              {(p) => (
-                <Select
-                  {...p}
-                  value={locationId}
-                  onChange={(e) => setLocationId(e.target.value)}
-                >
-                  <option value="">{t.booking.noLocation}</option>
-                  {(locations.data ?? []).map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-          {!past && !editing && (
+        {tooMany && (
+          <Banner tone="pending">
+            {t.booking.draftsTooMany
+              .replace('{max}', String(MAX_DRAFTS))
+              .replace('{n}', String(cards.length))}
+          </Banner>
+        )}
+        {full && !tooMany && !outcomeUnknown && (
+          <p className="text-sm text-slate">
+            {t.booking.listFull.replace('{n}', String(MAX_DRAFTS))}
+          </p>
+        )}
+        {canRepeat && (
+          <div className="sm:max-w-xs">
             <Field label={t.booking.repeat}>
               {(p) => (
                 <Select
                   {...p}
                   value={repeat}
+                  disabled={busy}
                   onChange={(e) => setRepeat(Number(e.target.value))}
                 >
                   <option value={1}>{t.booking.repeatNone}</option>
@@ -575,213 +381,90 @@ function ConfirmBooking({
                 </Select>
               )}
             </Field>
-          )}
-        </div>
-        <Field label={t.booking.notes}>
-          {(p) => (
-            <Textarea
-              {...p}
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+          </div>
+        )}
+        {!locked && (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            {cards.length > 1 && (
+              <Button
+                variant="ghost"
+                disabled={frozen}
+                onClick={() => setConfirmClear(true)}
+              >
+                {t.booking.clearList}
+              </Button>
+            )}
+            <AddCardButton
+              disabled={frozen || full}
+              focus={focusToken('add')}
+              onClick={addCard}
             />
-          )}
-        </Field>
-        {!ready && <Banner tone="pending">{t.booking.needCustomer}</Banner>}
-        {create.isError && <BookingErrorBanner error={create.error} />}
-        {repeating && (
-          <p className="text-sm text-slate">{t.booking.repeatNotListable}</p>
+            <Button loading={busy} disabled={!ready} onClick={commit}>
+              {commitLabel}
+            </Button>
+          </div>
         )}
-        {listLocked && (
-          <p className="text-sm text-slate">{t.booking.listLocked}</p>
-        )}
-        {listFull && !editing && !listLocked && (
-          <p className="text-sm text-slate">
-            {t.booking.listFull.replace('{n}', String(MAX_DRAFTS))}
+      </Card>
+
+      {confirmClear && (
+        <Dialog
+          title={
+            outcomeUnknown
+              ? t.booking.discardListTitle
+              : t.booking.clearListTitle
+          }
+          onClose={() => setConfirmClear(false)}
+        >
+          <p className="text-sm text-ink">
+            {(outcomeUnknown
+              ? t.booking.discardListBody
+              : t.booking.clearListBody
+            ).replace('{n}', String(drafts.cards.length))}
           </p>
-        )}
-        <div className="flex flex-wrap justify-end gap-2">
-          {onCancel && (
-            <Button type="button" variant="ghost" onClick={onCancel}>
-              {t.common.cancel}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="ghost" onClick={() => setConfirmClear(false)}>
+              {t.booking.keepList}
             </Button>
-          )}
-          {editing ? (
-            <Button type="button" disabled={!canList} onClick={addToList}>
-              {t.booking.updateInList}
+            <Button
+              variant="danger"
+              onClick={() => {
+                clear();
+                setFailure(null);
+                setConfirmClear(false);
+                const next = freshCard();
+                focusOn(`edit:${next.id}`);
+              }}
+            >
+              {outcomeUnknown ? t.booking.discardList : t.booking.clearList}
             </Button>
-          ) : (
-            <>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!canList || create.isPending}
-                onClick={addToList}
-              >
-                {t.booking.addToList}
-              </Button>
-              <Button
-                type="submit"
-                loading={create.isPending}
-                disabled={!ready}
-              >
-                {past ? t.booking.savePast : t.booking.book}
-              </Button>
-            </>
-          )}
-        </div>
-      </form>
-    </Card>
+          </div>
+        </Dialog>
+      )}
+
+      <BookingSettingsCard />
+    </div>
   );
 }
 
-function PastLessonForm({
-  header,
-  lessonTypeField,
-  customers,
-  lessonType,
-  today,
-  editing,
-  listFull,
-  listLocked,
-  onDone,
-  onAdd,
-  onCancelEdit,
+function AddCardButton({
+  disabled,
+  focus,
+  onClick,
 }: {
-  header: ReactNode;
-  lessonTypeField: ReactNode;
-  customers: PickedCustomer[];
-  lessonType: LessonType | null;
-  today: string;
-  editing: DraftBooking | null;
-  listFull: boolean;
-  listLocked: boolean;
-  onDone: (classes: AdminClass[]) => void;
-  onAdd: (draft: DraftInput) => void;
-  onCancelEdit: () => void;
+  disabled: boolean;
+  focus: number;
+  onClick: () => void;
 }) {
   const t = useT();
-  const { locale } = useLocale();
-  const instructors = useAdminInstructors({});
-  const initial = editing ? schoolParts(editing.startsAt) : null;
-  const [date, setDate] = useState(initial?.date ?? today);
-  const [time, setTime] = useState(initial?.time ?? '');
-  const [instructorId, setInstructorId] = useState(editing?.instructorId ?? '');
-  const [status, setStatus] = useState<BookableStatus>(
-    editing?.status ?? 'completed',
-  );
-  const [addToCalendar, setAddToCalendar] = useState(
-    editing?.addToCalendar ?? false,
-  );
-  const startsAt = date && time ? schoolInstant(date, time) : null;
-  const inPast = startsAt !== null && Date.parse(startsAt) < Date.now();
-  const options = (instructors.data ?? [])
-    .map((i) => ({
-      id: i.id,
-      nameEn: i.displayNameEn || i.email,
-      nameZh: i.displayNameZh,
-      name: localizeField(i.displayNameEn, i.displayNameZh, locale) || i.email,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const instructor = options.find((o) => o.id === instructorId);
-
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (focus) ref.current?.querySelector('button')?.focus();
+  }, [focus]);
   return (
-    <>
-      <Card className="flex flex-col gap-4">
-        {header}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {lessonTypeField}
-          <Field label={t.booking.instructor}>
-            {(p) => (
-              <Select
-                {...p}
-                value={instructorId}
-                onChange={(e) => setInstructorId(e.target.value)}
-              >
-                <option value="">{t.booking.chooseInstructor}</option>
-                {options.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label={t.booking.date}>
-            {(p) => (
-              <Input
-                {...p}
-                type="date"
-                max={today}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            )}
-          </Field>
-          <Field
-            label={t.booking.startTime}
-            error={startsAt && !inPast ? t.booking.pastMustBePast : undefined}
-          >
-            {(p) => (
-              <Input
-                {...p}
-                type="time"
-                step={300}
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-              />
-            )}
-          </Field>
-          <Field label={t.booking.status}>
-            {(p) => (
-              <Select
-                {...p}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as BookableStatus)}
-              >
-                <option value="completed">{t.lessons.classCompleted}</option>
-                <option value="no_show">{t.lessons.classNoShow}</option>
-                <option value="scheduled">{t.lessons.classScheduled}</option>
-              </Select>
-            )}
-          </Field>
-          <label className="flex items-center gap-2 text-sm text-ink sm:h-11 sm:self-end">
-            <input
-              type="checkbox"
-              checked={addToCalendar}
-              onChange={(e) => setAddToCalendar(e.target.checked)}
-            />
-            {t.booking.addToCalendar}
-          </label>
-        </div>
-        {!lessonType && (
-          <p className="text-sm text-slate">{t.booking.pickLessonFirst}</p>
-        )}
-      </Card>
-      {lessonType && instructor && startsAt && inPast && (
-        <ConfirmBooking
-          key={`${instructor.id}-${startsAt}-${status}-${addToCalendar}`}
-          customers={customers}
-          lessonType={lessonType}
-          instructor={instructor}
-          startsAt={startsAt}
-          past
-          status={status}
-          addToCalendar={addToCalendar}
-          editing={editing}
-          listFull={listFull}
-          listLocked={listLocked}
-          onDone={(classes) => {
-            onDone(classes);
-            setTime('');
-          }}
-          onAdd={(draft) => {
-            onAdd(draft);
-            setTime('');
-          }}
-          onCancel={editing ? onCancelEdit : undefined}
-        />
-      )}
-    </>
+    <span ref={ref} className="contents">
+      <Button variant="secondary" disabled={disabled} onClick={onClick}>
+        {t.booking.addCard}
+      </Button>
+    </span>
   );
 }

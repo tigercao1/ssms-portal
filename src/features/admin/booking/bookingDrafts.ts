@@ -1,23 +1,35 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { PickedCustomer } from './BookingParts';
-import type { BatchBookingRow, BookableStatus } from './types';
+import { schoolParts } from './bookingRules';
+import type {
+  BatchBookingRow,
+  BookableStatus,
+  CreateBookingInput,
+} from './types';
 
-const VERSION = 1;
+const VERSION = 2;
+const LEGACY_VERSION = 1;
 export const DRAFTS_KEY_PREFIX = `ssms.bookingDrafts.v${VERSION}:`;
+const LEGACY_KEY_PREFIX = `ssms.bookingDrafts.v${LEGACY_VERSION}:`;
 export const MAX_DRAFTS = 20;
+
+export type CardMode = 'grid' | 'past';
 
 export interface DraftError {
   code: string;
   message: string;
 }
 
-export interface DraftBooking {
+export interface DraftCard {
   id: string;
+  mode: CardMode;
   customers: PickedCustomer[];
   lessonTypeId: string;
   lessonTypeNameEn: string;
   lessonTypeNameZh: string | null;
   durationMin: number;
+  date: string;
+  time: string;
   instructorId: string;
   instructorNameEn: string;
   instructorNameZh: string | null;
@@ -32,17 +44,54 @@ export interface DraftBooking {
 export interface DraftCart {
   version: typeof VERSION;
   batchId: string;
-  rows: DraftBooking[];
+  cards: DraftCard[];
   outcomeUnknown?: boolean;
 }
 
-export type DraftInput = Omit<DraftBooking, 'id' | 'error'>;
+export type CardGap =
+  | 'customer'
+  | 'lessonType'
+  | 'instructor'
+  | 'startTime'
+  | 'pastTime';
 
 export function draftsKey(userId: string) {
   return `${DRAFTS_KEY_PREFIX}${userId}`;
 }
 
 export const newId = () => crypto.randomUUID();
+
+export function blankCard(date: string, from?: DraftCard): DraftCard {
+  return {
+    id: newId(),
+    mode: from?.mode ?? 'grid',
+    customers: from?.customers ?? [],
+    lessonTypeId: from?.lessonTypeId ?? '',
+    lessonTypeNameEn: from?.lessonTypeNameEn ?? '',
+    lessonTypeNameZh: from?.lessonTypeNameZh ?? null,
+    durationMin: from?.durationMin ?? 0,
+    date: from?.date ?? date,
+    time: '',
+    instructorId: '',
+    instructorNameEn: '',
+    instructorNameZh: null,
+    startsAt: '',
+    notes: '',
+    locationId: '',
+    ...(from?.mode === 'past' && { status: 'completed', addToCalendar: false }),
+  };
+}
+
+export function cardGaps(card: DraftCard, now: number): CardGap[] {
+  const gaps: CardGap[] = [];
+  if (card.customers.length === 0) gaps.push('customer');
+  if (!card.lessonTypeId) gaps.push('lessonType');
+  if (!card.instructorId) gaps.push('instructor');
+  if (!card.startsAt) gaps.push('startTime');
+  else if (card.mode === 'past' && Date.parse(card.startsAt) >= now)
+    gaps.push('pastTime');
+  return gaps;
+}
 
 function storage(): Storage | null {
   try {
@@ -54,6 +103,11 @@ function storage(): Storage | null {
 
 const isString = (v: unknown): v is string => typeof v === 'string';
 const isNullableString = (v: unknown) => v === null || isString(v);
+const isInstant = (v: unknown) => isString(v) && !Number.isNaN(Date.parse(v));
+const isStatus = (v: unknown) =>
+  v === undefined || v === 'scheduled' || v === 'completed' || v === 'no_show';
+const isOptionalBoolean = (v: unknown) =>
+  v === undefined || typeof v === 'boolean';
 
 function isCustomer(value: unknown): value is PickedCustomer {
   if (!value || typeof value !== 'object') return false;
@@ -67,11 +121,56 @@ function isCustomer(value: unknown): value is PickedCustomer {
   );
 }
 
-function isRow(value: unknown): value is DraftBooking {
+function isError(value: unknown) {
+  if (value === undefined) return true;
+  if (!value || typeof value !== 'object') return false;
+  const e = value as Record<string, unknown>;
+  return isString(e.code) && isString(e.message);
+}
+
+function isCard(value: unknown): value is DraftCard {
   if (!value || typeof value !== 'object') return false;
   const r = value as Record<string, unknown>;
-  const error = r.error as Record<string, unknown> | undefined;
   return (
+    isString(r.id) &&
+    (r.mode === 'grid' || r.mode === 'past') &&
+    Array.isArray(r.customers) &&
+    r.customers.every(isCustomer) &&
+    isString(r.lessonTypeId) &&
+    isString(r.lessonTypeNameEn) &&
+    isNullableString(r.lessonTypeNameZh) &&
+    typeof r.durationMin === 'number' &&
+    isString(r.date) &&
+    isString(r.time) &&
+    isString(r.instructorId) &&
+    isString(r.instructorNameEn) &&
+    isNullableString(r.instructorNameZh) &&
+    (r.startsAt === '' || isInstant(r.startsAt)) &&
+    isString(r.notes) &&
+    isString(r.locationId) &&
+    isStatus(r.status) &&
+    isOptionalBoolean(r.addToCalendar) &&
+    isError(r.error)
+  );
+}
+
+function isCart(value: unknown): value is DraftCart {
+  if (!value || typeof value !== 'object') return false;
+  const c = value as Record<string, unknown>;
+  return (
+    c.version === VERSION &&
+    isString(c.batchId) &&
+    c.batchId.length > 0 &&
+    Array.isArray(c.cards) &&
+    c.cards.every(isCard) &&
+    isOptionalBoolean(c.outcomeUnknown)
+  );
+}
+
+function legacyCard(value: unknown): DraftCard | null {
+  if (!value || typeof value !== 'object') return null;
+  const r = value as Record<string, unknown>;
+  const valid =
     isString(r.id) &&
     Array.isArray(r.customers) &&
     r.customers.length > 0 &&
@@ -83,37 +182,55 @@ function isRow(value: unknown): value is DraftBooking {
     isString(r.instructorId) &&
     isString(r.instructorNameEn) &&
     isNullableString(r.instructorNameZh) &&
-    isString(r.startsAt) &&
-    !Number.isNaN(Date.parse(r.startsAt)) &&
+    isInstant(r.startsAt) &&
     isString(r.notes) &&
     isString(r.locationId) &&
-    (r.status === undefined ||
-      r.status === 'scheduled' ||
-      r.status === 'completed' ||
-      r.status === 'no_show') &&
-    (r.addToCalendar === undefined || typeof r.addToCalendar === 'boolean') &&
-    (error === undefined ||
-      (!!error &&
-        typeof error === 'object' &&
-        isString(error.code) &&
-        isString(error.message)))
-  );
+    isStatus(r.status) &&
+    isOptionalBoolean(r.addToCalendar) &&
+    isError(r.error);
+  if (!valid) return null;
+  const row = r as unknown as Omit<DraftCard, 'mode' | 'date' | 'time'>;
+  const parts = schoolParts(row.startsAt);
+  return {
+    ...row,
+    mode: row.status ? 'past' : 'grid',
+    date: parts.date,
+    time: row.status ? parts.time : '',
+  };
 }
 
-function isCart(value: unknown): value is DraftCart {
-  if (!value || typeof value !== 'object') return false;
-  const c = value as Record<string, unknown>;
-  return (
-    c.version === VERSION &&
-    isString(c.batchId) &&
-    c.batchId.length > 0 &&
-    Array.isArray(c.rows) &&
-    c.rows.every(isRow) &&
-    (c.outcomeUnknown === undefined || typeof c.outcomeUnknown === 'boolean')
-  );
+function migrateLegacy(store: Storage, key: string) {
+  const legacyKey = key.replace(DRAFTS_KEY_PREFIX, LEGACY_KEY_PREFIX);
+  const raw = store.getItem(legacyKey);
+  if (!raw) return;
+  store.removeItem(legacyKey);
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      parsed.version !== LEGACY_VERSION ||
+      !isString(parsed.batchId) ||
+      !parsed.batchId ||
+      !Array.isArray(parsed.rows) ||
+      !isOptionalBoolean(parsed.outcomeUnknown)
+    )
+      return;
+    const cards = parsed.rows.map(legacyCard);
+    if (cards.length === 0 || cards.some((c) => c === null)) return;
+    const cart: DraftCart = {
+      version: VERSION,
+      batchId: parsed.batchId,
+      cards: cards as DraftCard[],
+      ...(parsed.outcomeUnknown !== undefined && {
+        outcomeUnknown: parsed.outcomeUnknown as boolean,
+      }),
+    };
+    store.setItem(key, JSON.stringify(cart));
+  } catch {
+    return;
+  }
 }
 
-const EMPTY: DraftBooking[] = [];
+const EMPTY: DraftCard[] = [];
 const listeners = new Set<() => void>();
 let snapshot: { key: string; raw: string | null; cart: DraftCart | null } = {
   key: '',
@@ -123,6 +240,7 @@ let snapshot: { key: string; raw: string | null; cart: DraftCart | null } = {
 
 function readCart(key: string): DraftCart | null {
   const store = storage();
+  if (store && store.getItem(key) === null) migrateLegacy(store, key);
   const raw = store?.getItem(key) ?? null;
   if (snapshot.key === key && snapshot.raw === raw) return snapshot.cart;
   let cart: DraftCart | null = null;
@@ -141,7 +259,7 @@ function readCart(key: string): DraftCart | null {
 
 function writeCart(key: string, cart: DraftCart | null) {
   try {
-    if (cart && cart.rows.length > 0)
+    if (cart && cart.cards.length > 0)
       storage()?.setItem(key, JSON.stringify(cart));
     else storage()?.removeItem(key);
   } catch {
@@ -162,18 +280,29 @@ function subscribe(listener: () => void) {
   };
 }
 
-export function toBatchRow(row: DraftBooking): BatchBookingRow {
+export function toBatchRow(card: DraftCard): BatchBookingRow {
   return {
-    instructorId: row.instructorId,
-    lessonTypeId: row.lessonTypeId,
-    startsAt: row.startsAt,
-    customerIds: row.customers.map((c) => c.id),
-    ...(row.notes.trim() && { notes: row.notes.trim() }),
-    ...(row.locationId && { locationId: row.locationId }),
-    ...(row.status && { status: row.status }),
-    ...(row.addToCalendar !== undefined && {
-      addToCalendar: row.addToCalendar,
+    instructorId: card.instructorId,
+    lessonTypeId: card.lessonTypeId,
+    startsAt: card.startsAt,
+    customerIds: card.customers.map((c) => c.id),
+    ...(card.notes.trim() && { notes: card.notes.trim() }),
+    ...(card.locationId && { locationId: card.locationId }),
+    ...(card.status && { status: card.status }),
+    ...(card.addToCalendar !== undefined && {
+      addToCalendar: card.addToCalendar,
     }),
+  };
+}
+
+export function toCreateInput(
+  card: DraftCard,
+  repeat: number,
+): CreateBookingInput {
+  return {
+    ...toBatchRow(card),
+    ...(card.mode === 'grid' &&
+      repeat > 1 && { repeat: { weekly: true as const, count: repeat } }),
   };
 }
 
@@ -186,56 +315,27 @@ export function useBookingDrafts(userId: string) {
       const current = readCart(key) ?? {
         version: VERSION,
         batchId: newId(),
-        rows: [],
+        cards: [],
       };
       writeCart(key, recipe(current));
     },
     [key],
   );
 
-  const add = useCallback(
-    (input: DraftInput) =>
-      update((c) =>
-        c.outcomeUnknown
-          ? c
-          : { ...c, rows: [...c.rows, { ...input, id: newId() }] },
-      ),
-    [update],
-  );
-
-  const replace = useCallback(
-    (id: string, input: DraftInput) =>
-      update((c) =>
-        c.outcomeUnknown
-          ? c
-          : {
-              ...c,
-              rows: c.rows.map((r) => (r.id === id ? { ...input, id } : r)),
-            },
-      ),
-    [update],
-  );
-
-  const remove = useCallback(
-    (id: string) =>
-      update((c) =>
-        c.outcomeUnknown
-          ? c
-          : { ...c, rows: c.rows.filter((r) => r.id !== id) },
-      ),
+  const edit = useCallback(
+    (recipe: (cards: DraftCard[]) => DraftCard[]) =>
+      update((c) => (c.outcomeUnknown ? c : { ...c, cards: recipe(c.cards) })),
     [update],
   );
 
   const clear = useCallback(() => writeCart(key, null), [key]);
 
   return {
-    rows: cart?.rows ?? EMPTY,
+    cards: cart?.cards ?? EMPTY,
     batchId: cart?.batchId ?? null,
     outcomeUnknown: cart?.outcomeUnknown === true,
     update,
-    add,
-    replace,
-    remove,
+    edit,
     clear,
   };
 }

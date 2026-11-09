@@ -168,12 +168,12 @@ export function CustomerPicker({
           {selected.map((c) => (
             <li
               key={c.id}
-              className="flex h-8 items-center gap-1 rounded-md bg-navy-tint pl-3 pr-1 text-sm text-navy"
+              className="flex min-h-11 items-center gap-1 rounded-md bg-navy-tint pl-3 text-sm text-navy"
             >
               {pickedName(c)}
               <button
                 type="button"
-                className="rounded-sm px-1.5 hover:bg-grey"
+                className="min-h-11 min-w-11 rounded-md hover:bg-grey"
                 aria-label={t.booking.removeCustomer.replace(
                   '{name}',
                   pickedName(c),

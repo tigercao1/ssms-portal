@@ -13,7 +13,7 @@ import {
 import { renderWithProviders } from '@/test/render';
 import { BookLessonPage } from './BookLessonPage';
 import { hideSyncToast } from './syncToast';
-import type { DraftBooking } from './bookingDrafts';
+import type { DraftCard } from './bookingDrafts';
 import type {
   Availability,
   BatchBookingInput,
@@ -203,6 +203,13 @@ function instructorRows() {
     .map((b) => b.textContent);
 }
 
+function startChosen() {
+  const missing = within(
+    screen.getByRole('region', { name: 'Booking 1' }),
+  ).queryByText(/^Missing:/);
+  return !/start time/.test(missing?.textContent ?? '');
+}
+
 const at = (h: number, m: number) =>
   new Date(Date.UTC(2026, 11, 12, h + 5, m)).toISOString();
 
@@ -251,18 +258,14 @@ describe('BookLessonPage', () => {
     expect(
       screen.getByRole('button', { name: 'Book Jane Snow at 10:00' }),
     ).toHaveAttribute('aria-pressed', 'true');
-    const form = screen.getByRole('form', { name: 'Confirm booking' });
-    expect(within(form).getByText('Lily Chen')).toBeInTheDocument();
-    expect(within(form).getByText('Jane Snow')).toBeInTheDocument();
-    expect(within(form).getByText(/Dec 12, 2026/)).toHaveTextContent(
-      /10:00–11:00/,
-    );
-    await user.selectOptions(within(form).getByLabelText('Repeat'), '3');
-    await user.selectOptions(within(form).getByLabelText('Location'), 'l1');
-    await user.type(within(form).getByLabelText('Notes'), ' first lesson ');
-    await user.click(within(form).getByRole('button', { name: 'Book lesson' }));
+    const card = screen.getByRole('region', { name: 'Booking 1' });
+    expect(within(card).getByText('Ready')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Repeat'), '3');
+    await user.selectOptions(within(card).getByLabelText('Location'), 'l1');
+    await user.type(within(card).getByLabelText('Notes'), ' first lesson ');
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
 
-    expect(await screen.findByText('Booked')).toBeInTheDocument();
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
     expect(recorded.bookings).toEqual([
       {
         instructorId: 'inst-1',
@@ -274,9 +277,17 @@ describe('BookLessonPage', () => {
         repeat: { weekly: true, count: 3 },
       },
     ]);
-    expect(
-      screen.queryByRole('form', { name: 'Confirm booking' }),
-    ).not.toBeInTheDocument();
+    const booked = screen.getByRole('list', { name: 'Booked' });
+    expect(booked).toHaveTextContent('Lily Chen');
+    expect(booked).toHaveTextContent(
+      /Private 1h · .*Dec 12, 2026.*10:00–11:00 · Jane Snow/,
+    );
+    const next = screen.getByRole('region', { name: 'Booking 1' });
+    expect(within(next).getByLabelText('Date')).toHaveValue('2026-12-12');
+    expect(within(next).getByLabelText('Lesson type')).toHaveValue('lt1');
+    expect(startChosen()).toBe(false);
+    expect(screen.getByLabelText('Repeat')).toHaveValue('1');
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 
   it('needs a customer before booking', async () => {
@@ -285,8 +296,11 @@ describe('BookLessonPage', () => {
     renderWithProviders(<BookLessonPage />);
     await chooseLesson(user);
     await chooseSlot(user, 'Jane Snow', '10:00');
+    expect(screen.getByText('Booking 1: customer')).toBeInTheDocument();
     expect(
-      screen.getByText('Add at least one customer first.'),
+      within(screen.getByRole('region', { name: 'Booking 1' })).getByText(
+        'Missing: customer',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Book lesson' })).toBeDisabled();
   });
@@ -375,7 +389,7 @@ describe('BookLessonPage', () => {
     await chooseSlot(user, 'Jane Snow', '10:00');
     await user.click(screen.getByRole('button', { name: 'Book lesson' }));
 
-    expect(await screen.findByText('Booked')).toBeInTheDocument();
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Saved. Google Calendar not updated yet; it will retry.',
@@ -465,14 +479,10 @@ describe('BookLessonPage', () => {
         .map((b) => b.textContent),
     ).toEqual(['10:00', '11:00']);
     expect(screen.queryByLabelText('Find instructor')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('form', { name: 'Confirm booking' }),
-    ).toBeInTheDocument();
+    expect(startChosen()).toBe(true);
 
     await user.click(screen.getByRole('button', { name: 'Change instructor' }));
-    expect(
-      screen.queryByRole('form', { name: 'Confirm booking' }),
-    ).not.toBeInTheDocument();
+    expect(startChosen()).toBe(false);
     await user.click(screen.getByRole('button', { name: /^Mia Park/ }));
     const mia = screen.getByRole('region', {
       name: 'Start times for Mia Park',
@@ -487,9 +497,7 @@ describe('BookLessonPage', () => {
       'false',
     );
     expect(screen.getByText('Morning')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('form', { name: 'Confirm booking' }),
-    ).not.toBeInTheDocument();
+    expect(startChosen()).toBe(false);
   });
 
   it('moves focus to the first time after choosing an instructor and back to the row after changing', async () => {
@@ -616,15 +624,11 @@ describe('BookLessonPage', () => {
     await user.click(
       screen.getByRole('button', { name: 'Book Jane Snow at 09:15' }),
     );
-    expect(
-      screen.getByRole('form', { name: 'Confirm booking' }),
-    ).toBeInTheDocument();
+    expect(startChosen()).toBe(true);
     await user.click(
       within(blocks).getByRole('button', { name: 'Every 30 min' }),
     );
-    expect(
-      screen.queryByRole('form', { name: 'Confirm booking' }),
-    ).not.toBeInTheDocument();
+    expect(startChosen()).toBe(false);
   });
 
   it('offers only block sizes that change what the slot size shows', async () => {
@@ -720,9 +724,7 @@ describe('BookLessonPage', () => {
     expect(
       screen.getByRole('button', { name: 'Change instructor' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('form', { name: 'Confirm booking' }),
-    ).toBeInTheDocument();
+    expect(startChosen()).toBe(true);
     expect(recorded.availabilityQueries.at(-1)?.get('date')).toBe('2026-12-12');
   });
 
@@ -789,9 +791,7 @@ describe('BookLessonPage', () => {
     expect(
       screen.getByRole('button', { name: 'Book Jane Snow at 10:00' }),
     ).toHaveAttribute('aria-pressed', 'false');
-    expect(
-      screen.queryByRole('form', { name: 'Confirm booking' }),
-    ).not.toBeInTheDocument();
+    expect(startChosen()).toBe(false);
   });
 
   it('says when the customer has no earlier lessons', async () => {
@@ -890,13 +890,10 @@ describe('BookLessonPage', () => {
       screen.queryByRole('list', { name: 'Free instructors' }),
     ).not.toBeInTheDocument();
 
-    const form = await screen.findByRole('form', { name: 'Confirm booking' });
-    expect(within(form).queryByLabelText('Repeat')).not.toBeInTheDocument();
-    await user.click(
-      within(form).getByRole('button', { name: 'Save past lesson' }),
-    );
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save past lesson' }));
 
-    await screen.findByText('Booked');
+    await screen.findByText('Booked 1 lesson(s)');
     expect(recorded.bookings).toEqual([
       {
         instructorId: 'inst-1',
@@ -920,6 +917,9 @@ describe('BookLessonPage', () => {
       target: { value: '23:00' },
     });
     expect(screen.getByText(/This time is in the future/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Booking 1: .*a start time in the past$/),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Start time'), {
       target: { value: '09:00' },
@@ -932,7 +932,7 @@ describe('BookLessonPage', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Save past lesson' }),
     );
-    await screen.findByText('Booked');
+    await screen.findByText('Booked 1 lesson(s)');
     expect(recorded.bookings[0]).toMatchObject({
       startsAt: '2026-12-10T14:00:00.000Z',
       status: 'completed',
@@ -1016,24 +1016,29 @@ describe('BookLessonPage', () => {
   });
 });
 
-const DRAFTS_KEY = 'ssms.bookingDrafts.v1:admin-1';
+const DRAFTS_KEY = 'ssms.bookingDrafts.v2:admin-1';
+const LEGACY_KEY = 'ssms.bookingDrafts.v1:admin-1';
+const UUID = /^[0-9a-f-]{36}$/;
 
-function draftRow(overrides: Partial<DraftBooking> = {}): DraftBooking {
+const lilyPicked = {
+  id: 'cu1',
+  firstName: 'Lily',
+  lastName: 'Chen',
+  email: null,
+  phone: null,
+};
+
+function card(overrides: Partial<DraftCard> = {}): DraftCard {
   return {
     id: 'd1',
-    customers: [
-      {
-        id: 'cu1',
-        firstName: 'Lily',
-        lastName: 'Chen',
-        email: null,
-        phone: null,
-      },
-    ],
+    mode: 'grid',
+    customers: [lilyPicked],
     lessonTypeId: 'lt1',
     lessonTypeNameEn: 'Private 1h',
     lessonTypeNameZh: '私教 1 小时',
     durationMin: 60,
+    date: '2026-12-12',
+    time: '',
     instructorId: 'inst-1',
     instructorNameEn: 'Jane Snow',
     instructorNameZh: '简雪',
@@ -1044,20 +1049,40 @@ function draftRow(overrides: Partial<DraftBooking> = {}): DraftBooking {
   };
 }
 
-function seedDrafts(
-  rows: DraftBooking[],
+function pastCard(overrides: Partial<DraftCard> = {}): DraftCard {
+  return card({
+    mode: 'past',
+    date: '2025-12-01',
+    time: '10:00',
+    startsAt: '2025-12-01T15:00:00.000Z',
+    status: 'completed',
+    addToCalendar: false,
+    ...overrides,
+  });
+}
+
+function legacyRow(c: DraftCard) {
+  const row: Partial<DraftCard> = { ...c };
+  delete row.mode;
+  delete row.date;
+  delete row.time;
+  return row;
+}
+
+function seedCards(
+  cards: DraftCard[],
   batchId = 'batch-1',
   extra: Record<string, unknown> = {},
 ) {
   localStorage.setItem(
     DRAFTS_KEY,
-    JSON.stringify({ version: 1, batchId, rows, ...extra }),
+    JSON.stringify({ version: 2, batchId, cards, ...extra }),
   );
 }
 
 function storedCart(): {
   batchId: string;
-  rows: DraftBooking[];
+  cards: DraftCard[];
   outcomeUnknown?: boolean;
 } | null {
   const raw = localStorage.getItem(DRAFTS_KEY);
@@ -1096,11 +1121,20 @@ function createdAll(body: BatchBookingInput): BatchBookingResult {
   };
 }
 
-function draftList() {
-  return screen.getByRole('list', { name: 'Booking list' });
+function serveInstructors() {
+  server.use(
+    http.get(`${API}/admin/instructors`, () =>
+      HttpResponse.json(fakeAdminList),
+    ),
+  );
 }
 
-describe('BookLessonPage booking list', () => {
+const region = (n: number) =>
+  screen.getByRole('region', { name: `Booking ${n}` });
+const cardRegions = () =>
+  screen.queryAllByRole('region', { name: /^Booking \d+$/ });
+
+describe('BookLessonPage booking cards', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-12-10T17:00:00Z'));
@@ -1110,218 +1144,267 @@ describe('BookLessonPage booking list', () => {
     hideSyncToast();
   });
 
-  it('adds a booking to the list and resets the form for the next one', async () => {
-    const recorded = serve();
+  it('adds another card pre-filled from the previous one and hides repeat', async () => {
+    serve();
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
+    expect(cardRegions()).toHaveLength(1);
     await pickLily(user);
     fireEvent.change(screen.getByLabelText('Date'), {
       target: { value: '2026-12-12' },
     });
     await chooseLesson(user);
     await chooseSlot(user, 'Jane Snow', '10:00');
-    const form = screen.getByRole('form', { name: 'Confirm booking' });
-    await user.type(within(form).getByLabelText('Notes'), ' bring skis ');
-    await user.click(within(form).getByRole('button', { name: 'Add to list' }));
+    expect(screen.getByRole('button', { name: 'Book lesson' })).toBeEnabled();
+    await user.selectOptions(screen.getByLabelText('Repeat'), '3');
+    await user.click(
+      screen.getByRole('button', { name: 'Add another booking' }),
+    );
 
-    const row = within(draftList()).getByRole('listitem');
-    expect(row).toHaveTextContent('Lily Chen');
-    expect(row).toHaveTextContent('Private 1h · Jane Snow');
-    expect(row).toHaveTextContent(/Dec 12, 2026.*10:00/);
-    expect(row).toHaveTextContent('Notes: bring skis');
-    expect(recorded.bookings).toEqual([]);
+    const first = region(1);
+    expect(first).toHaveTextContent('Lily Chen');
+    expect(first).toHaveTextContent(
+      /Private 1h · .*Dec 12, 2026.*10:00–11:00 · Jane Snow/,
+    );
+    expect(within(first).getByText('Ready')).toBeInTheDocument();
     expect(
-      screen.queryByRole('form', { name: 'Confirm booking' }),
-    ).not.toBeInTheDocument();
+      within(first).getByRole('button', { name: 'Edit booking 1' }),
+    ).toHaveAttribute('aria-expanded', 'false');
+    const second = region(2);
+    expect(within(second).getByLabelText('Find a customer')).toHaveFocus();
     expect(
-      screen.queryByRole('list', { name: 'Selected customers' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-12-12');
-    expect(screen.getByLabelText('Lesson type')).toHaveValue('lt1');
+      within(second).getByRole('list', { name: 'Selected customers' }),
+    ).toHaveTextContent('Lily Chen');
+    expect(within(second).getByLabelText('Date')).toHaveValue('2026-12-12');
+    expect(within(second).getByLabelText('Lesson type')).toHaveValue('lt1');
+    expect(
+      within(second).getByRole('button', { name: 'Book from availability' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
 
+    await user.click(
+      within(second).getByRole('button', { name: 'Clear customers' }),
+    );
+    expect(
+      within(second).queryByRole('list', { name: 'Selected customers' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Book all (2)' })).toBeDisabled();
+    expect(
+      screen.getByText('Booking 2: customer, instructor, start time'),
+    ).toBeInTheDocument();
     const cart = storedCart();
-    expect(cart?.batchId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(cart?.rows).toMatchObject([
+    expect(cart?.batchId).toMatch(UUID);
+    expect(cart?.cards).toMatchObject([
       {
         instructorId: 'inst-1',
         startsAt: '2026-12-12T15:00:00.000Z',
-        notes: 'bring skis',
         customers: [{ id: 'cu1' }],
       },
+      { customers: [], lessonTypeId: 'lt1', date: '2026-12-12', startsAt: '' },
     ]);
+
+    await user.click(
+      within(second).getByRole('button', { name: 'Remove booking 2' }),
+    );
+    expect(cardRegions()).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Add another booking' }),
+    ).toHaveFocus();
+    expect(screen.getByLabelText('Repeat')).toHaveValue('1');
+    expect(screen.getByRole('button', { name: 'Book lesson' })).toBeEnabled();
   });
 
-  it('does not let a repeating booking go on the list', async () => {
-    serve();
-    const user = userEvent.setup();
-    renderWithProviders(<BookLessonPage />);
-    await pickLily(user);
-    await chooseLesson(user);
-    await chooseSlot(user, 'Jane Snow', '10:00');
-    const form = screen.getByRole('form', { name: 'Confirm booking' });
-    await user.selectOptions(within(form).getByLabelText('Repeat'), '3');
-    expect(
-      within(form).getByRole('button', { name: 'Add to list' }),
-    ).toBeDisabled();
-    expect(
-      within(form).getByText(/Repeating bookings can't go on the list/),
-    ).toBeInTheDocument();
-    expect(
-      within(form).getByRole('button', { name: 'Book lesson' }),
-    ).toBeEnabled();
-  });
-
-  it('removes a row and keeps the list across a remount', async () => {
-    seedDrafts([
-      draftRow(),
-      draftRow({
-        id: 'd2',
-        startsAt: '2026-12-12T16:00:00.000Z',
-        customers: [
-          {
-            ...draftRow().customers[0]!,
-            id: 'cu2',
-            firstName: 'Max',
-            lastName: 'Wu',
-          },
-        ],
-      }),
+  it('folds, edits and removes cards and keeps them across a remount', async () => {
+    seedCards([
+      card({ notes: 'skis' }),
+      pastCard({ id: 'd2', status: 'no_show', addToCalendar: true }),
     ]);
     serve();
+    serveInstructors();
     const user = userEvent.setup();
     const view = renderWithProviders(<BookLessonPage />);
-    expect(within(draftList()).getAllByRole('listitem')).toHaveLength(2);
-    await user.click(
-      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+    expect(cardRegions()).toHaveLength(2);
+    expect(screen.queryByLabelText('Find a customer')).not.toBeInTheDocument();
+    expect(region(1)).toHaveTextContent('Notes: skis');
+    expect(region(2)).toHaveTextContent(/Dec 1, 2025.*10:00–11:00/);
+    expect(region(2)).toHaveTextContent('No-show');
+    expect(screen.getByRole('button', { name: 'Book all (2)' })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Edit booking 2' }));
+    const open = region(2);
+    expect(within(open).getByLabelText('Find a customer')).toHaveFocus();
+    expect(
+      within(open).getByRole('button', { name: 'Add a past lesson' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(within(open).getByLabelText('Date')).toHaveValue('2025-12-01');
+    expect(within(open).getByLabelText('Start time')).toHaveValue('10:00');
+    expect(within(open).getByLabelText('Status')).toHaveValue('no_show');
+    expect(within(open).getByLabelText(/Also add it/)).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Book all (2)' })).toBeEnabled();
+    await user.selectOptions(
+      within(open).getByLabelText('Status'),
+      'completed',
     );
-    expect(within(draftList()).getAllByRole('listitem')).toHaveLength(1);
+    const done = within(open).getByRole('button', {
+      name: 'Done with booking 2',
+    });
+    expect(done).toHaveAttribute('aria-expanded', 'true');
+    await user.click(done);
+
+    expect(
+      screen.getByRole('button', { name: 'Edit booking 2' }),
+    ).toHaveFocus();
+    expect(region(2)).toHaveTextContent('Completed');
+    expect(storedCart()?.cards[1]).toMatchObject({
+      id: 'd2',
+      status: 'completed',
+      addToCalendar: true,
+      startsAt: '2025-12-01T15:00:00.000Z',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove booking 1' }));
+    expect(cardRegions()).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Save past lesson' }),
+    ).toBeEnabled();
     view.unmount();
 
     renderWithProviders(<BookLessonPage />);
-    const rows = within(draftList()).getAllByRole('listitem');
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveTextContent('Max Wu');
+    expect(cardRegions()).toHaveLength(1);
+    expect(within(region(1)).getByLabelText('Status')).toHaveValue('completed');
+    expect(storedCart()?.cards.map((c) => c.id)).toEqual(['d2']);
     expect(storedCart()?.batchId).toBe('batch-1');
   });
 
-  it('loads a row back into the form and replaces it on save', async () => {
-    seedDrafts([
-      draftRow({ notes: 'old note' }),
-      draftRow({ id: 'd2', startsAt: '2026-12-13T15:00:00.000Z' }),
-    ]);
+  it('keeps an unfinished card across a reload', async () => {
     serve();
     const user = userEvent.setup();
+    const view = renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    await chooseLesson(user);
+    view.unmount();
+
     renderWithProviders(<BookLessonPage />);
-    await user.click(
-      screen.getAllByRole('button', { name: /^Edit Lily Chen, / })[0]!,
-    );
-
-    const form = await screen.findByRole('form', { name: 'Confirm booking' });
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-12-12');
-    expect(within(form).getByLabelText('Notes')).toHaveValue('old note');
-    expect(within(form).queryByLabelText('Repeat')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Book all/ })).toBeDisabled();
-    await user.click(
-      await screen.findByRole('button', { name: 'Book Jane Snow at 11:00' }),
-    );
-    const moved = screen.getByRole('form', { name: 'Confirm booking' });
-    await user.clear(within(moved).getByLabelText('Notes'));
-    await user.type(within(moved).getByLabelText('Notes'), 'new note');
-    await user.click(
-      within(moved).getByRole('button', { name: 'Update in list' }),
-    );
-
-    const rows = within(draftList()).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent(/Dec 12, 2026.*11:00/);
-    expect(rows[0]).toHaveTextContent('Notes: new note');
-    expect(storedCart()?.rows.map((r) => r.id)).toEqual(['d1', 'd2']);
+    await screen.findByRole('option', { name: /Private 1h/ });
+    const restored = region(1);
+    expect(
+      within(restored).getByRole('list', { name: 'Selected customers' }),
+    ).toHaveTextContent('Lily Chen');
+    expect(within(restored).getByLabelText('Lesson type')).toHaveValue('lt1');
+    expect(storedCart()?.cards).toHaveLength(1);
   });
 
-  it('edits a past-lesson row in past mode', async () => {
-    seedDrafts([
-      draftRow({
-        startsAt: '2025-12-01T15:00:00.000Z',
-        status: 'no_show',
-        addToCalendar: true,
+  it('moves a list saved by the previous version into cards', async () => {
+    localStorage.setItem(
+      LEGACY_KEY,
+      JSON.stringify({
+        version: 1,
+        batchId: 'batch-old',
+        outcomeUnknown: true,
+        rows: [
+          legacyRow(card({ notes: 'skis' })),
+          legacyRow(pastCard({ id: 'd2', status: 'no_show' })),
+        ],
       }),
-    ]);
-    serve();
-    server.use(
-      http.get(`${API}/admin/instructors`, () =>
-        HttpResponse.json(fakeAdminList),
-      ),
     );
+    serve();
+    const sent = serveBatch((body) => HttpResponse.json(createdAll(body)));
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
-    await user.click(screen.getByRole('button', { name: /^Edit Lily Chen, / }));
 
-    expect(
-      screen.getByRole('button', { name: 'Add a past lesson' }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByLabelText('Date')).toHaveValue('2025-12-01');
-    expect(screen.getByLabelText('Start time')).toHaveValue('10:00');
-    expect(screen.getByLabelText('Status')).toHaveValue('no_show');
-    await user.selectOptions(screen.getByLabelText('Status'), 'completed');
-    await user.click(
-      await screen.findByRole('button', { name: 'Update in list' }),
-    );
-
-    expect(storedCart()?.rows).toMatchObject([
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+    expect(storedCart()).toMatchObject({
+      batchId: 'batch-old',
+      outcomeUnknown: true,
+      cards: [
+        { id: 'd1', mode: 'grid', date: '2026-12-12', notes: 'skis' },
+        { id: 'd2', mode: 'past', date: '2025-12-01', time: '10:00' },
+      ],
+    });
+    expect(cardRegions()).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
+    expect(sent).toEqual([
       {
-        id: 'd1',
-        startsAt: '2025-12-01T15:00:00.000Z',
-        status: 'completed',
-        addToCalendar: true,
+        batchId: 'batch-old',
+        bookings: [
+          {
+            instructorId: 'inst-1',
+            lessonTypeId: 'lt1',
+            startsAt: '2026-12-12T15:00:00.000Z',
+            customerIds: ['cu1'],
+            notes: 'skis',
+          },
+          {
+            instructorId: 'inst-1',
+            lessonTypeId: 'lt1',
+            startsAt: '2025-12-01T15:00:00.000Z',
+            customerIds: ['cu1'],
+            status: 'no_show',
+            addToCalendar: false,
+          },
+        ],
       },
     ]);
-    expect(within(draftList()).getByRole('listitem')).toHaveTextContent(
-      'Completed',
-    );
   });
 
-  it('discards corrupt or old stored lists', async () => {
+  it('discards corrupt, old or unreadable stored cards', async () => {
     serve();
     localStorage.setItem(DRAFTS_KEY, '{not json');
+    localStorage.setItem(LEGACY_KEY, '{not json');
     const view = renderWithProviders(<BookLessonPage />);
     await screen.findByRole('option', { name: /Private 1h/ });
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
+    expect(cardRegions()).toHaveLength(1);
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
     view.unmount();
 
     localStorage.setItem(
+      LEGACY_KEY,
+      JSON.stringify({
+        version: 1,
+        batchId: 'b',
+        rows: [{ ...card(), customers: [] }],
+      }),
+    );
+    const again = renderWithProviders(<BookLessonPage />);
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+    again.unmount();
+
+    localStorage.setItem(
       DRAFTS_KEY,
-      JSON.stringify({ version: 0, batchId: 'b', rows: [draftRow()] }),
+      JSON.stringify({ version: 1, batchId: 'b', cards: [card()] }),
     );
     renderWithProviders(<BookLessonPage />);
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+    expect(region(1)).toHaveTextContent(
+      'Missing: customer, lesson type, instructor, start time',
+    );
 
-    seedDrafts([
-      { ...draftRow(), customers: 'Lily' } as unknown as DraftBooking,
-    ]);
+    seedCards([{ ...card(), customers: 'Lily' } as unknown as DraftCard]);
     window.dispatchEvent(new StorageEvent('storage', { key: DRAFTS_KEY }));
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
+    expect(cardRegions()).toHaveLength(1);
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 
-  it('books every row at once and shows what was booked', async () => {
-    seedDrafts([
-      draftRow({ notes: ' first ', locationId: 'l1' }),
-      draftRow({
-        id: 'd2',
-        startsAt: '2025-12-01T15:00:00.000Z',
-        status: 'completed',
-        addToCalendar: false,
-      }),
+  it('books one card once even when Book is pressed twice', async () => {
+    seedCards([card()]);
+    const recorded = serve();
+    renderWithProviders(<BookLessonPage />);
+    const book = screen.getByRole('button', { name: 'Book lesson' });
+    fireEvent.click(book);
+    fireEvent.click(book);
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings).toHaveLength(1);
+    expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+  });
+
+  it('books every card at once and shows what was booked', async () => {
+    seedCards([
+      card({ notes: ' first ', locationId: 'l1' }),
+      pastCard({ id: 'd2' }),
     ]);
-    serve();
+    const recorded = serve();
     const sent = serveBatch((body) => HttpResponse.json(createdAll(body)));
     renderWithProviders(<BookLessonPage />);
     const bookAll = screen.getByRole('button', { name: 'Book all (2)' });
@@ -1329,6 +1412,7 @@ describe('BookLessonPage booking list', () => {
     fireEvent.click(bookAll);
 
     expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings).toEqual([]);
     expect(sent).toEqual([
       {
         batchId: 'batch-1',
@@ -1352,48 +1436,51 @@ describe('BookLessonPage booking list', () => {
         ],
       },
     ]);
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
+    const booked = within(screen.getByRole('list', { name: 'Booked' }));
+    expect(booked.getAllByRole('listitem')).toHaveLength(2);
+    expect(booked.getAllByText('Booked')).toHaveLength(2);
+    expect(cardRegions()).toHaveLength(1);
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 
-  it('keeps failed rows with their reason and gives the rest a new batch id', async () => {
-    seedDrafts([
-      draftRow(),
-      draftRow({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
-      draftRow({ id: 'd3', startsAt: '2026-12-12T17:00:00.000Z' }),
+  it('keeps failed cards editable with their reason and books the rest under a new batch id', async () => {
+    seedCards([
+      card(),
+      card({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
+      card({ id: 'd3', startsAt: '2026-12-12T17:00:00.000Z' }),
     ]);
     serve();
-    const sent = serveBatch(() =>
-      HttpResponse.json({
-        batchId: 'batch-1',
-        results: [
-          {
-            index: 0,
-            status: 'created',
-            classes: [
-              {
-                ...fakeClass({ id: 'c0' }),
-                calendarSync: 'ok',
-                calendarSyncError: null,
-              },
-            ],
-          },
-          {
-            index: 1,
-            status: 'failed',
-            code: 'INSTRUCTOR_BUSY',
-            message: 'The instructor is not free at that time',
-          },
-          {
-            index: 2,
-            status: 'failed',
-            code: 'SOMETHING_NEW',
-            message: 'Server says no',
-          },
-        ],
-      }),
+    const sent = serveBatch(
+      () =>
+        HttpResponse.json({
+          batchId: 'batch-1',
+          results: [
+            {
+              index: 0,
+              status: 'created',
+              classes: [
+                {
+                  ...fakeClass({ id: 'c0' }),
+                  calendarSync: 'ok',
+                  calendarSyncError: null,
+                },
+              ],
+            },
+            {
+              index: 1,
+              status: 'failed',
+              code: 'INSTRUCTOR_BUSY',
+              message: 'The instructor is not free at that time',
+            },
+            {
+              index: 2,
+              status: 'failed',
+              code: 'SOMETHING_NEW',
+              message: 'Server says no',
+            },
+          ],
+        }),
+      (body) => HttpResponse.json(createdAll(body)),
     );
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
@@ -1403,17 +1490,33 @@ describe('BookLessonPage booking list', () => {
     expect(
       screen.getByText(/2 booking\(s\) could not be booked/),
     ).toBeInTheDocument();
-    const rows = within(draftList()).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent(
+    expect(
+      within(screen.getByRole('list', { name: 'Booked' })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(1);
+    expect(cardRegions()).toHaveLength(2);
+    expect(region(1)).toHaveTextContent(
       'The instructor is not free at that time.',
     );
-    expect(rows[1]).toHaveTextContent('Server says no');
+    expect(within(region(1)).getByText('Not booked')).toBeInTheDocument();
+    expect(region(2)).toHaveTextContent('Server says no');
     const cart = storedCart();
-    expect(cart?.rows.map((r) => r.id)).toEqual(['d2', 'd3']);
+    expect(cart?.cards.map((c) => c.id)).toEqual(['d2', 'd3']);
     expect(cart?.batchId).not.toBe('batch-1');
-    expect(cart?.batchId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(sent).toHaveLength(1);
+    expect(cart?.batchId).toMatch(UUID);
+
+    await user.click(screen.getByRole('button', { name: 'Edit booking 1' }));
+    expect(within(region(1)).getByRole('alert')).toHaveTextContent(
+      'The instructor is not free at that time.',
+    );
+    await user.type(within(region(1)).getByLabelText('Notes'), 'moved');
+    expect(storedCart()?.cards[0]?.error).toBeUndefined();
+    await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
+    expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
+    expect(sent).toHaveLength(2);
+    expect(sent[1]?.batchId).toBe(cart?.batchId);
+    expect(sent[1]?.bookings[0]).toMatchObject({ notes: 'moved' });
   });
 
   it.each([
@@ -1423,25 +1526,25 @@ describe('BookLessonPage booking list', () => {
       () => HttpResponse.json({ message: 'boom' }, { status: 503 }),
     ],
   ])(
-    'keeps the list and batch id after %s and retries safely',
+    'keeps the cards and batch id after %s and retries safely',
     async (_, fail) => {
-      seedDrafts([draftRow()]);
+      seedCards([card(), card({ id: 'd2' })]);
       serve();
       const sent = serveBatch(fail, (body) =>
         HttpResponse.json(createdAll(body)),
       );
       const user = userEvent.setup();
       renderWithProviders(<BookLessonPage />);
-      await user.click(screen.getByRole('button', { name: 'Book all (1)' }));
+      await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        'We could not confirm whether this list was booked',
+        'We could not confirm whether these bookings were saved',
       );
-      expect(within(draftList()).getAllByRole('listitem')).toHaveLength(1);
+      expect(cardRegions()).toHaveLength(2);
       expect(storedCart()?.batchId).toBe('batch-1');
       await user.click(screen.getByRole('button', { name: 'Try again' }));
 
-      expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+      expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
       expect(sent.map((b) => b.batchId)).toEqual(['batch-1', 'batch-1']);
       expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
     },
@@ -1452,7 +1555,7 @@ describe('BookLessonPage booking list', () => {
       .spyOn(window.navigator, 'onLine', 'get')
       .mockReturnValue(false);
     onlineManager.setOnline(false);
-    seedDrafts([draftRow()]);
+    seedCards([card(), card({ id: 'd2' })]);
     serve();
     serveBatch(
       () => HttpResponse.error(),
@@ -1460,11 +1563,11 @@ describe('BookLessonPage booking list', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
-    await user.click(screen.getByRole('button', { name: 'Book all (1)' }));
+    await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
 
     expect(
       await screen.findByText(
-        /We could not confirm whether this list was booked/,
+        /We could not confirm whether these bookings were saved/,
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
@@ -1472,10 +1575,10 @@ describe('BookLessonPage booking list', () => {
     onlineManager.setOnline(true);
   });
 
-  it('locks the list after an unknown outcome and retries it unchanged', async () => {
-    seedDrafts([
-      draftRow({ notes: 'skis' }),
-      draftRow({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
+  it('locks the cards after an unknown outcome and retries them unchanged', async () => {
+    seedCards([
+      card({ notes: 'skis' }),
+      card({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
     ]);
     serve();
     const sent = serveBatch(
@@ -1506,34 +1609,23 @@ describe('BookLessonPage booking list', () => {
     );
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Edit booking 1' }));
     await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The list is locked until Try again gets an answer',
+      'They are locked until Try again gets an answer',
     );
     expect(storedCart()?.outcomeUnknown).toBe(true);
-    for (const button of [
-      ...screen.getAllByRole('button', { name: /^Remove Lily Chen, / }),
-      ...screen.getAllByRole('button', { name: /^Edit Lily Chen, / }),
+    expect(screen.queryByLabelText('Find a customer')).not.toBeInTheDocument();
+    for (const name of [
+      'Edit booking 1',
+      'Remove booking 1',
+      'Edit booking 2',
+      'Remove booking 2',
     ])
-      expect(button).toBeDisabled();
-    expect(
-      screen.queryByRole('button', { name: 'Clear list' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^Book all/ }),
-    ).not.toBeInTheDocument();
-
-    await pickLily(user);
-    await chooseLesson(user);
-    await chooseSlot(user, 'Jane Snow', '10:00');
-    const form = screen.getByRole('form', { name: 'Confirm booking' });
-    expect(
-      within(form).getByRole('button', { name: 'Add to list' }),
-    ).toBeDisabled();
-    expect(
-      within(form).getByText(/The booking list is locked/),
-    ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+    for (const name of ['Add another booking', 'Remove all', /^Book all/])
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
@@ -1542,16 +1634,19 @@ describe('BookLessonPage booking list', () => {
     expect(sent[0]?.batchId).toBe('batch-1');
     const cart = storedCart();
     expect(cart?.outcomeUnknown).toBe(false);
-    expect(cart?.rows.map((r) => r.id)).toEqual(['d2']);
+    expect(cart?.cards.map((c) => c.id)).toEqual(['d2']);
     expect(cart?.batchId).not.toBe('batch-1');
     expect(
-      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+      screen.getByRole('button', { name: 'Edit booking 1' }),
     ).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Book all (1)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Book lesson' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Add another booking' }),
+    ).toBeEnabled();
   });
 
   it('saves the lock before sending so a reload mid-request stays locked', async () => {
-    seedDrafts([draftRow()]);
+    seedCards([card(), card({ id: 'd2' })]);
     serve();
     let release: () => void = () => {};
     const sent = serveBatch(
@@ -1562,7 +1657,7 @@ describe('BookLessonPage booking list', () => {
     );
     const user = userEvent.setup();
     const view = renderWithProviders(<BookLessonPage />);
-    await user.click(screen.getByRole('button', { name: 'Book all (1)' }));
+    await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(storedCart()?.outcomeUnknown).toBe(true);
     expect(
@@ -1576,18 +1671,18 @@ describe('BookLessonPage booking list', () => {
       await screen.findByRole('button', { name: 'Try again' }),
     ).toBeEnabled();
     expect(
-      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+      screen.getByRole('button', { name: 'Remove booking 1' }),
     ).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: /^Edit Lily Chen, / }),
+      screen.getByRole('button', { name: 'Edit booking 2' }),
     ).toBeDisabled();
     expect(
-      screen.queryByRole('button', { name: 'Clear list' }),
+      screen.queryByRole('button', { name: 'Remove all' }),
     ).not.toBeInTheDocument();
   });
 
-  it('unlocks the list when the whole request is rejected as invalid', async () => {
-    seedDrafts([draftRow()], 'batch-1', { outcomeUnknown: true });
+  it('unlocks the cards when the whole request is rejected as invalid', async () => {
+    seedCards([card()], 'batch-1', { outcomeUnknown: true });
     serve();
     serveBatch(() =>
       HttpResponse.json(
@@ -1603,94 +1698,140 @@ describe('BookLessonPage booking list', () => {
       'bookings must be an array',
     );
     expect(
-      screen.getByRole('button', { name: /^Remove Lily Chen, / }),
+      screen.getByRole('button', { name: 'Remove booking 1' }),
     ).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Clear list' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Book lesson' })).toBeEnabled();
     expect(storedCart()).toMatchObject({
       batchId: 'batch-1',
       outcomeUnknown: false,
     });
   });
 
-  it('discards a locked list only after a warning', async () => {
-    seedDrafts([draftRow()], 'batch-1', { outcomeUnknown: true });
+  it('discards locked cards only after a warning', async () => {
+    seedCards([card(), card({ id: 'd2' })], 'batch-1', {
+      outcomeUnknown: true,
+    });
     serve();
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
-    await user.click(screen.getByRole('button', { name: 'Discard list' }));
+    await user.click(screen.getByRole('button', { name: 'Discard bookings' }));
     const dialog = screen.getByRole('dialog', {
-      name: 'Discard the booking list?',
+      name: 'Discard these bookings?',
     });
     expect(dialog).toHaveTextContent(/may already exist/);
     await user.click(
-      within(dialog).getByRole('button', { name: 'Discard list' }),
+      within(dialog).getByRole('button', { name: 'Discard bookings' }),
     );
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
+    expect(cardRegions()).toHaveLength(1);
+    expect(screen.getByLabelText('Find a customer')).toHaveFocus();
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 
-  it('discards a stored list whose lock flag is corrupt', async () => {
-    seedDrafts([draftRow()], 'batch-1', { outcomeUnknown: 'yes' });
+  it('discards stored cards whose lock flag is corrupt', async () => {
+    seedCards([card()], 'batch-1', { outcomeUnknown: 'yes' });
     serve();
     renderWithProviders(<BookLessonPage />);
     await screen.findByRole('option', { name: /Private 1h/ });
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Try again' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('holds the list to 20 bookings', async () => {
+  it('holds the page to 20 bookings', async () => {
     const twenty = Array.from({ length: 20 }, (_, i) =>
-      draftRow({
+      card({
         id: `d${i}`,
         startsAt: `2026-12-${String(11 + (i % 9)).padStart(2, '0')}T${String(13 + Math.floor(i / 9)).padStart(2, '0')}:00:00.000Z`,
       }),
     );
-    seedDrafts(twenty);
+    seedCards(twenty);
     serve();
-    const user = userEvent.setup();
     const view = renderWithProviders(<BookLessonPage />);
-    await pickLily(user);
-    await chooseLesson(user);
-    await chooseSlot(user, 'Jane Snow', '10:00');
-    const form = screen.getByRole('form', { name: 'Confirm booking' });
     expect(
-      within(form).getByRole('button', { name: 'Add to list' }),
+      screen.getByRole('button', { name: 'Add another booking' }),
     ).toBeDisabled();
-    expect(within(form).getByText(/The list is full/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/You can add up to 20 bookings at once/),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Book all (20)' })).toBeEnabled();
     view.unmount();
 
-    seedDrafts([...twenty, draftRow({ id: 'd20' })]);
+    seedCards([...twenty, card({ id: 'd20' })]);
     const sent = serveBatch(() => HttpResponse.json({}));
     renderWithProviders(<BookLessonPage />);
     const bookAll = screen.getByRole('button', { name: 'Book all (21)' });
     expect(bookAll).toBeDisabled();
     expect(
-      screen.getByText(/Book all takes up to 20 bookings; this list has 21/),
+      screen.getByText(/Book all takes up to 20 bookings; this page has 21/),
     ).toBeInTheDocument();
     fireEvent.click(bookAll);
     expect(sent).toEqual([]);
   });
 
-  it('asks before clearing the list', async () => {
-    seedDrafts([draftRow()]);
+  it('books a past-lesson card together with a booking from availability', async () => {
+    seedCards([card()]);
+    serve();
+    serveInstructors();
+    const sent = serveBatch((body) => HttpResponse.json(createdAll(body)));
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(
+      screen.getByRole('button', { name: 'Add another booking' }),
+    );
+    const second = region(2);
+    await user.click(
+      within(second).getByRole('button', { name: 'Add a past lesson' }),
+    );
+    expect(within(second).getByLabelText('Date')).toHaveValue('2026-12-10');
+    fireEvent.change(within(second).getByLabelText('Date'), {
+      target: { value: '2026-12-01' },
+    });
+    fireEvent.change(within(second).getByLabelText('Start time'), {
+      target: { value: '10:30' },
+    });
+    await user.selectOptions(
+      await within(second).findByLabelText('Instructor'),
+      'inst-1',
+    );
+    await user.selectOptions(
+      within(second).getByLabelText('Status'),
+      'no_show',
+    );
+    await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
+
+    expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
+    expect(sent[0]?.bookings).toEqual([
+      {
+        instructorId: 'inst-1',
+        lessonTypeId: 'lt1',
+        startsAt: '2026-12-12T15:00:00.000Z',
+        customerIds: ['cu1'],
+      },
+      {
+        instructorId: 'inst-1',
+        lessonTypeId: 'lt1',
+        startsAt: '2026-12-01T15:30:00.000Z',
+        customerIds: ['cu1'],
+        status: 'no_show',
+        addToCalendar: false,
+      },
+    ]);
+  });
+
+  it('asks before removing every card', async () => {
+    seedCards([card(), card({ id: 'd2' })]);
     serve();
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
-    await user.click(screen.getByRole('button', { name: 'Clear list' }));
+    await user.click(screen.getByRole('button', { name: 'Remove all' }));
     const dialog = screen.getByRole('dialog', {
-      name: 'Clear the booking list?',
+      name: 'Remove all bookings?',
     });
     await user.click(
-      within(dialog).getByRole('button', { name: 'Clear list' }),
+      within(dialog).getByRole('button', { name: 'Remove all' }),
     );
-    expect(
-      screen.queryByRole('list', { name: 'Booking list' }),
-    ).not.toBeInTheDocument();
+    expect(cardRegions()).toHaveLength(1);
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 });
