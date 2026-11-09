@@ -4,6 +4,7 @@ import {
   fetchPdfBytes,
   originalPdfHref,
   type SignLang,
+  type SignOriginalPdfUrl,
 } from '../api';
 import type { PdfDocument } from './types';
 
@@ -33,22 +34,22 @@ export function useOriginalPdf(
 ): OriginalPdf {
   const [attempt, setAttempt] = useState(0);
   const [wanted, setWanted] = useState(false);
-  const [url, setUrl] = useState<string | null>(null);
+  const [signed, setSigned] = useState<SignOriginalPdfUrl | null>(null);
   const [bytes, setBytes] = useState<Loaded<Uint8Array>>(LOADING);
   const [doc, setDoc] = useState<Loaded<PdfDocument>>(LOADING);
 
   useEffect(() => {
-    setUrl(null);
+    setSigned(null);
     setBytes(LOADING);
     if (!enabled) return;
     const controller = new AbortController();
     const { signal } = controller;
     void (async () => {
       try {
-        const signed = await fetchOriginalPdfUrl(slug, lang, signal);
+        const link = await fetchOriginalPdfUrl(slug, lang, signal);
         if (signal.aborted) return;
-        setUrl(signed.url);
-        const value = await fetchPdfBytes(signed.url, signal);
+        setSigned(link);
+        const value = await fetchPdfBytes(link.url, signal);
         if (!signal.aborted) setBytes({ status: 'ready', value });
       } catch {
         if (!signal.aborted) setBytes({ status: 'error' });
@@ -81,8 +82,11 @@ export function useOriginalPdf(
     };
   }, [wanted, bytes]);
 
-  const open = useCallback(() => setWanted(true), []);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const open = useCallback(() => {
+    setWanted(true);
+    if (bytes.status === 'error') retry();
+  }, [bytes.status, retry]);
 
   const state: OriginalPdfState =
     bytes.status === 'error' || doc.status === 'error'
@@ -90,5 +94,11 @@ export function useOriginalPdf(
       : doc.status === 'ready'
         ? { status: 'ready', doc: doc.value }
         : LOADING;
-  return { state, href: url ?? originalPdfHref(slug, lang), open, retry };
+  const fresh = signed && Date.parse(signed.expiresAt) > Date.now();
+  return {
+    state,
+    href: fresh ? signed.url : originalPdfHref(slug, lang),
+    open,
+    retry,
+  };
 }

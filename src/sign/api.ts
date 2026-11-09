@@ -18,9 +18,17 @@ export interface SignPlacement {
   h: number;
 }
 
+export interface SignPdfPage {
+  width: number;
+  height: number;
+  rotate?: 0 | 90 | 180 | 270;
+  x?: number;
+  y?: number;
+}
+
 export interface SignOriginalPdf {
   pageCount: number;
-  pages: { width: number; height: number }[];
+  pages: SignPdfPage[];
   placements: SignPlacement[];
 }
 

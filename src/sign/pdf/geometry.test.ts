@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { viewportGeometry } from '@/features/documents/pdf/transforms';
 import {
   MAX_CANVAS_PIXELS,
   fitText,
@@ -46,6 +47,44 @@ describe('placement to pixel mapping', () => {
     expect(
       placementToPixels(transform, { x: 100, y: 40, w: 60, h: 10 }),
     ).toEqual({ left: 40, top: 100, width: 10, height: 60 });
+  });
+});
+
+describe('placement to pixel mapping on the page boxes the API reports', () => {
+  it('places a field on an offset A4 page rotated by 90 degrees where pdf.js draws it', () => {
+    const page = { width: 595, height: 842, rotate: 90, x: 10, y: 20 };
+    const scale = 358 / page.height;
+    const { transform, width, height } = viewportGeometry({
+      viewBox: [page.x, page.y, page.x + page.width, page.y + page.height],
+      scale,
+      rotation: page.rotate,
+    });
+
+    const box = placementToPixels(transform, {
+      x: 10 + 56,
+      y: 20 + 100,
+      w: 250,
+      h: 20,
+    });
+
+    expect(width).toBeCloseTo(358);
+    expect(height).toBeCloseTo(595 * scale);
+    expect(box.left).toBeCloseTo(100 * scale);
+    expect(box.top).toBeCloseTo(56 * scale);
+    expect(box.width).toBeCloseTo(20 * scale);
+    expect(box.height).toBeCloseTo(250 * scale);
+  });
+
+  it('places a field on an upright page whose box starts away from the origin', () => {
+    const { transform } = viewportGeometry({
+      viewBox: [36, 48, 648, 840],
+      scale: 1,
+      rotation: 0,
+    });
+
+    expect(
+      placementToPixels(transform, { x: 36, y: 48, w: 100, h: 20 }),
+    ).toEqual({ left: 0, top: 772, width: 100, height: 20 });
   });
 });
 

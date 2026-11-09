@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from 'react';
 import { outputRatio } from './geometry';
+import type { SignPdfPage } from '../api';
 import type { PdfDocument, PdfPage, PdfViewport } from './types';
 
 const MAX_PAGE_WIDTH = 820;
@@ -21,7 +22,7 @@ export interface PageLayout {
 interface PdfPageViewProps {
   doc: PdfDocument;
   pageNumber: number;
-  size?: { width: number; height: number };
+  size?: SignPdfPage;
   label: string;
   children?: (layout: PageLayout) => ReactNode;
 }
@@ -82,9 +83,15 @@ export function PdfPageView({
     };
   }, [doc, pageNumber]);
 
-  const scale = width / (page?.getViewport({ scale: 1 }).width ?? size.width);
+  const turned = size.rotate === 90 || size.rotate === 270;
+  const placeholder = turned
+    ? { width: size.height, height: size.width }
+    : size;
+  const scale =
+    width / (page?.getViewport({ scale: 1 }).width ?? placeholder.width);
   const viewport = page?.getViewport({ scale }) ?? null;
-  const height = viewport?.height ?? (size.height * width) / size.width;
+  const height =
+    viewport?.height ?? (placeholder.height * width) / placeholder.width;
 
   return (
     <div ref={boxRef} className="w-full">

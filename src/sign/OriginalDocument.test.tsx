@@ -24,7 +24,9 @@ function serveForm(lang: SignLang, withPdf = true) {
   );
 }
 
-function serveOriginal() {
+function serveOriginal(
+  expiresAt = new Date(Date.now() + 300_000).toISOString(),
+) {
   const requests = { url: 0, pdf: 0 };
   server.use(
     http.get(`${API}/sign/forms/waiver/original`, ({ request }) => {
@@ -32,7 +34,7 @@ function serveOriginal() {
       return new URL(request.url).searchParams.get('format') === 'json'
         ? HttpResponse.json({
             url: SIGNED_URL,
-            expiresAt: '2026-11-09T05:10:00Z',
+            expiresAt,
           })
         : HttpResponse.json({ message: 'not json' }, { status: 400 });
     }),
@@ -145,7 +147,7 @@ describe('signing site original document viewer', () => {
   it('offers retry and the same signed URL in a new tab when the PDF cannot be fetched', async () => {
     serveForm('en');
     serveOriginal();
-    let failures = 1;
+    let failures = 2;
     server.use(
       http.get('https://r2.example.test/original.pdf', () => {
         if (failures-- > 0) return HttpResponse.error();
@@ -206,6 +208,59 @@ describe('signing site original document viewer', () => {
     expect(
       await screen.findByRole('img', { name: 'Page 1 of 2' }),
     ).toBeInTheDocument();
+  });
+
+  it('opens the API link instead of a signed URL that has expired', async () => {
+    serveForm('en');
+    serveOriginal(new Date(Date.now() - 1000).toISOString());
+    let failures = 2;
+    server.use(
+      http.get('https://r2.example.test/original.pdf', () =>
+        failures-- > 0
+          ? HttpResponse.json({}, { status: 403 })
+          : HttpResponse.arrayBuffer(new Uint8Array([37]).buffer),
+      ),
+    );
+    const user = userEvent.setup();
+    renderSign();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'View original document' }),
+    );
+
+    const link = within(await screen.findByRole('alert')).getByRole('link', {
+      name: 'Open in a new tab',
+    });
+    expect(link.getAttribute('href')).toMatch(
+      /\/sign\/forms\/waiver\/original\?lang=en$/,
+    );
+  });
+
+  it('requests a new signed URL when the viewer opens after the preload failed', async () => {
+    serveForm('en');
+    const requests = serveOriginal();
+    let failures = 1;
+    server.use(
+      http.get('https://r2.example.test/original.pdf', () =>
+        failures-- > 0
+          ? HttpResponse.error()
+          : HttpResponse.arrayBuffer(new Uint8Array([37]).buffer),
+      ),
+    );
+    const user = userEvent.setup();
+    renderSign();
+    const button = await screen.findByRole('button', {
+      name: 'View original document',
+    });
+    await waitFor(() => expect(requests.url).toBe(1));
+    await waitFor(() => expect(failures).toBe(0));
+
+    await user.click(button);
+
+    expect(
+      await screen.findByRole('img', { name: 'Page 1 of 2' }),
+    ).toBeInTheDocument();
+    expect(requests.url).toBe(2);
   });
 
   it('has no viewer and fetches no PDF for a form without an original', async () => {
