@@ -4,14 +4,13 @@ import {
   fetchPdfBytes,
   originalPdfHref,
   type SignLang,
-  type SignOriginalPdfUrl,
 } from '../api';
 import type { PdfDocument } from './types';
 
 type Loaded<T> =
   | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; value: T };
+  | { status: 'error'; key: string }
+  | { status: 'ready'; key: string; value: T };
 
 export type OriginalPdfState =
   | { status: 'loading' }
@@ -27,19 +26,25 @@ export interface OriginalPdf {
 
 const LOADING = { status: 'loading' } as const;
 
+function current<T>(loaded: Loaded<T>, key: string): Loaded<T> {
+  return loaded.status !== 'loading' && loaded.key === key ? loaded : LOADING;
+}
+
 export function useOriginalPdf(
   slug: string,
   lang: SignLang,
+  version: number | null,
   enabled: boolean,
 ): OriginalPdf {
+  const key = `${slug}\n${lang}\n${version}`;
   const [attempt, setAttempt] = useState(0);
   const [wanted, setWanted] = useState(false);
-  const [signed, setSigned] = useState<SignOriginalPdfUrl | null>(null);
-  const [bytes, setBytes] = useState<Loaded<Uint8Array>>(LOADING);
-  const [doc, setDoc] = useState<Loaded<PdfDocument>>(LOADING);
+  const [loadedBytes, setBytes] = useState<Loaded<Uint8Array>>(LOADING);
+  const [loadedDoc, setDoc] = useState<Loaded<PdfDocument>>(LOADING);
+  const bytes = current(loadedBytes, key);
+  const doc = current(loadedDoc, key);
 
   useEffect(() => {
-    setSigned(null);
     setBytes(LOADING);
     if (!enabled) return;
     const controller = new AbortController();
@@ -47,40 +52,40 @@ export function useOriginalPdf(
     void (async () => {
       try {
         const link = await fetchOriginalPdfUrl(slug, lang, signal);
-        if (signal.aborted) return;
-        setSigned(link);
         const value = await fetchPdfBytes(link.url, signal);
-        if (!signal.aborted) setBytes({ status: 'ready', value });
+        if (!signal.aborted) setBytes({ status: 'ready', key, value });
       } catch {
-        if (!signal.aborted) setBytes({ status: 'error' });
+        if (!signal.aborted) setBytes({ status: 'error', key });
       }
     })();
     return () => controller.abort();
-  }, [enabled, slug, lang, attempt]);
+  }, [enabled, slug, lang, key, attempt]);
 
   useEffect(() => {
     setDoc(LOADING);
-    if (!wanted || bytes.status !== 'ready') return;
+    if (!wanted || loadedBytes.status !== 'ready') return;
+    const { key: bytesKey, value: source } = loadedBytes;
     let cancelled = false;
     let destroy: (() => void) | null = null;
     import('./pdfRuntime')
       .then(({ openPdf }) => {
         if (cancelled) return null;
-        const task = openPdf(bytes.value);
+        const task = openPdf(source);
         destroy = task.destroy;
         return task.promise;
       })
       .then((value) => {
-        if (!cancelled && value) setDoc({ status: 'ready', value });
+        if (!cancelled && value)
+          setDoc({ status: 'ready', key: bytesKey, value });
       })
       .catch(() => {
-        if (!cancelled) setDoc({ status: 'error' });
+        if (!cancelled) setDoc({ status: 'error', key: bytesKey });
       });
     return () => {
       cancelled = true;
       destroy?.();
     };
-  }, [wanted, bytes]);
+  }, [wanted, loadedBytes]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const open = useCallback(() => {
@@ -91,13 +96,12 @@ export function useOriginalPdf(
   const state: OriginalPdfState =
     bytes.status === 'error' || doc.status === 'error'
       ? { status: 'error' }
-      : doc.status === 'ready'
+      : doc.status === 'ready' && bytes.status === 'ready'
         ? { status: 'ready', doc: doc.value }
         : LOADING;
-  const fresh = signed && Date.parse(signed.expiresAt) > Date.now();
   return {
     state,
-    href: fresh ? signed.url : originalPdfHref(slug, lang),
+    href: originalPdfHref(slug, lang),
     open,
     retry,
   };

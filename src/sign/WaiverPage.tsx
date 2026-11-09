@@ -118,6 +118,7 @@ export function WaiverPage({
   const originalPdf = useOriginalPdf(
     slug,
     servedForm?.lang ?? lang,
+    servedForm?.version ?? null,
     servedForm?.hasOriginalPdf === true,
   );
 

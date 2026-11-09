@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/msw';
@@ -8,11 +15,13 @@ import type { SignLang } from './api';
 import { mockSignForm, mockSignFormWithPdf } from './mock/fixtures';
 import { openPdf } from './pdf/pdfRuntime';
 import { fakePdf } from '@/test/signPdfMock';
+import { useOriginalPdf } from './pdf/useOriginalPdf';
 
 vi.mock('./pdf/pdfRuntime', () => ({ openPdf: vi.fn() }));
 
 const API = 'http://localhost:3000';
 const SIGNED_URL = 'https://r2.example.test/original.pdf?X-Amz-Signature=abc';
+const ORIGINAL_ROUTE = `${import.meta.env.VITE_SIGN_API_BASE_URL ?? ''}/sign/forms/waiver/original?lang=en`;
 
 function serveForm(lang: SignLang, withPdf = true) {
   server.use(
@@ -63,6 +72,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -144,7 +154,7 @@ describe('signing site original document viewer', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers retry and the same signed URL in a new tab when the PDF cannot be fetched', async () => {
+  it('offers retry and the API link in a new tab when the PDF cannot be fetched', async () => {
     serveForm('en');
     serveOriginal();
     let failures = 2;
@@ -163,7 +173,7 @@ describe('signing site original document viewer', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The document could not be shown here.');
     const link = within(alert).getByRole('link', { name: 'Open in a new tab' });
-    expect(link).toHaveAttribute('href', SIGNED_URL);
+    expect(link).toHaveAttribute('href', ORIGINAL_ROUTE);
     expect(link).toHaveAttribute('target', '_blank');
 
     await user.click(within(alert).getByRole('button', { name: 'Try again' }));
@@ -191,9 +201,7 @@ describe('signing site original document viewer', () => {
     const link = within(await screen.findByRole('alert')).getByRole('link', {
       name: 'Open in a new tab',
     });
-    expect(link.getAttribute('href')).toMatch(
-      /\/sign\/forms\/waiver\/original\?lang=en$/,
-    );
+    expect(link).toHaveAttribute('href', ORIGINAL_ROUTE);
 
     serveOriginal();
     vi.mocked(openPdf).mockImplementationOnce(() => ({
@@ -210,30 +218,29 @@ describe('signing site original document viewer', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the API link instead of a signed URL that has expired', async () => {
+  it('never links the new tab to a signed URL that expires while the error panel stays open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     serveForm('en');
-    serveOriginal(new Date(Date.now() - 1000).toISOString());
-    let failures = 2;
+    serveOriginal(new Date(Date.now() + 300_000).toISOString());
     server.use(
       http.get('https://r2.example.test/original.pdf', () =>
-        failures-- > 0
-          ? HttpResponse.json({}, { status: 403 })
-          : HttpResponse.arrayBuffer(new Uint8Array([37]).buffer),
+        HttpResponse.error(),
       ),
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderSign();
 
     await user.click(
       await screen.findByRole('button', { name: 'View original document' }),
     );
+    const alert = await screen.findByRole('alert');
+    const link = within(alert).getByRole('link', { name: 'Open in a new tab' });
+    expect(link).toHaveAttribute('href', ORIGINAL_ROUTE);
 
-    const link = within(await screen.findByRole('alert')).getByRole('link', {
-      name: 'Open in a new tab',
-    });
-    expect(link.getAttribute('href')).toMatch(
-      /\/sign\/forms\/waiver\/original\?lang=en$/,
-    );
+    act(() => vi.advanceTimersByTime(301_000));
+
+    expect(link).toHaveAttribute('href', ORIGINAL_ROUTE);
+    expect(link.getAttribute('href')).not.toContain('r2.example.test');
   });
 
   it('requests a new signed URL when the viewer opens after the preload failed', async () => {
@@ -261,6 +268,41 @@ describe('signing site original document viewer', () => {
       await screen.findByRole('img', { name: 'Page 1 of 2' }),
     ).toBeInTheDocument();
     expect(requests.url).toBe(2);
+  });
+
+  it('drops the cached PDF and loads the new original when the form version changes', async () => {
+    const requests = serveOriginal();
+    let served = 0;
+    server.use(
+      http.get('https://r2.example.test/original.pdf', () => {
+        served += 1;
+        return HttpResponse.arrayBuffer(new Uint8Array([served]).buffer);
+      }),
+    );
+    const v3 = fakePdf(1);
+    const v4 = fakePdf(2);
+    vi.mocked(openPdf)
+      .mockImplementationOnce(() => v3)
+      .mockImplementationOnce(() => v4);
+    const { result, rerender } = renderHook(
+      ({ version }) => useOriginalPdf('waiver', 'en', version, true),
+      { initialProps: { version: 3 } },
+    );
+    act(() => result.current.open());
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+
+    rerender({ version: 4 });
+
+    expect(result.current.state).toEqual({ status: 'loading' });
+    expect(v3.destroy).toHaveBeenCalled();
+    await waitFor(() => {
+      const { state } = result.current;
+      expect(state.status === 'ready' && state.doc.numPages).toBe(2);
+    });
+    expect(requests.url).toBe(2);
+    expect(
+      vi.mocked(openPdf).mock.calls.map(([source]) => [...source]),
+    ).toEqual([[1], [2]]);
   });
 
   it('has no viewer and fetches no PDF for a form without an original', async () => {
