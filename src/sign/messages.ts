@@ -32,6 +32,16 @@ export interface SignMessages {
   signed: string;
   signedNotEmailed: string;
   back: string;
+  viewOriginal: string;
+  hideOriginal: string;
+  originalDocument: string;
+  pdfLoading: string;
+  pdfFailed: string;
+  pdfOpenInTab: string;
+  previousPage: string;
+  nextPage: string;
+  pageList: string;
+  pageOf: (page: number, total: number) => string;
 }
 
 const en: SignMessages = {
@@ -72,6 +82,16 @@ const en: SignMessages = {
   signedNotEmailed:
     'Signed. We could not email your copy right now; our team has your signed form.',
   back: 'Back',
+  viewOriginal: 'View original document',
+  hideOriginal: 'Hide original document',
+  originalDocument: 'Original document',
+  pdfLoading: 'Loading the document…',
+  pdfFailed: 'The document could not be shown here.',
+  pdfOpenInTab: 'Open in a new tab',
+  previousPage: 'Previous',
+  nextPage: 'Next',
+  pageList: 'Page',
+  pageOf: (page, total) => `Page ${page} of ${total}`,
 };
 
 const zh: SignMessages = {
@@ -107,6 +127,16 @@ const zh: SignMessages = {
   signedNotEmailed:
     '已签署。副本暂时无法发送至您的邮箱，我们已收到您签署的表格。',
   back: '返回',
+  viewOriginal: '查看原始文件',
+  hideOriginal: '收起原始文件',
+  originalDocument: '原始文件',
+  pdfLoading: '文件加载中…',
+  pdfFailed: '文件无法在此显示。',
+  pdfOpenInTab: '在新标签页中打开',
+  previousPage: '上一页',
+  nextPage: '下一页',
+  pageList: '页码',
+  pageOf: (page, total) => `第 ${page} 页，共 ${total} 页`,
 };
 
 export const SIGN_MESSAGES: Record<SignLang, SignMessages> = { en, zh };
