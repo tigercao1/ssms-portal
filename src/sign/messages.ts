@@ -42,6 +42,12 @@ export interface SignMessages {
   nextPage: string;
   pageList: string;
   pageOf: (page: number, total: number) => string;
+  review: string;
+  reviewHeading: string;
+  previewNotice: string;
+  previewPageOf: (page: number, total: number) => string;
+  backToEdit: string;
+  confirm: string;
 }
 
 const en: SignMessages = {
@@ -92,6 +98,13 @@ const en: SignMessages = {
   nextPage: 'Next',
   pageList: 'Page',
   pageOf: (page, total) => `Page ${page} of ${total}`,
+  review: 'Review',
+  reviewHeading: 'Check your document',
+  previewNotice: 'Preview, the signed copy is created when you confirm',
+  previewPageOf: (page, total) =>
+    `Preview of page ${page} of ${total} with your answers`,
+  backToEdit: 'Back to edit',
+  confirm: 'Confirm and sign',
 };
 
 const zh: SignMessages = {
@@ -137,6 +150,13 @@ const zh: SignMessages = {
   nextPage: '下一页',
   pageList: '页码',
   pageOf: (page, total) => `第 ${page} 页，共 ${total} 页`,
+  review: '预览并核对',
+  reviewHeading: '请核对文件',
+  previewNotice: '预览：确认后才会生成已签署的副本',
+  previewPageOf: (page, total) =>
+    `第 ${page} 页（共 ${total} 页）预览，含您填写的内容`,
+  backToEdit: '返回修改',
+  confirm: '确认并签署',
 };
 
 export const SIGN_MESSAGES: Record<SignLang, SignMessages> = { en, zh };

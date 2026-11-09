@@ -13,6 +13,7 @@ import {
   fetchSignForm,
   type SignErrorKind,
   type SignField,
+  type SignCompletion,
   type SignForm,
   type SignLang,
 } from './api';
@@ -20,6 +21,7 @@ import { Markdown } from './Markdown';
 import { SIGN_MESSAGES, type SignMessages } from './messages';
 import { OriginalDocument } from './OriginalDocument';
 import { useOriginalPdf } from './pdf/useOriginalPdf';
+import { ReviewStep } from './ReviewStep';
 import { SignaturePadField } from './SignaturePadField';
 import { torontoToday } from './torontoDate';
 
@@ -40,6 +42,8 @@ type LoadState =
   | { status: 'error'; kind: SignErrorKind }
   | { status: 'ready'; form: SignForm }
   | { status: 'signed'; emailed: boolean };
+
+type Step = 'edit' | 'review';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ANSWER_LENGTH = 500;
@@ -63,6 +67,10 @@ function errorKind(error: unknown): SignErrorKind {
 
 function errorReasons(error: unknown): string[] {
   return error instanceof SignApiError ? error.reasons : [];
+}
+
+function hasReviewStep(form: SignForm) {
+  return form.hasOriginalPdf === true && Boolean(form.originalPdf);
 }
 
 function fieldId(key: string) {
@@ -113,7 +121,13 @@ export function WaiverPage({
   const [consentError, setConsentError] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState<Step>('edit');
+  const [pending, setPending] = useState<SignCompletion | null>(null);
+  const sendingRef = useRef(false);
+  const stepChangedRef = useRef(false);
   const signedRef = useRef<HTMLHeadingElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const reviewRef = useRef<HTMLHeadingElement>(null);
   const servedForm = state.status === 'ready' ? state.form : null;
   const originalPdf = useOriginalPdf(
     slug,
@@ -160,6 +174,17 @@ export function WaiverPage({
     signedRef.current?.focus();
   }, [state.status]);
 
+  useEffect(() => {
+    if (!stepChangedRef.current) return;
+    window.scrollTo(0, 0);
+    (step === 'review' ? reviewRef : titleRef).current?.focus();
+  }, [step]);
+
+  const changeStep = (next: Step) => {
+    stepChangedRef.current = true;
+    setStep(next);
+  };
+
   const setAnswer = (key: string, value: string) => {
     setAnswers((current) => ({ ...current, [key]: value }));
     setErrors(({ [key]: _cleared, ...rest }) => rest);
@@ -181,9 +206,9 @@ export function WaiverPage({
     onLangChange(next);
   };
 
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (state.status !== 'ready' || submitting) return;
+    if (state.status !== 'ready' || sendingRef.current) return;
     const { form } = state;
     const nextErrors = validate(
       form.fields,
@@ -213,12 +238,12 @@ export function WaiverPage({
         if (value) answerValues[field.key] = value;
       }
     }
-    const body = {
+    const body: SignCompletion = {
       lang: form.lang,
       version: form.version,
       answers: answerValues,
       signatures: signatureValues,
-      consent: true as const,
+      consent: true,
     };
     if (
       new TextEncoder().encode(JSON.stringify(body)).length > MAX_BODY_BYTES
@@ -226,6 +251,16 @@ export function WaiverPage({
       setNotice({ message: text.payloadTooLarge, reasons: [] });
       return;
     }
+    setNotice(null);
+    if (!hasReviewStep(form)) return void send(form, body);
+    setPending(body);
+    originalPdf.open();
+    changeStep('review');
+  };
+
+  const send = async (form: SignForm, body: SignCompletion) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setNotice(null);
     setSubmitting(true);
     try {
@@ -243,8 +278,10 @@ export function WaiverPage({
             rejected[field.key] = text.notAccepted(field.label);
         setErrors(rejected);
       }
+      if (kind === 'stale' || reasons.length) changeStep('edit');
       if (kind === 'stale') await load();
     } finally {
+      sendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -301,8 +338,27 @@ export function WaiverPage({
     );
 
   const { form } = state;
-  return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-6">
+  const noticeBox = notice && (
+    <p
+      role="alert"
+      className="rounded-md bg-red-tint px-3 py-2 text-sm text-ink"
+    >
+      {notice.message}
+      {notice.reasons.map((reason) => (
+        <span key={reason} className="mt-1 block text-slate">
+          {reason}
+        </span>
+      ))}
+    </p>
+  );
+  const reviewInfo = step === 'review' && pending ? form.originalPdf : null;
+  const editStep = (
+    <form
+      noValidate
+      hidden={Boolean(reviewInfo)}
+      onSubmit={submit}
+      className={reviewInfo ? 'hidden' : 'flex flex-col gap-6'}
+    >
       <div
         role="group"
         aria-label={text.language}
@@ -328,7 +384,13 @@ export function WaiverPage({
           text={text}
         />
       )}
-      <h1 className="text-2xl leading-tight">{form.title}</h1>
+      <h1
+        ref={titleRef}
+        tabIndex={-1}
+        className="text-2xl leading-tight focus:outline-none"
+      >
+        {form.title}
+      </h1>
       <Markdown source={form.bodyMarkdown} />
       <div className="flex flex-col gap-5 border-t border-grey pt-5">
         {form.fields.map((field) => {
@@ -419,27 +481,42 @@ export function WaiverPage({
           </p>
         )}
       </div>
-      {notice && (
-        <p
-          role="alert"
-          className="rounded-md bg-red-tint px-3 py-2 text-sm text-ink"
-        >
-          {notice.message}
-          {notice.reasons.map((reason) => (
-            <span key={reason} className="mt-1 block text-slate">
-              {reason}
-            </span>
-          ))}
-        </p>
-      )}
+      {!reviewInfo && noticeBox}
       <button
         type="submit"
         disabled={submitting}
         className={buttonClasses({ className: 'w-full' })}
       >
         {submitting && <ButtonSpinner />}
-        {submitting ? text.submitting : text.submit}
+        {submitting
+          ? text.submitting
+          : hasReviewStep(form)
+            ? text.review
+            : text.submit}
       </button>
     </form>
+  );
+  return (
+    <>
+      {reviewInfo && pending && (
+        <ReviewStep
+          ref={reviewRef}
+          form={form}
+          info={reviewInfo}
+          pdf={originalPdf}
+          text={text}
+          answers={pending.answers}
+          signatures={pending.signatures}
+          notice={noticeBox}
+          submitting={submitting}
+          onBack={() => {
+            setNotice(null);
+            changeStep('edit');
+          }}
+          onConfirm={() => void send(form, pending)}
+        />
+      )}
+      {editStep}
+    </>
   );
 }
