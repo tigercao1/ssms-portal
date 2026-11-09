@@ -371,6 +371,50 @@ describe('signing site review step', () => {
     await screen.findByText('已签署，副本已发送至您的邮箱。');
   });
 
+  it('places answers on a rotated page whose box is offset, as the signed copy does', async () => {
+    const form = mockSignFormWithPdf('en');
+    serveForm('en');
+    server.use(
+      http.get(`${API}/sign/forms/waiver`, () =>
+        HttpResponse.json({
+          ...form,
+          originalPdf: {
+            pageCount: 1,
+            pages: [{ width: 595, height: 842, rotate: 90, x: 10, y: 20 }],
+            placements: [
+              {
+                key: 'participant_name',
+                page: 1,
+                x: 66,
+                y: 120,
+                w: 250,
+                h: 20,
+              },
+            ],
+          },
+        }),
+      ),
+    );
+    vi.mocked(openPdf).mockImplementation(() =>
+      fakePdf(1, [{ view: [10, 20, 605, 862], rotate: 90 }]),
+    );
+    captureSubmit();
+    const user = userEvent.setup();
+    renderSign();
+    await fillRequired(user);
+
+    await user.click(screen.getByRole('button', { name: 'Review' }));
+
+    const page = await previewPage(1, 1);
+    const scale = 358 / 842;
+    expect(parseFloat(page.style.height)).toBeCloseTo(595 * scale);
+    const name = within(page).getByText('Ada Snow');
+    expect(parseFloat(name.style.left)).toBeCloseTo(100 * scale);
+    expect(parseFloat(name.style.top)).toBeCloseTo(56 * scale);
+    expect(parseFloat(name.style.width)).toBeCloseTo(20 * scale);
+    expect(parseFloat(name.style.height)).toBeCloseTo(250 * scale);
+  });
+
   it('keeps the single-step flow for a form without an original PDF', async () => {
     serveForm('en', false);
     const sent = captureSubmit();
