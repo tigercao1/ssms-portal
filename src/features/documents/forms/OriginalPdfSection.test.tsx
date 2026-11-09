@@ -12,6 +12,7 @@ import {
   createFormsState,
   fakeOriginalPdf,
   formsHandlers,
+  storedPlacement,
   type FormsMockState,
 } from './fixtures';
 import type { FormPlacement } from './api';
@@ -832,5 +833,104 @@ describe('PDF writes that return text changed by another admin', () => {
       await screen.findByText(/changed by someone else, so it was reloaded/),
     ).toBeVisible();
     expect(savedTitle()).toBe(other);
+  });
+});
+
+describe('Publish after positions come back in the order the API stores them', () => {
+  const unsavedPositions = 'Save the field positions before publishing.';
+  const savePositions = () =>
+    screen.getByRole('button', { name: 'Save positions' });
+
+  function attachPlacedPdf() {
+    attachPdf();
+    state.forms[0]!.languages.zh.draft!.placements = [
+      { key: 'participant_name', page: 1, x: 100, y: 700, w: 200, h: 22 },
+      { key: 'email', page: 1, x: 100, y: 650, w: 200, h: 22 },
+      { key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 },
+      { key: 'participant_signature', page: 2, x: 100, y: 100, w: 180, h: 36 },
+    ].map(storedPlacement);
+  }
+
+  function expectPublishable() {
+    expect(publish()).toBeEnabled();
+    expect(screen.queryByText(unsavedPositions)).not.toBeInTheDocument();
+    expect(savePositions()).toBeDisabled();
+  }
+
+  it('does not mark saved positions unsaved when the form opens', async () => {
+    attachPlacedPdf();
+    await openChinese();
+
+    expectPublishable();
+  });
+
+  it('clears the unsaved positions once Save positions succeeds', async () => {
+    attachPdf();
+    const user = await openChinese();
+    for (const label of ['参与者姓名', '电子邮箱', '日期', '参与者签名'])
+      await user.click(
+        screen.getByRole('button', { name: `Place ${label} on the PDF` }),
+      );
+    expect(screen.getByText(unsavedPositions)).toBeVisible();
+
+    await user.click(savePositions());
+
+    expect(await screen.findByText('Field positions saved.')).toBeVisible();
+    expectPublishable();
+  });
+
+  it('keeps Publish enabled after Save positions, a language switch and back', async () => {
+    attachPdf();
+    const user = await openChinese();
+    for (const label of ['参与者姓名', '电子邮箱', '日期', '参与者签名'])
+      await user.click(
+        screen.getByRole('button', { name: `Place ${label} on the PDF` }),
+      );
+    await user.click(savePositions());
+    await screen.findByText('Field positions saved.');
+
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    await user.click(screen.getByRole('tab', { name: 'Chinese' }));
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Leave without saving?' }),
+    ).not.toBeInTheDocument();
+    expectPublishable();
+  });
+
+  it('keeps Publish enabled after making a placed field optional and saving the draft', async () => {
+    attachPlacedPdf();
+    const user = await openChinese();
+
+    await user.click(screen.getByRole('switch', { name: 'Required: 日期' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
+    expectPublishable();
+    expect(placementPuts()).toEqual([]);
+  });
+
+  it('asks only to place a newly required field after saving the draft', async () => {
+    attachPlacedPdf();
+    const user = await openChinese();
+
+    await user.click(
+      screen.getByRole('switch', { name: 'Required: 姓名缩写' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(
+      await screen.findByText(
+        'Place these required fields on the PDF before publishing: 姓名缩写.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(unsavedPositions)).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Place 姓名缩写 on the PDF' }),
+    );
+    await user.click(savePositions());
+    await screen.findByText('Field positions saved.');
+
+    expectPublishable();
   });
 });

@@ -93,6 +93,15 @@ export function fakeForm(overrides: Partial<FormTemplate> = {}): FormTemplate {
   };
 }
 
+export const storedPlacement = ({
+  key,
+  page,
+  x,
+  y,
+  w,
+  h,
+}: FormPlacement): FormPlacement => ({ h, w, x, y, key, page });
+
 export function fakeOriginalPdf(
   overrides: Partial<FormOriginalPdf> = {},
 ): FormOriginalPdf {
@@ -456,7 +465,7 @@ export function formsHandlers(
           if (problem)
             return bad(`The field positions are not valid: ${problem}`);
         }
-        draft.placements = placements;
+        draft.placements = placements.map(storedPlacement);
         draft.updatedAt = stamp(draft);
         return HttpResponse.json(form);
       },

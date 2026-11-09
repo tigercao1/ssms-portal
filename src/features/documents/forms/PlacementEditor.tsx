@@ -48,12 +48,16 @@ function withIds(placements: FormPlacement[]): Placed[] {
   return placements.map((p, i) => ({ ...p, id: `p${i}` }));
 }
 
+function plain({ key, page, x, y, w, h }: FormPlacement): FormPlacement {
+  return { key, page, x, y, w, h };
+}
+
 function withoutIds(items: Placed[]): FormPlacement[] {
-  return items.map(({ key, page, x, y, w, h }) => ({ key, page, x, y, w, h }));
+  return items.map(plain);
 }
 
 function samePlacements(a: FormPlacement[], b: FormPlacement[]): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return JSON.stringify(a.map(plain)) === JSON.stringify(b.map(plain));
 }
 
 export function PlacementEditor({
