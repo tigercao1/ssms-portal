@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
 import {
+  blockOptions,
   bookingProblem,
   fromDraft,
   nextWeekday,
+  resolveBlock,
   schoolInstant,
   schoolParts,
   shiftDate,
+  slotsOnBlock,
   toDraft,
   weekdayOf,
 } from './bookingRules';
@@ -101,5 +104,34 @@ describe('bookingProblem', () => {
       message: 'Cancelled classes cannot be edited',
     });
     expect(bookingProblem(new Error('x'))).toEqual({ kind: 'unknown' });
+  });
+});
+
+describe('start time blocks', () => {
+  const at = (time: string) => schoolInstant('2026-12-12', time);
+  const quarter = ['09:00', '09:15', '09:30', '09:45', '10:00'].map(at);
+
+  it('keeps starts on the block and shows every slot at or below the slot size', () => {
+    expect(slotsOnBlock(quarter, 60, 15)).toEqual([at('09:00'), at('10:00')]);
+    expect(slotsOnBlock(quarter, 30, 15)).toEqual(
+      ['09:00', '09:30', '10:00'].map(at),
+    );
+    expect(slotsOnBlock(quarter, 15, 15)).toEqual(quarter);
+  });
+
+  it('offers only block sizes that show something different', () => {
+    expect(blockOptions(quarter, 15)).toEqual([60, 30, 15]);
+    expect(blockOptions(['09:00', '09:30', '10:00'].map(at), 30)).toEqual([
+      60, 30,
+    ]);
+    expect(blockOptions(['09:00', '10:00'].map(at), 60)).toEqual([60]);
+    expect(blockOptions(['09:15', '09:45'].map(at), 30)).toEqual([30]);
+  });
+
+  it('falls back to the offered block that shows the same starts', () => {
+    const hourly = ['09:00', '10:00'].map(at);
+    expect(resolveBlock(30, hourly, 60)).toBe(60);
+    expect(resolveBlock(60, ['09:15', '09:45'].map(at), 30)).toBe(30);
+    expect(resolveBlock(15, quarter, 15)).toBe(15);
   });
 });

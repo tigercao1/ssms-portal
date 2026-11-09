@@ -104,14 +104,58 @@ export function formatSchoolDateTime(iso: string, locale: Locale): string {
   }).format(new Date(iso));
 }
 
-export function overlaps(
-  startIso: string,
-  durationMin: number,
-  block: { start: string; end: string },
-): boolean {
-  const start = Date.parse(startIso);
-  const end = start + durationMin * MINUTE_MS;
-  return Date.parse(block.start) < end && Date.parse(block.end) > start;
+export function addMinutes(iso: string, minutes: number): string {
+  return new Date(Date.parse(iso) + minutes * MINUTE_MS).toISOString();
+}
+
+export const BLOCK_SIZES = [60, 30, 15] as const;
+export type BlockSize = (typeof BLOCK_SIZES)[number];
+
+function minuteOfDay(iso: string): number {
+  const [h = 0, m = 0] = schoolParts(iso).time.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function slotsOnBlock(
+  slots: string[],
+  block: BlockSize,
+  slotMinutes: number,
+): string[] {
+  if (block <= slotMinutes) return slots;
+  return slots.filter((slot) => minuteOfDay(slot) % block === 0);
+}
+
+export function blockOptions(
+  slots: string[],
+  slotMinutes: number,
+): BlockSize[] {
+  const seen = new Set<string>();
+  const options: BlockSize[] = [];
+  for (const block of BLOCK_SIZES) {
+    const shown = slotsOnBlock(slots, block, slotMinutes);
+    const key = shown.join();
+    if (shown.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    options.push(block);
+  }
+  return options;
+}
+
+export function resolveBlock(
+  chosen: BlockSize,
+  slots: string[],
+  slotMinutes: number,
+): BlockSize {
+  const options = blockOptions(slots, slotMinutes);
+  if (options.includes(chosen)) return chosen;
+  const key = slotsOnBlock(slots, chosen, slotMinutes).join();
+  return (
+    options.find(
+      (block) => slotsOnBlock(slots, block, slotMinutes).join() === key,
+    ) ??
+    options.at(-1) ??
+    chosen
+  );
 }
 
 export function isTimeOfDay(value: string): boolean {
