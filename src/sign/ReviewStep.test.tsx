@@ -49,6 +49,7 @@ vi.mock('signature_pad', () => ({
 const API = 'http://localhost:3000';
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 const SIGNED_URL = 'https://r2.example.test/original.pdf?X-Amz-Signature=abc';
+const ORIGINAL_ROUTE = `${import.meta.env.VITE_SIGN_API_BASE_URL ?? ''}/sign/forms/waiver/original?lang=en`;
 
 const EN = {
   name: 'Participant name',
@@ -95,6 +96,54 @@ async function fillRequired(
   await user.type(screen.getByLabelText(labels.email), 'ada@example.com');
   act(() => pads[0]!.draw());
   await user.click(screen.getByRole('checkbox', { name: labels.consent }));
+}
+
+function serveVersionedForm() {
+  const served = { version: 3, urls: 0, pdfFailures: 0 };
+  let releaseV4: () => void = () => {};
+  const v4Ready = new Promise<void>((resolve) => {
+    releaseV4 = resolve;
+  });
+  server.use(
+    http.get(`${API}/sign/forms/waiver`, () => {
+      const form = mockSignFormWithPdf('en', served.version);
+      if (served.version === 4 && form.originalPdf)
+        form.originalPdf = {
+          pageCount: 3,
+          pages: [...form.originalPdf.pages, { width: 612, height: 792 }],
+          placements: [
+            { key: 'participant_name', page: 3, x: 100, y: 700, w: 200, h: 12 },
+          ],
+        };
+      return HttpResponse.json(form);
+    }),
+    http.get(`${API}/sign/forms/waiver/original`, () => {
+      served.urls += 1;
+      return HttpResponse.json({
+        url: `https://r2.example.test/v${served.version}.pdf`,
+        expiresAt: '2026-11-08T03:35:00Z',
+      });
+    }),
+    http.get('https://r2.example.test/:file', async ({ params }) => {
+      if (params.file === 'v4.pdf') {
+        await v4Ready;
+        if (served.pdfFailures-- > 0) return HttpResponse.error();
+      }
+      return HttpResponse.arrayBuffer(
+        new Uint8Array([params.file === 'v4.pdf' ? 4 : 3]).buffer,
+      );
+    }),
+  );
+  vi.mocked(openPdf).mockImplementation((source) =>
+    fakePdf(source[0] === 4 ? 3 : 2),
+  );
+  return { served, releaseV4 };
+}
+
+function staleOnce() {
+  return captureSubmit(() =>
+    HttpResponse.json({ message: 'stale' }, { status: 409 }),
+  );
 }
 
 function renderSign(search = '?lang=en') {
@@ -337,7 +386,7 @@ describe('signing site review step', () => {
     expect(alert).toHaveTextContent('The document could not be shown here.');
     expect(
       within(alert).getByRole('link', { name: 'Open in a new tab' }),
-    ).toHaveAttribute('href', SIGNED_URL);
+    ).toHaveAttribute('href', ORIGINAL_ROUTE);
     await user.click(within(alert).getByRole('button', { name: 'Try again' }));
     expect(
       within(await previewPage(2)).getByText('Ada Snow'),
@@ -413,6 +462,70 @@ describe('signing site review step', () => {
     expect(parseFloat(name.style.top)).toBeCloseTo(56 * scale);
     expect(parseFloat(name.style.width)).toBeCloseTo(20 * scale);
     expect(parseFloat(name.style.height)).toBeCloseTo(250 * scale);
+  });
+
+  it('shows the new version’s original after a stale Confirm, never the old PDF under the new places', async () => {
+    const { served, releaseV4 } = serveVersionedForm();
+    const sent = staleOnce();
+    const user = userEvent.setup();
+    renderSign();
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: 'Review' }));
+    expect(within(await previewPage(2)).getByText('Ada Snow')).toBeVisible();
+
+    served.version = 4;
+    await user.click(screen.getByRole('button', { name: 'Confirm and sign' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This form was just updated. We loaded the latest version',
+    );
+    await waitFor(() => expect(served.urls).toBe(2));
+    await user.click(screen.getByRole('button', { name: 'Review' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading');
+    expect(screen.queryByRole('img', { name: /^Preview of page/ })).toBeNull();
+    expect(screen.queryByText('Ada Snow')).toBeNull();
+
+    act(() => releaseV4());
+    const third = await previewPage(3, 3);
+    expect(within(third).getByText('Ada Snow')).toBeVisible();
+    expect(
+      screen.queryByRole('img', { name: /of 2 with your answers/ }),
+    ).toBeNull();
+    expect(served.urls).toBe(2);
+    expect(vi.mocked(openPdf).mock.calls.map(([source]) => source[0])).toEqual([
+      3, 4,
+    ]);
+    expect(
+      await vi.mocked(openPdf).mock.results[0]!.value.destroy,
+    ).toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Confirm and sign' }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent.map((body) => body.version)).toEqual([3, 4]);
+  });
+
+  it('offers retry when the new version’s original cannot be fetched after a stale Confirm', async () => {
+    const { served, releaseV4 } = serveVersionedForm();
+    staleOnce();
+    const user = userEvent.setup();
+    renderSign();
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: 'Review' }));
+    await previewPage(2);
+
+    served.version = 4;
+    served.pdfFailures = 2;
+    act(() => releaseV4());
+    await user.click(screen.getByRole('button', { name: 'Confirm and sign' }));
+    await screen.findByText(/This form was just updated/);
+    await user.click(screen.getByRole('button', { name: 'Review' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The document could not be shown here.');
+    expect(screen.queryByText('Ada Snow')).toBeNull();
+    await user.click(within(alert).getByRole('button', { name: 'Try again' }));
+    expect(within(await previewPage(3, 3)).getByText('Ada Snow')).toBeVisible();
+    expect(served.urls).toBe(4);
   });
 
   it('keeps the single-step flow for a form without an original PDF', async () => {
