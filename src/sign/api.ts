@@ -9,6 +9,29 @@ export interface SignField {
   required: boolean;
 }
 
+export interface SignPlacement {
+  key: string;
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface SignPdfPage {
+  width: number;
+  height: number;
+  rotate?: 0 | 90 | 180 | 270;
+  x?: number;
+  y?: number;
+}
+
+export interface SignOriginalPdf {
+  pageCount: number;
+  pages: SignPdfPage[];
+  placements: SignPlacement[];
+}
+
 export interface SignForm {
   slug: string;
   lang: SignLang;
@@ -16,6 +39,13 @@ export interface SignForm {
   title: string;
   bodyMarkdown: string;
   fields: SignField[];
+  hasOriginalPdf?: boolean;
+  originalPdf?: SignOriginalPdf | null;
+}
+
+export interface SignOriginalPdfUrl {
+  url: string;
+  expiresAt: string;
 }
 
 export interface SignCompletion {
@@ -100,6 +130,42 @@ export function fetchSignForm(
     `/sign/forms/${encodeURIComponent(slug)}?lang=${lang}`,
     { method: 'GET', signal },
   );
+}
+
+function originalPath(slug: string, lang: SignLang) {
+  return `/sign/forms/${encodeURIComponent(slug)}/original?lang=${lang}`;
+}
+
+export function originalPdfHref(slug: string, lang: SignLang): string {
+  return `${apiBase}${originalPath(slug, lang)}`;
+}
+
+export function fetchOriginalPdfUrl(
+  slug: string,
+  lang: SignLang,
+  signal?: AbortSignal,
+): Promise<SignOriginalPdfUrl> {
+  return request<SignOriginalPdfUrl>(
+    `${originalPath(slug, lang)}&format=json`,
+    {
+      method: 'GET',
+      signal,
+    },
+  );
+}
+
+export async function fetchPdfBytes(
+  url: string,
+  signal?: AbortSignal,
+): Promise<Uint8Array> {
+  let res: Response;
+  try {
+    res = await fetch(url, { credentials: 'omit', signal });
+  } catch {
+    throw new SignApiError('failed', 0);
+  }
+  if (!res.ok) throw new SignApiError('failed', res.status);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 export function completeSignForm(

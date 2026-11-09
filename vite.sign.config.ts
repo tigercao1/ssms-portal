@@ -4,7 +4,9 @@ import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 import tailwindConfig from './tailwind.config';
 import { fileURLToPath, URL } from 'node:url';
-import { mockSignForm } from './src/sign/mock/fixtures';
+import { cpSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { mockSignForm, mockSignFormWithPdf } from './src/sign/mock/fixtures';
 
 const SIGN_CONTENT = [
   './sign/index.html',
@@ -15,6 +17,12 @@ const SIGN_CONTENT = [
 ];
 const MOCK_API_PATH = '/mock-api';
 const PRODUCTION_SIGN_API_BASE_URL = 'https://sign-api.ssnow.club';
+const MOCK_PLAIN_SLUG = 'plain';
+const MOCK_PDF_PATH = '/files/original.pdf';
+const PDF_ASSET_DIRS = ['cmaps', 'standard_fonts'];
+const pdfjsRoot = fileURLToPath(
+  new URL('./node_modules/pdfjs-dist/', import.meta.url),
+);
 const MOCK_SUBMIT_STATUS: Record<string, number> = {
   stale: 409,
   invalid: 400,
@@ -28,7 +36,15 @@ function signMockApi(): Plugin {
     configureServer(server) {
       server.middlewares.use(MOCK_API_PATH, (req, res) => {
         const url = new URL(req.url ?? '/', 'http://mock');
-        const match = /^\/sign\/forms\/([^/]+)(\/complete)?$/.exec(
+        if (url.pathname === MOCK_PDF_PATH) {
+          res.setHeader('Content-Type', 'application/pdf');
+          return res.end(
+            readFileSync(
+              new URL('./src/sign/mock/original.pdf', import.meta.url),
+            ),
+          );
+        }
+        const match = /^\/sign\/forms\/([^/]+)(\/complete|\/original)?$/.exec(
           url.pathname,
         );
         const send = (status: number, body: unknown) => {
@@ -39,11 +55,17 @@ function signMockApi(): Plugin {
         const slug = match?.[1];
         if (!slug || slug === 'missing')
           return send(404, { message: 'Not found' });
+        const lang = url.searchParams.get('lang') === 'en' ? 'en' : 'zh';
+        if (match[2] === '/original')
+          return send(200, {
+            url: `${MOCK_API_PATH}${MOCK_PDF_PATH}`,
+            expiresAt: new Date(Date.now() + 300_000).toISOString(),
+          });
         if (!match[2])
           return send(200, {
-            ...mockSignForm(
-              url.searchParams.get('lang') === 'en' ? 'en' : 'zh',
-            ),
+            ...(slug === MOCK_PLAIN_SLUG
+              ? mockSignForm(lang)
+              : mockSignFormWithPdf(lang)),
             slug,
           });
         const status = MOCK_SUBMIT_STATUS[slug];
@@ -55,6 +77,34 @@ function signMockApi(): Plugin {
             })
           : send(201, { status: 'signed', emailed: true });
       });
+    },
+  };
+}
+
+function pdfjsAssets(): Plugin {
+  let outDir = '';
+  return {
+    name: 'sign-pdfjs-assets',
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    configureServer(server) {
+      for (const dir of PDF_ASSET_DIRS)
+        server.middlewares.use(`/pdfjs/${dir}/`, (req, res, next) => {
+          const name = (req.url ?? '').split('?')[0]?.replace(/^\/+/, '');
+          if (!name || !/^[\w.-]+$/.test(name)) return next();
+          try {
+            res.end(readFileSync(join(pdfjsRoot, dir, name)));
+          } catch {
+            next();
+          }
+        });
+    },
+    writeBundle() {
+      for (const dir of PDF_ASSET_DIRS)
+        cpSync(join(pdfjsRoot, dir), join(outDir, 'pdfjs', dir), {
+          recursive: true,
+        });
     },
   };
 }
@@ -72,7 +122,11 @@ export default defineConfig(({ mode }) => ({
   root: fileURLToPath(new URL('./sign', import.meta.url)),
   envDir: ENV_DIR,
   publicDir: 'public',
-  plugins: [react(), ...(mode === 'mock' ? [signMockApi()] : [])],
+  plugins: [
+    react(),
+    pdfjsAssets(),
+    ...(mode === 'mock' ? [signMockApi()] : []),
+  ],
   define: {
     'import.meta.env.VITE_SIGN_API_BASE_URL': JSON.stringify(
       signApiBaseUrl(mode),

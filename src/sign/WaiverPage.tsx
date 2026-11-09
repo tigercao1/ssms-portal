@@ -18,6 +18,8 @@ import {
 } from './api';
 import { Markdown } from './Markdown';
 import { SIGN_MESSAGES, type SignMessages } from './messages';
+import { OriginalDocument } from './OriginalDocument';
+import { useOriginalPdf } from './pdf/useOriginalPdf';
 import { SignaturePadField } from './SignaturePadField';
 import { torontoToday } from './torontoDate';
 
@@ -112,6 +114,13 @@ export function WaiverPage({
   const [notice, setNotice] = useState<Notice | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const signedRef = useRef<HTMLHeadingElement>(null);
+  const servedForm = state.status === 'ready' ? state.form : null;
+  const originalPdf = useOriginalPdf(
+    slug,
+    servedForm?.lang ?? lang,
+    servedForm?.version ?? null,
+    servedForm?.hasOriginalPdf === true,
+  );
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -312,6 +321,13 @@ export function WaiverPage({
           </button>
         ))}
       </div>
+      {form.hasOriginalPdf && (
+        <OriginalDocument
+          pdf={originalPdf}
+          info={form.originalPdf ?? null}
+          text={text}
+        />
+      )}
       <h1 className="text-2xl leading-tight">{form.title}</h1>
       <Markdown source={form.bodyMarkdown} />
       <div className="flex flex-col gap-5 border-t border-grey pt-5">

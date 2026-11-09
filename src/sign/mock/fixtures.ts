@@ -1,4 +1,10 @@
-import type { SignField, SignForm, SignLang } from '../api';
+import type {
+  SignField,
+  SignForm,
+  SignLang,
+  SignOriginalPdf,
+  SignPlacement,
+} from '../api';
 
 const FIELD_LABELS: Record<SignLang, Record<string, string>> = {
   en: {
@@ -79,5 +85,35 @@ export function mockSignForm(lang: SignLang, version = 3): SignForm {
       ...field,
       label: FIELD_LABELS[lang][field.key] ?? field.key,
     })),
+  };
+}
+
+const MOCK_PLACEMENTS: SignPlacement[] = [
+  { key: 'initials', page: 1, x: 432, y: 611.5, w: 128, h: 11 },
+  { key: 'date', page: 2, x: 76, y: 124.3, w: 225, h: 10.8 },
+  { key: 'id_number', page: 2, x: 335, y: 124.3, w: 226, h: 10.8 },
+  { key: 'participant_signature', page: 2, x: 56, y: 92.5, w: 250, h: 17.8 },
+  { key: 'guardian_signature', page: 2, x: 316, y: 92.5, w: 245, h: 17.8 },
+  { key: 'participant_name', page: 2, x: 56, y: 66.1, w: 250, h: 12.4 },
+  { key: 'guardian_name', page: 2, x: 316, y: 66.1, w: 245, h: 12.4 },
+  { key: 'witness_name', page: 2, x: 56, y: 38.1, w: 250, h: 14 },
+  { key: 'witness_signature', page: 2, x: 316, y: 34, w: 245, h: 18.1 },
+  { key: 'email', page: 2, x: 52, y: 14, w: 300, h: 11 },
+];
+
+export const MOCK_ORIGINAL_PDF: SignOriginalPdf = {
+  pageCount: 2,
+  pages: [
+    { width: 612, height: 792 },
+    { width: 612, height: 792 },
+  ],
+  placements: MOCK_PLACEMENTS,
+};
+
+export function mockSignFormWithPdf(lang: SignLang, version = 3): SignForm {
+  return {
+    ...mockSignForm(lang, version),
+    hasOriginalPdf: true,
+    originalPdf: MOCK_ORIGINAL_PDF,
   };
 }
