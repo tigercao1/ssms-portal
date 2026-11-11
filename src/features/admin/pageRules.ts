@@ -1,4 +1,4 @@
-export const MAX_PAGE_BYTES = 2_097_152;
+export const MAX_PAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_SLUG_LENGTH = 80;
 export const MAX_TITLE_LENGTH = 200;
 
