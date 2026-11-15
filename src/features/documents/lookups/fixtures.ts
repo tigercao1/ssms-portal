@@ -57,11 +57,23 @@ export const sampleSigners: Signer[] = [
         templateId: 'tpl-waiver-form',
         titleEn: 'Liability waiver',
         titleZh: '免责声明',
-        kind: 'sign',
+        kind: 'form',
         language: 'zh',
         formVersion: 2,
         signedAt: '2026-11-08T03:30:00Z',
         hasSignedCopy: true,
+        validThisYear: true,
+      },
+      {
+        assignmentId: 'asg-rules-lily',
+        templateId: 'tpl-hill-rules',
+        titleEn: 'Hill safety rules',
+        titleZh: '雪场安全须知',
+        kind: 'read',
+        language: null,
+        formVersion: null,
+        signedAt: '2026-11-08T03:20:00Z',
+        hasSignedCopy: false,
         validThisYear: true,
       },
     ],
@@ -118,7 +130,7 @@ export const sampleSigners: Signer[] = [
         templateId: 'tpl-waiver-form',
         titleEn: 'Liability waiver',
         titleZh: '免责声明',
-        kind: 'sign',
+        kind: 'form',
         language: 'zh',
         formVersion: 2,
         signedAt: '2026-10-30T18:00:00Z',
@@ -208,8 +220,11 @@ const includes = (value: string | null, q: string) =>
 const newestFirst = (a: { signedAt: string }, b: { signedAt: string }) =>
   b.signedAt.localeCompare(a.signedAt);
 
+const isWaiverKind = (e: { kind: string }) =>
+  e.kind === 'form' || e.kind === 'sign';
+
 function waiverOf(signatures: Signer['signatures']): CustomerWaiver {
-  const signed = signatures.filter((e) => e.kind === 'sign').sort(newestFirst);
+  const signed = signatures.filter(isWaiverKind).sort(newestFirst);
   const current = signed.filter((e) => e.validThisYear !== false);
   const latest = current[0] ?? signed[0];
   return {
@@ -251,7 +266,7 @@ export function lookupsHandlers(
       const entries = state.signers
         .filter((s) => s.email?.toLowerCase() === email)
         .flatMap((s) => s.signatures)
-        .filter((e) => e.kind === 'sign');
+        .filter(isWaiverKind);
       const waiver = waiverOf(entries);
       const result: SignatureCheck = {
         signed: waiver.status === 'signed',
@@ -285,7 +300,7 @@ export function lookupsHandlers(
         const customer = state.customers.find((c) => c.id === customerId);
         if (!from || !entry || !customer)
           return HttpResponse.json({ message: 'Not found' }, { status: 404 });
-        if (from.subjectType !== 'customer' || entry.kind !== 'sign')
+        if (from.subjectType !== 'customer')
           return HttpResponse.json(
             { message: 'Not a completed customer signature' },
             { status: 400 },

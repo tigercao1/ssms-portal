@@ -195,7 +195,7 @@ describe('Waiver status for this waiver year', () => {
     await search('lily');
     const lily = await waitFor(() => person('Lily Chen'));
     expect(within(lily).getByText('Waiver signed Nov 7, 2026')).toBeVisible();
-    expect(within(lily).getByText('Valid this waiver year')).toBeVisible();
+    expect(within(lily).getAllByText('Valid this waiver year')).toHaveLength(2);
   });
 
   it('asks for a re-sign when the only waiver is from an earlier year', async () => {
@@ -279,6 +279,30 @@ describe('Link a signature to a customer', () => {
     expect(
       screen.queryByRole('button', { name: /to a customer/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it('offers the link on customer form and sign waivers but not on read acknowledgements', async () => {
+    const user = await search('lily');
+    const lily = await waitFor(() => person('Lily Chen'));
+    expect(within(lily).getByText('Hill safety rules')).toBeVisible();
+    expect(
+      within(lily).getByRole('button', {
+        name: 'Link Liability waiver signed by Lily Chen to a customer',
+      }),
+    ).toBeVisible();
+    expect(
+      within(lily).queryByRole('button', { name: /^Link Hill safety rules/ }),
+    ).not.toBeInTheDocument();
+
+    const box = screen.getByRole('searchbox', { name: 'Name or email' });
+    await user.clear(box);
+    await user.type(box, 'max');
+    const max = await waitFor(() => person('Max Müller'));
+    expect(
+      within(max).getByRole('button', {
+        name: 'Link Liability waiver signed by Max Müller to a customer',
+      }),
+    ).toBeVisible();
   });
 
   it('links after a confirmation naming both customers, then refreshes the list', async () => {

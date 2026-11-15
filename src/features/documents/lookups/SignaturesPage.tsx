@@ -26,6 +26,8 @@ import { LinkSignatureDialog } from './LinkSignatureDialog';
 import { EMAIL_SHAPE, SignatureCheckBox } from './SignatureCheckBox';
 import { WaiverBadge } from './WaiverBadge';
 
+const LINKABLE_KINDS = new Set(['form', 'sign']);
+
 interface LinkRequest {
   entry: SignedDocumentEntry;
   title: string;
@@ -173,7 +175,8 @@ function SignerCard({
                 entry={entry}
                 name={name}
                 onLink={
-                  signer.subjectType === 'customer' && entry.kind === 'sign'
+                  signer.subjectType === 'customer' &&
+                  LINKABLE_KINDS.has(entry.kind)
                     ? onLink
                     : undefined
                 }
