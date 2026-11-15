@@ -118,10 +118,12 @@ export function CustomerPicker({
   selected,
   onChange,
   forBooking = true,
+  disabled = false,
 }: {
   selected: PickedCustomer[];
   onChange: (next: PickedCustomer[]) => void;
   forBooking?: boolean;
+  disabled?: boolean;
 }) {
   const t = useT();
   const listId = useId();
@@ -145,6 +147,7 @@ export function CustomerPicker({
   const optionId = (index: number) => `${listId}-${index}`;
 
   function add(customer: PickedCustomer) {
+    if (disabled) return;
     onChange([...selected, customer]);
     setDraft('');
   }
@@ -195,7 +198,8 @@ export function CustomerPicker({
               </span>
               <button
                 type="button"
-                className="min-h-11 min-w-11 rounded-md hover:bg-grey"
+                className="min-h-11 min-w-11 rounded-md hover:bg-grey disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
                 aria-label={t.booking.removeCustomer.replace(
                   '{name}',
                   pickedName(c),
@@ -225,6 +229,7 @@ export function CustomerPicker({
                 activeIndex >= 0 ? optionId(activeIndex) : undefined
               }
               value={draft}
+              disabled={disabled}
               onChange={(e) => {
                 setDraft(e.target.value);
                 setDismissed(false);
@@ -243,6 +248,7 @@ export function CustomerPicker({
           <Button
             variant="secondary"
             type="button"
+            disabled={disabled}
             onClick={() => setCreating(true)}
             className="mt-2.5 justify-self-start sm:col-start-2 sm:row-start-1 sm:mt-0 sm:self-end"
           >

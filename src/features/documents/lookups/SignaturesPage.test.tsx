@@ -377,6 +377,50 @@ describe('Link a signature to a customer', () => {
     },
   );
 
+  it('locks the target customer and the button while a link is pending', async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const posted: string[] = [];
+    server.use(
+      http.post(`${API}/admin/signatures/:id/link`, async ({ request }) => {
+        posted.push(
+          ((await request.clone().json()) as { customerId: string }).customerId,
+        );
+        await held;
+      }),
+    );
+    const { user, dialog } = await openLink();
+    await pickWangFang(user, dialog);
+    const button = within(dialog).getByRole('button', {
+      name: 'Link signature',
+    });
+    await user.click(button);
+    await waitFor(() => expect(posted).toEqual(['cu-wang']));
+
+    const remove = within(dialog).getByRole('button', {
+      name: 'Remove Wang Fang',
+    });
+    expect(remove).toBeDisabled();
+    expect(within(dialog).getByLabelText('Find a customer')).toBeDisabled();
+    expect(button).toBeDisabled();
+    await user.click(remove);
+    await user.click(button);
+    expect(
+      within(dialog).getByRole('list', { name: 'Selected customers' }),
+    ).toHaveTextContent('Wang Fang');
+
+    release();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(posted).toEqual(['cu-wang']);
+    expect(state.links).toEqual([
+      { assignmentId: 'asg-waiver-fang', customerId: 'cu-wang' },
+    ]);
+  });
+
   it('closes without linking on Cancel', async () => {
     const { user, dialog } = await openLink();
     await pickWangFang(user, dialog);

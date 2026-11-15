@@ -44,7 +44,7 @@ export function LinkSignatureDialog({
   const link = useLinkSignature();
 
   function confirm() {
-    if (!picked) return;
+    if (!picked || link.isPending) return;
     link.mutate(
       { assignmentId: entry.assignmentId, customerId: picked.id },
       { onSuccess: onLinked },
@@ -61,8 +61,10 @@ export function LinkSignatureDialog({
       </p>
       <CustomerPicker
         forBooking={false}
+        disabled={link.isPending}
         selected={picked ? [picked] : []}
         onChange={(next) => {
+          if (link.isPending) return;
           setPicked(next.at(-1) ?? null);
           link.reset();
         }}
@@ -82,7 +84,11 @@ export function LinkSignatureDialog({
         <Button variant="secondary" onClick={onClose}>
           {t.common.cancel}
         </Button>
-        <Button disabled={!picked} loading={link.isPending} onClick={confirm}>
+        <Button
+          disabled={!picked || link.isPending}
+          loading={link.isPending}
+          onClick={confirm}
+        >
           {s.linkButton}
         </Button>
       </div>
