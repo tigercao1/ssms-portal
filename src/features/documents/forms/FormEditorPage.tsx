@@ -27,7 +27,6 @@ import {
   isConflict,
   publicFormUrl,
   sameDraft,
-  unplacedRequired,
   useDraftRevision,
   useForm,
   useFormWriting,
@@ -35,10 +34,19 @@ import {
   useReloadForm,
   useSaveFormDraft,
   useUpdateForm,
-  type FormDraft,
   type FormTemplate,
 } from './api';
-import { FieldList, fieldsProblem } from './FieldList';
+import { FieldList } from './FieldList';
+import {
+  fieldIssues,
+  fieldsProblem,
+  publishProblems,
+  toEditor,
+  toFormDraft,
+  type DraftField,
+  type DraftPlacement,
+  type EditorDraft,
+} from './formFields';
 import { OriginalPdfSection } from './OriginalPdfSection';
 
 export function FormEditorPage() {
@@ -267,52 +275,34 @@ function LanguageEditor({
   const s = t.signingForms;
   const { draft, published } = form.languages[lang];
   const baseline = baselineOf(form, lang);
-  const [values, setValues] = useState<FormDraft>(baseline);
+  const [values, setValues] = useState<EditorDraft>(() => toEditor(baseline));
   const [mode, setMode] = useState<'write' | 'preview'>('write');
-  const [{ updatedAt: revision, text: loaded }, setRevision] = useDraftRevision(
-    form,
-    lang,
-  );
-  const [reloaded, setReloaded] = useState<{ mine: FormDraft | null } | null>(
+  const [{ updatedAt: revision }, setRevision] = useDraftRevision(form, lang);
+  const [reloaded, setReloaded] = useState<{ mine: EditorDraft | null } | null>(
     null,
   );
-  const [reloads, setReloads] = useState(0);
   const latest = useRef(values);
   latest.current = values;
-  const loadedText = useRef(loaded);
-  loadedText.current = loaded;
-  const textDirty = useRef(false);
+  const latestBaseline = useRef(baseline);
+  latestBaseline.current = baseline;
   const save = useSaveFormDraft(form.id, lang);
   const publish = usePublishForm(form.id, lang);
   const reload = useReloadForm(form.id);
   const writing = useFormWriting(form.id, lang);
-  const dirty = !sameDraft(values, baseline);
+  const current = toFormDraft(values);
+  const dirty = !sameDraft(current, baseline);
+  const textDirty = useRef(false);
   textDirty.current = dirty;
-  const savedOther = useRef(false);
-  savedOther.current =
-    save.isSuccess &&
-    !sameDraft(baselineOf(save.data, lang), {
-      title: save.variables.title,
-      bodyMarkdown: save.variables.bodyMarkdown,
-      fields: save.variables.fields,
-    });
-  const [placementsDirty, setPlacementsDirty] = useState(false);
-  const unsaved = dirty || placementsDirty || !!reloaded?.mine;
+  const unsaved = dirty || !!reloaded?.mine;
+  const issues = fieldIssues(values.fields, t);
   const problem = fieldsProblem(values.fields, t);
-  const incomplete = !values.title.trim() || !values.bodyMarkdown.trim();
-  const unplaced = draft ? unplacedRequired(draft) : [];
+  const incomplete = !values.title.trim();
+  const hasPdf = !!(draft ?? published)?.originalPdf;
   const publishBlocked = dirty
     ? s.publishUnsaved
     : !draft
       ? s.publishNeedsDraft
-      : placementsDirty
-        ? s.publishPlacementsUnsaved
-        : unplaced.length > 0
-          ? s.publishNeedsPlacements.replace(
-              '{fields}',
-              unplaced.map((f) => f.label).join(', '),
-            )
-          : null;
+      : publishProblems(draft, t).join(' ') || null;
 
   useEffect(() => {
     onDirtyChange(unsaved);
@@ -327,62 +317,73 @@ function LanguageEditor({
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [unsaved]);
 
-  const edit = (patch: Partial<FormDraft>) => {
+  const edit = (patch: Partial<EditorDraft>) => {
     setValues((v) => ({ ...v, ...patch }));
     if (!publish.isPending) publish.reset();
   };
+
+  const editFields = (fields: DraftField[], placements: DraftPlacement[]) =>
+    edit({ fields, placements });
 
   const showFresh = (fresh: FormTemplate) => {
     save.reset();
     publish.reset();
     setRevision(fresh);
-    setValues(baselineOf(fresh, lang));
+    setValues(toEditor(baselineOf(fresh, lang)));
   };
 
-  const reloadAfterConflict = (keepMine: (mine: FormDraft) => boolean) =>
+  const reloadAfterConflict = (keepMine: (mine: EditorDraft) => boolean) =>
     reload().then(
       (fresh) => {
         const mine = latest.current;
         showFresh(fresh);
-        setReloads((n) => n + 1);
         setReloaded({ mine: keepMine(mine) ? mine : null });
       },
       () => undefined,
     );
 
   const adoptPdfWrite = (next: FormTemplate) => {
-    const known = loadedText.current;
-    const fresh = baselineOf(next, lang);
     const mine = latest.current;
-    if (
-      sameDraft(fresh, known) &&
-      (!savedOther.current || sameDraft(mine, fresh))
-    )
-      return;
+    const before = latestBaseline.current;
     showFresh(next);
-    if (!sameDraft(mine, known)) setReloaded({ mine });
+    if (!sameDraft(toFormDraft(mine), before)) setReloaded({ mine });
   };
 
-  const saveDraft = () => {
+  const saveDraft = (onDone?: (saved: boolean) => void) => {
     const sent = values;
+    const body = toFormDraft(sent);
     publish.reset();
     setReloaded(null);
     save.mutate(
       {
-        title: sent.title.trim(),
-        bodyMarkdown: sent.bodyMarkdown,
-        fields: sent.fields.map((f) => ({ ...f, label: f.label.trim() })),
+        ...body,
+        title: body.title.trim(),
+        fields: body.fields.map((f) => ({ ...f, label: f.label.trim() })),
         expectedUpdatedAt: revision,
       },
       {
-        onSuccess: (next) =>
-          setValues((v) => (v === sent ? baselineOf(next, lang) : v)),
+        onSuccess: (next) => {
+          const fresh = baselineOf(next, lang);
+          setValues((v) =>
+            v === sent && !sameDraft(toFormDraft(v), fresh)
+              ? toEditor(fresh)
+              : v,
+          );
+          onDone?.(true);
+        },
         onError: (err) => {
           if (isConflict(err)) void reloadAfterConflict(() => true);
+          onDone?.(false);
         },
       },
     );
   };
+
+  const ensureDraft = () =>
+    new Promise<boolean>((resolve) => {
+      if (problem !== null || incomplete) resolve(false);
+      else saveDraft(resolve);
+    });
 
   return (
     <div className="flex flex-col gap-5 pt-4">
@@ -423,10 +424,7 @@ function LanguageEditor({
 
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-medium text-navy">
-              {s.body}
-              <span className="ml-0.5 text-red">*</span>
-            </span>
+            <span className="text-sm font-medium text-navy">{s.body}</span>
             <div
               role="group"
               aria-label={s.bodyModes}
@@ -484,8 +482,11 @@ function LanguageEditor({
         </div>
         <FieldList
           fields={values.fields}
-          defaults={form.defaultFields[lang]}
-          onChange={(fields) => edit({ fields })}
+          placements={values.placements}
+          hasPdf={hasPdf}
+          lang={lang}
+          issues={issues}
+          onChange={editFields}
         />
         {problem && (
           <p role="alert" className="text-sm text-status-rejected">
@@ -498,11 +499,13 @@ function LanguageEditor({
         form={form}
         lang={lang}
         sourceRecovery={sourceRecovery}
-        revision={revision}
-        reloads={reloads}
         writing={writing}
-        placementsDirty={placementsDirty}
-        onDirtyChange={setPlacementsDirty}
+        unsaved={unsaved}
+        fields={values.fields}
+        placements={values.placements}
+        issues={issues}
+        onChange={editFields}
+        onEnsureDraft={ensureDraft}
         onConflict={() => void reloadAfterConflict(() => textDirty.current)}
         onWritten={adoptPdfWrite}
       />
@@ -520,7 +523,7 @@ function LanguageEditor({
                   size="sm"
                   variant="secondary"
                   onClick={() => {
-                    setValues(reloaded.mine ?? baseline);
+                    setValues(reloaded.mine ?? toEditor(baseline));
                     setReloaded(null);
                   }}
                 >
@@ -571,7 +574,7 @@ function LanguageEditor({
         <Button
           loading={save.isPending}
           disabled={!dirty || incomplete || problem !== null || writing}
-          onClick={saveDraft}
+          onClick={() => saveDraft()}
         >
           {s.saveDraft}
         </Button>
@@ -580,7 +583,7 @@ function LanguageEditor({
           loading={publish.isPending}
           disabled={publishBlocked !== null || writing}
           onClick={() => {
-            const sent = values;
+            const sent = current;
             save.reset();
             setReloaded(null);
             if (revision === null) {
@@ -590,7 +593,9 @@ function LanguageEditor({
             publish.mutate(revision, {
               onError: (err) => {
                 if (isConflict(err))
-                  void reloadAfterConflict((mine) => !sameDraft(mine, sent));
+                  void reloadAfterConflict(
+                    (mine) => !sameDraft(toFormDraft(mine), sent),
+                  );
               },
             });
           }}
@@ -601,7 +606,7 @@ function LanguageEditor({
           <Button
             variant="ghost"
             onClick={() => {
-              setValues(baseline);
+              setValues(toEditor(baseline));
               if (!save.isPending) save.reset();
             }}
           >

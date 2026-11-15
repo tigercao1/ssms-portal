@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
@@ -30,8 +30,6 @@ function renderEditor(route = '/admin/signing-forms/form-waiver') {
   );
   return screen.findByRole('tab', { name: 'English' });
 }
-
-const fieldList = () => screen.getByRole('list', { name: 'Fields' });
 
 describe('FormEditorPage', () => {
   it('shows the published English version with its public link and the legal note', async () => {
@@ -124,9 +122,11 @@ describe('FormEditorPage', () => {
     );
     expect(screen.getByText('Draft v1')).toBeVisible();
     expect(screen.getByLabelText(/Title signers see/)).toHaveValue('免责声明');
-    expect(screen.getByLabelText('Label for participant_name')).toHaveValue(
-      '参与者姓名',
-    );
+    expect(
+      within(screen.getByRole('group', { name: 'Field 1' })).getByLabelText(
+        'Label',
+      ),
+    ).toHaveValue('参与者姓名');
 
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     expect(
@@ -198,55 +198,97 @@ describe('FormEditorPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('starts a form with no version from the default fields', async () => {
+  it('starts a form with no fields and saves the fields the admin adds', async () => {
     const user = userEvent.setup();
     await renderEditor('/admin/signing-forms/form-rental');
 
     expect(screen.getByText('No version yet')).toBeVisible();
-    expect(within(fieldList()).getAllByRole('listitem')).toHaveLength(10);
-    expect(screen.getByLabelText(/Title signers see/)).toHaveValue(
-      'Equipment rental agreement',
-    );
+    expect(
+      screen.getByText(
+        'No fields yet. Add one here, or add it straight onto the PDF below.',
+      ),
+    ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
 
-    await user.type(
-      screen.getByRole('textbox', { name: 'Text' }),
-      'Return the skis.',
-    );
+    const addType = screen.getByRole('combobox', {
+      name: 'Type of the new field',
+    });
+    for (const type of ['full_name', 'email', 'checkbox', 'signature']) {
+      await user.selectOptions(addType, type);
+      await user.click(screen.getByRole('button', { name: 'Add field' }));
+    }
+    const group = (n: number) =>
+      within(screen.getByRole('group', { name: `Field ${n}` }));
+    const rename = async (n: number, key: string, label: string) => {
+      await user.clear(group(n).getByLabelText('Key'));
+      await user.type(group(n).getByLabelText('Key'), key);
+      await user.clear(group(n).getByLabelText('Label'));
+      await user.type(group(n).getByLabelText('Label'), label);
+    };
+    await rename(1, 'renter_name', 'Renter');
+    await rename(3, 'helmet_ok', 'I received a helmet');
+    expect(group(1).getByText('Signer name')).toBeVisible();
+    expect(group(2).getByText('Signer email')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
     expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
     expect(state.requests.at(-1)).toMatchObject({
       method: 'PUT',
       path: '/admin/documents/forms/form-rental/versions/en',
-      body: { bodyMarkdown: 'Return the skis.' },
+      body: {
+        bodyMarkdown: '',
+        fields: [
+          {
+            key: 'renter_name',
+            type: 'full_name',
+            label: 'Renter',
+            required: true,
+          },
+          { key: 'email', type: 'email', label: 'Email', required: true },
+          {
+            key: 'helmet_ok',
+            type: 'checkbox',
+            label: 'I received a helmet',
+            required: false,
+          },
+          {
+            key: 'signature',
+            type: 'signature',
+            label: 'Signature',
+            required: true,
+          },
+        ],
+        placements: [],
+      },
     });
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+    expect(
+      screen.getByText('Write the text or upload a PDF before publishing.'),
+    ).toBeVisible();
   });
 
-  it('lets admins rename, require, remove and re-add fields within the API rules', async () => {
+  it('changes the type, label and required flag of any field and reorders or removes it', async () => {
     const user = userEvent.setup();
     await renderEditor();
-
-    expect(
-      screen.queryByRole('button', { name: 'Remove Participant name' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('switch', { name: 'Required: Email' }),
-    ).not.toBeInTheDocument();
 
     await user.click(
       screen.getByRole('switch', { name: 'Required: Initials' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Remove ID number' }));
-    const label = screen.getByLabelText('Label for date');
-    await user.clear(label);
-    await user.type(label, 'Date signed');
-
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Add a field' }),
-      'guardian_signature',
+      within(screen.getByRole('group', { name: 'Field 5' })).getByLabelText(
+        'Type',
+      ),
+      'initials',
     );
-    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: 'Remove ID number' }));
+    const date = within(
+      screen.getByRole('group', { name: 'Field 3' }),
+    ).getByLabelText('Label');
+    await user.clear(date);
+    await user.type(date, 'Date signed');
+    await user.click(
+      screen.getByRole('button', { name: 'Move Date signed down' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await screen.findByText('Draft v2 saved.');
@@ -254,66 +296,102 @@ describe('FormEditorPage', () => {
     expect((put?.body as { fields: unknown[] }).fields).toEqual([
       {
         key: 'participant_name',
-        type: 'text',
+        type: 'full_name',
         required: true,
         label: 'Participant name',
       },
       { key: 'email', type: 'email', required: true, label: 'Email' },
+      { key: 'initials', type: 'initials', required: true, label: 'Initials' },
       { key: 'date', type: 'date', required: true, label: 'Date signed' },
-      { key: 'initials', type: 'text', required: true, label: 'Initials' },
       {
         key: 'participant_signature',
         type: 'signature',
         required: true,
         label: 'Participant signature',
       },
-      {
-        key: 'guardian_signature',
-        type: 'signature',
-        required: false,
-        label: 'Guardian signature',
-      },
     ]);
   });
 
-  it('blocks saving without a required signature or with an empty label', async () => {
+  it('flags duplicate or malformed keys and empty labels and blocks saving', async () => {
+    const user = userEvent.setup();
+    await renderEditor();
+    const group = (n: number) =>
+      within(screen.getByRole('group', { name: `Field ${n}` }));
+    const save = screen.getByRole('button', { name: 'Save draft' });
+
+    await user.clear(group(2).getByLabelText('Key'));
+    await user.type(group(2).getByLabelText('Key'), 'participant_name');
+    expect(
+      screen.getAllByText('Another field already uses this key.'),
+    ).toHaveLength(2);
+    expect(
+      screen.getByText('Fix the highlighted fields before saving.'),
+    ).toBeVisible();
+    expect(save).toBeDisabled();
+
+    await user.clear(group(2).getByLabelText('Key'));
+    await user.type(group(2).getByLabelText('Key'), 'Email Address');
+    expect(
+      screen.getByText(
+        'Start with a lower-case letter and use only a–z, 0–9 and _ (up to 40).',
+      ),
+    ).toBeVisible();
+    expect(group(2).getByLabelText('Key')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+
+    await user.clear(group(2).getByLabelText('Key'));
+    await user.type(group(2).getByLabelText('Key'), 'email_address');
+    await user.clear(group(3).getByLabelText('Label'));
+    expect(screen.getByText('Enter a label.')).toBeVisible();
+    expect(save).toBeDisabled();
+
+    await user.type(group(3).getByLabelText('Label'), 'Signed on');
+    expect(save).toBeEnabled();
+  });
+
+  it('asks for the signer fields before publishing', async () => {
     const user = userEvent.setup();
     await renderEditor();
 
-    await user.click(
-      screen.getByRole('button', { name: 'Remove Participant signature' }),
-    );
-    expect(
-      screen.getByText('Keep at least one required signature field.'),
-    ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Remove Email' }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Add a field' }),
-      'participant_signature',
-    );
-    await user.click(screen.getByRole('button', { name: 'Add' }));
-    await user.clear(screen.getByLabelText('Label for email'));
-    expect(screen.getByText('Every field needs a label.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await screen.findByText('Draft v2 saved.');
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+    expect(
+      screen.getByText(
+        'Add a required Email field for the signer before publishing.',
+      ),
+    ).toBeVisible();
   });
 
   it('shows the API message when saving fails', async () => {
     const user = userEvent.setup();
-    state.forms[0]!.languages.en.published!.fields = [];
+    server.use(
+      http.put(
+        'http://localhost:3000/admin/documents/forms/:id/versions/:lang',
+        () =>
+          HttpResponse.json(
+            {
+              statusCode: 400,
+              message: 'The field list is not valid: too many fields',
+              error: 'Bad Request',
+            },
+            { status: 400 },
+          ),
+        { once: true },
+      ),
+    );
     await renderEditor();
 
     await user.type(screen.getByRole('textbox', { name: 'Text' }), ' More.');
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Add a field' }),
-      'participant_signature',
-    );
-    await user.click(screen.getByRole('button', { name: 'Add' }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
     expect(
       await screen.findByText(
-        'Could not save the draft: The field list is not valid: it needs a required participant_name text field and a required email field',
+        'Could not save the draft: The field list is not valid: too many fields',
       ),
     ).toBeVisible();
   });

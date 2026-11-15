@@ -2,9 +2,9 @@ import { http, HttpResponse, type HttpHandler } from 'msw';
 import type { DocumentLanguage } from '../api';
 import { MOCK_STORAGE_ORIGIN } from '../api/fixtures';
 import {
+  FORM_FIELD_KEY_PATTERN,
+  FORM_FIELD_TYPES,
   FORM_LANGUAGES,
-  SIGNER_EMAIL_KEY,
-  SIGNER_NAME_KEY,
   type FormDraft,
   type FormField,
   type FormOriginalPdf,
@@ -23,7 +23,7 @@ const field = (
 
 export const defaultFormFields: Record<DocumentLanguage, FormField[]> = {
   en: [
-    field('participant_name', 'text', true, 'Participant name'),
+    field('participant_name', 'full_name', true, 'Participant name'),
     field('email', 'email', true, 'Email'),
     field('date', 'date', true, 'Date'),
     field('id_number', 'text', false, 'ID number'),
@@ -35,7 +35,7 @@ export const defaultFormFields: Record<DocumentLanguage, FormField[]> = {
     field('witness_signature', 'signature', false, 'Witness signature'),
   ],
   zh: [
-    field('participant_name', 'text', true, '参与者姓名'),
+    field('participant_name', 'full_name', true, '参与者姓名'),
     field('email', 'email', true, '电子邮箱'),
     field('date', 'date', true, '日期'),
     field('id_number', 'text', false, '证件号码'),
@@ -86,7 +86,6 @@ export function fakeForm(overrides: Partial<FormTemplate> = {}): FormTemplate {
         }),
       },
     },
-    defaultFields: defaultFormFields,
     insertedAt: '2026-10-30T12:00:00Z',
     updatedAt: '2026-11-01T15:00:00Z',
     ...overrides,
@@ -182,26 +181,45 @@ export function toSummary(form: FormTemplate): FormTemplateSummary {
 
 export function fieldsInvalid(fields: FormField[]): string | null {
   const keys = new Set<string>();
-  for (const f of fields) {
-    if (keys.has(f.key)) return `${f.key} appears twice`;
+  for (const [i, f] of fields.entries()) {
+    if (!FORM_FIELD_KEY_PATTERN.test(f.key))
+      return `fields.${i}.key must start with a lowercase letter`;
+    if (!FORM_FIELD_TYPES.includes(f.type))
+      return `fields.${i}.type must be one of the following values`;
+    if (keys.has(f.key))
+      return `each key must be unique, but ${f.key} appears more than once`;
     keys.add(f.key);
   }
-  const has = (key: string, type: FormField['type']) =>
-    fields.some((f) => f.key === key && f.type === type && f.required);
-  if (!has(SIGNER_NAME_KEY, 'text') || !has(SIGNER_EMAIL_KEY, 'email'))
-    return 'it needs a required participant_name text field and a required email field';
-  if (!fields.some((f) => f.type === 'signature' && f.required))
-    return 'it needs a required signature field';
   return null;
+}
+
+function publishProblems(draft: FormVersion): string[] {
+  const problems: string[] = [];
+  if (!draft.originalPdf && !draft.bodyMarkdown.trim())
+    problems.push('write the form text or upload a PDF');
+  const has = (type: FormField['type']) =>
+    draft.fields.some((f) => f.type === type && f.required);
+  if (!has('full_name'))
+    problems.push('add a required Full name field for the signer');
+  if (!has('email')) problems.push('add a required Email field for the signer');
+  const placed = new Set(draft.placements.map((p) => p.key));
+  const missing = draft.originalPdf
+    ? draft.fields.filter((f) => f.required && !placed.has(f.key))
+    : [];
+  if (missing.length > 0)
+    problems.push(
+      `place these required fields on the PDF: ${missing.map((f) => f.key).join(', ')}`,
+    );
+  return problems;
 }
 
 function placementProblem(
   placement: FormPlacement,
-  version: FormVersion,
+  fields: FormField[],
+  pdf: FormOriginalPdf,
 ): string | null {
-  const pdf = version.originalPdf!;
   const page = pdf.pages[placement.page - 1];
-  if (!version.fields.some((f) => f.key === placement.key))
+  if (!fields.some((f) => f.key === placement.key))
     return `${placement.key} is not a field of this version`;
   if (!page)
     return `${placement.key} is on page ${placement.page}, but the PDF has ${pdf.pages.length} page(s)`;
@@ -311,13 +329,17 @@ export function formsHandlers(
       const slot = form.languages[l];
       if (stale(slot.draft, body, true)) return changed();
       const fields =
-        body.fields ??
-        slot.draft?.fields ??
-        slot.published?.fields ??
-        defaultFormFields[l];
+        body.fields ?? slot.draft?.fields ?? slot.published?.fields ?? [];
       const problem = fieldsInvalid(fields);
       if (problem) return bad(`The field list is not valid: ${problem}`);
       const source = slot.draft ?? slot.published;
+      const pdf = source?.originalPdf ?? null;
+      if (body.placements?.length && !pdf)
+        return bad('This draft has no original PDF');
+      for (const placement of pdf ? (body.placements ?? []) : []) {
+        const issue = placementProblem(placement, fields, pdf!);
+        if (issue) return bad(`The field positions are not valid: ${issue}`);
+      }
       const keys = new Set(fields.map((f) => f.key));
       slot.draft = {
         ...(source ?? fakeFormVersion()),
@@ -326,7 +348,10 @@ export function formsHandlers(
         bodyMarkdown: body.bodyMarkdown,
         fields,
         originalPdf: source?.originalPdf ?? null,
-        placements: (source?.placements ?? []).filter((p) => keys.has(p.key)),
+        placements: pdf
+          ? (body.placements?.map(storedPlacement) ??
+            (source?.placements ?? []).filter((p) => keys.has(p.key)))
+          : [],
         publishedAt: null,
         updatedAt: stamp(slot.draft),
       };
@@ -348,14 +373,9 @@ export function formsHandlers(
           ? await request.json()
           : undefined;
         if (stale(draft, body)) return changed();
-        const placed = new Set(draft.placements.map((p) => p.key));
-        const missing = draft.originalPdf
-          ? draft.fields.filter((f) => f.required && !placed.has(f.key))
-          : [];
-        if (missing.length > 0)
-          return bad(
-            `Place these required fields on the PDF before publishing: ${missing.map((f) => f.key).join(', ')}`,
-          );
+        const problems = publishProblems(draft);
+        if (problems.length > 0)
+          return bad(`Before publishing, ${problems.join('; ')}`);
         slot.published = {
           ...draft,
           publishedAt: new Date().toISOString(),
@@ -441,31 +461,6 @@ export function formsHandlers(
           return bad('This draft has no original PDF', 404);
         draft.originalPdf = null;
         draft.placements = [];
-        draft.updatedAt = stamp(draft);
-        return HttpResponse.json(form);
-      },
-    ),
-    http.put(
-      `${base}/:id/versions/:lang/placements`,
-      async ({ params, request }) => {
-        await log(request);
-        const form = find(params.id);
-        const l = lang(params.lang);
-        const draft = l && form?.languages[l].draft;
-        if (!form || !l) return notFound();
-        if (!draft) return bad('There is no draft in this language');
-        if (!draft.originalPdf) return bad('This draft has no original PDF');
-        const body = (await request.json()) as {
-          placements: FormPlacement[];
-        };
-        if (stale(draft, body)) return changed();
-        const { placements } = body;
-        for (const placement of placements) {
-          const problem = placementProblem(placement, draft);
-          if (problem)
-            return bad(`The field positions are not valid: ${problem}`);
-        }
-        draft.placements = placements.map(storedPlacement);
         draft.updatedAt = stamp(draft);
         return HttpResponse.json(form);
       },
