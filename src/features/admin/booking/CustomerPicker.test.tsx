@@ -220,3 +220,117 @@ describe('CustomerPicker typeahead', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 });
+
+describe('CustomerPicker waiver status', () => {
+  const signed = fakeCustomer({
+    waiver: {
+      status: 'signed',
+      signedAt: '2026-11-08T03:30:00Z',
+      year: '2026/27',
+    },
+  });
+  const expired = fakeCustomer({
+    id: 'cu2',
+    firstName: 'Lin',
+    lastName: 'Wu',
+    email: 'lin@example.com',
+    waiver: {
+      status: 'expired',
+      signedAt: '2026-01-10T15:00:00Z',
+      year: '2026/27',
+    },
+  });
+  const none = fakeCustomer({
+    id: 'cu3',
+    firstName: 'Lia',
+    lastName: 'Park',
+    email: 'lia@example.com',
+    waiver: { status: 'none', signedAt: null, year: '2026/27' },
+  });
+
+  it('shows each match’s waiver status for this waiver year', async () => {
+    serveSearch(() => [signed, expired, none]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByLabelText('Find a customer'), 'li');
+
+    expect(
+      await screen.findByRole('option', { name: /Lily Chen/ }),
+    ).toHaveTextContent('Waiver signed Nov 7, 2026');
+    expect(screen.getByRole('option', { name: /Lin Wu/ })).toHaveTextContent(
+      'Signed last year (Jan 10, 2026), needs re-sign',
+    );
+    expect(screen.getByRole('option', { name: /Lia Park/ })).toHaveTextContent(
+      'No waiver on file',
+    );
+  });
+
+  it('keeps the badge on a picked customer and adds no note when they signed this year', async () => {
+    serveSearch(() => [signed]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByLabelText('Find a customer'), 'li');
+    await user.click(await screen.findByRole('option', { name: /Lily Chen/ }));
+
+    expect(
+      within(
+        screen.getByRole('list', { name: 'Selected customers' }),
+      ).getByText('Waiver signed Nov 7, 2026'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No signed waiver/)).not.toBeInTheDocument();
+  });
+
+  it('still lets the admin pick customers without a waiver this year and names them in a note', async () => {
+    serveSearch(() => [signed, expired, none]);
+    const onPick = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<Picker onPick={onPick} />);
+    const input = screen.getByLabelText('Find a customer');
+    await user.type(input, 'li');
+    await user.click(await screen.findByRole('option', { name: /Lin Wu/ }));
+    await user.type(input, 'li');
+    await user.click(await screen.findByRole('option', { name: /Lia Park/ }));
+
+    expect(onPick).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'cu2' }),
+      expect.objectContaining({ id: 'cu3' }),
+    ]);
+    const selected = screen.getByRole('list', { name: 'Selected customers' });
+    expect(
+      within(selected).getByText(
+        'Signed last year (Jan 10, 2026), needs re-sign',
+      ),
+    ).toBeInTheDocument();
+    expect(within(selected).getByText('No waiver on file')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No signed waiver for 2026/27: Lin Wu, Lia Park. You can still book.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the waiver status and note in Chinese', async () => {
+    serveSearch(() => [none]);
+    const user = userEvent.setup();
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByRole('combobox'), 'li');
+    const option = await screen.findByRole('option', { name: /Lia/ });
+    expect(option).toHaveTextContent('没有免责声明记录');
+    await user.click(option);
+    expect(
+      screen.getByText(
+        '以下客户没有 2026/27 年度已签署的免责声明：Lia Park。仍可预约。',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no badge or note when the API sends no waiver status', async () => {
+    serveSearch(() => [lily]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByLabelText('Find a customer'), 'li');
+    await user.click(await screen.findByRole('option', { name: /Lily Chen/ }));
+    expect(screen.queryByText(/waiver/i)).not.toBeInTheDocument();
+  });
+});

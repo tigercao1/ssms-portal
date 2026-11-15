@@ -1232,10 +1232,28 @@ export const en: Messages = {
     checkLabel: 'Email address',
     checkButton: 'Check',
     checkInvalid: 'Enter a full email address.',
-    checkSigned: '{email} has signed. Last signed {date}.',
+    checkSigned: '{email} signed this waiver year, on {date}.',
     checkNotSigned: 'Nothing signed with {email}.',
     checkDocuments: 'Signed documents',
     checkFailed: 'Could not check: {reason}',
+    checkExpired:
+      '{email} last signed on {date}, before this waiver year. Needs re-sign.',
+    validThisYear: 'Valid this waiver year',
+    expired: 'Expired',
+    link: 'Link to a customer',
+    linkFor: 'Link {title} signed by {name} to a customer',
+    linkTitle: 'Link signature to a customer',
+    linkIntro:
+      '{title}, signed by {name} on {date}. Choose the customer it belongs to, for example someone who signed with a different email.',
+    linkConfirm:
+      'Link the {title} signed by {from} to {to}? It will count as {to}’s signature.',
+    linkButton: 'Link signature',
+    linkDone: 'Linked {title} to {name}.',
+    linkInvalid:
+      'This is not a completed customer signature, so it cannot be linked.',
+    linkNotFound:
+      'That signature or customer no longer exists. Search again and retry.',
+    linkFailed: 'Could not link: {reason}',
   },
   signingForms: {
     title: 'Signing forms',
@@ -1378,8 +1396,17 @@ export const en: Messages = {
     noName: 'No name',
     signed: 'Signed',
     notSigned: 'Not signed',
+    needsResign: 'Needs re-sign',
     capped: 'Showing the first {n} students. Search by name to find others.',
     loadFailed: 'Could not load your students.',
+  },
+  waiver: {
+    signed: 'Waiver signed {date}',
+    signedNoDate: 'Waiver signed',
+    expired: 'Signed last year ({date}), needs re-sign',
+    expiredNoDate: 'Signed last year, needs re-sign',
+    none: 'No waiver on file',
+    missingNote: 'No signed waiver for {year}: {names}. You can still book.',
   },
   instructorCalendar: {
     title: 'Google Calendar',

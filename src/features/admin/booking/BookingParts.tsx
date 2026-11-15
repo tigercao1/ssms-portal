@@ -14,6 +14,7 @@ import { Banner, Button, Field, Input } from '@/components';
 import { cn } from '@/lib/cn';
 import { useModalFocus } from '@/lib/useModalFocus';
 import type { Customer } from '@/lib/types';
+import { WaiverBadge } from '@/features/documents/lookups/WaiverBadge';
 import { CreateCustomerCard } from '../CustomersPage';
 import { customerName } from '../lessonRules';
 import {
@@ -24,7 +25,7 @@ import {
 
 export type PickedCustomer = Pick<
   Customer,
-  'id' | 'firstName' | 'lastName' | 'email' | 'phone'
+  'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'waiver'
 >;
 
 const TYPEAHEAD_DELAY_MS = 150;
@@ -97,12 +98,30 @@ export function pickedName(c: PickedCustomer): string {
   return customerName(c) || c.email || c.phone || '—';
 }
 
+function MissingWaiverNote({ selected }: { selected: PickedCustomer[] }) {
+  const t = useT();
+  const missing = selected.filter(
+    (c) => c.waiver && c.waiver.status !== 'signed',
+  );
+  const year = missing[0]?.waiver?.year;
+  if (!year) return null;
+  return (
+    <p className="rounded-md border-l-[3px] border-l-status-pending bg-status-pending/10 px-3 py-2 text-sm text-ink">
+      {t.waiver.missingNote
+        .replace('{year}', year)
+        .replace('{names}', missing.map(pickedName).join(', '))}
+    </p>
+  );
+}
+
 export function CustomerPicker({
   selected,
   onChange,
+  forBooking = true,
 }: {
   selected: PickedCustomer[];
   onChange: (next: PickedCustomer[]) => void;
+  forBooking?: boolean;
 }) {
   const t = useT();
   const listId = useId();
@@ -168,9 +187,12 @@ export function CustomerPicker({
           {selected.map((c) => (
             <li
               key={c.id}
-              className="flex min-h-11 items-center gap-1 rounded-md bg-navy-tint pl-3 text-sm text-navy"
+              className="flex min-h-11 max-w-full items-center gap-1 rounded-md bg-navy-tint pl-3 text-sm text-navy"
             >
-              {pickedName(c)}
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-1.5">
+                {pickedName(c)}
+                {c.waiver && <WaiverBadge waiver={c.waiver} />}
+              </span>
               <button
                 type="button"
                 className="min-h-11 min-w-11 rounded-md hover:bg-grey"
@@ -186,6 +208,7 @@ export function CustomerPicker({
           ))}
         </ul>
       )}
+      {forBooking && <MissingWaiverNote selected={selected} />}
       <div className="grid gap-1.5 sm:grid-cols-[1fr_auto] sm:gap-x-2">
         <Field label={t.booking.customerSearch}>
           {(p) => (
@@ -216,14 +239,16 @@ export function CustomerPicker({
         >
           {t.booking.customerSearchHint}
         </p>
-        <Button
-          variant="secondary"
-          type="button"
-          onClick={() => setCreating(true)}
-          className="mt-2.5 justify-self-start sm:col-start-2 sm:row-start-1 sm:mt-0 sm:self-end"
-        >
-          {t.booking.newCustomer}
-        </Button>
+        {forBooking && (
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => setCreating(true)}
+            className="mt-2.5 justify-self-start sm:col-start-2 sm:row-start-1 sm:mt-0 sm:self-end"
+          >
+            {t.booking.newCustomer}
+          </Button>
+        )}
       </div>
       {open &&
         !dismissed &&
@@ -264,6 +289,7 @@ export function CustomerPicker({
                       {c.phone}
                     </span>
                   )}
+                  {c.waiver && <WaiverBadge waiver={c.waiver} />}
                 </li>
               ))}
             </ul>
