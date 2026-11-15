@@ -16,6 +16,10 @@ export function parseSignLocation(
     slug: WAIVER_PATH.exec(location.pathname)?.[1] ?? null,
     lang,
     returnUrl: allowedReturnUrl(params.get('return')),
+    prefill: {
+      email: params.get('email')?.trim() || null,
+      name: params.get('name')?.trim() || null,
+    },
   };
 }
 
@@ -27,7 +31,7 @@ export function SignApp({
   const rootRef = useRef<HTMLDivElement>(null);
   useParentHeight(rootRef);
   const [initial] = useState(() => parseSignLocation(location));
-  const { slug, returnUrl } = initial;
+  const { slug, returnUrl, prefill } = initial;
   const [lang, setLang] = useState(initial.lang);
   const changeLang = (next: SignLang) => {
     const url = new URL(window.location.href);
@@ -43,6 +47,7 @@ export function SignApp({
             slug={slug}
             lang={lang}
             returnUrl={returnUrl}
+            prefill={prefill}
             onLangChange={changeLang}
           />
         ) : (
