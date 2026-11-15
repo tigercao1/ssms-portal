@@ -21,6 +21,31 @@ import type { Season } from '@/features/reference/api';
 
 const API = 'http://localhost:3000';
 
+const CUSTOMER_IDS_MAX = 50;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function customersByIds(
+  customers: Customer[],
+  idsParam: string,
+): Response {
+  const ids = idsParam.split(',').map((id) => id.trim());
+  if (ids.length > CUSTOMER_IDS_MAX)
+    return HttpResponse.json(
+      { message: `ids must contain no more than ${CUSTOMER_IDS_MAX} elements` },
+      { status: 400 },
+    );
+  if (!ids.every((id) => UUID.test(id)))
+    return HttpResponse.json(
+      { message: 'each value in ids must be a UUID' },
+      { status: 400 },
+    );
+  const wanted = new Set(ids);
+  const rows = customers.filter((c) => wanted.has(c.id));
+  return HttpResponse.json(rows, {
+    headers: { 'X-Total-Count': String(rows.length) },
+  });
+}
+
 export const fakeProfile: InstructorProfile = {
   id: 'inst-1',
   email: 'jane@example.com',
@@ -399,7 +424,10 @@ export const handlers = [
   ),
   http.get(`${API}/admin/lesson-types`, () => HttpResponse.json([])),
   http.get(`${API}/admin/pay-rates`, () => HttpResponse.json([])),
-  http.get(`${API}/admin/customers`, () => HttpResponse.json([])),
+  http.get(`${API}/admin/customers`, ({ request }) => {
+    const ids = new URL(request.url).searchParams.get('ids');
+    return ids === null ? HttpResponse.json([]) : customersByIds([], ids);
+  }),
   http.get(`${API}/admin/customers/sync-status`, () =>
     HttpResponse.json({
       scheduled: false,

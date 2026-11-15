@@ -1,11 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { fakeAdminList, fakeClass, fakeLessonType, server } from '@/test/msw';
+import {
+  customersByIds,
+  fakeAdminList,
+  fakeClass,
+  fakeCustomer,
+  fakeLessonType,
+  server,
+} from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
-import type { AdminClass, AdminInstructorRecord } from '@/lib/types';
+import type { AdminClass, AdminInstructorRecord, Customer } from '@/lib/types';
+import {
+  contactlessCustomer,
+  deletedCustomer,
+} from '@/features/documents/lookups/fixtures';
 import { ClassActions } from './ClassActions';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({ user: { id: 'admin-1' } }),
+}));
 
 const API = 'http://localhost:3000';
 
@@ -342,46 +357,107 @@ describe('ClassActions', () => {
     expect(calls[0]?.body).toEqual({ customerIds: ['cu2'] });
   });
 
-  it('shows the waiver status of customers already in the lesson', async () => {
+  it('shows the waiver status of every customer already in the lesson from one lookup by id', async () => {
     serve();
-    const queries: string[] = [];
+    const lily = fakeCustomer({
+      id: '3d6f1b2a-8c4e-4a7d-9b15-7e2c4f6a8d01',
+      waiver: {
+        status: 'expired',
+        signedAt: '2026-01-10T15:00:00Z',
+        year: '2026/27',
+      },
+    });
+    const li = fakeCustomer({
+      id: '9a4c2e7b-1d3f-4b6a-8e5c-0f7d9b2a4c63',
+      firstName: '李',
+      lastName: null,
+      email: null,
+      phone: null,
+      waiver: {
+        status: 'signed',
+        signedAt: '2026-11-01T15:00:00Z',
+        year: '2026/27',
+      },
+    });
+    const unknownId = 'e7b3d9f1-5a2c-4e8b-a6d4-1c9f3b7e5a28';
+    const requests: (string | null)[] = [];
     server.use(
       http.get(`${API}/admin/customers`, ({ request }) => {
-        queries.push(new URL(request.url).searchParams.get('q') ?? '');
-        return HttpResponse.json([
-          {
-            id: 'cu9',
-            shopifyCustomerId: 9,
-            firstName: 'Lilyanne',
-            lastName: 'Chen',
-            email: 'lily@example.com.au',
-            phone: null,
-            shopifyUpdatedAt: null,
-            createdAt: '',
-            updatedAt: '',
-            waiver: {
-              status: 'signed',
-              signedAt: '2026-11-01T15:00:00Z',
-              year: '2026/27',
-            },
-          },
-          {
-            id: 'cu1',
-            shopifyCustomerId: 1,
-            firstName: 'Lily',
-            lastName: 'Chen',
-            email: 'lily@example.com',
-            phone: null,
-            shopifyUpdatedAt: null,
-            createdAt: '',
-            updatedAt: '',
-            waiver: {
-              status: 'expired',
-              signedAt: '2026-01-10T15:00:00Z',
-              year: '2026/27',
-            },
-          },
-        ]);
+        const ids = new URL(request.url).searchParams.get('ids');
+        requests.push(ids);
+        return customersByIds(
+          [lily, li, contactlessCustomer, deletedCustomer],
+          ids ?? '',
+        );
+      }),
+    );
+    const participant = (c: Customer) => ({
+      customerId: c.id,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      email: c.email,
+      phone: c.phone,
+      attendance: 'expected' as const,
+    });
+    const item = fakeClass({
+      ...booked,
+      participants: [
+        participant(lily),
+        participant(li),
+        participant(contactlessCustomer),
+        participant(deletedCustomer),
+        participant(fakeCustomer({ id: unknownId, firstName: 'Ghost' })),
+      ],
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ClassActions item={item} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Move or edit…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Move or edit lesson' });
+    const selected = within(dialog).getByRole('list', {
+      name: 'Selected customers',
+    });
+    const row = (name: string) =>
+      within(selected).getByText(name).closest('li') as HTMLElement;
+
+    await waitFor(() =>
+      expect(row('Lily Chen')).toHaveTextContent(
+        'Signed last year (Jan 10, 2026), needs re-sign',
+      ),
+    );
+    expect(row('李')).toHaveTextContent('Waiver signed Nov 1, 2026');
+    expect(row('—')).toHaveTextContent('No waiver on file');
+    expect(row('Zoë Tremblay')).toHaveTextContent(
+      'Signed last year (Jan 10, 2026), needs re-sign',
+    );
+    expect(row('Ghost Chen')).not.toHaveTextContent(/waiver|sign/i);
+    expect(
+      within(dialog).getByText(
+        'No signed waiver for 2026/27: Lily Chen, —, Zoë Tremblay. You can still book.',
+      ),
+    ).toBeVisible();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(requests).toEqual([
+      [
+        lily.id,
+        li.id,
+        contactlessCustomer.id,
+        deletedCustomer.id,
+        unknownId,
+      ].join(','),
+    ]);
+  });
+
+  it('shows no waiver badge and keeps the lesson editable when the lookup is refused', async () => {
+    const calls = serve();
+    let lookups = 0;
+    server.use(
+      http.get(`${API}/admin/customers`, () => {
+        lookups += 1;
+        return HttpResponse.json(
+          { message: 'each value in ids must be a UUID' },
+          { status: 400 },
+        );
       }),
     );
     const user = userEvent.setup();
@@ -389,21 +465,21 @@ describe('ClassActions', () => {
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: 'Move or edit…' }));
     const dialog = screen.getByRole('dialog', { name: 'Move or edit lesson' });
-    const selected = within(dialog).getByRole('list', {
-      name: 'Selected customers',
-    });
 
+    await waitFor(() => expect(lookups).toBe(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookups).toBe(1);
     expect(
-      await within(selected).findByText(
-        'Signed last year (Jan 10, 2026), needs re-sign',
-      ),
-    ).toBeVisible();
-    expect(
-      within(dialog).getByText(
-        'No signed waiver for 2026/27: Lily Chen. You can still book.',
-      ),
-    ).toBeVisible();
-    expect(queries).toEqual(['lily@example.com']);
+      within(dialog).getByRole('list', { name: 'Selected customers' }),
+    ).not.toHaveTextContent(/waiver|sign/i);
+    fireEvent.change(within(dialog).getByLabelText('Notes'), {
+      target: { value: 'Meet at the lodge' },
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save changes' }),
+    );
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.body).toEqual({ notes: 'Meet at the lodge' });
   });
 
   it('lists conflicts from a refused move', async () => {

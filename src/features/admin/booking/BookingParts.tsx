@@ -8,12 +8,13 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
+import { useSession } from '@/auth/SessionProvider';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { api } from '@/lib/api';
 import { Banner, Button, Field, Input } from '@/components';
 import { cn } from '@/lib/cn';
 import { useModalFocus } from '@/lib/useModalFocus';
-import type { Customer } from '@/lib/types';
+import type { Customer, CustomerWaiver } from '@/lib/types';
 import { WaiverBadge } from '@/features/documents/lookups/WaiverBadge';
 import { CreateCustomerCard } from '../CustomersPage';
 import { customerName } from '../lessonRules';
@@ -31,7 +32,7 @@ export type PickedCustomer = Pick<
 const TYPEAHEAD_DELAY_MS = 150;
 const TYPEAHEAD_MIN = 2;
 const TYPEAHEAD_LIMIT = 20;
-const WAIVER_LOOKUP_LIMIT = 100;
+const WAIVER_LOOKUP_MAX_IDS = 50;
 
 export function Dialog({
   title,
@@ -95,30 +96,57 @@ function useCustomerTypeahead(q: string) {
   });
 }
 
-function waiverLookupTerm(c: PickedCustomer): string {
-  return (
-    c.email?.trim() || c.phone?.replace(/\D/g, '') || customerName(c).trim()
-  );
+type WaiverWaiter = {
+  resolve: (waiver: CustomerWaiver | null) => void;
+  reject: (error: unknown) => void;
+};
+
+let waiverQueue = new Map<string, WaiverWaiter[]>();
+
+async function fetchWaivers(
+  ids: string[],
+  waiters: Map<string, WaiverWaiter[]>,
+) {
+  try {
+    const rows = await api<Customer[]>(
+      `/admin/customers?${new URLSearchParams({ ids: ids.join(',') })}`,
+    );
+    const byId = new Map(rows.map((row) => [row.id, row.waiver ?? null]));
+    for (const id of ids)
+      for (const w of waiters.get(id) ?? []) w.resolve(byId.get(id) ?? null);
+  } catch (error) {
+    for (const id of ids)
+      for (const w of waiters.get(id) ?? []) w.reject(error);
+  }
+}
+
+function flushWaiverQueue() {
+  const waiters = waiverQueue;
+  waiverQueue = new Map();
+  const ids = [...waiters.keys()];
+  for (let i = 0; i < ids.length; i += WAIVER_LOOKUP_MAX_IDS)
+    void fetchWaivers(ids.slice(i, i + WAIVER_LOOKUP_MAX_IDS), waiters);
+}
+
+function loadWaiver(id: string): Promise<CustomerWaiver | null> {
+  return new Promise((resolve, reject) => {
+    if (waiverQueue.size === 0) queueMicrotask(flushWaiverQueue);
+    waiverQueue.set(id, [...(waiverQueue.get(id) ?? []), { resolve, reject }]);
+  });
 }
 
 function useWithWaivers(selected: PickedCustomer[]): PickedCustomer[] {
+  const userId = useSession().user?.id ?? null;
   const lookups = useQueries({
-    queries: selected.map((c) => {
-      const q = c.waiver ? '' : waiverLookupTerm(c);
-      return {
-        queryKey: ['admin', 'customers', 'waiver', c.id, q] as const,
-        enabled: q.length >= TYPEAHEAD_MIN,
-        queryFn: () =>
-          api<Customer[]>(
-            `/admin/customers?${new URLSearchParams({ q, limit: String(WAIVER_LOOKUP_LIMIT) })}`,
-          ),
-        select: (rows: Customer[]) =>
-          rows.find((row) => row.id === c.id)?.waiver,
-      };
-    }),
+    queries: selected.map((c) => ({
+      queryKey: ['admin', 'customers', 'waiver', userId, c.id] as const,
+      enabled: userId !== null && !c.waiver,
+      retry: false,
+      queryFn: () => loadWaiver(c.id),
+    })),
   });
   return selected.map((c, i) =>
-    c.waiver ? c : { ...c, waiver: lookups[i]?.data },
+    c.waiver ? c : { ...c, waiver: lookups[i]?.data ?? undefined },
   );
 }
 

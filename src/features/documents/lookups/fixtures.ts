@@ -1,6 +1,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { MOCK_STORAGE_ORIGIN } from '../api/fixtures';
 import type { Customer, CustomerWaiver } from '@/lib/types';
+import { customersByIds } from '@/test/msw';
 import type { SignatureCheck, Signer, StudentSignature } from './api';
 
 export const WAIVER_YEAR = '2026/27';
@@ -165,6 +166,38 @@ export const sampleCustomers: Customer[] = sampleSigners
     waiver: s.waiver ?? undefined,
   }));
 
+export const deletedCustomer: Customer = {
+  id: '6f1c2a4e-0d3b-4c8e-9a51-2b7d8e3f4a10',
+  shopifyCustomerId: 7200,
+  firstName: 'Zoë',
+  lastName: 'Tremblay',
+  email: 'zoe.tremblay@example.com',
+  phone: null,
+  shopifyUpdatedAt: '2026-10-12T00:00:00Z',
+  shopifyDeletedAt: '2026-10-12T00:00:00Z',
+  createdAt: '2026-10-10T00:00:00Z',
+  updatedAt: '2026-10-12T00:00:00Z',
+  waiver: {
+    status: 'expired',
+    signedAt: '2026-01-10T15:00:00Z',
+    year: WAIVER_YEAR,
+  },
+};
+
+export const contactlessCustomer: Customer = {
+  id: '0b9e7d52-6a14-4f3c-8e2d-5c1a9b7f3e21',
+  shopifyCustomerId: 7201,
+  firstName: null,
+  lastName: null,
+  email: null,
+  phone: null,
+  shopifyUpdatedAt: '2026-10-10T00:00:00Z',
+  shopifyDeletedAt: null,
+  createdAt: '2026-10-10T00:00:00Z',
+  updatedAt: '2026-10-10T00:00:00Z',
+  waiver: { status: 'none', signedAt: null, year: WAIVER_YEAR },
+};
+
 export const sampleStudents: StudentSignature[] = [
   {
     name: 'Lily Chen',
@@ -203,7 +236,11 @@ export function createLookupsState(
 ): LookupsMockState {
   return {
     signers: structuredClone(sampleSigners),
-    customers: structuredClone(sampleCustomers),
+    customers: structuredClone([
+      ...sampleCustomers,
+      deletedCustomer,
+      contactlessCustomer,
+    ]),
     students: structuredClone(sampleStudents),
     meStatus: 'approved',
     signatureQueries: [],
@@ -332,12 +369,16 @@ export function lookupsHandlers(
       },
     ),
     http.get(`${apiBase}/admin/customers`, ({ request }) => {
-      const q = (new URL(request.url).searchParams.get('q') ?? '').trim();
+      const params = new URL(request.url).searchParams;
+      const ids = params.get('ids');
+      if (ids !== null) return customersByIds(state.customers, ids);
+      const q = (params.get('q') ?? '').trim();
       return HttpResponse.json(
         state.customers.filter(
           (c) =>
-            includes(`${c.firstName ?? ''} ${c.lastName ?? ''}`, q) ||
-            includes(c.email, q),
+            !c.shopifyDeletedAt &&
+            (includes(`${c.firstName ?? ''} ${c.lastName ?? ''}`, q) ||
+              includes(c.email, q)),
         ),
       );
     }),

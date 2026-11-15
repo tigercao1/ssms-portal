@@ -328,6 +328,7 @@ export interface Customer {
   email: string | null;
   phone: string | null;
   shopifyUpdatedAt: string | null;
+  shopifyDeletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   waiver?: CustomerWaiver;

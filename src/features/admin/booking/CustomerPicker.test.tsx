@@ -4,9 +4,13 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Customer } from '@/lib/types';
-import { fakeCustomer, server } from '@/test/msw';
+import { customersByIds, fakeCustomer, server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import { CustomerPicker, type PickedCustomer } from './BookingParts';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({ user: { id: 'admin-1' } }),
+}));
 
 const API = 'http://localhost:3000';
 
@@ -39,8 +43,14 @@ function deferred() {
   return { promise, resolve };
 }
 
-function Picker({ onPick }: { onPick?: (next: PickedCustomer[]) => void }) {
-  const [selected, setSelected] = useState<PickedCustomer[]>([]);
+function Picker({
+  onPick,
+  initial = [],
+}: {
+  onPick?: (next: PickedCustomer[]) => void;
+  initial?: PickedCustomer[];
+}) {
+  const [selected, setSelected] = useState<PickedCustomer[]>(initial);
   return (
     <CustomerPicker
       selected={selected}
@@ -332,5 +342,83 @@ describe('CustomerPicker waiver status', () => {
     await user.type(screen.getByLabelText('Find a customer'), 'li');
     await user.click(await screen.findByRole('option', { name: /Lily Chen/ }));
     expect(screen.queryByText(/waiver/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('CustomerPicker waiver lookup by id', () => {
+  const uuid = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const withWaiver = (c: Customer): Customer => ({
+    ...c,
+    waiver: { status: 'none', signedAt: null, year: '2026/27' },
+  });
+
+  function serveCustomers(stored: Customer[], search: Customer[] = []) {
+    const lookups: string[][] = [];
+    server.use(
+      http.get(`${API}/admin/customers`, ({ request }) => {
+        const ids = new URL(request.url).searchParams.get('ids');
+        if (ids === null) return HttpResponse.json(search);
+        lookups.push(ids.split(','));
+        return customersByIds(stored, ids);
+      }),
+    );
+    return lookups;
+  }
+
+  it('looks up 51 picked customers in two requests of at most 50 ids', async () => {
+    const picked = Array.from({ length: 51 }, (_, i) =>
+      fakeCustomer({ id: uuid(i), firstName: `Kid${i}`, email: null }),
+    );
+    const lookups = serveCustomers(picked.map(withWaiver));
+    renderWithProviders(<Picker initial={picked} />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText('No waiver on file')).toHaveLength(51),
+    );
+    expect(lookups.map((ids) => ids.length)).toEqual([50, 1]);
+    expect(lookups.flat()).toEqual(picked.map((c) => c.id));
+  });
+
+  it('looks up only the newly picked customer and never repeats a lookup that found nothing', async () => {
+    const known = fakeCustomer({ id: uuid(1), email: null, phone: null });
+    const missing = fakeCustomer({
+      id: uuid(2),
+      firstName: 'Gone',
+      lastName: 'Away',
+      email: null,
+      phone: null,
+    });
+    const added = fakeCustomer({
+      id: uuid(3),
+      firstName: 'Lin',
+      lastName: 'Wu',
+      email: 'lin@example.com',
+    });
+    const lookups = serveCustomers(
+      [withWaiver(known), withWaiver(added)],
+      [added],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Picker initial={[known, missing]} />);
+
+    expect(await screen.findByText('No waiver on file')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Find a customer'), 'lin');
+    await user.click(await screen.findByRole('option', { name: /Lin Wu/ }));
+
+    await waitFor(() =>
+      expect(screen.getAllByText('No waiver on file')).toHaveLength(2),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookups).toEqual([[known.id, missing.id], [added.id]]);
+  });
+
+  it('makes no lookup when every picked customer already has a waiver status', async () => {
+    const lookups = serveCustomers([]);
+    renderWithProviders(<Picker initial={[withWaiver(lily)]} />);
+
+    expect(await screen.findByText('No waiver on file')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookups).toEqual([]);
   });
 });
