@@ -142,11 +142,10 @@ async function withTimeout<T>(
 export function useLinkSignature(assignmentId: string) {
   const userId = useSession().user?.id ?? null;
   const qc = useQueryClient();
-  const refreshSignatures = () =>
-    Promise.all([
-      qc.invalidateQueries({ queryKey: ['admin', userId, 'signatures'] }),
-      qc.invalidateQueries({ queryKey: ['admin', 'customers'] }),
-    ]);
+  const refreshSignatures = () => {
+    void qc.invalidateQueries({ queryKey: ['admin', userId, 'signatures'] });
+    void qc.invalidateQueries({ queryKey: ['admin', 'customers'] });
+  };
   return useMutation({
     mutationKey: linkSignatureKey(userId, assignmentId),
     mutationFn: ({ customerId }: { customerId: string }) =>
@@ -160,7 +159,7 @@ export function useLinkSignature(assignmentId: string) {
       ),
     onSuccess: refreshSignatures,
     onError: (error) => {
-      if (error instanceof LinkTimeoutError) void refreshSignatures();
+      if (error instanceof LinkTimeoutError) refreshSignatures();
     },
   });
 }
