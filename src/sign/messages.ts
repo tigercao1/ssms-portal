@@ -15,6 +15,8 @@ export interface SignMessages {
   language: string;
   signatureRequired: (label: string) => string;
   optional: string;
+  prefilledEmail: string;
+  prefilledName: string;
   signHere: (label: string) => string;
   signHint: string;
   clear: string;
@@ -68,6 +70,10 @@ const en: SignMessages = {
   language: 'Language',
   signatureRequired: (label) => `Please sign in the ${label} box.`,
   optional: 'optional',
+  prefilledEmail:
+    'We filled in the email from your booking. Change it only if you used a different one.',
+  prefilledName:
+    'We filled in the name from your booking. Change it if it is not right.',
   signHere: (label) => `${label}, draw your signature here`,
   signHint: 'Sign with your finger or mouse.',
   clear: 'Clear',
@@ -122,6 +128,9 @@ const zh: SignMessages = {
   language: '语言',
   signatureRequired: (label) => `请在“${label}”框内签名。`,
   optional: '选填',
+  prefilledEmail:
+    '我们已根据您的预订填入邮箱。仅当您使用了其他邮箱时才需修改。',
+  prefilledName: '我们已根据您的预订填入姓名。如有不对，请修改。',
   signHere: (label) => `${label}，请在此处签名`,
   signHint: '请用手指或鼠标签名。',
   clear: '清除',

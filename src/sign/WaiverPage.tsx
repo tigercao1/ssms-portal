@@ -29,7 +29,13 @@ interface WaiverPageProps {
   slug: string;
   lang: SignLang;
   returnUrl: string | null;
+  prefill?: Prefill;
   onLangChange: (lang: SignLang) => void;
+}
+
+export interface Prefill {
+  email: string | null;
+  name: string | null;
 }
 
 interface Notice {
@@ -73,6 +79,36 @@ function hasReviewStep(form: SignForm) {
   return form.hasOriginalPdf === true && Boolean(form.originalPdf);
 }
 
+const NO_PREFILL: Prefill = { email: null, name: null };
+
+function prefillValue(field: SignField, prefill: Prefill): string | null {
+  if (field.type === 'email') {
+    const email = prefill.email?.toLowerCase() ?? null;
+    return email && EMAIL.test(email) && email.length <= MAX_ANSWER_LENGTH
+      ? email
+      : null;
+  }
+  if (field.type === 'text' && /(^|_)name$/.test(field.key)) {
+    const name = prefill.name;
+    return name && [...name].length <= MAX_ANSWER_LENGTH ? name : null;
+  }
+  return null;
+}
+
+function prefilledAnswers(fields: SignField[], prefill: Prefill) {
+  const filled: Record<string, string> = {};
+  const seen = new Set<'email' | 'name'>();
+  for (const field of fields) {
+    const slot = field.type === 'email' ? 'email' : 'name';
+    if (seen.has(slot)) continue;
+    const value = prefillValue(field, prefill);
+    if (value === null) continue;
+    filled[field.key] = value;
+    seen.add(slot);
+  }
+  return filled;
+}
+
 function fieldId(key: string) {
   return `field-${key}`;
 }
@@ -107,6 +143,7 @@ export function WaiverPage({
   slug,
   lang,
   returnUrl,
+  prefill = NO_PREFILL,
   onLangChange,
 }: WaiverPageProps) {
   const text = SIGN_MESSAGES[lang];
@@ -123,6 +160,7 @@ export function WaiverPage({
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<Step>('edit');
   const [pending, setPending] = useState<SignCompletion | null>(null);
+  const [prefilled, setPrefilled] = useState<Record<string, string>>({});
   const sendingRef = useRef(false);
   const stepChangedRef = useRef(false);
   const signedRef = useRef<HTMLHeadingElement>(null);
@@ -141,11 +179,15 @@ export function WaiverPage({
       try {
         const form = await fetchSignForm(slug, lang, signal);
         if (signal?.aborted) return;
+        const filled = prefilledAnswers(form.fields, prefill);
+        setPrefilled(filled);
         setAnswers((current) => {
           const next = { ...current };
           for (const field of form.fields)
             if (field.type === 'date' && next[field.key] === undefined)
               next[field.key] = torontoToday();
+          for (const [key, value] of Object.entries(filled))
+            if (next[key] === undefined) next[key] = value;
           return next;
         });
         setState({ status: 'ready', form });
@@ -154,7 +196,7 @@ export function WaiverPage({
           setState({ status: 'error', kind: errorKind(error) });
       }
     },
-    [slug, lang],
+    [slug, lang, prefill],
   );
 
   useEffect(() => {
@@ -397,6 +439,14 @@ export function WaiverPage({
           const error = errors[field.key];
           const errorId = `${fieldId(field.key)}-error`;
           const labelId = `${fieldId(field.key)}-label`;
+          const noteId = `${fieldId(field.key)}-prefilled`;
+          const showPrefillNote =
+            prefilled[field.key] !== undefined &&
+            answers[field.key] === prefilled[field.key];
+          const describedBy =
+            [error && errorId, showPrefillNote && noteId]
+              .filter(Boolean)
+              .join(' ') || undefined;
           const label = (
             <span className="text-sm font-medium text-navy">
               {field.label}
@@ -443,11 +493,18 @@ export function WaiverPage({
                     required={field.required}
                     aria-required={field.required}
                     aria-invalid={error ? true : undefined}
-                    aria-describedby={error ? errorId : undefined}
+                    aria-describedby={describedBy}
                     onChange={(event) =>
                       setAnswer(field.key, event.target.value)
                     }
                   />
+                  {showPrefillNote && (
+                    <p id={noteId} className="text-sm text-slate">
+                      {field.type === 'email'
+                        ? text.prefilledEmail
+                        : text.prefilledName}
+                    </p>
+                  )}
                 </>
               )}
               {error && (

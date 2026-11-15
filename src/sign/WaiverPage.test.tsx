@@ -640,6 +640,104 @@ describe('signing site waiver page', () => {
     );
   });
 
+  it('prefills the email and name from the link, explains it, and lets the signer change them', async () => {
+    serveForm('en');
+    const sent = captureSubmit();
+    const user = userEvent.setup();
+    renderSign('?lang=en&email=Ada%40Example.com&name=Ada%20Snow');
+
+    const email = await screen.findByLabelText('Email');
+    const name = screen.getByLabelText('Participant name');
+    expect(email).toHaveValue('ada@example.com');
+    expect(email).not.toHaveAttribute('readonly');
+    expect(email).toBeEnabled();
+    expect(email).toHaveAccessibleDescription(
+      'We filled in the email from your booking. Change it only if you used a different one.',
+    );
+    expect(name).toHaveValue('Ada Snow');
+    expect(name).toHaveAccessibleDescription(
+      'We filled in the name from your booking. Change it if it is not right.',
+    );
+    expect(
+      screen.getByLabelText('Parent or guardian name (optional)'),
+    ).toHaveValue('');
+
+    await user.clear(email);
+    await user.type(email, 'ada.snow@example.com');
+    expect(
+      screen.queryByText(/We filled in the email/),
+    ).not.toBeInTheDocument();
+
+    act(() => pads[0]!.draw());
+    await user.click(
+      screen.getByRole('checkbox', { name: /I have read and agree/ }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+    await screen.findByRole('heading', {
+      name: 'Signed, a copy has been emailed to you.',
+    });
+    expect(sent[0]?.answers).toMatchObject({
+      participant_name: 'Ada Snow',
+      email: 'ada.snow@example.com',
+    });
+  });
+
+  it('removes only the email and name from the address bar and keeps the prefill across a language switch', async () => {
+    server.use(
+      http.get(`${API}/sign/forms/waiver`, ({ request }) =>
+        HttpResponse.json(
+          mockSignForm(
+            new URL(request.url).searchParams.get('lang') === 'en'
+              ? 'en'
+              : 'zh',
+          ),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    window.history.replaceState(
+      { from: 'link' },
+      '',
+      '/w/waiver?lang=en&email=a%2Bb%40x.com&name=Zo%C3%AB&return=https%3A%2F%2Fssnow.club%2Fbook',
+    );
+    render(<SignApp />);
+
+    expect(await screen.findByLabelText('Email')).toHaveValue('a+b@x.com');
+    expect(window.location.pathname).toBe('/w/waiver');
+    expect(window.location.search).toBe(
+      '?lang=en&return=https%3A%2F%2Fssnow.club%2Fbook',
+    );
+    expect(window.history.state).toEqual({ from: 'link' });
+
+    await user.click(screen.getByRole('button', { name: '中文' }));
+    expect(await screen.findByLabelText('电子邮箱')).toHaveValue('a+b@x.com');
+    expect(screen.getByLabelText('参与者姓名')).toHaveValue('Zoë');
+    const params = new URL(window.location.href).searchParams;
+    expect([...params.keys()]).toEqual(['lang', 'return']);
+    expect(params.get('lang')).toBe('zh');
+  });
+
+  it('explains a prefilled email in Chinese', async () => {
+    serveForm('zh');
+    renderSign('?email=ada%40example.com');
+
+    const email = await screen.findByLabelText('电子邮箱');
+    expect(email).toHaveValue('ada@example.com');
+    expect(email).toHaveAccessibleDescription(
+      '我们已根据您的预订填入邮箱。仅当您使用了其他邮箱时才需修改。',
+    );
+    expect(screen.getByLabelText('参与者姓名')).toHaveValue('');
+  });
+
+  it('leaves the email empty when the link carries something that is not an email', async () => {
+    serveForm('en');
+    renderSign('?lang=en&email=not-an-email');
+
+    const email = await screen.findByLabelText('Email');
+    expect(email).toHaveValue('');
+    expect(screen.queryByText(/We filled in/)).not.toBeInTheDocument();
+  });
+
   it('shows not found for a path that is not a waiver link', () => {
     renderSign('?lang=en', '/admin');
     expect(screen.getByRole('alert')).toHaveTextContent(
