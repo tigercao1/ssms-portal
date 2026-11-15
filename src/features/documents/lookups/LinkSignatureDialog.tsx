@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Banner, Button } from '@/components';
 import {
   CustomerPicker,
@@ -11,7 +11,9 @@ import type { Messages } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
 import { errorText } from '../admin/format';
 import {
+  LinkTimeoutError,
   useIsLinkingSignature,
+  useLatestSignatureLink,
   useLinkSignature,
   type SignedDocumentEntry,
   type Signer,
@@ -19,6 +21,7 @@ import {
 import { formatSignedDate } from './format';
 
 function linkErrorText(error: unknown, t: Messages): string {
+  if (error instanceof LinkTimeoutError) return t.signatures.linkTimeout;
   if (error instanceof ApiError && error.status === 400)
     return t.signatures.linkInvalid;
   if (error instanceof ApiError && error.status === 404)
@@ -48,6 +51,16 @@ export function LinkSignatureDialog({
   const [picked, setPicked] = useState<PickedCustomer | null>(null);
   const link = useLinkSignature(entry.assignmentId);
   const pending = useIsLinkingSignature(entry.assignmentId) || link.isPending;
+  const latest = useLatestSignatureLink(entry.assignmentId);
+  const linkedElsewhere =
+    latest?.status === 'success' ? latest.data : undefined;
+  const wasPending = useRef(pending);
+
+  useEffect(() => {
+    if (link.isIdle && wasPending.current && !pending && linkedElsewhere)
+      onLinked(linkedElsewhere);
+    wasPending.current = pending;
+  }, [link.isIdle, pending, linkedElsewhere, onLinked]);
 
   function confirm() {
     if (!picked || pending) return;

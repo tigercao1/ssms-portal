@@ -1188,6 +1188,8 @@ export const zhCN: Messages = {
     linkInvalid: '这不是一份已完成的客户签署，无法关联。',
     linkNotFound: '该签署记录或客户已不存在。请重新搜索后再试。',
     linkFailed: '无法关联：{reason}',
+    linkTimeout:
+      '关联请求超时。请先查看这份签署，关联可能已经完成，再决定是否重试。',
   },
   signingForms: {
     title: '签署表单',

@@ -501,6 +501,157 @@ describe('Link a signature to a customer', () => {
     expect(posted).toEqual(['cu-wang']);
   });
 
+  it('gives up on a link with no answer after 30 seconds, refreshes the list and allows a retry', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const signals: AbortSignal[] = [];
+      server.use(
+        http.post(
+          `${API}/admin/signatures/:id/link`,
+          async ({ request }) => {
+            signals.push(request.signal);
+            await new Promise(() => {});
+          },
+          { once: true },
+        ),
+      );
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      const view = renderWithProviders(<SignaturesPage />);
+      const searchFor = async (text: string) => {
+        const box = screen.getByRole('searchbox', { name: 'Name or email' });
+        await user.clear(box);
+        await user.type(box, text);
+      };
+      await searchFor('fang');
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Link Liability waiver signed by Fang Wang to a customer',
+        }),
+      );
+      const dialog = screen.getByRole('dialog', {
+        name: 'Link signature to a customer',
+      });
+      await pickWangFang(user, dialog);
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Link signature' }),
+      );
+      await waitFor(() => expect(signals).toHaveLength(1));
+      const queriesBefore = state.signatureQueries.length;
+
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(
+        within(dialog).getByRole('button', { name: 'Linking…' }),
+      ).toBeDisabled();
+      expect(signals[0]?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'The link request took too long. Check the signature before trying again, it may have gone through.',
+      );
+      expect(signals[0]?.aborted).toBe(true);
+      await waitFor(() =>
+        expect(state.signatureQueries.length).toBeGreaterThan(queriesBefore),
+      );
+      expect(
+        within(dialog).getByRole('button', { name: 'Cancel' }),
+      ).toBeEnabled();
+      expect(within(dialog).getByLabelText('Find a customer')).toBeEnabled();
+
+      view.rerender(<div />);
+      view.rerender(<SignaturesPage />);
+      await searchFor('lily');
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Link Liability waiver signed by Lily Chen to a customer',
+        }),
+      );
+      const lily = screen.getByRole('dialog');
+      expect(within(lily).getByLabelText('Find a customer')).toBeEnabled();
+      expect(within(lily).queryByRole('alert')).not.toBeInTheDocument();
+      await user.click(within(lily).getByRole('button', { name: 'Cancel' }));
+
+      await searchFor('fang');
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Link Liability waiver signed by Fang Wang to a customer',
+        }),
+      );
+      const retry = screen.getByRole('dialog');
+      await pickWangFang(user, retry);
+      await user.click(
+        within(retry).getByRole('button', { name: 'Link signature' }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      );
+      expect(
+        screen.getByText('Linked Liability waiver to Wang Fang.'),
+      ).toBeVisible();
+      expect(state.links).toEqual([
+        { assignmentId: 'asg-waiver-fang', customerId: 'cu-wang' },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes the reopened dialog and shows the result when a link started earlier succeeds', async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.post(
+        `${API}/admin/signatures/:id/link`,
+        async () => {
+          await held;
+        },
+        { once: true },
+      ),
+    );
+    const user = userEvent.setup();
+    const view = renderWithProviders(<SignaturesPage />);
+    const openFang = async () => {
+      await user.type(
+        screen.getByRole('searchbox', { name: 'Name or email' }),
+        'fang',
+      );
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Link Liability waiver signed by Fang Wang to a customer',
+        }),
+      );
+      return screen.getByRole('dialog', {
+        name: 'Link signature to a customer',
+      });
+    };
+    const first = await openFang();
+    await pickWangFang(user, first);
+    await user.click(
+      within(first).getByRole('button', { name: 'Link signature' }),
+    );
+    await within(first).findByRole('button', { name: 'Linking…' });
+
+    view.rerender(<div />);
+    view.rerender(<SignaturesPage />);
+    const second = await openFang();
+    expect(
+      within(second).getByRole('button', { name: 'Linking…' }),
+    ).toBeDisabled();
+
+    release();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    const done = screen.getByText('Linked Liability waiver to Wang Fang.');
+    expect(done.parentElement).toHaveTextContent('Waiver signed Oct 30, 2026');
+    expect(state.links).toEqual([
+      { assignmentId: 'asg-waiver-fang', customerId: 'cu-wang' },
+    ]);
+  });
+
   it('closes without linking on Cancel', async () => {
     const { user, dialog } = await openLink();
     await pickWangFang(user, dialog);

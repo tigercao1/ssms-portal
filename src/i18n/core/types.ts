@@ -1142,6 +1142,7 @@ export interface Messages {
     linkInvalid: string;
     linkNotFound: string;
     linkFailed: string;
+    linkTimeout: string;
   };
   signingForms: {
     title: string;

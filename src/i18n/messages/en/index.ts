@@ -1255,6 +1255,8 @@ export const en: Messages = {
     linkNotFound:
       'That signature or customer no longer exists. Search again and retry.',
     linkFailed: 'Could not link: {reason}',
+    linkTimeout:
+      'The link request took too long. Check the signature before trying again, it may have gone through.',
   },
   signingForms: {
     title: 'Signing forms',
