@@ -190,7 +190,194 @@ describe('SignaturesPage', () => {
   });
 });
 
+describe('Waiver status for this waiver year', () => {
+  it('shows each person’s status with the date and marks each signature valid or expired', async () => {
+    await search('lily');
+    const lily = await waitFor(() => person('Lily Chen'));
+    expect(within(lily).getByText('Waiver signed Nov 7, 2026')).toBeVisible();
+    expect(within(lily).getByText('Valid this waiver year')).toBeVisible();
+  });
+
+  it('asks for a re-sign when the only waiver is from an earlier year', async () => {
+    await search('max');
+    const max = await waitFor(() => person('Max Müller'));
+    expect(
+      within(max).getByText('Signed last year (Jan 10, 2026), needs re-sign'),
+    ).toBeVisible();
+    expect(within(max).getByText('Expired')).toBeVisible();
+  });
+
+  it('says when a customer has no waiver on file', async () => {
+    await search('janet');
+    const janet = await waitFor(() => person('Janet Park'));
+    expect(within(janet).getByText('No waiver on file')).toBeVisible();
+  });
+
+  it('checks a searched email in the check-by-email box too', async () => {
+    await search('Max@Example.com');
+    expect(
+      await screen.findByText(
+        'max@example.com last signed on Jan 10, 2026, before this waiver year. Needs re-sign.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Email address')).toHaveValue(
+      'max@example.com',
+    );
+    expect(state.checkEmails).toEqual(['max@example.com']);
+  });
+
+  it('shows the status chips in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const user = userEvent.setup();
+    renderWithProviders(<SignaturesPage />);
+    await user.type(
+      screen.getByRole('searchbox', { name: '姓名或邮箱' }),
+      'max',
+    );
+    const max = await screen.findByRole('listitem', { name: 'Max Müller' });
+    expect(
+      within(max).getByText('去年已签署（2026年1月10日），需重新签署'),
+    ).toBeVisible();
+    expect(within(max).getByText('已过期')).toBeVisible();
+    expect(
+      within(max).getByRole('button', {
+        name: '将 Max Müller 签署的 免责声明 关联到客户',
+      }),
+    ).toHaveTextContent('关联到客户');
+  });
+});
+
+describe('Link a signature to a customer', () => {
+  async function openLink() {
+    const user = await search('fang');
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Link Liability waiver signed by Fang Wang to a customer',
+      }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Link signature to a customer',
+    });
+    return { user, dialog };
+  }
+
+  async function pickWangFang(
+    user: ReturnType<typeof userEvent.setup>,
+    dialog: HTMLElement,
+  ) {
+    await user.type(within(dialog).getByLabelText('Find a customer'), 'wang');
+    const option = await within(dialog).findByRole('option', {
+      name: /Wang Fang/,
+    });
+    expect(option).toHaveTextContent('No waiver on file');
+    await user.click(option);
+  }
+
+  it('offers the link only on customer signatures', async () => {
+    await search('jan');
+    await waitFor(() => person('Jane Snow'));
+    expect(
+      screen.queryByRole('button', { name: /to a customer/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('links after a confirmation naming both customers, then refreshes the list', async () => {
+    const { user, dialog } = await openLink();
+    expect(dialog).toHaveTextContent(
+      'Liability waiver, signed by Fang Wang on Oct 30, 2026.',
+    );
+    expect(
+      within(dialog).queryByRole('button', { name: 'New customer' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Link signature' }),
+    ).toBeDisabled();
+
+    await pickWangFang(user, dialog);
+    expect(
+      within(dialog).getByText(
+        'Link the Liability waiver signed by Fang Wang to Wang Fang? It will count as Wang Fang’s signature.',
+      ),
+    ).toBeVisible();
+    expect(within(dialog).queryByText(/You can still book/)).toBeNull();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Link signature' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(state.links).toEqual([
+      { assignmentId: 'asg-waiver-fang', customerId: 'cu-wang' },
+    ]);
+    const done = screen.getByText('Linked Liability waiver to Wang Fang.');
+    expect(done.parentElement).toHaveTextContent('Waiver signed Oct 30, 2026');
+    await waitFor(() =>
+      expect(
+        within(person('Fang Wang')).getByText('No signed documents yet.'),
+      ).toBeVisible(),
+    );
+    const wang = person('Wang Fang');
+    expect(within(wang).getByText('Liability waiver')).toBeVisible();
+    expect(within(wang).getByText('Waiver signed Oct 30, 2026')).toBeVisible();
+  });
+
+  it.each([
+    [
+      400,
+      'Not a completed customer signature',
+      'This is not a completed customer signature, so it cannot be linked.',
+    ],
+    [
+      404,
+      'Not found',
+      'That signature or customer no longer exists. Search again and retry.',
+    ],
+    [500, 'Database down', 'Could not link: Database down'],
+  ])(
+    'keeps the dialog open and explains a %i',
+    async (status, message, shown) => {
+      server.use(
+        http.post(`${API}/admin/signatures/:id/link`, () =>
+          HttpResponse.json({ message }, { status }),
+        ),
+      );
+      const { user, dialog } = await openLink();
+      await pickWangFang(user, dialog);
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Link signature' }),
+      );
+
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(shown);
+      expect(screen.queryByText(/^Linked /)).not.toBeInTheDocument();
+    },
+  );
+
+  it('closes without linking on Cancel', async () => {
+    const { user, dialog } = await openLink();
+    await pickWangFang(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(state.links).toEqual([]);
+  });
+});
+
 describe('Check by email', () => {
+  it('says when the latest signature is from an earlier waiver year', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SignaturesPage />);
+    await user.type(screen.getByLabelText('Email address'), 'max@example.com');
+    await user.click(screen.getByRole('button', { name: 'Check' }));
+    expect(
+      await screen.findByText(
+        'max@example.com last signed on Jan 10, 2026, before this waiver year. Needs re-sign.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('list', { name: 'Signed documents' }),
+    ).not.toBeInTheDocument();
+  });
+
   async function check(email: string) {
     const user = userEvent.setup();
     renderWithProviders(<SignaturesPage />);
@@ -203,7 +390,7 @@ describe('Check by email', () => {
 
     expect(
       await screen.findByText(
-        'lily@example.com has signed. Last signed Nov 7, 2026.',
+        'lily@example.com signed this waiver year, on Nov 7, 2026.',
       ),
     ).toBeVisible();
     expect(
@@ -245,7 +432,9 @@ describe('Check by email', () => {
     await user.click(screen.getByRole('button', { name: 'Check' }));
 
     expect(
-      await screen.findByText(/janet\.park@example\.com has signed/),
+      await screen.findByText(
+        /janet\.park@example\.com signed this waiver year/,
+      ),
     ).toBeVisible();
     expect(state.checkEmails).toEqual([
       'janet.park@example.com',
@@ -271,7 +460,7 @@ describe('Check by email', () => {
 
     expect(
       await screen.findByText(
-        'lily@example.com has signed. Last signed Nov 7, 2026.',
+        'lily@example.com signed this waiver year, on Nov 7, 2026.',
       ),
     ).toBeVisible();
     expect(screen.queryByText(/Could not check/)).not.toBeInTheDocument();

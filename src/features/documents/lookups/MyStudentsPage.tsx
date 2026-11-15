@@ -125,7 +125,7 @@ function StudentList({
                       {formatSignedDate(row.signedAt, locale)}
                     </span>
                   )}
-                  <SignedBadge signed={row.signed} />
+                  <StatusBadge row={row} />
                 </span>
               </li>
             );
@@ -141,12 +141,11 @@ function StudentList({
   );
 }
 
-function SignedBadge({ signed }: { signed: boolean }) {
-  const t = useT();
-  return (
-    <Chip
-      tone={signed ? 'approved' : 'rejected'}
-      label={signed ? t.myStudents.signed : t.myStudents.notSigned}
-    />
-  );
+function StatusBadge({ row }: { row: StudentSignature }) {
+  const s = useT().myStudents;
+  const status = row.status ?? (row.signed ? 'signed' : 'none');
+  if (status === 'signed') return <Chip tone="approved" label={s.signed} />;
+  if (status === 'expired')
+    return <Chip tone="pending" label={s.needsResign} />;
+  return <Chip tone="rejected" label={s.notSigned} />;
 }

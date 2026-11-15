@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useSession } from '@/auth/SessionProvider';
 import { api } from '@/lib/api';
+import type { CustomerWaiver, WaiverStatus } from '@/lib/types';
 import type { DocumentLanguage } from '../api';
 
 export const SIGNATURE_QUERY_MIN = 2;
@@ -19,6 +20,7 @@ export interface SignedDocumentEntry {
   formVersion: number | null;
   signedAt: string;
   hasSignedCopy: boolean;
+  validThisYear?: boolean;
 }
 
 export interface Signer {
@@ -27,18 +29,22 @@ export interface Signer {
   name: string | null;
   email: string | null;
   signatures: SignedDocumentEntry[];
+  waiver?: CustomerWaiver | null;
+  customerId?: string | null;
 }
 
 export interface SignatureCheck {
   signed: boolean;
   signedAt: string | null;
   templateTitles: string[];
+  status?: WaiverStatus;
 }
 
 export interface StudentSignature {
   name: string | null;
   signed: boolean;
   signedAt: string | null;
+  status?: WaiverStatus;
 }
 
 export function useDebounced(value: string, ms = SEARCH_DEBOUNCE_MS) {
@@ -93,5 +99,28 @@ export function useMyStudentSignatures(q: string) {
           ? `/me/students/signatures?${new URLSearchParams({ q })}`
           : '/me/students/signatures',
       ),
+  });
+}
+
+export function useLinkSignature() {
+  const userId = useSession().user?.id ?? null;
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assignmentId,
+      customerId,
+    }: {
+      assignmentId: string;
+      customerId: string;
+    }) =>
+      api<Signer>(
+        `/admin/signatures/${encodeURIComponent(assignmentId)}/link`,
+        { method: 'POST', body: { customerId } },
+      ),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ['admin', userId, 'signatures'] }),
+        qc.invalidateQueries({ queryKey: ['admin', 'customers'] }),
+      ]),
   });
 }

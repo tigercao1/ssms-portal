@@ -1,13 +1,18 @@
 import { http, HttpResponse, type HttpHandler } from 'msw';
 import { MOCK_STORAGE_ORIGIN } from '../api/fixtures';
+import type { Customer, CustomerWaiver } from '@/lib/types';
 import type { SignatureCheck, Signer, StudentSignature } from './api';
+
+export const WAIVER_YEAR = '2026/27';
 
 export const sampleSigners: Signer[] = [
   {
     subjectType: 'instructor',
     subjectId: 'inst-1',
+    customerId: null,
     name: 'Jane Snow',
     email: 'jane@example.com',
+    waiver: null,
     signatures: [
       {
         assignmentId: 'asg-conduct',
@@ -19,6 +24,7 @@ export const sampleSigners: Signer[] = [
         formVersion: null,
         signedAt: '2026-10-07T15:05:00Z',
         hasSignedCopy: true,
+        validThisYear: true,
       },
       {
         assignmentId: 'asg-handbook',
@@ -30,14 +36,21 @@ export const sampleSigners: Signer[] = [
         formVersion: null,
         signedAt: '2026-10-06T15:10:00Z',
         hasSignedCopy: false,
+        validThisYear: true,
       },
     ],
   },
   {
     subjectType: 'customer',
     subjectId: 'cust-1',
+    customerId: 'cu1',
     name: 'Lily Chen',
     email: 'lily@example.com',
+    waiver: {
+      status: 'signed',
+      signedAt: '2026-11-08T03:30:00Z',
+      year: WAIVER_YEAR,
+    },
     signatures: [
       {
         assignmentId: 'asg-waiver-lily',
@@ -49,31 +62,128 @@ export const sampleSigners: Signer[] = [
         formVersion: 2,
         signedAt: '2026-11-08T03:30:00Z',
         hasSignedCopy: true,
+        validThisYear: true,
       },
     ],
   },
   {
     subjectType: 'customer',
     subjectId: 'cust-2',
+    customerId: 'cu-janet',
     name: 'Janet Park',
     email: 'janet.park@example.com',
+    waiver: { status: 'none', signedAt: null, year: WAIVER_YEAR },
+    signatures: [],
+  },
+  {
+    subjectType: 'customer',
+    subjectId: 'cust-3',
+    customerId: 'cu-max',
+    name: 'Max Müller',
+    email: 'max@example.com',
+    waiver: {
+      status: 'expired',
+      signedAt: '2026-01-10T15:00:00Z',
+      year: WAIVER_YEAR,
+    },
+    signatures: [
+      {
+        assignmentId: 'asg-waiver-max',
+        templateId: 'tpl-waiver-form',
+        titleEn: 'Liability waiver',
+        titleZh: '免责声明',
+        kind: 'sign',
+        language: 'en',
+        formVersion: 1,
+        signedAt: '2026-01-10T15:00:00Z',
+        hasSignedCopy: true,
+        validThisYear: false,
+      },
+    ],
+  },
+  {
+    subjectType: 'customer',
+    subjectId: 'cust-4',
+    customerId: 'cu-fang-work',
+    name: 'Fang Wang',
+    email: 'fang.w@work.example',
+    waiver: {
+      status: 'signed',
+      signedAt: '2026-10-30T18:00:00Z',
+      year: WAIVER_YEAR,
+    },
+    signatures: [
+      {
+        assignmentId: 'asg-waiver-fang',
+        templateId: 'tpl-waiver-form',
+        titleEn: 'Liability waiver',
+        titleZh: '免责声明',
+        kind: 'sign',
+        language: 'zh',
+        formVersion: 2,
+        signedAt: '2026-10-30T18:00:00Z',
+        hasSignedCopy: true,
+        validThisYear: true,
+      },
+    ],
+  },
+  {
+    subjectType: 'customer',
+    subjectId: 'cust-5',
+    customerId: 'cu-wang',
+    name: 'Wang Fang',
+    email: 'wang.fang@example.com',
+    waiver: { status: 'none', signedAt: null, year: WAIVER_YEAR },
     signatures: [],
   },
 ];
 
+export const sampleCustomers: Customer[] = sampleSigners
+  .filter((s) => s.customerId)
+  .map((s, i) => ({
+    id: s.customerId ?? '',
+    shopifyCustomerId: 7100 + i,
+    firstName: s.name?.split(' ')[0] ?? null,
+    lastName: s.name?.split(' ').slice(1).join(' ') ?? null,
+    email: s.email,
+    phone: null,
+    shopifyUpdatedAt: null,
+    createdAt: '2026-10-10T00:00:00Z',
+    updatedAt: '2026-10-10T00:00:00Z',
+    waiver: s.waiver ?? undefined,
+  }));
+
 export const sampleStudents: StudentSignature[] = [
-  { name: 'Lily Chen', signed: true, signedAt: '2026-11-08T03:30:00Z' },
-  { name: 'Max Müller', signed: false, signedAt: null },
-  { name: 'Wang Fang', signed: true, signedAt: '2026-10-30T18:00:00Z' },
+  {
+    name: 'Lily Chen',
+    signed: true,
+    signedAt: '2026-11-08T03:30:00Z',
+    status: 'signed',
+  },
+  { name: 'Max Müller', signed: false, signedAt: null, status: 'none' },
+  {
+    name: 'Wang Fang',
+    signed: true,
+    signedAt: '2026-10-30T18:00:00Z',
+    status: 'signed',
+  },
+  {
+    name: 'Ava Brown',
+    signed: false,
+    signedAt: '2026-02-01T16:00:00Z',
+    status: 'expired',
+  },
 ];
 
 export interface LookupsMockState {
   signers: Signer[];
+  customers: Customer[];
   students: StudentSignature[];
   meStatus: 'approved' | 'pending' | 'rejected' | 'deactivated' | 'none';
   signatureQueries: string[];
   studentQueries: (string | null)[];
   checkEmails: string[];
+  links: { assignmentId: string; customerId: string }[];
 }
 
 export function createLookupsState(
@@ -81,17 +191,33 @@ export function createLookupsState(
 ): LookupsMockState {
   return {
     signers: structuredClone(sampleSigners),
+    customers: structuredClone(sampleCustomers),
     students: structuredClone(sampleStudents),
     meStatus: 'approved',
     signatureQueries: [],
     studentQueries: [],
     checkEmails: [],
+    links: [],
     ...overrides,
   };
 }
 
 const includes = (value: string | null, q: string) =>
   (value ?? '').toLowerCase().includes(q.toLowerCase());
+
+const newestFirst = (a: { signedAt: string }, b: { signedAt: string }) =>
+  b.signedAt.localeCompare(a.signedAt);
+
+function waiverOf(signatures: Signer['signatures']): CustomerWaiver {
+  const signed = signatures.filter((e) => e.kind === 'sign').sort(newestFirst);
+  const current = signed.filter((e) => e.validThisYear !== false);
+  const latest = current[0] ?? signed[0];
+  return {
+    status: current.length > 0 ? 'signed' : latest ? 'expired' : 'none',
+    signedAt: latest?.signedAt ?? null,
+    year: WAIVER_YEAR,
+  };
+}
 
 export function lookupsHandlers(
   state: LookupsMockState = createLookupsState(),
@@ -125,14 +251,80 @@ export function lookupsHandlers(
       const entries = state.signers
         .filter((s) => s.email?.toLowerCase() === email)
         .flatMap((s) => s.signatures)
-        .filter((e) => e.kind === 'sign')
-        .sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+        .filter((e) => e.kind === 'sign');
+      const waiver = waiverOf(entries);
       const result: SignatureCheck = {
-        signed: entries.length > 0,
-        signedAt: entries[0]?.signedAt ?? null,
-        templateTitles: [...new Set(entries.map((e) => e.titleEn))],
+        signed: waiver.status === 'signed',
+        signedAt: waiver.signedAt,
+        status: waiver.status,
+        templateTitles: [
+          ...new Set(
+            entries
+              .filter((e) => e.validThisYear !== false)
+              .sort(newestFirst)
+              .map((e) => e.titleEn),
+          ),
+        ],
       };
       return HttpResponse.json(result);
+    }),
+    http.post(
+      `${apiBase}/admin/signatures/:assignmentId/link`,
+      async ({ params, request }) => {
+        const assignmentId = String(params.assignmentId);
+        const { customerId } = (await request.json()) as {
+          customerId: string;
+        };
+        state.links.push({ assignmentId, customerId });
+        const from = state.signers.find((s) =>
+          s.signatures.some((e) => e.assignmentId === assignmentId),
+        );
+        const entry = from?.signatures.find(
+          (e) => e.assignmentId === assignmentId,
+        );
+        const customer = state.customers.find((c) => c.id === customerId);
+        if (!from || !entry || !customer)
+          return HttpResponse.json({ message: 'Not found' }, { status: 404 });
+        if (from.subjectType !== 'customer' || entry.kind !== 'sign')
+          return HttpResponse.json(
+            { message: 'Not a completed customer signature' },
+            { status: 400 },
+          );
+        let to = state.signers.find(
+          (s) => s.subjectType === 'customer' && s.customerId === customerId,
+        );
+        if (!to) {
+          to = {
+            subjectType: 'customer',
+            subjectId: customerId,
+            customerId,
+            name: [customer.firstName, customer.lastName]
+              .filter(Boolean)
+              .join(' '),
+            email: customer.email,
+            signatures: [],
+          };
+          state.signers.push(to);
+        }
+        if (to !== from) {
+          from.signatures = from.signatures.filter((e) => e !== entry);
+          to.signatures = [entry, ...to.signatures].sort(newestFirst);
+        }
+        from.waiver = waiverOf(from.signatures);
+        to.waiver = waiverOf(to.signatures);
+        customer.waiver = to.waiver;
+        return HttpResponse.json(to);
+      },
+    ),
+    http.get(`${apiBase}/admin/customers`, ({ request }) => {
+      const q = (new URL(request.url).searchParams.get('q') ?? '').trim();
+      return HttpResponse.json(
+        state.customers.filter(
+          (c) =>
+            includes(`${c.firstName ?? ''} ${c.lastName ?? ''}`, q) ||
+            includes(c.email, q),
+        ),
+      );
     }),
     http.get(`${apiBase}/me/students/signatures`, ({ request }) => {
       const q = new URL(request.url).searchParams.get('q');

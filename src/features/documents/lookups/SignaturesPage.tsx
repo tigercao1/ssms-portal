@@ -11,6 +11,7 @@ import {
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { cn } from '@/lib/cn';
 import { downloadPresigned, getAssignmentSignedUrl } from '../api';
+import { Chip } from '../admin/badges';
 import { errorText, languageName, templateTitle } from '../admin/format';
 import {
   SEARCH_QUERY_MAX,
@@ -21,7 +22,20 @@ import {
   type Signer,
 } from './api';
 import { formatSignedDate } from './format';
-import { SignatureCheckBox } from './SignatureCheckBox';
+import { LinkSignatureDialog } from './LinkSignatureDialog';
+import { EMAIL_SHAPE, SignatureCheckBox } from './SignatureCheckBox';
+import { WaiverBadge } from './WaiverBadge';
+
+interface LinkRequest {
+  entry: SignedDocumentEntry;
+  title: string;
+  signerName: string;
+}
+
+interface LinkResult {
+  person: Signer;
+  title: string;
+}
 
 export function SignaturesPage() {
   const t = useT();
@@ -30,6 +44,9 @@ export function SignaturesPage() {
   const q = useDebounced(draft.trim());
   const results = useSignatureLookup(q);
   const short = q.length < SIGNATURE_QUERY_MIN;
+  const searchEmail = EMAIL_SHAPE.test(q) ? q.toLowerCase() : null;
+  const [linking, setLinking] = useState<LinkRequest | null>(null);
+  const [linked, setLinked] = useState<LinkResult | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,8 +71,23 @@ export function SignaturesPage() {
             </Field>
           </form>
         </Card>
-        <SignatureCheckBox />
+        <SignatureCheckBox searchEmail={searchEmail} />
       </div>
+      {linked && (
+        <Banner tone="approved">
+          <span data-private className="flex flex-wrap items-center gap-2">
+            {s.linkDone
+              .replace('{title}', linked.title)
+              .replace(
+                '{name}',
+                linked.person.name || linked.person.email || s.noName,
+              )}
+            {linked.person.waiver && (
+              <WaiverBadge waiver={linked.person.waiver} />
+            )}
+          </span>
+        </Banner>
+      )}
       {short ? (
         <p role="status" className="text-sm text-slate">
           {q ? s.tooShort : s.start}
@@ -84,15 +116,35 @@ export function SignaturesPage() {
             <SignerCard
               key={`${signer.subjectType}:${signer.subjectId}`}
               signer={signer}
+              onLink={(request) => {
+                setLinked(null);
+                setLinking(request);
+              }}
             />
           ))}
         </ul>
+      )}
+      {linking && (
+        <LinkSignatureDialog
+          {...linking}
+          onClose={() => setLinking(null)}
+          onLinked={(person) => {
+            setLinked({ person, title: linking.title });
+            setLinking(null);
+          }}
+        />
       )}
     </div>
   );
 }
 
-function SignerCard({ signer }: { signer: Signer }) {
+function SignerCard({
+  signer,
+  onLink,
+}: {
+  signer: Signer;
+  onLink: (request: LinkRequest) => void;
+}) {
   const t = useT();
   const s = t.signatures;
   const name = signer.name || signer.email || s.noName;
@@ -104,6 +156,7 @@ function SignerCard({ signer }: { signer: Signer }) {
           <span className="whitespace-nowrap rounded-sm bg-navy-tint px-2 py-0.5 text-xs font-medium text-navy">
             {signer.subjectType === 'instructor' ? s.instructor : s.customer}
           </span>
+          {signer.waiver && <WaiverBadge waiver={signer.waiver} />}
         </div>
         {signer.email && (
           <p className="-mt-2 break-all font-mono text-xs text-slate">
@@ -119,6 +172,11 @@ function SignerCard({ signer }: { signer: Signer }) {
                 key={entry.assignmentId}
                 entry={entry}
                 name={name}
+                onLink={
+                  signer.subjectType === 'customer' && entry.kind === 'sign'
+                    ? onLink
+                    : undefined
+                }
               />
             ))}
           </ul>
@@ -131,9 +189,11 @@ function SignerCard({ signer }: { signer: Signer }) {
 function SignatureRow({
   entry,
   name,
+  onLink,
 }: {
   entry: SignedDocumentEntry;
   name: string;
+  onLink?: (request: LinkRequest) => void;
 }) {
   const t = useT();
   const s = t.signatures;
@@ -151,17 +211,39 @@ function SignatureRow({
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="font-medium text-ink">{title}</span>
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-ink">{title}</span>
+          {entry.validThisYear !== undefined && (
+            <Chip
+              tone={entry.validThisYear ? 'approved' : 'neutral'}
+              label={entry.validThisYear ? s.validThisYear : s.expired}
+            />
+          )}
+        </span>
         <span className="text-xs text-slate">{details.join(' · ')}</span>
       </div>
-      {entry.hasSignedCopy && (
-        <DownloadButton
-          assignmentId={entry.assignmentId}
-          label={s.downloadFor
-            .replace('{title}', title)
-            .replace('{name}', name)}
-        />
-      )}
+      <div className="flex flex-wrap items-start gap-2 sm:justify-end">
+        {onLink && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={s.linkFor
+              .replace('{title}', title)
+              .replace('{name}', name)}
+            onClick={() => onLink({ entry, title, signerName: name })}
+          >
+            {s.link}
+          </Button>
+        )}
+        {entry.hasSignedCopy && (
+          <DownloadButton
+            assignmentId={entry.assignmentId}
+            label={s.downloadFor
+              .replace('{title}', title)
+              .replace('{name}', name)}
+          />
+        )}
+      </div>
     </li>
   );
 }
