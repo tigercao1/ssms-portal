@@ -52,6 +52,26 @@ describe('MyStudentsPage', () => {
     expect(state.studentQueries).toEqual([null]);
   });
 
+  it('asks for a re-sign when the waiver was signed before this waiver year', async () => {
+    setup();
+    const ava = await waitFor(() => student('Ava Brown'));
+    expect(within(ava).getByText('Needs re-sign')).toBeVisible();
+    expect(within(ava).queryByText('Signed')).toBeNull();
+    expect(within(ava).queryByText(/2026/)).toBeNull();
+  });
+
+  it('falls back to the signed flag when the API sends no status', async () => {
+    setup({
+      students: [
+        { name: 'Lily Chen', signed: true, signedAt: '2026-11-08T03:30:00Z' },
+        { name: 'Max Müller', signed: false, signedAt: null },
+      ],
+    });
+    const lily = await waitFor(() => student('Lily Chen'));
+    expect(within(lily).getByText('Signed')).toBeVisible();
+    expect(within(student('Max Müller')).getByText('Not signed')).toBeVisible();
+  });
+
   it('shows no emails or download links', async () => {
     setup();
     await screen.findByRole('list', { name: 'Students' });
@@ -176,6 +196,7 @@ describe('MyStudentsPage', () => {
     const list = await screen.findByRole('list', { name: '学员' });
     expect(within(list).getAllByText('已签署')).toHaveLength(2);
     expect(within(list).getByText('未签署')).toBeVisible();
+    expect(within(list).getByText('需重新签署')).toBeVisible();
     expect(
       screen.getByRole('heading', { name: '我的学员与免责声明' }),
     ).toBeInTheDocument();

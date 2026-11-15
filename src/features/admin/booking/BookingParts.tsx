@@ -7,13 +7,15 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
+import { useSession } from '@/auth/SessionProvider';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { api } from '@/lib/api';
 import { Banner, Button, Field, Input } from '@/components';
 import { cn } from '@/lib/cn';
 import { useModalFocus } from '@/lib/useModalFocus';
-import type { Customer } from '@/lib/types';
+import type { Customer, CustomerWaiver } from '@/lib/types';
+import { WaiverBadge } from '@/features/documents/lookups/WaiverBadge';
 import { CreateCustomerCard } from '../CustomersPage';
 import { customerName } from '../lessonRules';
 import {
@@ -24,26 +26,33 @@ import {
 
 export type PickedCustomer = Pick<
   Customer,
-  'id' | 'firstName' | 'lastName' | 'email' | 'phone'
+  'id' | 'firstName' | 'lastName' | 'email' | 'phone' | 'waiver'
 >;
 
 const TYPEAHEAD_DELAY_MS = 150;
 const TYPEAHEAD_MIN = 2;
 const TYPEAHEAD_LIMIT = 20;
+const WAIVER_LOOKUP_MAX_IDS = 50;
 
 export function Dialog({
   title,
   onClose,
+  dismissible = true,
   children,
 }: {
   title: string;
   onClose: () => void;
+  dismissible?: boolean;
   children: ReactNode;
 }) {
   const t = useT();
   const id = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  useModalFocus(panelRef, { onEscape: onClose });
+  useModalFocus(panelRef, {
+    onEscape: () => {
+      if (dismissible) onClose();
+    },
+  });
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(28,34,51,0.4)] p-4">
       <div
@@ -61,6 +70,7 @@ export function Dialog({
           <Button
             variant="ghost"
             size="sm"
+            disabled={!dismissible}
             onClick={onClose}
             aria-label={t.booking.close}
           >
@@ -93,16 +103,90 @@ function useCustomerTypeahead(q: string) {
   });
 }
 
+type WaiverWaiter = {
+  resolve: (waiver: CustomerWaiver | null) => void;
+  reject: (error: unknown) => void;
+};
+
+let waiverQueue = new Map<string, WaiverWaiter[]>();
+
+async function fetchWaivers(
+  ids: string[],
+  waiters: Map<string, WaiverWaiter[]>,
+) {
+  try {
+    const rows = await api<Customer[]>(
+      `/admin/customers?${new URLSearchParams({ ids: ids.join(',') })}`,
+    );
+    const byId = new Map(rows.map((row) => [row.id, row.waiver ?? null]));
+    for (const id of ids)
+      for (const w of waiters.get(id) ?? []) w.resolve(byId.get(id) ?? null);
+  } catch (error) {
+    for (const id of ids)
+      for (const w of waiters.get(id) ?? []) w.reject(error);
+  }
+}
+
+function flushWaiverQueue() {
+  const waiters = waiverQueue;
+  waiverQueue = new Map();
+  const ids = [...waiters.keys()];
+  for (let i = 0; i < ids.length; i += WAIVER_LOOKUP_MAX_IDS)
+    void fetchWaivers(ids.slice(i, i + WAIVER_LOOKUP_MAX_IDS), waiters);
+}
+
+function loadWaiver(id: string): Promise<CustomerWaiver | null> {
+  return new Promise((resolve, reject) => {
+    if (waiverQueue.size === 0) queueMicrotask(flushWaiverQueue);
+    waiverQueue.set(id, [...(waiverQueue.get(id) ?? []), { resolve, reject }]);
+  });
+}
+
+function useWithWaivers(selected: PickedCustomer[]): PickedCustomer[] {
+  const userId = useSession().user?.id ?? null;
+  const lookups = useQueries({
+    queries: selected.map((c) => ({
+      queryKey: ['admin', 'customers', 'waiver', userId, c.id] as const,
+      enabled: userId !== null && !c.waiver,
+      retry: false,
+      queryFn: () => loadWaiver(c.id),
+    })),
+  });
+  return selected.map((c, i) =>
+    c.waiver ? c : { ...c, waiver: lookups[i]?.data ?? undefined },
+  );
+}
+
 export function pickedName(c: PickedCustomer): string {
   return customerName(c) || c.email || c.phone || '—';
+}
+
+function MissingWaiverNote({ selected }: { selected: PickedCustomer[] }) {
+  const t = useT();
+  const missing = selected.filter(
+    (c) => c.waiver && c.waiver.status !== 'signed',
+  );
+  const year = missing[0]?.waiver?.year;
+  if (!year) return null;
+  return (
+    <p className="rounded-md border-l-[3px] border-l-status-pending bg-status-pending/10 px-3 py-2 text-sm text-ink">
+      {t.waiver.missingNote
+        .replace('{year}', year)
+        .replace('{names}', missing.map(pickedName).join(', '))}
+    </p>
+  );
 }
 
 export function CustomerPicker({
   selected,
   onChange,
+  forBooking = true,
+  disabled = false,
 }: {
   selected: PickedCustomer[];
   onChange: (next: PickedCustomer[]) => void;
+  forBooking?: boolean;
+  disabled?: boolean;
 }) {
   const t = useT();
   const listId = useId();
@@ -113,6 +197,7 @@ export function CustomerPicker({
   const results = useCustomerTypeahead(q);
   const [active, setActive] = useState({ q: '', index: -1 });
   const [dismissed, setDismissed] = useState(false);
+  const shown = useWithWaivers(selected);
   const chosen = new Set(selected.map((c) => c.id));
   const data = results.data;
   const options = (data ?? []).filter((c) => !chosen.has(c.id));
@@ -126,6 +211,7 @@ export function CustomerPicker({
   const optionId = (index: number) => `${listId}-${index}`;
 
   function add(customer: PickedCustomer) {
+    if (disabled) return;
     onChange([...selected, customer]);
     setDraft('');
   }
@@ -165,15 +251,19 @@ export function CustomerPicker({
           aria-label={t.booking.selectedCustomers}
           className="flex flex-wrap gap-2"
         >
-          {selected.map((c) => (
+          {shown.map((c) => (
             <li
               key={c.id}
-              className="flex min-h-11 items-center gap-1 rounded-md bg-navy-tint pl-3 text-sm text-navy"
+              className="flex min-h-11 max-w-full items-center gap-1 rounded-md bg-navy-tint pl-3 text-sm text-navy"
             >
-              {pickedName(c)}
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-1.5">
+                {pickedName(c)}
+                {c.waiver && <WaiverBadge waiver={c.waiver} />}
+              </span>
               <button
                 type="button"
-                className="min-h-11 min-w-11 rounded-md hover:bg-grey"
+                className="min-h-11 min-w-11 rounded-md hover:bg-grey disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
                 aria-label={t.booking.removeCustomer.replace(
                   '{name}',
                   pickedName(c),
@@ -186,6 +276,7 @@ export function CustomerPicker({
           ))}
         </ul>
       )}
+      {forBooking && <MissingWaiverNote selected={shown} />}
       <div className="grid gap-1.5 sm:grid-cols-[1fr_auto] sm:gap-x-2">
         <Field label={t.booking.customerSearch}>
           {(p) => (
@@ -202,6 +293,7 @@ export function CustomerPicker({
                 activeIndex >= 0 ? optionId(activeIndex) : undefined
               }
               value={draft}
+              disabled={disabled}
               onChange={(e) => {
                 setDraft(e.target.value);
                 setDismissed(false);
@@ -216,14 +308,17 @@ export function CustomerPicker({
         >
           {t.booking.customerSearchHint}
         </p>
-        <Button
-          variant="secondary"
-          type="button"
-          onClick={() => setCreating(true)}
-          className="mt-2.5 justify-self-start sm:col-start-2 sm:row-start-1 sm:mt-0 sm:self-end"
-        >
-          {t.booking.newCustomer}
-        </Button>
+        {forBooking && (
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={disabled}
+            onClick={() => setCreating(true)}
+            className="mt-2.5 justify-self-start sm:col-start-2 sm:row-start-1 sm:mt-0 sm:self-end"
+          >
+            {t.booking.newCustomer}
+          </Button>
+        )}
       </div>
       {open &&
         !dismissed &&
@@ -264,6 +359,7 @@ export function CustomerPicker({
                       {c.phone}
                     </span>
                   )}
+                  {c.waiver && <WaiverBadge waiver={c.waiver} />}
                 </li>
               ))}
             </ul>

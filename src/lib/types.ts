@@ -312,6 +312,14 @@ export interface PayRatePatch {
   effectiveTo?: string | null;
 }
 
+export type WaiverStatus = 'signed' | 'expired' | 'none';
+
+export interface CustomerWaiver {
+  status: WaiverStatus;
+  signedAt: string | null;
+  year: string;
+}
+
 export interface Customer {
   id: string;
   shopifyCustomerId: number;
@@ -320,8 +328,10 @@ export interface Customer {
   email: string | null;
   phone: string | null;
   shopifyUpdatedAt: string | null;
+  shopifyDeletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  waiver?: CustomerWaiver;
 }
 
 export interface CustomerCreate {

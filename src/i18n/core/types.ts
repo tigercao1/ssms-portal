@@ -1128,6 +1128,21 @@ export interface Messages {
     checkNotSigned: string;
     checkDocuments: string;
     checkFailed: string;
+    checkExpired: string;
+    validThisYear: string;
+    expired: string;
+    link: string;
+    linkFor: string;
+    linkTitle: string;
+    linkIntro: string;
+    linkConfirm: string;
+    linkButton: string;
+    linking: string;
+    linkDone: string;
+    linkInvalid: string;
+    linkNotFound: string;
+    linkFailed: string;
+    linkTimeout: string;
   };
   signingForms: {
     title: string;
@@ -1255,8 +1270,17 @@ export interface Messages {
     noName: string;
     signed: string;
     notSigned: string;
+    needsResign: string;
     capped: string;
     loadFailed: string;
+  };
+  waiver: {
+    signed: string;
+    signedNoDate: string;
+    expired: string;
+    expiredNoDate: string;
+    none: string;
+    missingNote: string;
   };
   instructorCalendar: {
     title: string;

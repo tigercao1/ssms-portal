@@ -290,6 +290,45 @@ describe('BookLessonPage', () => {
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
   });
 
+  it('notes a customer without this year’s waiver and still books them', async () => {
+    const recorded = serve();
+    server.use(
+      http.get(`${API}/admin/customers`, () =>
+        HttpResponse.json([
+          {
+            ...lily,
+            waiver: { status: 'none', signedAt: null, year: '2026/27' },
+          },
+        ]),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+
+    await pickLily(user);
+    expect(
+      within(
+        screen.getByRole('list', { name: 'Selected customers' }),
+      ).getByText('No waiver on file'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No signed waiver for 2026/27: Lily Chen. You can still book.',
+      ),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
+    });
+    await chooseLesson(user);
+    await chooseSlot(user, 'Jane Snow', '10:00');
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings).toEqual([
+      expect.objectContaining({ customerIds: ['cu1'] }),
+    ]);
+  });
+
   it('needs a customer before booking', async () => {
     serve();
     const user = userEvent.setup();

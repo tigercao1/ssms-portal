@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Banner, Button, Card, Field, Input } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { errorText } from '../admin/format';
@@ -6,9 +6,13 @@ import { useSignatureCheck } from './api';
 import { formatSignedDate } from './format';
 
 const EMAIL_MAX = 254;
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function SignatureCheckBox() {
+export function SignatureCheckBox({
+  searchEmail = null,
+}: {
+  searchEmail?: string | null;
+}) {
   const t = useT();
   const s = t.signatures;
   const { locale } = useLocale();
@@ -16,6 +20,17 @@ export function SignatureCheckBox() {
   const [email, setEmail] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const check = useSignatureCheck(email);
+  const status = check.data?.status ?? (check.data?.signed ? 'signed' : 'none');
+  const date = check.data?.signedAt
+    ? formatSignedDate(check.data.signedAt, locale)
+    : '—';
+
+  useEffect(() => {
+    if (!searchEmail) return;
+    setDraft(searchEmail);
+    setInvalid(false);
+    setEmail(searchEmail);
+  }, [searchEmail]);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -69,17 +84,12 @@ export function SignatureCheckBox() {
       )}
       {email !== null && check.data && (
         <div role="status" data-private className="flex flex-col gap-2">
-          {check.data.signed ? (
+          {status === 'signed' ? (
             <>
               <p className="font-medium text-ink">
                 {s.checkSigned
                   .replace('{email}', email)
-                  .replace(
-                    '{date}',
-                    check.data.signedAt
-                      ? formatSignedDate(check.data.signedAt, locale)
-                      : '—',
-                  )}
+                  .replace('{date}', date)}
               </p>
               <ul
                 aria-label={s.checkDocuments}
@@ -90,6 +100,10 @@ export function SignatureCheckBox() {
                 ))}
               </ul>
             </>
+          ) : status === 'expired' ? (
+            <p className="font-medium text-ink">
+              {s.checkExpired.replace('{email}', email).replace('{date}', date)}
+            </p>
           ) : (
             <p className="text-ink">
               {s.checkNotSigned.replace('{email}', email)}

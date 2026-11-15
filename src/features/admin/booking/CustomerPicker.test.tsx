@@ -4,9 +4,13 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Customer } from '@/lib/types';
-import { fakeCustomer, server } from '@/test/msw';
+import { customersByIds, fakeCustomer, server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import { CustomerPicker, type PickedCustomer } from './BookingParts';
+
+vi.mock('@/auth/SessionProvider', () => ({
+  useSession: () => ({ user: { id: 'admin-1' } }),
+}));
 
 const API = 'http://localhost:3000';
 
@@ -39,8 +43,14 @@ function deferred() {
   return { promise, resolve };
 }
 
-function Picker({ onPick }: { onPick?: (next: PickedCustomer[]) => void }) {
-  const [selected, setSelected] = useState<PickedCustomer[]>([]);
+function Picker({
+  onPick,
+  initial = [],
+}: {
+  onPick?: (next: PickedCustomer[]) => void;
+  initial?: PickedCustomer[];
+}) {
+  const [selected, setSelected] = useState<PickedCustomer[]>(initial);
   return (
     <CustomerPicker
       selected={selected}
@@ -218,5 +228,197 @@ describe('CustomerPicker typeahead', () => {
     renderWithProviders(<Picker />);
     await user.type(screen.getByLabelText('Find a customer'), 'li');
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+});
+
+describe('CustomerPicker waiver status', () => {
+  const signed = fakeCustomer({
+    waiver: {
+      status: 'signed',
+      signedAt: '2026-11-08T03:30:00Z',
+      year: '2026/27',
+    },
+  });
+  const expired = fakeCustomer({
+    id: 'cu2',
+    firstName: 'Lin',
+    lastName: 'Wu',
+    email: 'lin@example.com',
+    waiver: {
+      status: 'expired',
+      signedAt: '2026-01-10T15:00:00Z',
+      year: '2026/27',
+    },
+  });
+  const none = fakeCustomer({
+    id: 'cu3',
+    firstName: 'Lia',
+    lastName: 'Park',
+    email: 'lia@example.com',
+    waiver: { status: 'none', signedAt: null, year: '2026/27' },
+  });
+
+  it('shows each match’s waiver status for this waiver year', async () => {
+    serveSearch(() => [signed, expired, none]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByLabelText('Find a customer'), 'li');
+
+    expect(
+      await screen.findByRole('option', { name: /Lily Chen/ }),
+    ).toHaveTextContent('Waiver signed Nov 7, 2026');
+    expect(screen.getByRole('option', { name: /Lin Wu/ })).toHaveTextContent(
+      'Signed last year (Jan 10, 2026), needs re-sign',
+    );
+    expect(screen.getByRole('option', { name: /Lia Park/ })).toHaveTextContent(
+      'No waiver on file',
+    );
+  });
+
+  it('keeps the badge on a picked customer and adds no note when they signed this year', async () => {
+    serveSearch(() => [signed]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByLabelText('Find a customer'), 'li');
+    await user.click(await screen.findByRole('option', { name: /Lily Chen/ }));
+
+    expect(
+      within(
+        screen.getByRole('list', { name: 'Selected customers' }),
+      ).getByText('Waiver signed Nov 7, 2026'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No signed waiver/)).not.toBeInTheDocument();
+  });
+
+  it('still lets the admin pick customers without a waiver this year and names them in a note', async () => {
+    serveSearch(() => [signed, expired, none]);
+    const onPick = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<Picker onPick={onPick} />);
+    const input = screen.getByLabelText('Find a customer');
+    await user.type(input, 'li');
+    await user.click(await screen.findByRole('option', { name: /Lin Wu/ }));
+    await user.type(input, 'li');
+    await user.click(await screen.findByRole('option', { name: /Lia Park/ }));
+
+    expect(onPick).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'cu2' }),
+      expect.objectContaining({ id: 'cu3' }),
+    ]);
+    const selected = screen.getByRole('list', { name: 'Selected customers' });
+    expect(
+      within(selected).getByText(
+        'Signed last year (Jan 10, 2026), needs re-sign',
+      ),
+    ).toBeInTheDocument();
+    expect(within(selected).getByText('No waiver on file')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No signed waiver for 2026/27: Lin Wu, Lia Park. You can still book.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the waiver status and note in Chinese', async () => {
+    serveSearch(() => [none]);
+    const user = userEvent.setup();
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByRole('combobox'), 'li');
+    const option = await screen.findByRole('option', { name: /Lia/ });
+    expect(option).toHaveTextContent('没有免责声明记录');
+    await user.click(option);
+    expect(
+      screen.getByText(
+        '以下客户没有 2026/27 年度已签署的免责声明：Lia Park。仍可预约。',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows no badge or note when the API sends no waiver status', async () => {
+    serveSearch(() => [lily]);
+    const user = userEvent.setup();
+    renderWithProviders(<Picker />);
+    await user.type(screen.getByLabelText('Find a customer'), 'li');
+    await user.click(await screen.findByRole('option', { name: /Lily Chen/ }));
+    expect(screen.queryByText(/waiver/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('CustomerPicker waiver lookup by id', () => {
+  const uuid = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const withWaiver = (c: Customer): Customer => ({
+    ...c,
+    waiver: { status: 'none', signedAt: null, year: '2026/27' },
+  });
+
+  function serveCustomers(stored: Customer[], search: Customer[] = []) {
+    const lookups: string[][] = [];
+    server.use(
+      http.get(`${API}/admin/customers`, ({ request }) => {
+        const ids = new URL(request.url).searchParams.get('ids');
+        if (ids === null) return HttpResponse.json(search);
+        lookups.push(ids.split(','));
+        return customersByIds(stored, ids);
+      }),
+    );
+    return lookups;
+  }
+
+  it('looks up 51 picked customers in two requests of at most 50 ids', async () => {
+    const picked = Array.from({ length: 51 }, (_, i) =>
+      fakeCustomer({ id: uuid(i), firstName: `Kid${i}`, email: null }),
+    );
+    const lookups = serveCustomers(picked.map(withWaiver));
+    renderWithProviders(<Picker initial={picked} />);
+
+    await waitFor(() =>
+      expect(screen.getAllByText('No waiver on file')).toHaveLength(51),
+    );
+    expect(lookups.map((ids) => ids.length)).toEqual([50, 1]);
+    expect(lookups.flat()).toEqual(picked.map((c) => c.id));
+  });
+
+  it('looks up only the newly picked customer and never repeats a lookup that found nothing', async () => {
+    const known = fakeCustomer({ id: uuid(1), email: null, phone: null });
+    const missing = fakeCustomer({
+      id: uuid(2),
+      firstName: 'Gone',
+      lastName: 'Away',
+      email: null,
+      phone: null,
+    });
+    const added = fakeCustomer({
+      id: uuid(3),
+      firstName: 'Lin',
+      lastName: 'Wu',
+      email: 'lin@example.com',
+    });
+    const lookups = serveCustomers(
+      [withWaiver(known), withWaiver(added)],
+      [added],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Picker initial={[known, missing]} />);
+
+    expect(await screen.findByText('No waiver on file')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Find a customer'), 'lin');
+    await user.click(await screen.findByRole('option', { name: /Lin Wu/ }));
+
+    await waitFor(() =>
+      expect(screen.getAllByText('No waiver on file')).toHaveLength(2),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookups).toEqual([[known.id, missing.id], [added.id]]);
+  });
+
+  it('makes no lookup when every picked customer already has a waiver status', async () => {
+    const lookups = serveCustomers([]);
+    renderWithProviders(<Picker initial={[withWaiver(lily)]} />);
+
+    expect(await screen.findByText('No waiver on file')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(lookups).toEqual([]);
   });
 });

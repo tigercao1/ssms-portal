@@ -1167,10 +1167,29 @@ export const zhCN: Messages = {
     checkLabel: '邮箱地址',
     checkButton: '核对',
     checkInvalid: '请输入完整的邮箱地址。',
-    checkSigned: '{email} 已签署，最近一次签署于 {date}。',
+    checkSigned: '{email} 已在本免责年度签署，签署于 {date}。',
     checkNotSigned: '{email} 没有签署记录。',
     checkDocuments: '已签署的文件',
     checkFailed: '无法核对：{reason}',
+    checkExpired:
+      '{email} 最近一次签署于 {date}，早于本免责年度，需要重新签署。',
+    validThisYear: '本免责年度有效',
+    expired: '已过期',
+    link: '关联到客户',
+    linkFor: '将 {name} 签署的 {title} 关联到客户',
+    linkTitle: '将签署记录关联到客户',
+    linkIntro:
+      '{title}，由 {name} 于 {date} 签署。请选择这份签署所属的客户，例如签署时使用了其他邮箱的客户。',
+    linkConfirm:
+      '将 {from} 签署的 {title} 关联到 {to}？之后将计为 {to} 的签署。',
+    linkButton: '关联签署记录',
+    linking: '正在关联…',
+    linkDone: '已将 {title} 关联到 {name}。',
+    linkInvalid: '这不是一份已完成的客户签署，无法关联。',
+    linkNotFound: '该签署记录或客户已不存在。请重新搜索后再试。',
+    linkFailed: '无法关联：{reason}',
+    linkTimeout:
+      '关联请求超时。请先查看这份签署，关联可能已经完成，再决定是否重试。',
   },
   signingForms: {
     title: '签署表单',
@@ -1305,8 +1324,18 @@ export const zhCN: Messages = {
     noName: '无姓名',
     signed: '已签署',
     notSigned: '未签署',
+    needsResign: '需重新签署',
     capped: '仅显示前 {n} 名学员。按姓名搜索以查找其他学员。',
     loadFailed: '无法加载你的学员。',
+  },
+  waiver: {
+    signed: '免责声明已签署 {date}',
+    signedNoDate: '免责声明已签署',
+    expired: '去年已签署（{date}），需重新签署',
+    expiredNoDate: '去年已签署，需重新签署',
+    none: '没有免责声明记录',
+    missingNote:
+      '以下客户没有 {year} 年度已签署的免责声明：{names}。仍可预约。',
   },
   instructorCalendar: {
     title: 'Google 日历',
