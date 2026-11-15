@@ -1137,6 +1137,7 @@ export interface Messages {
     linkIntro: string;
     linkConfirm: string;
     linkButton: string;
+    linking: string;
     linkDone: string;
     linkInvalid: string;
     linkNotFound: string;

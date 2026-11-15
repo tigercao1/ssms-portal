@@ -37,16 +37,22 @@ const WAIVER_LOOKUP_MAX_IDS = 50;
 export function Dialog({
   title,
   onClose,
+  dismissible = true,
   children,
 }: {
   title: string;
   onClose: () => void;
+  dismissible?: boolean;
   children: ReactNode;
 }) {
   const t = useT();
   const id = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  useModalFocus(panelRef, { onEscape: onClose });
+  useModalFocus(panelRef, {
+    onEscape: () => {
+      if (dismissible) onClose();
+    },
+  });
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(28,34,51,0.4)] p-4">
       <div
@@ -64,6 +70,7 @@ export function Dialog({
           <Button
             variant="ghost"
             size="sm"
+            disabled={!dismissible}
             onClick={onClose}
             aria-label={t.booking.close}
           >

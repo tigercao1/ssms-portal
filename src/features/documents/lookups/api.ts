@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useSession } from '@/auth/SessionProvider';
 import { api } from '@/lib/api';
@@ -102,17 +107,15 @@ export function useMyStudentSignatures(q: string) {
   });
 }
 
-export function useLinkSignature() {
+const linkSignatureKey = (userId: string | null, assignmentId: string) =>
+  ['admin', userId, 'signatures', 'link', assignmentId] as const;
+
+export function useLinkSignature(assignmentId: string) {
   const userId = useSession().user?.id ?? null;
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      assignmentId,
-      customerId,
-    }: {
-      assignmentId: string;
-      customerId: string;
-    }) =>
+    mutationKey: linkSignatureKey(userId, assignmentId),
+    mutationFn: ({ customerId }: { customerId: string }) =>
       api<Signer>(
         `/admin/signatures/${encodeURIComponent(assignmentId)}/link`,
         { method: 'POST', body: { customerId } },
@@ -123,4 +126,11 @@ export function useLinkSignature() {
         qc.invalidateQueries({ queryKey: ['admin', 'customers'] }),
       ]),
   });
+}
+
+export function useIsLinkingSignature(assignmentId: string): boolean {
+  const userId = useSession().user?.id ?? null;
+  return (
+    useIsMutating({ mutationKey: linkSignatureKey(userId, assignmentId) }) > 0
+  );
 }

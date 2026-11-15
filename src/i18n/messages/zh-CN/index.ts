@@ -1183,6 +1183,7 @@ export const zhCN: Messages = {
     linkConfirm:
       '将 {from} 签署的 {title} 关联到 {to}？之后将计为 {to} 的签署。',
     linkButton: '关联签署记录',
+    linking: '正在关联…',
     linkDone: '已将 {title} 关联到 {name}。',
     linkInvalid: '这不是一份已完成的客户签署，无法关联。',
     linkNotFound: '该签署记录或客户已不存在。请重新搜索后再试。',

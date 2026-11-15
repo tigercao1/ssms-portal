@@ -421,6 +421,86 @@ describe('Link a signature to a customer', () => {
     ]);
   });
 
+  it('starts no second link for a signature while one is pending, even after leaving and reopening', async () => {
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const posted: string[] = [];
+    server.use(
+      http.post(`${API}/admin/signatures/:id/link`, async ({ request }) => {
+        posted.push(
+          ((await request.clone().json()) as { customerId: string }).customerId,
+        );
+        await held;
+        return HttpResponse.json({ message: 'Not found' }, { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+    const view = renderWithProviders(<SignaturesPage />);
+    const openFang = async () => {
+      await user.type(
+        screen.getByRole('searchbox', { name: 'Name or email' }),
+        'fang',
+      );
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Link Liability waiver signed by Fang Wang to a customer',
+        }),
+      );
+      return screen.getByRole('dialog', {
+        name: 'Link signature to a customer',
+      });
+    };
+    const first = await openFang();
+    await pickWangFang(user, first);
+    await user.click(
+      within(first).getByRole('button', { name: 'Link signature' }),
+    );
+    await waitFor(() => expect(posted).toEqual(['cu-wang']));
+
+    expect(
+      within(first).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled();
+    expect(within(first).getByRole('button', { name: 'Close' })).toBeDisabled();
+    await user.click(within(first).getByRole('button', { name: 'Cancel' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBe(first);
+    expect(
+      within(first).getByRole('button', { name: 'Linking…' }),
+    ).toBeDisabled();
+
+    view.rerender(<div />);
+    view.rerender(<SignaturesPage />);
+    const second = await openFang();
+    const link = within(second).getByRole('button', { name: 'Linking…' });
+    expect(link).toBeDisabled();
+    expect(within(second).getByLabelText('Find a customer')).toBeDisabled();
+    expect(
+      within(second).getByRole('button', { name: 'Cancel' }),
+    ).toBeDisabled();
+    await user.click(link);
+    expect(posted).toEqual(['cu-wang']);
+
+    release();
+    await waitFor(() =>
+      expect(
+        within(second).getByLabelText('Find a customer'),
+      ).not.toBeDisabled(),
+    );
+    await user.type(within(second).getByLabelText('Find a customer'), 'lily');
+    await user.click(
+      await within(second).findByRole('option', { name: /Lily Chen/ }),
+    );
+    expect(
+      within(second).getByRole('button', { name: 'Link signature' }),
+    ).toBeEnabled();
+    expect(
+      within(second).getByRole('button', { name: 'Cancel' }),
+    ).toBeEnabled();
+    expect(posted).toEqual(['cu-wang']);
+  });
+
   it('closes without linking on Cancel', async () => {
     const { user, dialog } = await openLink();
     await pickWangFang(user, dialog);

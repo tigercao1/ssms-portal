@@ -1248,6 +1248,7 @@ export const en: Messages = {
     linkConfirm:
       'Link the {title} signed by {from} to {to}? It will count as {to}’s signature.',
     linkButton: 'Link signature',
+    linking: 'Linking…',
     linkDone: 'Linked {title} to {name}.',
     linkInvalid:
       'This is not a completed customer signature, so it cannot be linked.',

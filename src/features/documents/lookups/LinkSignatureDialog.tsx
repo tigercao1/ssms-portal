@@ -10,7 +10,12 @@ import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { ApiError } from '@/lib/api';
 import { errorText } from '../admin/format';
-import { useLinkSignature, type SignedDocumentEntry, type Signer } from './api';
+import {
+  useIsLinkingSignature,
+  useLinkSignature,
+  type SignedDocumentEntry,
+  type Signer,
+} from './api';
 import { formatSignedDate } from './format';
 
 function linkErrorText(error: unknown, t: Messages): string {
@@ -41,18 +46,16 @@ export function LinkSignatureDialog({
   const s = t.signatures;
   const { locale } = useLocale();
   const [picked, setPicked] = useState<PickedCustomer | null>(null);
-  const link = useLinkSignature();
+  const link = useLinkSignature(entry.assignmentId);
+  const pending = useIsLinkingSignature(entry.assignmentId) || link.isPending;
 
   function confirm() {
-    if (!picked || link.isPending) return;
-    link.mutate(
-      { assignmentId: entry.assignmentId, customerId: picked.id },
-      { onSuccess: onLinked },
-    );
+    if (!picked || pending) return;
+    link.mutate({ customerId: picked.id }, { onSuccess: onLinked });
   }
 
   return (
-    <Dialog title={s.linkTitle} onClose={onClose}>
+    <Dialog title={s.linkTitle} onClose={onClose} dismissible={!pending}>
       <p className="text-sm text-slate">
         {s.linkIntro
           .replace('{title}', title)
@@ -61,10 +64,10 @@ export function LinkSignatureDialog({
       </p>
       <CustomerPicker
         forBooking={false}
-        disabled={link.isPending}
+        disabled={pending}
         selected={picked ? [picked] : []}
         onChange={(next) => {
-          if (link.isPending) return;
+          if (pending) return;
           setPicked(next.at(-1) ?? null);
           link.reset();
         }}
@@ -81,15 +84,15 @@ export function LinkSignatureDialog({
         <Banner tone="error">{linkErrorText(link.error, t)}</Banner>
       )}
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" disabled={pending} onClick={onClose}>
           {t.common.cancel}
         </Button>
         <Button
-          disabled={!picked || link.isPending}
-          loading={link.isPending}
+          disabled={!picked || pending}
+          loading={pending}
           onClick={confirm}
         >
-          {s.linkButton}
+          {pending ? s.linking : s.linkButton}
         </Button>
       </div>
     </Dialog>
