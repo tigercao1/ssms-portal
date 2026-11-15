@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SignLang } from './api';
 import { SIGN_MESSAGES } from './messages';
 import { useParentHeight } from './parentHeight';
@@ -6,6 +6,14 @@ import { allowedReturnUrl } from './returnUrl';
 import { WaiverPage } from './WaiverPage';
 
 const WAIVER_PATH = /^\/w\/([A-Za-z0-9_-]+)\/?$/;
+const PREFILL_PARAMS = ['email', 'name'];
+
+function removePrefillFromAddressBar() {
+  const url = new URL(window.location.href);
+  if (!PREFILL_PARAMS.some((key) => url.searchParams.has(key))) return;
+  for (const key of PREFILL_PARAMS) url.searchParams.delete(key);
+  window.history.replaceState(window.history.state, '', url);
+}
 
 export function parseSignLocation(
   location: Pick<Location, 'pathname' | 'search'>,
@@ -33,6 +41,7 @@ export function SignApp({
   const [initial] = useState(() => parseSignLocation(location));
   const { slug, returnUrl, prefill } = initial;
   const [lang, setLang] = useState(initial.lang);
+  useEffect(removePrefillFromAddressBar, []);
   const changeLang = (next: SignLang) => {
     const url = new URL(window.location.href);
     url.searchParams.set('lang', next);

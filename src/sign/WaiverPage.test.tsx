@@ -682,6 +682,41 @@ describe('signing site waiver page', () => {
     });
   });
 
+  it('removes only the email and name from the address bar and keeps the prefill across a language switch', async () => {
+    server.use(
+      http.get(`${API}/sign/forms/waiver`, ({ request }) =>
+        HttpResponse.json(
+          mockSignForm(
+            new URL(request.url).searchParams.get('lang') === 'en'
+              ? 'en'
+              : 'zh',
+          ),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    window.history.replaceState(
+      { from: 'link' },
+      '',
+      '/w/waiver?lang=en&email=a%2Bb%40x.com&name=Zo%C3%AB&return=https%3A%2F%2Fssnow.club%2Fbook',
+    );
+    render(<SignApp />);
+
+    expect(await screen.findByLabelText('Email')).toHaveValue('a+b@x.com');
+    expect(window.location.pathname).toBe('/w/waiver');
+    expect(window.location.search).toBe(
+      '?lang=en&return=https%3A%2F%2Fssnow.club%2Fbook',
+    );
+    expect(window.history.state).toEqual({ from: 'link' });
+
+    await user.click(screen.getByRole('button', { name: '中文' }));
+    expect(await screen.findByLabelText('电子邮箱')).toHaveValue('a+b@x.com');
+    expect(screen.getByLabelText('参与者姓名')).toHaveValue('Zoë');
+    const params = new URL(window.location.href).searchParams;
+    expect([...params.keys()]).toEqual(['lang', 'return']);
+    expect(params.get('lang')).toBe('zh');
+  });
+
   it('explains a prefilled email in Chinese', async () => {
     serveForm('zh');
     renderSign('?email=ada%40example.com');
