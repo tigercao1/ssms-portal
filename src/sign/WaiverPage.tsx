@@ -11,6 +11,7 @@ import {
   SignApiError,
   completeSignForm,
   fetchSignForm,
+  isDrawnField,
   type SignErrorKind,
   type SignField,
   type SignCompletion,
@@ -113,22 +114,44 @@ function fieldId(key: string) {
   return `field-${key}`;
 }
 
+type Answers = Record<string, string | boolean>;
+
+const INPUT_TYPE: Partial<Record<SignField['type'], string>> = {
+  email: 'email',
+  date: 'date',
+};
+
+const AUTOCOMPLETE: Partial<Record<SignField['type'], string>> = {
+  email: 'email',
+  full_name: 'name',
+};
+
+function textOf(answers: Answers, key: string): string {
+  const value = answers[key];
+  return typeof value === 'string' ? value : '';
+}
+
 function validate(
   fields: SignField[],
-  answers: Record<string, string>,
+  answers: Answers,
   signatures: Record<string, string | null>,
   oversized: Record<string, boolean>,
   text: SignMessages,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const field of fields) {
-    if (field.type === 'signature') {
+    if (isDrawnField(field)) {
       if (oversized[field.key]) errors[field.key] = text.signatureTooLarge;
       else if (field.required && !signatures[field.key])
         errors[field.key] = text.signatureRequired(field.label);
       continue;
     }
-    const value = (answers[field.key] ?? '').trim();
+    if (field.type === 'checkbox') {
+      if (field.required && answers[field.key] !== true)
+        errors[field.key] = text.checkRequired(field.label);
+      continue;
+    }
+    const value = textOf(answers, field.key).trim();
     if (field.required && !value)
       errors[field.key] = text.required(field.label);
     else if ([...value].length > MAX_ANSWER_LENGTH)
@@ -148,7 +171,7 @@ export function WaiverPage({
 }: WaiverPageProps) {
   const text = SIGN_MESSAGES[lang];
   const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Answers>({});
   const [signatures, setSignatures] = useState<Record<string, string | null>>(
     {},
   );
@@ -227,7 +250,7 @@ export function WaiverPage({
     setStep(next);
   };
 
-  const setAnswer = (key: string, value: string) => {
+  const setAnswer = (key: string, value: string | boolean) => {
     setAnswers((current) => ({ ...current, [key]: value }));
     setErrors(({ [key]: _cleared, ...rest }) => rest);
   };
@@ -269,14 +292,16 @@ export function WaiverPage({
         ?.focus();
       return;
     }
-    const answerValues: Record<string, string> = {};
+    const answerValues: Answers = {};
     const signatureValues: Record<string, string> = {};
     for (const field of form.fields) {
-      if (field.type === 'signature') {
+      if (isDrawnField(field)) {
         const png = signatures[field.key];
         if (png) signatureValues[field.key] = png;
+      } else if (field.type === 'checkbox') {
+        if (answers[field.key] === true) answerValues[field.key] = true;
       } else {
-        const value = (answers[field.key] ?? '').trim();
+        const value = textOf(answers, field.key).trim();
         if (value) answerValues[field.key] = value;
       }
     }
@@ -460,7 +485,7 @@ export function WaiverPage({
           );
           return (
             <div key={field.key} className="flex flex-col gap-1.5">
-              {field.type === 'signature' ? (
+              {isDrawnField(field) ? (
                 <div
                   id={fieldId(field.key)}
                   role="group"
@@ -480,16 +505,33 @@ export function WaiverPage({
                     }
                   />
                 </div>
+              ) : field.type === 'checkbox' ? (
+                <label className="flex items-start gap-3 text-base">
+                  <input
+                    id={fieldId(field.key)}
+                    name={field.key}
+                    type="checkbox"
+                    checked={answers[field.key] === true}
+                    aria-required={field.required}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? errorId : undefined}
+                    onChange={(event) =>
+                      setAnswer(field.key, event.target.checked)
+                    }
+                    className="mt-1 h-5 w-5 shrink-0 accent-navy"
+                  />
+                  {label}
+                </label>
               ) : (
                 <>
                   <label htmlFor={fieldId(field.key)}>{label}</label>
                   <Input
                     id={fieldId(field.key)}
                     name={field.key}
-                    type={field.type}
+                    type={INPUT_TYPE[field.type] ?? 'text'}
                     className="text-base"
-                    autoComplete={field.type === 'email' ? 'email' : undefined}
-                    value={answers[field.key] ?? ''}
+                    autoComplete={AUTOCOMPLETE[field.type]}
+                    value={textOf(answers, field.key)}
                     required={field.required}
                     aria-required={field.required}
                     aria-invalid={error ? true : undefined}

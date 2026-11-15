@@ -14,6 +14,7 @@ export interface SignMessages {
   payloadTooLarge: string;
   language: string;
   signatureRequired: (label: string) => string;
+  checkRequired: (label: string) => string;
   optional: string;
   prefilledEmail: string;
   prefilledName: string;
@@ -69,6 +70,7 @@ const en: SignMessages = {
     'Your signatures are too large to send together. Please clear one and sign it again.',
   language: 'Language',
   signatureRequired: (label) => `Please sign in the ${label} box.`,
+  checkRequired: (label) => `Please tick ${label}.`,
   optional: 'optional',
   prefilledEmail:
     'We filled in the email from your booking. Change it only if you used a different one.',
@@ -127,6 +129,7 @@ const zh: SignMessages = {
   payloadTooLarge: '签名数据过大，无法一起提交。请清除其中一个签名后重新签名。',
   language: '语言',
   signatureRequired: (label) => `请在“${label}”框内签名。`,
+  checkRequired: (label) => `请勾选“${label}”。`,
   optional: '选填',
   prefilledEmail:
     '我们已根据您的预订填入邮箱。仅当您使用了其他邮箱时才需修改。',
