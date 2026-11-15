@@ -342,6 +342,70 @@ describe('ClassActions', () => {
     expect(calls[0]?.body).toEqual({ customerIds: ['cu2'] });
   });
 
+  it('shows the waiver status of customers already in the lesson', async () => {
+    serve();
+    const queries: string[] = [];
+    server.use(
+      http.get(`${API}/admin/customers`, ({ request }) => {
+        queries.push(new URL(request.url).searchParams.get('q') ?? '');
+        return HttpResponse.json([
+          {
+            id: 'cu9',
+            shopifyCustomerId: 9,
+            firstName: 'Lilyanne',
+            lastName: 'Chen',
+            email: 'lily@example.com.au',
+            phone: null,
+            shopifyUpdatedAt: null,
+            createdAt: '',
+            updatedAt: '',
+            waiver: {
+              status: 'signed',
+              signedAt: '2026-11-01T15:00:00Z',
+              year: '2026/27',
+            },
+          },
+          {
+            id: 'cu1',
+            shopifyCustomerId: 1,
+            firstName: 'Lily',
+            lastName: 'Chen',
+            email: 'lily@example.com',
+            phone: null,
+            shopifyUpdatedAt: null,
+            createdAt: '',
+            updatedAt: '',
+            waiver: {
+              status: 'expired',
+              signedAt: '2026-01-10T15:00:00Z',
+              year: '2026/27',
+            },
+          },
+        ]);
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ClassActions item={booked} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Move or edit…' }));
+    const dialog = screen.getByRole('dialog', { name: 'Move or edit lesson' });
+    const selected = within(dialog).getByRole('list', {
+      name: 'Selected customers',
+    });
+
+    expect(
+      await within(selected).findByText(
+        'Signed last year (Jan 10, 2026), needs re-sign',
+      ),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        'No signed waiver for 2026/27: Lily Chen. You can still book.',
+      ),
+    ).toBeVisible();
+    expect(queries).toEqual(['lily@example.com']);
+  });
+
   it('lists conflicts from a refused move', async () => {
     serve();
     server.use(

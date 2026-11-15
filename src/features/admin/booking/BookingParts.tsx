@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { api } from '@/lib/api';
 import { Banner, Button, Field, Input } from '@/components';
@@ -31,6 +31,7 @@ export type PickedCustomer = Pick<
 const TYPEAHEAD_DELAY_MS = 150;
 const TYPEAHEAD_MIN = 2;
 const TYPEAHEAD_LIMIT = 20;
+const WAIVER_LOOKUP_LIMIT = 100;
 
 export function Dialog({
   title,
@@ -94,6 +95,33 @@ function useCustomerTypeahead(q: string) {
   });
 }
 
+function waiverLookupTerm(c: PickedCustomer): string {
+  return (
+    c.email?.trim() || c.phone?.replace(/\D/g, '') || customerName(c).trim()
+  );
+}
+
+function useWithWaivers(selected: PickedCustomer[]): PickedCustomer[] {
+  const lookups = useQueries({
+    queries: selected.map((c) => {
+      const q = c.waiver ? '' : waiverLookupTerm(c);
+      return {
+        queryKey: ['admin', 'customers', 'waiver', c.id, q] as const,
+        enabled: q.length >= TYPEAHEAD_MIN,
+        queryFn: () =>
+          api<Customer[]>(
+            `/admin/customers?${new URLSearchParams({ q, limit: String(WAIVER_LOOKUP_LIMIT) })}`,
+          ),
+        select: (rows: Customer[]) =>
+          rows.find((row) => row.id === c.id)?.waiver,
+      };
+    }),
+  });
+  return selected.map((c, i) =>
+    c.waiver ? c : { ...c, waiver: lookups[i]?.data },
+  );
+}
+
 export function pickedName(c: PickedCustomer): string {
   return customerName(c) || c.email || c.phone || '—';
 }
@@ -134,6 +162,7 @@ export function CustomerPicker({
   const results = useCustomerTypeahead(q);
   const [active, setActive] = useState({ q: '', index: -1 });
   const [dismissed, setDismissed] = useState(false);
+  const shown = useWithWaivers(selected);
   const chosen = new Set(selected.map((c) => c.id));
   const data = results.data;
   const options = (data ?? []).filter((c) => !chosen.has(c.id));
@@ -187,7 +216,7 @@ export function CustomerPicker({
           aria-label={t.booking.selectedCustomers}
           className="flex flex-wrap gap-2"
         >
-          {selected.map((c) => (
+          {shown.map((c) => (
             <li
               key={c.id}
               className="flex min-h-11 max-w-full items-center gap-1 rounded-md bg-navy-tint pl-3 text-sm text-navy"
@@ -212,7 +241,7 @@ export function CustomerPicker({
           ))}
         </ul>
       )}
-      {forBooking && <MissingWaiverNote selected={selected} />}
+      {forBooking && <MissingWaiverNote selected={shown} />}
       <div className="grid gap-1.5 sm:grid-cols-[1fr_auto] sm:gap-x-2">
         <Field label={t.booking.customerSearch}>
           {(p) => (
