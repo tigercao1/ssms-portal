@@ -34,7 +34,7 @@ const FIELD_LABELS: Record<SignLang, Record<string, string>> = {
 };
 
 const FIELD_SHAPES: Omit<SignField, 'label'>[] = [
-  { key: 'participant_name', type: 'text', required: true },
+  { key: 'participant_name', type: 'full_name', required: true },
   { key: 'email', type: 'email', required: true },
   { key: 'date', type: 'date', required: true },
   { key: 'id_number', type: 'text', required: false },

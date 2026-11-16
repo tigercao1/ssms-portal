@@ -1,6 +1,11 @@
 import { forwardRef, type ReactNode } from 'react';
 import { ButtonSpinner, buttonClasses } from '@/components/Button';
-import type { SignForm, SignOriginalPdf, SignPlacement } from './api';
+import {
+  isDrawnField,
+  type SignForm,
+  type SignOriginalPdf,
+  type SignPlacement,
+} from './api';
 import type { SignMessages } from './messages';
 import { OriginalPdfStatus } from './OriginalDocument';
 import { fitText, placementToPixels } from './pdf/geometry';
@@ -20,12 +25,17 @@ function widthAtOnePixel(value: string) {
   return measureContext.measureText(value).width / MEASURE_SIZE;
 }
 
+function answerText(value: string | boolean | undefined, drawn: boolean) {
+  if (drawn || value === undefined || value === false) return '';
+  return value === true ? '✓' : value;
+}
+
 interface ReviewStepProps {
   form: SignForm;
   info: SignOriginalPdf;
   pdf: OriginalPdf;
   text: SignMessages;
-  answers: Record<string, string>;
+  answers: Record<string, string | boolean>;
   signatures: Record<string, string>;
   notice: ReactNode;
   submitting: boolean;
@@ -116,13 +126,9 @@ export const ReviewStep = forwardRef<HTMLHeadingElement, ReviewStepProps>(
               placement={placement}
               layout={layout}
               label={field.label}
-              answer={
-                field.type === 'signature' ? '' : (answers[field.key] ?? '')
-              }
+              answer={answerText(answers[field.key], isDrawnField(field))}
               signature={
-                field.type === 'signature'
-                  ? (signatures[field.key] ?? null)
-                  : null
+                isDrawnField(field) ? (signatures[field.key] ?? null) : null
               }
             />
           );

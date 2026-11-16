@@ -11,11 +11,10 @@ import {
   MAX_FORM_PDF_PAGES,
   isConflict,
   useRemoveFormPdf,
-  useSaveFormPlacements,
   useUploadFormPdf,
-  type FormPlacement,
   type FormTemplate,
 } from './api';
+import type { DraftField, DraftPlacement, FieldIssues } from './formFields';
 import { PlacementEditor } from './PlacementEditor';
 
 function uploadError(err: unknown, t: Messages): string {
@@ -36,22 +35,28 @@ export function OriginalPdfSection({
   form,
   lang,
   sourceRecovery,
-  revision,
-  reloads,
   writing,
-  placementsDirty,
-  onDirtyChange,
+  unsaved,
+  fields,
+  placements,
+  stacked,
+  issues,
+  onChange,
+  onEnsureDraft,
   onConflict,
   onWritten,
 }: {
   form: FormTemplate;
   lang: DocumentLanguage;
   sourceRecovery: SourceRecovery;
-  revision: string | null;
-  reloads: number;
   writing: boolean;
-  placementsDirty: boolean;
-  onDirtyChange: (dirty: boolean) => void;
+  unsaved: boolean;
+  fields: DraftField[];
+  placements: DraftPlacement[];
+  stacked: number;
+  issues: Map<string, FieldIssues>;
+  onChange: (fields: DraftField[], placements: DraftPlacement[]) => void;
+  onEnsureDraft: () => Promise<boolean>;
   onConflict: () => void;
   onWritten: (next: FormTemplate) => void;
 }) {
@@ -63,35 +68,32 @@ export function OriginalPdfSection({
   const pdf = version?.originalPdf ?? null;
   const upload = useUploadFormPdf(form.id, lang);
   const remove = useRemoveFormPdf(form.id, lang);
-  const placements = useSaveFormPlacements(form.id, lang);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
-  const busy = writing || placementsDirty;
+  const [preparing, setPreparing] = useState(false);
+  const busy = writing || unsaved || preparing;
   const written = {
     onSuccess: onWritten,
     onError: (err: unknown) => {
       if (isConflict(err)) onConflict();
     },
   };
-  const savePlacements = (list: FormPlacement[]) =>
-    revision === null
-      ? onConflict()
-      : placements.mutate(
-          { placements: list, expectedUpdatedAt: revision },
-          written,
-        );
 
   const reset = () => {
     upload.reset();
     remove.reset();
-    placements.reset();
   };
 
-  function onFile(e: ChangeEvent<HTMLInputElement>) {
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     reset();
     setConfirmingRemove(false);
+    if (!draft) {
+      setPreparing(true);
+      const ready = await onEnsureDraft().finally(() => setPreparing(false));
+      if (!ready) return;
+    }
     upload.mutate(file, written);
   }
 
@@ -127,62 +129,56 @@ export function OriginalPdfSection({
         <p className="text-sm text-slate">{s.noPdf}</p>
       )}
 
-      {draft ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <FileButton
-            size="sm"
-            variant={pdf ? 'secondary' : 'primary'}
-            accept="application/pdf,.pdf"
-            loading={upload.isPending}
-            disabled={busy}
-            onChange={onFile}
-          >
-            {pdf ? s.replacePdf : s.uploadPdf}
-          </FileButton>
-          {pdf &&
-            (confirmingRemove ? (
-              <>
-                <span className="text-sm text-ink">{s.removeConfirm}</span>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  loading={remove.isPending}
-                  disabled={busy}
-                  onClick={() => {
-                    reset();
-                    remove.mutate(undefined, {
-                      ...written,
-                      onSettled: () => setConfirmingRemove(false),
-                    });
-                  }}
-                >
-                  {s.removePdf}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmingRemove(false)}
-                >
-                  {t.common.cancel}
-                </Button>
-              </>
-            ) : (
+      <div className="flex flex-wrap items-center gap-2">
+        <FileButton
+          size="sm"
+          variant={pdf ? 'secondary' : 'primary'}
+          accept="application/pdf,.pdf"
+          loading={upload.isPending || preparing}
+          disabled={busy}
+          onChange={(e) => void onFile(e)}
+        >
+          {pdf ? s.replacePdf : s.uploadPdf}
+        </FileButton>
+        {pdf &&
+          draft &&
+          (confirmingRemove ? (
+            <>
+              <span className="text-sm text-ink">{s.removeConfirm}</span>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="danger"
+                loading={remove.isPending}
                 disabled={busy}
-                onClick={() => setConfirmingRemove(true)}
+                onClick={() => {
+                  reset();
+                  remove.mutate(undefined, {
+                    ...written,
+                    onSettled: () => setConfirmingRemove(false),
+                  });
+                }}
               >
                 {s.removePdf}
               </Button>
-            ))}
-        </div>
-      ) : (
-        <p className="text-sm text-slate">{s.pdfNeedsDraft}</p>
-      )}
-      {draft && pdf && placementsDirty && (
-        <p className="text-sm text-slate">{s.pdfSavePositionsFirst}</p>
-      )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmingRemove(false)}
+              >
+                {t.common.cancel}
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setConfirmingRemove(true)}
+            >
+              {s.removePdf}
+            </Button>
+          ))}
+      </div>
 
       {upload.isError && (
         <Banner tone="error">{uploadError(upload.error, t)}</Banner>
@@ -195,25 +191,29 @@ export function OriginalPdfSection({
           )}
         </Banner>
       )}
-      {upload.isSuccess && (
-        <Banner tone={upload.data.placementsCleared ? 'pending' : 'approved'}>
-          {upload.data.placementsCleared ? s.placementsCleared : s.pdfUploaded}
+      {stacked > 0 ? (
+        <Banner tone="pending">
+          {upload.data?.placementsCleared
+            ? s.placementsCleared
+            : s.fieldsStacked}
         </Banner>
+      ) : (
+        upload.isSuccess &&
+        fields.length === 0 && <Banner tone="approved">{s.pdfUploaded}</Banner>
       )}
       {remove.isSuccess && <Banner tone="approved">{s.pdfRemoved}</Banner>}
 
-      {pdf && version && (
+      {pdf && (
         <PlacementEditor
-          key={`${pdf.sha256}:${reloads}`}
+          key={pdf.sha256}
           pdf={pdf}
-          fields={version.fields}
-          placements={version.placements}
-          editable={draft !== null}
+          fields={fields}
+          placements={placements}
+          lang={lang}
+          issues={issues}
+          editable={!writing}
           sourceRecovery={sourceRecovery}
-          writing={writing}
-          onDirtyChange={onDirtyChange}
-          save={placements}
-          onSave={savePlacements}
+          onChange={onChange}
         />
       )}
     </Card>

@@ -20,10 +20,21 @@ export const FORM_TITLE_MAX = 200;
 export const FORM_BODY_MAX = 50_000;
 export const MAX_FORM_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_FORM_PDF_PAGES = 30;
-export const SIGNER_NAME_KEY = 'participant_name';
-export const SIGNER_EMAIL_KEY = 'email';
+export const FORM_FIELD_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
+export const FORM_FIELD_KEY_MAX = 40;
+export const FORM_MAX_FIELDS = 50;
+export const FORM_MAX_PLACEMENTS = 100;
+export const FORM_FIELD_TYPES = [
+  'text',
+  'full_name',
+  'email',
+  'date',
+  'checkbox',
+  'initials',
+  'signature',
+] as const;
 
-export type FormFieldType = 'text' | 'email' | 'date' | 'signature';
+export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
 
 export interface FormField {
   key: string;
@@ -82,7 +93,6 @@ export interface FormTemplate {
   titleZh: string | null;
   emailCopy: boolean;
   languages: Record<DocumentLanguage, FormLanguageVersions>;
-  defaultFields: Record<DocumentLanguage, FormField[]>;
   insertedAt: string;
   updatedAt: string;
 }
@@ -117,6 +127,7 @@ export interface FormDraft {
   title: string;
   bodyMarkdown: string;
   fields: FormField[];
+  placements: FormPlacement[];
 }
 
 export interface FormRevision {
@@ -166,8 +177,29 @@ export function baselineOf(
       version?.title ??
       (lang === 'zh' ? (form.titleZh ?? form.titleEn) : form.titleEn),
     bodyMarkdown: version?.bodyMarkdown ?? '',
-    fields: version?.fields ?? form.defaultFields[lang],
+    fields: (version?.fields ?? []).map(plainField),
+    placements: (version?.placements ?? []).map(plainPlacement),
   };
+}
+
+export function plainField({
+  key,
+  type,
+  label,
+  required,
+}: FormField): FormField {
+  return { key, type, label, required };
+}
+
+export function plainPlacement({
+  key,
+  page,
+  x,
+  y,
+  w,
+  h,
+}: FormPlacement): FormPlacement {
+  return { key, page, x, y, w, h };
 }
 
 export function sameDraft(a: FormDraft, b: FormDraft): boolean {
@@ -191,12 +223,6 @@ export function editableVersion(
 ): FormVersion | null {
   const { draft, published } = form.languages[lang];
   return draft ?? published;
-}
-
-export function unplacedRequired(version: FormVersion): FormField[] {
-  if (!version.originalPdf) return [];
-  const placed = new Set(version.placements.map((p) => p.key));
-  return version.fields.filter((f) => f.required && !placed.has(f.key));
 }
 
 export function useForms() {
@@ -246,10 +272,14 @@ function useDraftSync(
     const key = formsKeys.revision(id, lang);
     const known = qc.getQueryData<DraftRevision>(key);
     const next = draftRevisionOf(form, lang);
-    if (!onlyWithSameText || (known && sameDraft(known.text, next.text)))
+    if (!onlyWithSameText || (known && sameText(known.text, next.text)))
       qc.setQueryData(key, next);
     return sync(form);
   };
+}
+
+function sameText(a: FormDraft, b: FormDraft) {
+  return sameDraft({ ...a, placements: [] }, { ...b, placements: [] });
 }
 
 export function useReloadForm(id: string) {
@@ -360,24 +390,6 @@ export function useRemoveFormPdf(id: string, lang: DocumentLanguage) {
     mutationFn: () =>
       api<FormTemplate>(`${versionPath(id, lang)}/source`, {
         method: 'DELETE',
-      }),
-    onSuccess: sync,
-    onError: refresh,
-  });
-}
-
-export function useSaveFormPlacements(id: string, lang: DocumentLanguage) {
-  const sync = useDraftSync(id, lang, true);
-  const refresh = useRefreshOnConflict(id);
-  return useMutation({
-    mutationKey: formsKeys.writes(id, lang),
-    mutationFn: (body: {
-      placements: FormPlacement[];
-      expectedUpdatedAt: string;
-    }) =>
-      api<FormTemplate>(`${versionPath(id, lang)}/placements`, {
-        method: 'PUT',
-        body,
       }),
     onSuccess: sync,
     onError: refresh,

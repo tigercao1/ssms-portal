@@ -2,137 +2,241 @@ import { useState } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { Button, Input, Select, Toggle } from '@/components';
+import type { DocumentLanguage } from '../api';
 import {
+  FORM_FIELD_KEY_MAX,
+  FORM_FIELD_TYPES,
   FORM_TITLE_MAX,
-  SIGNER_EMAIL_KEY,
-  SIGNER_NAME_KEY,
-  type FormField,
   type FormFieldType,
 } from './api';
-
-const LOCKED_KEYS = new Set([SIGNER_NAME_KEY, SIGNER_EMAIL_KEY]);
+import {
+  changeFieldType,
+  newField,
+  signerFieldIds,
+  type DraftField,
+  type FieldIssues,
+} from './formFields';
 
 export function fieldTypeLabel(type: FormFieldType, t: Messages): string {
   const s = t.signingForms;
   return {
     text: s.typeText,
+    full_name: s.typeFullName,
     email: s.typeEmail,
     date: s.typeDate,
+    checkbox: s.typeCheckbox,
+    initials: s.typeInitials,
     signature: s.typeSignature,
   }[type];
 }
 
-export function fieldsProblem(fields: FormField[], t: Messages): string | null {
-  if (fields.some((f) => !f.label.trim())) return t.signingForms.labelMissing;
-  if (!fields.some((f) => f.type === 'signature' && f.required))
-    return t.signingForms.needSignature;
-  return null;
+export function FieldTypeSelect({
+  value,
+  label,
+  className,
+  onChange,
+}: {
+  value: FormFieldType;
+  label: string;
+  className?: string;
+  onChange: (type: FormFieldType) => void;
+}) {
+  const t = useT();
+  return (
+    <Select
+      aria-label={label}
+      value={value}
+      className={className}
+      onChange={(e) => onChange(e.target.value as FormFieldType)}
+    >
+      {FORM_FIELD_TYPES.map((type) => (
+        <option key={type} value={type}>
+          {fieldTypeLabel(type, t)}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+export function SignerBadge({ label }: { label: string }) {
+  return (
+    <span className="w-fit rounded-sm bg-navy-tint px-1.5 py-0.5 text-xs font-medium text-navy">
+      {label}
+    </span>
+  );
 }
 
 export function FieldList({
   fields,
-  defaults,
+  lang,
+  issues,
   onChange,
 }: {
-  fields: FormField[];
-  defaults: FormField[];
-  onChange: (fields: FormField[]) => void;
+  fields: DraftField[];
+  lang: DocumentLanguage;
+  issues: Map<string, FieldIssues>;
+  onChange: (fields: DraftField[]) => void;
 }) {
   const t = useT();
   const s = t.signingForms;
-  const present = new Set(fields.map((f) => f.key));
-  const addable = defaults.filter((f) => !present.has(f.key));
-  const [adding, setAdding] = useState('');
-  const toAdd = addable.find((f) => f.key === adding) ?? addable[0];
+  const [adding, setAdding] = useState<FormFieldType>('text');
+  const signer = signerFieldIds(fields);
 
-  const patch = (key: string, next: Partial<FormField>) =>
-    onChange(fields.map((f) => (f.key === key ? { ...f, ...next } : f)));
+  const setFields = onChange;
+  const patch = (id: string, next: Partial<DraftField>) =>
+    setFields(fields.map((f) => (f.id === id ? { ...f, ...next } : f)));
+  const move = (index: number, by: number) => {
+    const field = fields[index];
+    if (!field) return;
+    const next = fields.filter((_, i) => i !== index);
+    next.splice(index + by, 0, field);
+    setFields(next);
+  };
+  const remove = (id: string) => setFields(fields.filter((f) => f.id !== id));
 
   return (
     <div className="flex flex-col gap-3">
-      <ul
-        aria-label={s.fieldsLabel}
-        className="flex flex-col divide-y divide-grey/40 rounded-md border border-grey/60"
-      >
-        {fields.map((field) => {
-          const locked = LOCKED_KEYS.has(field.key);
-          const label = field.label || field.key;
-          return (
-            <li
-              key={field.key}
-              className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3"
-            >
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex items-center gap-2 text-xs text-slate">
-                  <span className="rounded-sm bg-navy-tint px-1.5 py-0.5 font-medium text-navy">
-                    {fieldTypeLabel(field.type, t)}
-                  </span>
-                  <span className="font-mono">{field.key}</span>
-                </div>
-                <Input
-                  aria-label={s.labelFor.replace('{key}', field.key)}
-                  value={field.label}
-                  maxLength={FORM_TITLE_MAX}
-                  aria-invalid={!field.label.trim()}
-                  onChange={(e) => patch(field.key, { label: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-3 sm:justify-end">
-                {locked ? (
-                  <span className="text-xs text-slate">{s.alwaysRequired}</span>
-                ) : (
-                  <label className="flex items-center gap-2 text-sm text-ink">
-                    <Toggle
-                      checked={field.required}
-                      label={s.requiredFor.replace('{label}', label)}
-                      onChange={(required) => patch(field.key, { required })}
-                    />
-                    {s.required}
-                  </label>
-                )}
-                {!locked && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={s.removeField.replace('{label}', label)}
-                    onClick={() =>
-                      onChange(fields.filter((f) => f.key !== field.key))
+      {fields.length === 0 ? (
+        <p className="rounded-md border border-dashed border-grey p-3 text-sm text-slate">
+          {s.noFields}
+        </p>
+      ) : (
+        <ul
+          aria-label={s.fieldsLabel}
+          className="flex flex-col divide-y divide-grey/40 rounded-md border border-grey/60"
+        >
+          <li
+            aria-hidden
+            className="hidden gap-2 px-3 pt-2 text-xs font-medium text-slate sm:grid sm:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1.3fr)_auto]"
+          >
+            <span>{s.fieldType}</span>
+            <span>{s.fieldKey}</span>
+            <span>{s.fieldLabel}</span>
+            <span className="w-52" />
+          </li>
+          {fields.map((field, index) => {
+            const issue = issues.get(field.id);
+            const name = field.label.trim() || field.key;
+            const role =
+              signer.name === field.id
+                ? s.signerName
+                : signer.email === field.id
+                  ? s.signerEmail
+                  : null;
+            return (
+              <li
+                key={field.id}
+                role="group"
+                aria-label={s.fieldN.replace('{n}', String(index + 1))}
+                className="flex flex-col gap-1.5 p-3"
+              >
+                <div className="grid gap-2 sm:grid-cols-[8.5rem_minmax(0,1fr)_minmax(0,1.3fr)_auto] sm:items-start">
+                  <FieldTypeSelect
+                    label={s.fieldType}
+                    value={field.type}
+                    className="h-10 text-sm"
+                    onChange={(type) =>
+                      setFields(
+                        fields.map((f) =>
+                          f.id === field.id
+                            ? changeFieldType(f, type, lang)
+                            : f,
+                        ),
+                      )
                     }
-                  >
-                    {t.common.remove}
-                  </Button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {toAdd && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label={s.addField}
-            value={toAdd.key}
-            onChange={(e) => setAdding(e.target.value)}
-            className="w-auto"
-          >
-            {addable.map((f) => (
-              <option key={f.key} value={f.key}>
-                {f.label} ({fieldTypeLabel(f.type, t)})
-              </option>
-            ))}
-          </Select>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              onChange([...fields, toAdd]);
-              setAdding('');
-            }}
-          >
-            {s.addFieldButton}
-          </Button>
-        </div>
+                  />
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      aria-label={s.fieldKey}
+                      value={field.key}
+                      maxLength={FORM_FIELD_KEY_MAX}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      className="h-10 font-mono text-sm"
+                      aria-invalid={issue?.key ? true : undefined}
+                      onChange={(e) => patch(field.id, { key: e.target.value })}
+                    />
+                    {issue?.key && (
+                      <p className="text-xs text-status-rejected">
+                        {issue.key}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      aria-label={s.fieldLabel}
+                      value={field.label}
+                      maxLength={FORM_TITLE_MAX}
+                      className="h-10 text-sm"
+                      aria-invalid={issue?.label ? true : undefined}
+                      onChange={(e) =>
+                        patch(field.id, { label: e.target.value })
+                      }
+                    />
+                    {issue?.label && (
+                      <p className="text-xs text-status-rejected">
+                        {issue.label}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 sm:w-52 sm:justify-end">
+                    <label className="mr-1 flex items-center gap-2 text-sm text-ink">
+                      <Toggle
+                        checked={field.required}
+                        label={s.requiredFor.replace('{label}', name)}
+                        onChange={(required) => patch(field.id, { required })}
+                      />
+                      {s.required}
+                    </label>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={index === 0}
+                      aria-label={s.moveUp.replace('{label}', name)}
+                      onClick={() => move(index, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={index === fields.length - 1}
+                      aria-label={s.moveDown.replace('{label}', name)}
+                      onClick={() => move(index, 1)}
+                    >
+                      ↓
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={s.removeField.replace('{label}', name)}
+                      onClick={() => remove(field.id)}
+                    >
+                      {t.common.remove}
+                    </Button>
+                  </div>
+                </div>
+                {role && <SignerBadge label={role} />}
+              </li>
+            );
+          })}
+        </ul>
       )}
+      <div className="flex flex-wrap items-center gap-2">
+        <FieldTypeSelect
+          label={s.addFieldType}
+          value={adding}
+          className="h-10 w-auto text-sm"
+          onChange={setAdding}
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setFields([...fields, newField(adding, lang, fields)])}
+        >
+          {s.addFieldButton}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -24,6 +24,7 @@ export function PlacedFieldBox({
   rect,
   editable,
   selected,
+  invalid = false,
   icon,
   label,
   ariaLabel,
@@ -35,6 +36,7 @@ export function PlacedFieldBox({
   rect: ScreenRect;
   editable: boolean;
   selected: boolean;
+  invalid?: boolean;
   icon: ReactNode;
   label: string;
   ariaLabel: string;
@@ -51,7 +53,10 @@ export function PlacedFieldBox({
       minWidth={4}
       minHeight={4}
       disableDragging={!editable}
-      enableResizing={editable}
+      enableResizing={editable && { bottomRight: true }}
+      resizeHandleStyles={{
+        bottomRight: { width: 10, height: 10, right: -5, bottom: -5 },
+      }}
       onDragStart={onSelect}
       onDragStop={(_e, d) => onPlace(d.x, d.y, rect.width, rect.height)}
       onResizeStart={onSelect}
@@ -70,6 +75,7 @@ export function PlacedFieldBox({
         role="button"
         tabIndex={0}
         aria-pressed={selected}
+        aria-invalid={invalid || undefined}
         aria-label={ariaLabel}
         onClick={onSelect}
         onKeyDown={onKeyDown}
@@ -77,7 +83,9 @@ export function PlacedFieldBox({
           'flex h-full w-full cursor-move items-center gap-1 overflow-hidden rounded-sm border px-1 text-[11px] leading-none outline-none',
           selected
             ? 'border-red bg-red/10 text-red ring-2 ring-red/40'
-            : 'border-navy/70 bg-navy-tint/80 text-navy hover:border-navy',
+            : invalid
+              ? 'border-status-rejected bg-status-rejected/10 text-status-rejected'
+              : 'border-navy/70 bg-navy-tint/80 text-navy hover:border-navy',
         )}
       >
         <span aria-hidden className="shrink-0">

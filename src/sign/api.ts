@@ -1,6 +1,17 @@
 export type SignLang = 'en' | 'zh';
 
-export type SignFieldType = 'text' | 'email' | 'date' | 'signature';
+export type SignFieldType =
+  | 'text'
+  | 'full_name'
+  | 'email'
+  | 'date'
+  | 'checkbox'
+  | 'initials'
+  | 'signature';
+
+export function isDrawnField(field: Pick<SignField, 'type'>): boolean {
+  return field.type === 'signature' || field.type === 'initials';
+}
 
 export interface SignField {
   key: string;
@@ -51,7 +62,7 @@ export interface SignOriginalPdfUrl {
 export interface SignCompletion {
   lang: SignLang;
   version: number;
-  answers: Record<string, string>;
+  answers: Record<string, string | boolean>;
   signatures: Record<string, string>;
   consent: true;
 }

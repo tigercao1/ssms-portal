@@ -744,4 +744,102 @@ describe('signing site waiver page', () => {
       'This form could not be found.',
     );
   });
+
+  it('signs a form with its own keys, a checkbox and drawn initials', async () => {
+    server.use(
+      http.get(`${API}/sign/forms/rental`, () =>
+        HttpResponse.json({
+          slug: 'rental',
+          lang: 'en',
+          version: 1,
+          title: 'Equipment rental',
+          bodyMarkdown: '',
+          fields: [
+            {
+              key: 'renter',
+              type: 'full_name',
+              label: 'Renter',
+              required: true,
+            },
+            {
+              key: 'renter_email',
+              type: 'email',
+              label: 'Email',
+              required: true,
+            },
+            {
+              key: 'helmet_ok',
+              type: 'checkbox',
+              label: 'Helmet fits',
+              required: true,
+            },
+            {
+              key: 'photos_ok',
+              type: 'checkbox',
+              label: 'Photos OK',
+              required: false,
+            },
+            {
+              key: 'renter_initials',
+              type: 'initials',
+              label: 'Initials',
+              required: true,
+            },
+          ],
+        }),
+      ),
+    );
+    const sent: SignCompletion[] = [];
+    server.use(
+      http.post(`${API}/sign/forms/rental/complete`, async ({ request }) => {
+        sent.push((await request.json()) as SignCompletion);
+        return HttpResponse.json(
+          { status: 'signed', emailed: true },
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderSign('?lang=en', '/w/rental');
+
+    await user.type(await screen.findByLabelText('Renter'), 'Ana Lima');
+    expect(screen.getByLabelText('Renter')).toHaveAttribute(
+      'autocomplete',
+      'name',
+    );
+    await user.type(screen.getByLabelText('Email'), 'ana@example.com');
+    await user.click(
+      screen.getByRole('checkbox', { name: /I have read and agree/ }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+
+    expect(
+      await screen.findByText('Please tick Helmet fits.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Please sign in the Initials box.'),
+    ).toBeInTheDocument();
+    expect(sent).toEqual([]);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Helmet fits' }));
+    act(() => pads[0]!.draw());
+    await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
+
+    await screen.findByRole('heading', {
+      name: 'Signed, a copy has been emailed to you.',
+    });
+    expect(sent).toEqual([
+      {
+        lang: 'en',
+        version: 1,
+        answers: {
+          renter: 'Ana Lima',
+          renter_email: 'ana@example.com',
+          helmet_ok: true,
+        },
+        signatures: { renter_initials: PNG },
+        consent: true,
+      },
+    ]);
+  });
 });
