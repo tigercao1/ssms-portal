@@ -89,23 +89,18 @@ function prefillValue(field: SignField, prefill: Prefill): string | null {
       ? email
       : null;
   }
-  if (field.type === 'text' && /(^|_)name$/.test(field.key)) {
-    const name = prefill.name;
-    return name && [...name].length <= MAX_ANSWER_LENGTH ? name : null;
-  }
-  return null;
+  const name = prefill.name;
+  return name && [...name].length <= MAX_ANSWER_LENGTH ? name : null;
 }
 
 function prefilledAnswers(fields: SignField[], prefill: Prefill) {
   const filled: Record<string, string> = {};
-  const seen = new Set<'email' | 'name'>();
-  for (const field of fields) {
-    const slot = field.type === 'email' ? 'email' : 'name';
-    if (seen.has(slot)) continue;
-    const value = prefillValue(field, prefill);
-    if (value === null) continue;
-    filled[field.key] = value;
-    seen.add(slot);
+  for (const type of ['full_name', 'email'] as const) {
+    const field =
+      fields.find((f) => f.type === type && f.required) ??
+      fields.find((f) => f.type === type);
+    const value = field ? prefillValue(field, prefill) : null;
+    if (field && value !== null) filled[field.key] = value;
   }
   return filled;
 }
