@@ -7,7 +7,6 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { useT } from '@/i18n/core/I18nProvider';
-import { cn } from '@/lib/cn';
 import { Button, Card, Field, Input, Toggle } from '@/components';
 import type { DocumentLanguage } from '../api';
 import {
@@ -34,11 +33,12 @@ import {
   type FormFieldType,
   type FormOriginalPdf,
 } from './api';
-import { FieldTypeSelect, fieldTypeLabel } from './FieldList';
+import { FieldTypeSelect, SignerBadge, fieldTypeLabel } from './FieldList';
 import {
   EDITOR_TYPE,
   changeFieldType,
   newField,
+  signerFieldIds,
   type DraftField,
   type DraftPlacement,
   type FieldIssues,
@@ -96,16 +96,16 @@ export function PlacementEditor({
   const replace = (item: DraftPlacement) =>
     setPlacements(placements.map((p) => (p.id === item.id ? item : p)));
 
-  const removePlacement = (id: string) => {
-    setPlacements(placements.filter((p) => p.id !== id));
-    setSelectedId(null);
-  };
-
-  const deleteField = (fieldId: string) => {
-    onChange(
-      fields.filter((f) => f.id !== fieldId),
-      placements.filter((p) => p.fieldId !== fieldId),
+  const remove = (item: DraftPlacement) => {
+    const shared = placements.some(
+      (p) => p.fieldId === item.fieldId && p.id !== item.id,
     );
+    if (shared) setPlacements(placements.filter((p) => p.id !== item.id));
+    else
+      onChange(
+        fields.filter((f) => f.id !== item.fieldId),
+        placements.filter((p) => p.fieldId !== item.fieldId),
+      );
     setSelectedId(null);
   };
 
@@ -136,14 +136,14 @@ export function PlacementEditor({
     };
   }
 
-  function add(
-    field: DraftField,
-    nextFields: DraftField[],
+  function addNew(
+    type: FormFieldType,
     page: number,
     at?: { x: number; y: number },
   ) {
     const g = geometry(page);
     if (!g) return;
+    const field = newField(type, lang, fields);
     const item = placementAt(
       field,
       page,
@@ -151,23 +151,10 @@ export function PlacementEditor({
       at?.x ?? g.width / 2,
       at?.y ?? g.height / 2,
     );
-    onChange(nextFields, [...placements, item]);
+    onChange([...fields, field], [...placements, item]);
     setSelectedId(item.id);
     setActivePage(page);
     if (!at) pdfRef.current?.scrollToRect(page, item);
-  }
-
-  function addNew(
-    type: FormFieldType,
-    page: number,
-    at?: { x: number; y: number },
-  ) {
-    const field = newField(type, lang, fields);
-    add(field, [...fields, field], page, at);
-  }
-
-  function placeAgain(field: DraftField) {
-    add(field, fields, selected?.page ?? activePage);
   }
 
   function onBoxKey(e: KeyboardEvent, item: DraftPlacement) {
@@ -179,7 +166,7 @@ export function PlacementEditor({
       replace(nudgeField(item, g, move[0], move[1]));
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      removePlacement(item.id);
+      remove(item);
     } else if (e.key === 'Escape') {
       setSelectedId(null);
     }
@@ -223,6 +210,7 @@ export function PlacementEditor({
                 rect={pdfRectToScreen(info.geometry, item)}
                 editable={editable}
                 selected={item.id === selectedId}
+                invalid={issues.has(field.id)}
                 icon={icon(field.type)}
                 label={`${label}${field.required ? ' *' : ''}`}
                 ariaLabel={s.placedAria
@@ -247,6 +235,13 @@ export function PlacementEditor({
   }
 
   const issue = selectedField ? issues.get(selectedField.id) : undefined;
+  const signer = signerFieldIds(fields);
+  const role =
+    selectedField && signer.name === selectedField.id
+      ? s.signerName
+      : selectedField && signer.email === selectedField.id
+        ? s.signerEmail
+        : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -278,7 +273,7 @@ export function PlacementEditor({
                       e.dataTransfer.setData(DRAG_MIME, type);
                       e.dataTransfer.effectAllowed = 'copy';
                     }}
-                    onClick={() => addNew(type, selected?.page ?? activePage)}
+                    onClick={() => addNew(type, activePage)}
                     aria-label={s.addFieldOf.replace(
                       '{type}',
                       fieldTypeLabel(type, t),
@@ -293,7 +288,7 @@ export function PlacementEditor({
               <p className="text-xs text-slate">{s.paletteHint}</p>
             </Card>
           )}
-          {selected && selectedField && editable ? (
+          {selected && selectedField && editable && (
             <section aria-label={s.selectedField}>
               <Card className="flex flex-col gap-3 p-3 text-sm">
                 <div className="flex items-baseline justify-between gap-2">
@@ -360,79 +355,18 @@ export function PlacementEditor({
                   />
                   {s.required}
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => placeAgain(selectedField)}
-                  >
-                    {s.placeAgain}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removePlacement(selected.id)}
-                  >
-                    {s.removePlacement}
-                  </Button>
+                {role && <SignerBadge label={role} />}
+                <div>
                   <Button
                     size="sm"
                     variant="danger"
-                    onClick={() => deleteField(selectedField.id)}
+                    onClick={() => remove(selected)}
                   >
                     {s.deleteField}
                   </Button>
                 </div>
               </Card>
             </section>
-          ) : (
-            editable && (
-              <p className="px-1 text-xs text-slate">{s.selectHint}</p>
-            )
-          )}
-          {editable && fields.length > 0 && (
-            <Card className="flex flex-col gap-2 p-3">
-              <h3 className="text-sm font-medium uppercase tracking-wide text-slate">
-                {s.placeFields}
-              </h3>
-              <ul aria-label={s.placeFields} className="flex flex-col gap-1">
-                {fields.map((field) => {
-                  const count = placements.filter(
-                    (p) => p.fieldId === field.id,
-                  ).length;
-                  const missing = field.required && count === 0;
-                  const label = field.label || field.key;
-                  return (
-                    <li key={field.id} className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => placeAgain(field)}
-                        aria-label={s.placeField.replace('{label}', label)}
-                        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border border-grey/80 bg-surface px-2 py-1 text-left text-xs text-navy hover:border-navy hover:bg-navy-tint"
-                      >
-                        <span aria-hidden>{icon(field.type)}</span>
-                        <span className="truncate">
-                          {label}
-                          {field.required && ' *'}
-                        </span>
-                      </button>
-                      <span
-                        className={cn(
-                          'whitespace-nowrap text-xs',
-                          missing
-                            ? 'font-medium text-status-rejected'
-                            : 'text-slate',
-                        )}
-                      >
-                        {count === 0
-                          ? s.notPlaced
-                          : s.placedCount.replace('{n}', String(count))}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
           )}
         </div>
       </div>

@@ -24,6 +24,7 @@ import {
   FORM_LANGUAGES,
   FORM_TITLE_MAX,
   baselineOf,
+  editableVersion,
   isConflict,
   publicFormUrl,
   sameDraft,
@@ -41,6 +42,7 @@ import {
   fieldIssues,
   fieldsProblem,
   publishProblems,
+  stackUnplaced,
   toEditor,
   toFormDraft,
   type DraftField,
@@ -140,8 +142,6 @@ function Editor({
       </div>
 
       <EmailCopySetting form={form} />
-
-      <Banner tone="info">{s.legalNote}</Banner>
 
       <div
         role="tablist"
@@ -260,6 +260,13 @@ function EmailCopySetting({ form }: { form: FormTemplate }) {
   );
 }
 
+function loadDraft(form: FormTemplate, lang: DocumentLanguage) {
+  return stackUnplaced(
+    toEditor(baselineOf(form, lang)),
+    editableVersion(form, lang)?.originalPdf?.pages[0],
+  );
+}
+
 function LanguageEditor({
   form,
   lang,
@@ -275,7 +282,10 @@ function LanguageEditor({
   const s = t.signingForms;
   const { draft, published } = form.languages[lang];
   const baseline = baselineOf(form, lang);
-  const [values, setValues] = useState<EditorDraft>(() => toEditor(baseline));
+  const [initial] = useState(() => loadDraft(form, lang));
+  const [values, setValues] = useState<EditorDraft>(initial.draft);
+  const [stacked, setStacked] = useState(initial.stacked);
+  const pristine = toFormDraft(loadDraft(form, lang).draft);
   const [mode, setMode] = useState<'write' | 'preview'>('write');
   const [{ updatedAt: revision }, setRevision] = useDraftRevision(form, lang);
   const [reloaded, setReloaded] = useState<{ mine: EditorDraft | null } | null>(
@@ -283,26 +293,30 @@ function LanguageEditor({
   );
   const latest = useRef(values);
   latest.current = values;
-  const latestBaseline = useRef(baseline);
-  latestBaseline.current = baseline;
+  const latestPristine = useRef(pristine);
+  latestPristine.current = pristine;
   const save = useSaveFormDraft(form.id, lang);
   const publish = usePublishForm(form.id, lang);
   const reload = useReloadForm(form.id);
   const writing = useFormWriting(form.id, lang);
   const current = toFormDraft(values);
   const dirty = !sameDraft(current, baseline);
+  const edited = !sameDraft(current, pristine);
   const textDirty = useRef(false);
-  textDirty.current = dirty;
-  const unsaved = dirty || !!reloaded?.mine;
+  textDirty.current = edited;
+  const unsaved = edited || !!reloaded?.mine;
   const issues = fieldIssues(values.fields, t);
   const problem = fieldsProblem(values.fields, t);
   const incomplete = !values.title.trim();
   const hasPdf = !!(draft ?? published)?.originalPdf;
-  const publishBlocked = dirty
-    ? s.publishUnsaved
-    : !draft
-      ? s.publishNeedsDraft
-      : publishProblems(draft, t).join(' ') || null;
+  const publishBlocked = problem
+    ? problem
+    : dirty
+      ? s.publishUnsaved
+      : !draft
+        ? s.publishNeedsDraft
+        : publishProblems(draft, t).join(' ') || null;
+  const blockedNote = !draft && published && !dirty ? null : publishBlocked;
 
   useEffect(() => {
     onDirtyChange(unsaved);
@@ -322,14 +336,21 @@ function LanguageEditor({
     if (!publish.isPending) publish.reset();
   };
 
-  const editFields = (fields: DraftField[], placements: DraftPlacement[]) =>
+  const editFields = (fields: DraftField[], placements: DraftPlacement[]) => {
+    setStacked(0);
     edit({ fields, placements });
+  };
+
+  const showLoaded = (loaded: ReturnType<typeof loadDraft>) => {
+    setValues(loaded.draft);
+    setStacked(loaded.stacked);
+  };
 
   const showFresh = (fresh: FormTemplate) => {
     save.reset();
     publish.reset();
     setRevision(fresh);
-    setValues(toEditor(baselineOf(fresh, lang)));
+    showLoaded(loadDraft(fresh, lang));
   };
 
   const reloadAfterConflict = (keepMine: (mine: EditorDraft) => boolean) =>
@@ -344,7 +365,7 @@ function LanguageEditor({
 
   const adoptPdfWrite = (next: FormTemplate) => {
     const mine = latest.current;
-    const before = latestBaseline.current;
+    const before = latestPristine.current;
     showFresh(next);
     if (!sameDraft(toFormDraft(mine), before)) setReloaded({ mine });
   };
@@ -364,6 +385,7 @@ function LanguageEditor({
       {
         onSuccess: (next) => {
           const fresh = baselineOf(next, lang);
+          setStacked(0);
           setValues((v) =>
             v === sent && !sameDraft(toFormDraft(v), fresh)
               ? toEditor(fresh)
@@ -475,25 +497,20 @@ function LanguageEditor({
         </div>
       </Card>
 
-      <Card className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg">{s.fields}</h2>
-          <p className="text-sm text-slate">{s.fieldsHint}</p>
-        </div>
-        <FieldList
-          fields={values.fields}
-          placements={values.placements}
-          hasPdf={hasPdf}
-          lang={lang}
-          issues={issues}
-          onChange={editFields}
-        />
-        {problem && (
-          <p role="alert" className="text-sm text-status-rejected">
-            {problem}
-          </p>
-        )}
-      </Card>
+      {!hasPdf && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg">{s.fields}</h2>
+            <p className="text-sm text-slate">{s.fieldsHint}</p>
+          </div>
+          <FieldList
+            fields={values.fields}
+            lang={lang}
+            issues={issues}
+            onChange={(fields) => edit({ fields })}
+          />
+        </Card>
+      )}
 
       <OriginalPdfSection
         form={form}
@@ -503,6 +520,7 @@ function LanguageEditor({
         unsaved={unsaved}
         fields={values.fields}
         placements={values.placements}
+        stacked={stacked}
         issues={issues}
         onChange={editFields}
         onEnsureDraft={ensureDraft}
@@ -602,19 +620,27 @@ function LanguageEditor({
         >
           {s.publish}
         </Button>
-        {dirty && (
+        {edited && (
           <Button
             variant="ghost"
             onClick={() => {
-              setValues(toEditor(baseline));
+              showLoaded(loadDraft(form, lang));
               if (!save.isPending) save.reset();
             }}
           >
             {s.discard}
           </Button>
         )}
-        {publishBlocked && (
-          <p className="text-sm text-slate">{publishBlocked}</p>
+        {blockedNote && (
+          <p
+            role={problem ? 'alert' : undefined}
+            className={cn(
+              'text-sm',
+              problem ? 'text-status-rejected' : 'text-slate',
+            )}
+          >
+            {blockedNote}
+          </p>
         )}
       </div>
     </div>

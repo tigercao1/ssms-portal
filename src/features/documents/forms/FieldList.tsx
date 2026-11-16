@@ -14,7 +14,6 @@ import {
   newField,
   signerFieldIds,
   type DraftField,
-  type DraftPlacement,
   type FieldIssues,
 } from './formFields';
 
@@ -59,27 +58,31 @@ export function FieldTypeSelect({
   );
 }
 
+export function SignerBadge({ label }: { label: string }) {
+  return (
+    <span className="w-fit rounded-sm bg-navy-tint px-1.5 py-0.5 text-xs font-medium text-navy">
+      {label}
+    </span>
+  );
+}
+
 export function FieldList({
   fields,
-  placements,
-  hasPdf,
   lang,
   issues,
   onChange,
 }: {
   fields: DraftField[];
-  placements: DraftPlacement[];
-  hasPdf: boolean;
   lang: DocumentLanguage;
   issues: Map<string, FieldIssues>;
-  onChange: (fields: DraftField[], placements: DraftPlacement[]) => void;
+  onChange: (fields: DraftField[]) => void;
 }) {
   const t = useT();
   const s = t.signingForms;
   const [adding, setAdding] = useState<FormFieldType>('text');
   const signer = signerFieldIds(fields);
 
-  const setFields = (next: DraftField[]) => onChange(next, placements);
+  const setFields = onChange;
   const patch = (id: string, next: Partial<DraftField>) =>
     setFields(fields.map((f) => (f.id === id ? { ...f, ...next } : f)));
   const move = (index: number, by: number) => {
@@ -89,11 +92,7 @@ export function FieldList({
     next.splice(index + by, 0, field);
     setFields(next);
   };
-  const remove = (id: string) =>
-    onChange(
-      fields.filter((f) => f.id !== id),
-      placements.filter((p) => p.fieldId !== id),
-    );
+  const remove = (id: string) => setFields(fields.filter((f) => f.id !== id));
 
   return (
     <div className="flex flex-col gap-3">
@@ -118,9 +117,6 @@ export function FieldList({
           {fields.map((field, index) => {
             const issue = issues.get(field.id);
             const name = field.label.trim() || field.key;
-            const count = placements.filter(
-              (p) => p.fieldId === field.id,
-            ).length;
             const role =
               signer.name === field.id
                 ? s.signerName
@@ -220,28 +216,7 @@ export function FieldList({
                     </Button>
                   </div>
                 </div>
-                {(role || hasPdf) && (
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {role && (
-                      <span className="rounded-sm bg-navy-tint px-1.5 py-0.5 font-medium text-navy">
-                        {role}
-                      </span>
-                    )}
-                    {hasPdf && (
-                      <span
-                        className={
-                          field.required && count === 0
-                            ? 'font-medium text-status-rejected'
-                            : 'text-slate'
-                        }
-                      >
-                        {count === 0
-                          ? s.notPlaced
-                          : s.placedCount.replace('{n}', String(count))}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {role && <SignerBadge label={role} />}
               </li>
             );
           })}

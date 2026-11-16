@@ -1,12 +1,19 @@
 import type { Messages } from '@/i18n/core/types';
 import type { DocumentLanguage, FieldType } from '../api';
-import { DEFAULT_LABELS, newFieldId } from '../admin/editor/fieldModel';
+import {
+  DEFAULT_LABELS,
+  DEFAULT_SIZE,
+  fitToPage,
+  newFieldId,
+} from '../admin/editor/fieldModel';
+import { screenRectToPdf, viewportGeometry } from '../pdf/transforms';
 import {
   FORM_FIELD_KEY_PATTERN,
   FORM_MAX_FIELDS,
   type FormDraft,
   type FormField,
   type FormFieldType,
+  type FormPdfPage,
   type FormPlacement,
   type FormVersion,
 } from './api';
@@ -87,6 +94,48 @@ export function toFormDraft(draft: EditorDraft): FormDraft {
   };
 }
 
+const STACK_MARGIN = 36;
+const STACK_GAP = 8;
+
+export function stackUnplaced(
+  draft: EditorDraft,
+  page: FormPdfPage | undefined,
+): { draft: EditorDraft; stacked: number } {
+  const placed = new Set(draft.placements.map((p) => p.fieldId));
+  const unplaced = draft.fields.filter((f) => !placed.has(f.id));
+  if (!page || unplaced.length === 0) return { draft, stacked: 0 };
+  const g = viewportGeometry({
+    viewBox: [page.x, page.y, page.x + page.width, page.y + page.height],
+    scale: 1,
+    rotation: page.rotate,
+  });
+  const ids = draft.placements.map((p) => p.id);
+  let left = STACK_MARGIN;
+  let top = STACK_MARGIN;
+  let columnWidth = 0;
+  const added = unplaced.map((field): DraftPlacement => {
+    const size = DEFAULT_SIZE[EDITOR_TYPE[field.type]];
+    if (top + size.h > g.height - STACK_MARGIN && top > STACK_MARGIN) {
+      left += columnWidth + STACK_GAP * 2;
+      top = STACK_MARGIN;
+      columnWidth = 0;
+    }
+    const rect = fitToPage(
+      screenRectToPdf(g, { left, top, width: size.w, height: size.h }),
+      g,
+    );
+    top += size.h + STACK_GAP;
+    columnWidth = Math.max(columnWidth, size.w);
+    const id = newFieldId(ids);
+    ids.push(id);
+    return { id, fieldId: field.id, page: 1, ...rect };
+  });
+  return {
+    draft: { ...draft, placements: [...draft.placements, ...added] },
+    stacked: added.length,
+  };
+}
+
 export function newField(
   type: FormFieldType,
   lang: DocumentLanguage,
@@ -161,18 +210,5 @@ export function publishProblems(version: FormVersion, t: Messages): string[] {
     version.fields.some((f) => f.type === type && f.required);
   if (!required('full_name')) problems.push(s.publishNeedsName);
   if (!required('email')) problems.push(s.publishNeedsEmail);
-  if (version.originalPdf) {
-    const placed = new Set(version.placements.map((p) => p.key));
-    const unplaced = version.fields.filter(
-      (f) => f.required && !placed.has(f.key),
-    );
-    if (unplaced.length > 0)
-      problems.push(
-        s.publishNeedsPlacements.replace(
-          '{fields}',
-          unplaced.map((f) => f.label).join(', '),
-        ),
-      );
-  }
   return problems;
 }

@@ -1323,8 +1323,6 @@ export const en: Messages = {
     emailCopyMineOn: 'Your choice to turn the email copy on was not saved.',
     emailCopyMineOff: 'Your choice to turn the email copy off was not saved.',
     emailCopyApply: 'Save my choice',
-    legalNote:
-      'When an original PDF is attached, it is the legal copy. The text, the fields and the PDF of a language are published together as one version.',
     unsaved: 'Unsaved changes',
     leaveTitle: 'Leave without saving?',
     leaveBody:
@@ -1343,7 +1341,7 @@ export const en: Messages = {
     saveFailed: 'Could not save the draft: {reason}',
     publish: 'Publish',
     publishNeedsDraft: 'Save a draft first; there is nothing new to publish.',
-    publishUnsaved: 'Save your changes before publishing.',
+    publishUnsaved: 'Save your changes before publishing or changing the PDF.',
     published: 'Published version {n} in {lang}. The public link now shows it.',
     publishFailed: 'Could not publish: {reason}',
     publicLink: 'Public link',
@@ -1353,14 +1351,13 @@ export const en: Messages = {
     uploadPdf: 'Upload PDF',
     replacePdf: 'Replace PDF',
     removePdf: 'Remove PDF',
-    removeConfirm: 'Remove the PDF and its field positions from this draft?',
+    removeConfirm:
+      'Remove the PDF from this draft? The fields stay, without their positions.',
     removeFailed: 'Could not remove the PDF: {reason}',
     placementsCleared:
-      'PDF replaced. The pages changed, so the field positions were cleared; place the fields again.',
+      'PDF replaced. The pages changed, so the fields were moved to the top of page 1. Drag them into place, then save.',
     pdfRemoved: 'PDF removed from this draft.',
     desktopNote: 'Placing fields works best on a computer.',
-    placedCount: '{n} placed',
-    notPlaced: 'Not placed',
     placedAria: '{label} on page {page}',
     bodyHint:
       'Markdown: # headings, - lists and **bold**. Other markup shows as plain text. Optional when a PDF is attached.',
@@ -1370,8 +1367,7 @@ export const en: Messages = {
     fieldType: 'Type',
     fieldKey: 'Key',
     fieldLabel: 'Label',
-    noFields:
-      'No fields yet. Add one here, or add it straight onto the PDF below.',
+    noFields: 'No fields yet. Add the first one below.',
     addFieldType: 'Type of the new field',
     addFieldButton: 'Add field',
     moveUp: 'Move {label} up',
@@ -1392,23 +1388,17 @@ export const en: Messages = {
       'Add a required Full name field for the signer before publishing.',
     publishNeedsEmail:
       'Add a required Email field for the signer before publishing.',
-    publishNeedsPlacements:
-      'Place these required fields on the PDF before publishing: {fields}.',
     pdfHint:
-      "Optional. Up to {mb} MB and {pages} pages. Signers' answers and signatures are stamped onto this PDF where you place the fields.",
-    pdfSaveFirst: 'Save your changes before changing the PDF.',
-    pdfUploaded: 'PDF uploaded. Add the fields onto it next.',
+      "Optional. Up to {mb} MB and {pages} pages. When attached, the PDF is the legal copy, and signers' answers are stamped onto it where you place the fields.",
+    pdfUploaded: 'PDF uploaded. Use "Add a field" to put fields on it.',
     palette: 'Add a field',
     addFieldOf: 'Add a {type} field to the PDF',
     paletteHint:
-      'Click a type to add a new field to the current page, or drag it onto a page. Drag a box to move it and its corner to resize it; arrow keys nudge it and Delete takes it off the PDF. * marks required fields.',
+      'Click a type or drag it onto a page to add a field. Click a field to edit it, drag it to move, drag its corner to resize; Delete removes it. * marks required fields.',
     selectedField: 'Selected field',
-    selectHint: 'Select a box on the PDF to edit its field.',
-    placeAgain: 'Place again',
-    removePlacement: 'Remove from PDF',
     deleteField: 'Delete field',
-    placeFields: 'Place existing fields',
-    placeField: 'Place {label} on the PDF',
+    fieldsStacked:
+      'Fields that were not on the PDF yet were put at the top of page 1. Drag them into place, then save.',
   },
   myStudents: {
     title: 'My students and waivers',

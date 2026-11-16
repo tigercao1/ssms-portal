@@ -39,6 +39,7 @@ export function OriginalPdfSection({
   unsaved,
   fields,
   placements,
+  stacked,
   issues,
   onChange,
   onEnsureDraft,
@@ -52,6 +53,7 @@ export function OriginalPdfSection({
   unsaved: boolean;
   fields: DraftField[];
   placements: DraftPlacement[];
+  stacked: number;
   issues: Map<string, FieldIssues>;
   onChange: (fields: DraftField[], placements: DraftPlacement[]) => void;
   onEnsureDraft: () => Promise<boolean>;
@@ -177,7 +179,6 @@ export function OriginalPdfSection({
             </Button>
           ))}
       </div>
-      {unsaved && <p className="text-sm text-slate">{s.pdfSaveFirst}</p>}
 
       {upload.isError && (
         <Banner tone="error">{uploadError(upload.error, t)}</Banner>
@@ -190,10 +191,15 @@ export function OriginalPdfSection({
           )}
         </Banner>
       )}
-      {upload.isSuccess && (
-        <Banner tone={upload.data.placementsCleared ? 'pending' : 'approved'}>
-          {upload.data.placementsCleared ? s.placementsCleared : s.pdfUploaded}
+      {stacked > 0 ? (
+        <Banner tone="pending">
+          {upload.data?.placementsCleared
+            ? s.placementsCleared
+            : s.fieldsStacked}
         </Banner>
+      ) : (
+        upload.isSuccess &&
+        fields.length === 0 && <Banner tone="approved">{s.pdfUploaded}</Banner>
       )}
       {remove.isSuccess && <Banner tone="approved">{s.pdfRemoved}</Banner>}
 

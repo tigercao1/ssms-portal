@@ -1204,7 +1204,6 @@ export interface Messages {
     emailCopyMineOn: string;
     emailCopyMineOff: string;
     emailCopyApply: string;
-    legalNote: string;
     unsaved: string;
     leaveTitle: string;
     leaveBody: string;
@@ -1235,8 +1234,6 @@ export interface Messages {
     placementsCleared: string;
     pdfRemoved: string;
     desktopNote: string;
-    placedCount: string;
-    notPlaced: string;
     placedAria: string;
     bodyHint: string;
     fieldsHint: string;
@@ -1262,20 +1259,14 @@ export interface Messages {
     publishNeedsContent: string;
     publishNeedsName: string;
     publishNeedsEmail: string;
-    publishNeedsPlacements: string;
     pdfHint: string;
-    pdfSaveFirst: string;
     pdfUploaded: string;
     palette: string;
     addFieldOf: string;
     paletteHint: string;
     selectedField: string;
-    selectHint: string;
-    placeAgain: string;
-    removePlacement: string;
     deleteField: string;
-    placeFields: string;
-    placeField: string;
+    fieldsStacked: string;
   };
   myStudents: {
     title: string;

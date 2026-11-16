@@ -113,10 +113,14 @@ const draftPuts = (lang = 'zh') =>
     );
 
 const saveDraft = () => screen.getByRole('button', { name: 'Save draft' });
+const boxesOnPage = (page: number) =>
+  screen.getAllByRole('button', { name: new RegExp(` on page ${page}$`) });
+const stackedNote =
+  'Fields that were not on the PDF yet were put at the top of page 1. Drag them into place, then save.';
 const selectedField = () => within(screen.getByLabelText('Selected field'));
 
 describe('Original PDF on a signing form', () => {
-  it('uploads a PDF through the presigned URL and asks for the required fields before publishing', async () => {
+  it('uploads a PDF through the presigned URL and puts the existing fields on page 1', async () => {
     const user = await openChinese();
     expect(publish()).toBeEnabled();
     expect(
@@ -124,12 +128,11 @@ describe('Original PDF on a signing form', () => {
         'No original PDF. The signed copy is made from the text.',
       ),
     ).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Fields' })).toBeVisible();
 
     await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
 
-    expect(
-      await screen.findByText('PDF uploaded. Add the fields onto it next.'),
-    ).toBeVisible();
+    expect(await screen.findByText(stackedNote)).toBeVisible();
     expect(state.requests.map((r) => r.path)).toEqual([
       '/admin/documents/forms/form-waiver/versions/zh/source/upload-url',
       '/admin/documents/forms/form-waiver/versions/zh/source/confirm',
@@ -140,14 +143,30 @@ describe('Original PDF on a signing form', () => {
       'https://storage.mock/forms/form-waiver/zh-v1.pdf?sig=mock',
     );
     expect(screen.getByRole('link', { name: 'Open PDF' })).toBeVisible();
-    expect(publish()).toBeDisabled();
     expect(
-      screen.getByText(
-        'Place these required fields on the PDF before publishing: 参与者姓名, 电子邮箱, 日期, 参与者签名.',
-      ),
-    ).toBeVisible();
-    const palette = screen.getByRole('list', { name: 'Place existing fields' });
-    expect(within(palette).getAllByText('Not placed')).toHaveLength(6);
+      screen.queryByRole('list', { name: 'Fields' }),
+    ).not.toBeInTheDocument();
+    expect(boxesOnPage(1)).toHaveLength(6);
+    expect(screen.getByText('Unsaved changes')).toBeVisible();
+    expect(publish()).toBeDisabled();
+    await user.click(
+      within(screen.getAllByTestId('rnd')[0]!).getByRole('button', {
+        name: 'drag',
+      }),
+    );
+    expect(screen.queryByText(stackedNote)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^PDF uploaded/)).not.toBeInTheDocument();
+
+    await user.click(saveDraft());
+    expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
+    const put = draftPuts().at(-1)!;
+    expect(put.placements.map((p) => [p.key, p.page])).toEqual(
+      put.fields.map((f) => [f.key, 1]),
+    );
+    const tops = put.placements.map((p) => p.y + p.h);
+    expect(tops).toEqual([...tops].sort((a, b) => b - a));
+    expect(screen.queryByText(stackedNote)).not.toBeInTheDocument();
+    expect(publish()).toBeEnabled();
   });
 
   it('saves a draft first when the PDF goes on a language with only a published version', async () => {
@@ -162,15 +181,37 @@ describe('Original PDF on a signing form', () => {
 
     await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
 
-    expect(
-      await screen.findByText('PDF uploaded. Add the fields onto it next.'),
-    ).toBeVisible();
+    expect(await screen.findByText(stackedNote)).toBeVisible();
     expect(state.requests.map((r) => `${r.method} ${r.path}`)).toEqual([
       'PUT /admin/documents/forms/form-waiver/versions/en',
       'POST /admin/documents/forms/form-waiver/versions/en/source/upload-url',
       'POST /admin/documents/forms/form-waiver/versions/en/source/confirm',
     ]);
     expect(state.forms[0]!.languages.en.draft!.originalPdf).not.toBeNull();
+  });
+
+  it('asks for fields after a PDF goes on a form that has none', async () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/signing-forms/:id" element={<FormEditorPage />} />
+      </Routes>,
+      { route: '/admin/signing-forms/form-rental', dataRouter: true },
+    );
+    await screen.findByRole('tab', { name: 'English' });
+    const user = userEvent.setup({ applyAccept: false });
+
+    await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
+
+    expect(
+      await screen.findByText(
+        'PDF uploaded. Use "Add a field" to put fields on it.',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(stackedNote)).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: 'Add a Full name field to the PDF' }),
+    );
+    expect(screen.queryByText(/^PDF uploaded/)).not.toBeInTheDocument();
   });
 
   it('adds a new field of every type onto the PDF and saves them with the draft', async () => {
@@ -221,7 +262,7 @@ describe('Original PDF on a signing form', () => {
         required: true,
       },
     ]);
-    expect(put.placements.map((p) => [p.key, p.page])).toEqual([
+    expect(put.placements.slice(6).map((p) => [p.key, p.page])).toEqual([
       ['text', 1],
       ['full_name', 1],
       ['email_2', 1],
@@ -230,7 +271,7 @@ describe('Original PDF on a signing form', () => {
       ['initials_2', 1],
       ['renter_signature', 1],
     ]);
-    expect(state.forms[0]!.languages.zh.draft!.placements).toHaveLength(7);
+    expect(state.forms[0]!.languages.zh.draft!.placements).toHaveLength(13);
   });
 
   it('adds a field where its type is dropped on a page', async () => {
@@ -249,23 +290,15 @@ describe('Original PDF on a signing form', () => {
     expect(screen.getByText('Unsaved changes')).toBeVisible();
   });
 
-  it('places existing fields, moves and removes boxes, saves them with the draft and publishes', async () => {
+  it('moves and deletes fields on the PDF, saves them with the draft and publishes', async () => {
     attachPdf();
     const user = await openChinese();
 
-    for (const label of [
-      '参与者姓名',
-      '电子邮箱',
-      '日期',
-      '参与者签名',
-      '姓名缩写',
-    ])
-      await user.click(
-        screen.getByRole('button', { name: `Place ${label} on the PDF` }),
-      );
     expect(publish()).toBeDisabled();
     expect(
-      screen.getByText('Save your changes before publishing.'),
+      screen.getByText(
+        'Save your changes before publishing or changing the PDF.',
+      ),
     ).toBeVisible();
     const before = screen
       .getAllByTestId('rnd')[0]!
@@ -285,17 +318,31 @@ describe('Original PDF on a signing form', () => {
       screen.getByRole('button', { name: '姓名缩写 on page 1' }),
       { key: 'Delete' },
     );
+    await user.click(
+      screen.getByRole('button', { name: '证件号码 on page 1' }),
+    );
+    await user.click(
+      selectedField().getByRole('button', { name: 'Delete field' }),
+    );
     await user.click(saveDraft());
 
     expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
     const put = draftPuts().at(-1)!;
+    expect(put.fields.map((f) => f.key)).toEqual([
+      'participant_name',
+      'email',
+      'date',
+      'participant_signature',
+    ]);
     expect(put.placements.map((p) => p.key)).toEqual([
       'participant_name',
       'email',
       'date',
       'participant_signature',
     ]);
-    expect(put.placements[0]!.y).toBe(put.placements[1]!.y + 20);
+    expect(put.placements[0]!.y).toBe(
+      put.placements[1]!.y + put.placements[1]!.h + 8 + 20,
+    );
     expect(publish()).toBeEnabled();
     await user.click(publish());
     expect(
@@ -305,7 +352,7 @@ describe('Original PDF on a signing form', () => {
     ).toBeVisible();
   });
 
-  it('renames a placed field from its box, places it again and removes one copy', async () => {
+  it('edits the type, key, label and required flag of a field from its box', async () => {
     attachPdf();
     state.forms[0]!.languages.zh.draft!.placements = [
       { key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 },
@@ -313,41 +360,67 @@ describe('Original PDF on a signing form', () => {
     const user = await openChinese();
 
     await user.click(screen.getByRole('button', { name: '日期 on page 1' }));
+    expect(
+      selectedField().queryByRole('button', {
+        name: /Place again|Remove from PDF/,
+      }),
+    ).not.toBeInTheDocument();
+    await user.selectOptions(selectedField().getByLabelText('Type'), 'text');
     const key = selectedField().getByLabelText('Key');
     await user.clear(key);
     await user.type(key, 'signed_on');
     const label = selectedField().getByLabelText('Label');
     await user.clear(label);
-    await user.type(label, '签署日期');
+    await user.type(label, '签署地点');
     await user.click(
-      selectedField().getByRole('button', { name: 'Place again' }),
-    );
-    await user.click(
-      selectedField().getByRole('button', { name: 'Place again' }),
+      selectedField().getByRole('switch', { name: 'Required: 签署地点' }),
     );
     expect(
-      screen.getAllByRole('button', { name: '签署日期 on page 1' }),
-    ).toHaveLength(3);
-    await user.click(
-      selectedField().getByRole('button', { name: 'Remove from PDF' }),
-    );
+      screen.getByRole('button', { name: '签署地点 on page 1' }),
+    ).toBeVisible();
     await user.click(saveDraft());
 
     await screen.findByText('Draft v1 saved.');
     const put = draftPuts().at(-1)!;
     expect(put.fields[2]).toEqual({
       key: 'signed_on',
-      type: 'date',
-      label: '签署日期',
-      required: true,
+      type: 'text',
+      label: '签署地点',
+      required: false,
     });
-    expect(put.placements.map((p) => p.key)).toEqual([
-      'signed_on',
-      'signed_on',
-    ]);
+    expect(put.placements[0]).toMatchObject({
+      key: 'signed_on',
+      page: 1,
+      x: 100,
+      y: 600,
+    });
   });
 
-  it('deletes a field and its boxes from the selected box', async () => {
+  it('marks the boxes of fields with a bad key and names the signer fields', async () => {
+    attachPdf();
+    const user = await openChinese();
+
+    await user.click(
+      screen.getByRole('button', { name: '电子邮箱 on page 1' }),
+    );
+    expect(selectedField().getByText('Signer email')).toBeVisible();
+    const key = selectedField().getByLabelText('Key');
+    await user.clear(key);
+    await user.type(key, 'date');
+
+    expect(
+      screen.getByRole('button', { name: '日期 on page 1' }),
+    ).toHaveAttribute('aria-invalid', 'true');
+    expect(
+      selectedField().getByText('Another field already uses this key.'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Fix the highlighted fields before saving.'),
+    ).toBeVisible();
+    expect(saveDraft()).toBeDisabled();
+  });
+
+  it('deletes one box of a field placed twice, then the field with its last box', async () => {
     attachPdf();
     state.forms[0]!.languages.zh.draft!.placements = [
       { key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 },
@@ -359,35 +432,33 @@ describe('Original PDF on a signing form', () => {
     await user.click(
       selectedField().getByRole('button', { name: 'Delete field' }),
     );
+    expect(
+      screen.queryByRole('button', { name: '日期 on page 2' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '日期 on page 1' }));
+    await user.click(
+      selectedField().getByRole('button', { name: 'Delete field' }),
+    );
 
     expect(
       screen.queryByRole('button', { name: /^日期 on page/ }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Remove 日期' }),
-    ).not.toBeInTheDocument();
     await user.click(saveDraft());
     await screen.findByText('Draft v1 saved.');
-    expect(
-      draftPuts()
-        .at(-1)!
-        .fields.map((f) => f.key),
-    ).not.toContain('date');
-    expect(draftPuts().at(-1)!.placements).toEqual([]);
+    const put = draftPuts().at(-1)!;
+    expect(put.fields.map((f) => f.key)).not.toContain('date');
+    expect(put.placements.map((p) => p.key)).not.toContain('date');
   });
 
   it('shows the API message when the saved positions are rejected', async () => {
     attachPdf();
     const user = await openChinese();
-    await user.click(
-      screen.getByRole('button', { name: 'Place 日期 on the PDF' }),
-    );
     state.forms[0]!.languages.zh.draft!.originalPdf!.pages = [];
     await user.click(saveDraft());
 
     expect(
       await screen.findByText(
-        'Could not save the draft: The field positions are not valid: date is on page 1, but the PDF has 0 page(s)',
+        'Could not save the draft: The field positions are not valid: participant_name is on page 1, but the PDF has 0 page(s)',
       ),
     ).toBeVisible();
   });
@@ -398,7 +469,9 @@ describe('Original PDF on a signing form', () => {
     await user.type(screen.getByLabelText(/Title signers see/), ' 2');
 
     expect(
-      screen.getByText('Save your changes before changing the PDF.'),
+      screen.getByText(
+        'Save your changes before publishing or changing the PDF.',
+      ),
     ).toBeVisible();
     expect(screen.getByLabelText('Replace PDF')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Remove PDF' })).toBeDisabled();
@@ -417,10 +490,9 @@ describe('Original PDF on a signing form', () => {
     );
     const user = userEvent.setup();
     await screen.findByRole('button', { name: 'Date on page 1' });
+    expect(screen.getByText(stackedNote)).toBeVisible();
+    expect(boxesOnPage(1)).toHaveLength(6);
 
-    await user.click(
-      screen.getByRole('button', { name: 'Place Email on the PDF' }),
-    );
     await user.click(saveDraft());
 
     expect(await screen.findByText('Draft v2 saved.')).toBeVisible();
@@ -428,7 +500,14 @@ describe('Original PDF on a signing form', () => {
       draftPuts('en')
         .at(-1)!
         .placements.map((p) => p.key),
-    ).toEqual(['date', 'email']);
+    ).toEqual([
+      'date',
+      'participant_name',
+      'email',
+      'id_number',
+      'initials',
+      'participant_signature',
+    ]);
     expect(state.forms[0]!.languages.en.draft!.originalPdf).not.toBeNull();
   });
 
@@ -438,6 +517,8 @@ describe('Original PDF on a signing form', () => {
       { key: 'participant_name', page: 1, x: 100, y: 700, w: 200, h: 22 },
       { key: 'email', page: 1, x: 100, y: 650, w: 200, h: 22 },
       { key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 },
+      { key: 'id_number', page: 1, x: 100, y: 550, w: 200, h: 22 },
+      { key: 'initials', page: 1, x: 100, y: 500, w: 60, h: 30 },
       { key: 'participant_signature', page: 2, x: 100, y: 100, w: 180, h: 36 },
     ].map(storedPlacement);
     await openChinese();
@@ -476,24 +557,25 @@ describe('Original PDF on a signing form', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('clears the positions when a replacement PDF has different pages', async () => {
+  it('moves the fields to page 1 when a replacement PDF has different pages', async () => {
     attachPdf();
     state.forms[0]!.languages.zh.draft!.placements = [
-      { key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 },
+      { key: 'date', page: 2, x: 100, y: 600, w: 110, h: 22 },
     ];
     state.nextPageCount = 3;
     const user = await openChinese();
+    await user.click(saveDraft());
+    await screen.findByText('Draft v1 saved.');
 
     await user.upload(screen.getByLabelText('Replace PDF'), pdfFile());
 
     expect(
       await screen.findByText(
-        'PDF replaced. The pages changed, so the field positions were cleared; place the fields again.',
+        'PDF replaced. The pages changed, so the fields were moved to the top of page 1. Drag them into place, then save.',
       ),
     ).toBeVisible();
-    expect(
-      screen.queryByRole('button', { name: /on page/ }),
-    ).not.toBeInTheDocument();
+    expect(boxesOnPage(1)).toHaveLength(6);
+    expect(screen.getByText('Unsaved changes')).toBeVisible();
   });
 
   it('removes the PDF after a confirmation', async () => {
@@ -504,7 +586,7 @@ describe('Original PDF on a signing form', () => {
     await user.click(screen.getByRole('button', { name: 'Remove PDF' }));
     expect(
       screen.getByText(
-        'Remove the PDF and its field positions from this draft?',
+        'Remove the PDF from this draft? The fields stay, without their positions.',
       ),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Remove PDF' }));
@@ -517,6 +599,11 @@ describe('Original PDF on a signing form', () => {
       path: '/admin/documents/forms/form-waiver/versions/zh/source',
     });
     expect(screen.queryByTestId('pdf-pages')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Fields' })).getAllByRole(
+        'group',
+      ),
+    ).toHaveLength(6);
     expect(publish()).toBeEnabled();
   });
 
@@ -566,9 +653,7 @@ describe('Original PDF on a signing form', () => {
     expect(publish()).toBeDisabled();
 
     upload.release();
-    expect(
-      await screen.findByText('PDF uploaded. Add the fields onto it next.'),
-    ).toBeVisible();
+    expect(await screen.findByText(stackedNote)).toBeVisible();
     expect(state.forms[0]!.languages.zh.published).toBeNull();
   });
 });
@@ -613,7 +698,7 @@ describe('PDF writes that return text changed by another admin', () => {
     otherAdminSaves();
 
     await user.upload(screen.getByLabelText('Upload PDF'), pdfFile());
-    await screen.findByText('PDF uploaded. Add the fields onto it next.');
+    await screen.findByText(stackedNote);
 
     await expectSaveKeepsTheirText(user);
   });

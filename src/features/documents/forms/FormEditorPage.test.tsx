@@ -32,7 +32,7 @@ function renderEditor(route = '/admin/signing-forms/form-waiver') {
 }
 
 describe('FormEditorPage', () => {
-  it('shows the published English version with its public link and the legal note', async () => {
+  it('shows the published English version with its public link and one field list', async () => {
     await renderEditor();
 
     expect(
@@ -46,16 +46,24 @@ describe('FormEditorPage', () => {
       (screen.getByRole('textbox', { name: 'Text' }) as HTMLTextAreaElement)
         .value,
     ).toContain('Skiing has risks.');
+    expect(screen.getAllByRole('list', { name: 'Fields' })).toHaveLength(1);
     expect(
-      screen.getByText(/original PDF is attached, it is the legal copy/),
-    ).toBeVisible();
+      screen.queryByRole('region', { name: 'Selected field' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'https://sign.ssnow.club/w/waiver' }),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
     expect(
-      screen.getByText('Save a draft first; there is nothing new to publish.'),
+      screen.getByText(
+        /This is the published version\. Saving creates a new draft/,
+      ),
     ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'Save a draft first; there is nothing new to publish.',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it('previews the text the way signers see it, without running markup', async () => {
@@ -89,7 +97,9 @@ describe('FormEditorPage', () => {
     expect(screen.getByText('Unsaved changes')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
     expect(
-      screen.getByText('Save your changes before publishing.'),
+      screen.getByText(
+        'Save your changes before publishing or changing the PDF.',
+      ),
     ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
@@ -204,9 +214,7 @@ describe('FormEditorPage', () => {
 
     expect(screen.getByText('No version yet')).toBeVisible();
     expect(
-      screen.getByText(
-        'No fields yet. Add one here, or add it straight onto the PDF below.',
-      ),
+      screen.getByText('No fields yet. Add the first one below.'),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
 
