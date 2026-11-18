@@ -52,11 +52,15 @@ const SIGNED_URL = 'https://r2.example.test/original.pdf?X-Amz-Signature=abc';
 const ORIGINAL_ROUTE = `${import.meta.env.VITE_SIGN_API_BASE_URL ?? ''}/sign/forms/waiver/original?lang=en`;
 
 const EN = {
-  name: 'Participant name',
-  email: 'Email',
+  name: 'Participant name *',
+  email: 'Email *',
   consent: /I have read and agree/,
 };
-const ZH = { name: '参与者姓名', email: '电子邮箱', consent: /我已阅读并同意/ };
+const ZH = {
+  name: '参与者姓名 *',
+  email: '电子邮箱 *',
+  consent: /我已阅读并同意/,
+};
 
 function serveForm(lang: SignLang, withPdf = true) {
   server.use(
@@ -191,7 +195,7 @@ describe('signing site review step', () => {
     expect(
       screen.getByText('Please sign in the Participant signature box.'),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Participant name')).toHaveFocus();
+    expect(screen.getByLabelText('Participant name *')).toHaveFocus();
     expect(
       screen.queryByRole('heading', { name: 'Check your document' }),
     ).not.toBeInTheDocument();
@@ -230,7 +234,7 @@ describe('signing site review step', () => {
     expect(parseFloat(name.style.top)).toBeCloseTo((792 - 66.1 - 12.4) * scale);
     expect(parseFloat(name.style.width)).toBeCloseTo(250 * scale);
     expect(within(second).queryByAltText('Guardian signature')).toBeNull();
-    expect(screen.getByLabelText('Participant name')).not.toBeVisible();
+    expect(screen.getByLabelText('Participant name *')).not.toBeVisible();
     expect(sent).toEqual([]);
   });
 
@@ -248,14 +252,17 @@ describe('signing site review step', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: /Release of liability/ }),
     ).toHaveFocus();
-    expect(screen.getByLabelText('Participant name')).toHaveValue('Ada Snow');
-    expect(screen.getByLabelText('Email')).toHaveValue('ada@example.com');
+    expect(screen.getByLabelText('Participant name *')).toHaveValue('Ada Snow');
+    expect(screen.getByLabelText('Email *')).toHaveValue('ada@example.com');
     expect(screen.getByRole('checkbox', { name: EN.consent })).toBeChecked();
     const pad = screen.getByRole('group', { name: /^Participant signature/ });
     expect(within(pad).getByRole('button', { name: 'Undo' })).toBeEnabled();
 
-    await user.clear(screen.getByLabelText('Participant name'));
-    await user.type(screen.getByLabelText('Participant name'), 'Ada Lovelace');
+    await user.clear(screen.getByLabelText('Participant name *'));
+    await user.type(
+      screen.getByLabelText('Participant name *'),
+      'Ada Lovelace',
+    );
     await user.click(screen.getByRole('button', { name: 'Review' }));
     const second = await previewPage(2);
     expect(within(second).getByText('Ada Lovelace')).toBeInTheDocument();
@@ -364,7 +371,7 @@ describe('signing site review step', () => {
     expect(
       await screen.findByText('Email was not accepted. Please check it.'),
     ).toBeVisible();
-    expect(screen.getByLabelText('Email')).toBeVisible();
+    expect(screen.getByLabelText('Email *')).toBeVisible();
     expect(
       screen.queryByRole('heading', { name: 'Check your document' }),
     ).not.toBeInTheDocument();
