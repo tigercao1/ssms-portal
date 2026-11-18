@@ -1399,6 +1399,12 @@ export const en: Messages = {
     deleteField: 'Delete field',
     fieldsStacked:
       'Fields that were not on the PDF yet were put at the top of page 1. Drag them into place, then save.',
+    signingOrder: 'Signing order',
+    signingOrderHint:
+      'Signers see the fields in this order. It does not change where answers are printed on the PDF.',
+    dragToReorder: 'Drag to reorder',
+    orderPage: 'p. {pages}',
+    orderMoved: '{label} moved to position {n} of {total}.',
   },
   myStudents: {
     title: 'My students and waivers',

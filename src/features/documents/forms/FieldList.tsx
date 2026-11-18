@@ -9,7 +9,9 @@ import {
   FORM_TITLE_MAX,
   type FormFieldType,
 } from './api';
+import { FIELD_ICONS } from '../admin/editor/labels';
 import {
+  EDITOR_TYPE,
   changeFieldType,
   newField,
   signerFieldIds,
@@ -29,6 +31,9 @@ export function fieldTypeLabel(type: FormFieldType, t: Messages): string {
     signature: s.typeSignature,
   }[type];
 }
+
+export const fieldIcon = (type: FormFieldType) =>
+  type === 'email' ? '@' : FIELD_ICONS[EDITOR_TYPE[type]];
 
 export function FieldTypeSelect({
   value,

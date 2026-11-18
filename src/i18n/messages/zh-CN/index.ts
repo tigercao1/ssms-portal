@@ -1323,6 +1323,12 @@ export const zhCN: Messages = {
     deleteField: '删除字段',
     fieldsStacked:
       '还不在 PDF 上的字段已放到第 1 页顶部。请拖到合适位置后保存。',
+    signingOrder: '签署顺序',
+    signingOrderHint:
+      '签署人按此顺序看到字段。它不会改变答案印在 PDF 上的位置。',
+    dragToReorder: '拖动以调整顺序',
+    orderPage: '第 {pages} 页',
+    orderMoved: '{label} 已移到第 {n} 位，共 {total} 个。',
   },
   myStudents: {
     title: '我的学员与免责声明',
