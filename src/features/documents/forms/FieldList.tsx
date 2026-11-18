@@ -3,6 +3,7 @@ import { useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { Button, Input, Select, Toggle } from '@/components';
 import type { DocumentLanguage } from '../api';
+import { FIELD_ICONS } from '../admin/editor/labels';
 import {
   FORM_FIELD_KEY_MAX,
   FORM_FIELD_TYPES,
@@ -10,6 +11,7 @@ import {
   type FormFieldType,
 } from './api';
 import {
+  EDITOR_TYPE,
   changeFieldType,
   newField,
   signerFieldIds,
@@ -29,6 +31,9 @@ export function fieldTypeLabel(type: FormFieldType, t: Messages): string {
     signature: s.typeSignature,
   }[type];
 }
+
+export const fieldIcon = (type: FormFieldType) =>
+  type === 'email' ? '@' : FIELD_ICONS[EDITOR_TYPE[type]];
 
 export function FieldTypeSelect({
   value,

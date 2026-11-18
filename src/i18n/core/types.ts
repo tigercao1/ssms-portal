@@ -1267,6 +1267,11 @@ export interface Messages {
     selectedField: string;
     deleteField: string;
     fieldsStacked: string;
+    signingOrder: string;
+    signingOrderHint: string;
+    dragToReorder: string;
+    orderPage: string;
+    orderMoved: string;
   };
   myStudents: {
     title: string;

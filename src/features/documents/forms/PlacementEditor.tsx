@@ -24,7 +24,6 @@ import {
   rectAt,
   scaleOf,
 } from '../admin/editor/fieldModel';
-import { FIELD_ICONS } from '../admin/editor/labels';
 import { arrowDelta, PlacedFieldBox } from '../admin/editor/PlacedFieldBox';
 import {
   FORM_FIELD_KEY_MAX,
@@ -33,7 +32,12 @@ import {
   type FormFieldType,
   type FormOriginalPdf,
 } from './api';
-import { FieldTypeSelect, SignerBadge, fieldTypeLabel } from './FieldList';
+import {
+  FieldTypeSelect,
+  SignerBadge,
+  fieldIcon,
+  fieldTypeLabel,
+} from './FieldList';
 import {
   EDITOR_TYPE,
   changeFieldType,
@@ -43,11 +47,9 @@ import {
   type DraftPlacement,
   type FieldIssues,
 } from './formFields';
+import { SigningOrderList } from './SigningOrderList';
 
 const DRAG_MIME = 'application/x-ssms-form-field-type';
-
-const icon = (type: FormFieldType) =>
-  type === 'email' ? '@' : FIELD_ICONS[EDITOR_TYPE[type]];
 
 export function PlacementEditor({
   pdf,
@@ -80,8 +82,12 @@ export function PlacementEditor({
     : null;
   const fieldOf = (p: DraftPlacement) => fields.find((f) => f.id === p.fieldId);
 
+  const focusSelected = useRef(true);
+
   useEffect(() => {
-    if (selectedId)
+    const focus = focusSelected.current;
+    focusSelected.current = true;
+    if (selectedId && focus)
       boxes.current.get(selectedId)?.focus({ preventScroll: true });
   }, [selectedId]);
 
@@ -157,6 +163,17 @@ export function PlacementEditor({
     if (!at) pdfRef.current?.scrollToRect(page, item);
   }
 
+  function selectField(fieldId: string) {
+    const item = placements
+      .filter((p) => p.fieldId === fieldId)
+      .sort((a, b) => a.page - b.page)[0];
+    if (!item) return;
+    if (item.id !== selectedId) focusSelected.current = false;
+    setSelectedId(item.id);
+    setActivePage(item.page);
+    pdfRef.current?.scrollToRect(item.page, item);
+  }
+
   function onBoxKey(e: KeyboardEvent, item: DraftPlacement) {
     const g = geometry(item.page);
     if (!g || !editable) return;
@@ -211,7 +228,7 @@ export function PlacementEditor({
                 editable={editable}
                 selected={item.id === selectedId}
                 invalid={issues.has(field.id)}
-                icon={icon(field.type)}
+                icon={fieldIcon(field.type)}
                 label={`${label}${field.required ? ' *' : ''}`}
                 ariaLabel={s.placedAria
                   .replace('{label}', label)
@@ -280,13 +297,23 @@ export function PlacementEditor({
                     )}
                     className="flex cursor-grab items-center gap-1 whitespace-nowrap rounded-md border border-grey/80 bg-surface px-2 py-1 text-xs text-navy hover:border-navy hover:bg-navy-tint"
                   >
-                    <span aria-hidden>{icon(type)}</span>
+                    <span aria-hidden>{fieldIcon(type)}</span>
                     {fieldTypeLabel(type, t)}
                   </button>
                 ))}
               </div>
               <p className="text-xs text-slate">{s.paletteHint}</p>
             </Card>
+          )}
+          {fields.length > 0 && (
+            <SigningOrderList
+              fields={fields}
+              placements={placements}
+              selectedFieldId={selectedField?.id ?? null}
+              editable={editable}
+              onReorder={(next) => onChange(next, placements)}
+              onSelect={selectField}
+            />
           )}
           {selected && selectedField && editable && (
             <section aria-label={s.selectedField}>

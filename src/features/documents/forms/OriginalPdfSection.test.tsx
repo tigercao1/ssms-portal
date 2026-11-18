@@ -743,3 +743,212 @@ describe('PDF writes that return text changed by another admin', () => {
     expect(savedTitle()).toBe(other);
   });
 });
+
+describe('Signing order on a PDF form', () => {
+  const placed = (): FormPlacement[] =>
+    [
+      { key: 'participant_name', page: 1, x: 100, y: 700, w: 200, h: 22 },
+      { key: 'email', page: 1, x: 100, y: 650, w: 200, h: 22 },
+      { key: 'date', page: 1, x: 100, y: 600, w: 110, h: 22 },
+      { key: 'id_number', page: 1, x: 100, y: 550, w: 200, h: 22 },
+      { key: 'initials', page: 2, x: 100, y: 500, w: 60, h: 30 },
+      { key: 'participant_signature', page: 2, x: 100, y: 100, w: 180, h: 36 },
+    ].map(storedPlacement);
+  const placeChinese = () => {
+    attachPdf();
+    state.forms[0]!.languages.zh.draft!.placements = placed();
+  };
+  const orderList = () => screen.getByRole('list', { name: 'Signing order' });
+  const rows = () =>
+    within(orderList())
+      .getAllByRole('listitem')
+      .map((li) =>
+        [...within(li).getAllByRole('button')[0]!.children]
+          .filter((c) => !c.hasAttribute('aria-hidden'))
+          .map((c) => c.textContent!.replace(/\u00a0/g, ' '))
+          .join(' '),
+      );
+  const row = (n: number) =>
+    within(orderList()).getByRole('button', { name: new RegExp(`^${n}\\.`) });
+
+  it('moves a field up and down with its buttons, keeps focus on them and saves the new order', async () => {
+    placeChinese();
+    const user = await openChinese();
+    expect(rows()).toEqual([
+      '1. 参与者姓名 * · p. 1',
+      '2. 电子邮箱 * · p. 1',
+      '3. 日期 * · p. 1',
+      '4. 证件号码 · p. 1',
+      '5. 姓名缩写 · p. 2',
+      '6. 参与者签名 * · p. 2',
+    ]);
+    expect(
+      screen.getByText(
+        'Signers see the fields in this order. It does not change where answers are printed on the PDF.',
+      ),
+    ).toBeVisible();
+    expect(saveDraft()).toBeDisabled();
+
+    const up = screen.getByRole('button', { name: 'Move 电子邮箱 up' });
+    await user.click(up);
+    expect(rows()[0]).toBe('1. 电子邮箱 * · p. 1');
+    expect(
+      screen.getByRole('button', { name: 'Move 电子邮箱 down' }),
+    ).toHaveFocus();
+    expect(
+      screen.getByText('电子邮箱 moved to position 1 of 6.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Unsaved changes')).toBeVisible();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Move 证件号码 down' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Move 证件号码 down' }),
+    ).toHaveFocus();
+    await user.click(saveDraft());
+
+    expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
+    const put = draftPuts().at(-1)!;
+    expect(put.fields.map((f) => f.key)).toEqual([
+      'email',
+      'participant_name',
+      'date',
+      'initials',
+      'id_number',
+      'participant_signature',
+    ]);
+    expect(
+      Object.fromEntries(put.placements.map((p) => [p.key, [p.page, p.y]])),
+    ).toEqual(Object.fromEntries(placed().map((p) => [p.key, [p.page, p.y]])));
+  });
+
+  it('reorders from the keyboard', async () => {
+    placeChinese();
+    const user = await openChinese();
+
+    screen.getByRole('button', { name: 'Move 参与者签名 up' }).focus();
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+    expect(
+      screen.getByRole('button', { name: 'Move 参与者签名 up' }),
+    ).toHaveFocus();
+    await user.keyboard('{Enter}{Enter}{Enter}');
+
+    expect(rows()[0]).toMatch(/参与者签名/);
+    expect(
+      screen.getByRole('button', { name: 'Move 参与者签名 down' }),
+    ).toHaveFocus();
+    expect(
+      screen.getByRole('button', { name: 'Move 参与者签名 up' }),
+    ).toBeDisabled();
+  });
+
+  it('reorders by dragging a row onto another', async () => {
+    placeChinese();
+    await openChinese();
+
+    const handles = screen.getAllByTestId('signing-order-handle');
+    const targets = screen.getAllByTestId('signing-order-row');
+    const dataTransfer = {
+      setData: vi.fn(),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    fireEvent.dragStart(handles[3]!, { dataTransfer });
+    fireEvent.dragOver(targets[0]!, { dataTransfer });
+    fireEvent.drop(targets[0]!, { dataTransfer });
+    fireEvent.dragEnd(handles[3]!, { dataTransfer });
+
+    expect(rows()).toEqual([
+      '1. 证件号码 · p. 1',
+      '2. 参与者姓名 * · p. 1',
+      '3. 电子邮箱 * · p. 1',
+      '4. 日期 * · p. 1',
+      '5. 姓名缩写 · p. 2',
+      '6. 参与者签名 * · p. 2',
+    ]);
+    expect(screen.getByText('Unsaved changes')).toBeVisible();
+  });
+
+  it('selects the field on the PDF when its row is clicked and only edits it in the Selected field panel', async () => {
+    placeChinese();
+    const user = await openChinese();
+    fakePdf.scrollToRect.mockClear();
+
+    await user.click(row(5));
+
+    expect(selectedField().getByLabelText('Label')).toHaveValue('姓名缩写');
+    expect(screen.getByText('Page 2 of 2')).toBeVisible();
+    expect(fakePdf.scrollToRect).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ page: 2, y: 500 }),
+    );
+    expect(row(5)).toHaveAttribute('aria-current', 'true');
+    expect(row(5)).toHaveFocus();
+    expect(within(orderList()).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(orderList()).queryByRole('combobox')).not.toBeInTheDocument();
+    expect(within(orderList()).queryByRole('switch')).not.toBeInTheDocument();
+    expect(
+      within(orderList()).queryByRole('button', { name: /Delete|Remove/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Add a Text field to the PDF' }),
+    );
+    expect(rows().at(-1)).toBe('7. 文本 · p. 2');
+  });
+
+  it('orders each language on its own', async () => {
+    placeChinese();
+    const en = state.forms[0]!.languages.en.published!;
+    en.originalPdf = fakeOriginalPdf();
+    en.placements = placed();
+    const user = await openChinese();
+
+    await user.click(screen.getByRole('button', { name: 'Move 日期 up' }));
+    await user.click(saveDraft());
+    expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
+
+    await user.click(screen.getByRole('tab', { name: 'English' }));
+    expect(rows()[1]).toBe('2. Email * · p. 1');
+    await user.click(
+      screen.getByRole('button', { name: 'Move Participant signature up' }),
+    );
+    await user.click(saveDraft());
+    expect(await screen.findByText('Draft v2 saved.')).toBeVisible();
+
+    expect(
+      draftPuts('zh')
+        .at(-1)!
+        .fields.map((f) => f.key),
+    ).toEqual([
+      'participant_name',
+      'date',
+      'email',
+      'id_number',
+      'initials',
+      'participant_signature',
+    ]);
+    expect(
+      draftPuts('en')
+        .at(-1)!
+        .fields.map((f) => f.key),
+    ).toEqual([
+      'participant_name',
+      'email',
+      'date',
+      'id_number',
+      'participant_signature',
+      'initials',
+    ]);
+    expect(
+      state.forms[0]!.languages.zh.draft!.fields.map((f) => f.key),
+    ).toEqual(
+      draftPuts('zh')
+        .at(-1)!
+        .fields.map((f) => f.key),
+    );
+  });
+});
