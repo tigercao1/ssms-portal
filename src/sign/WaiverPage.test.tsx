@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/msw';
 import { SignApp } from './SignApp';
-import type { SignCompletion, SignLang } from './api';
+import type { SignCompletion, SignField, SignLang } from './api';
 import { mockSignForm } from './mock/fixtures';
 
 const API = 'http://localhost:3000';
@@ -85,15 +85,34 @@ async function fillRequired(
   const labels =
     lang === 'en'
       ? {
-          name: 'Participant name',
-          email: 'Email',
+          name: 'Participant name *',
+          email: 'Email *',
           consent: /I have read and agree/,
         }
-      : { name: '参与者姓名', email: '电子邮箱', consent: /我已阅读并同意/ };
+      : {
+          name: '参与者姓名 *',
+          email: '电子邮箱 *',
+          consent: /我已阅读并同意/,
+        };
   await user.type(await screen.findByLabelText(labels.name), 'Ada Snow');
   await user.type(screen.getByLabelText(labels.email), 'ada@example.com');
   act(() => pads[0]!.draw());
   await user.click(screen.getByRole('checkbox', { name: labels.consent }));
+}
+
+function visibleLabel(control: HTMLElement) {
+  const labelledBy = control.getAttribute('aria-labelledby');
+  const label = labelledBy
+    ? document.getElementById(labelledBy)
+    : (control as HTMLInputElement).labels?.[0];
+  if (!label) throw new Error('control has no label');
+  return label;
+}
+
+function starsIn(label: HTMLElement) {
+  return Array.from(label.querySelectorAll('span[aria-hidden]')).filter(
+    (span) => span.textContent?.trim() === '*',
+  );
 }
 
 function pngOfBytes(bytes: number) {
@@ -148,8 +167,14 @@ describe('signing site waiver page', () => {
     expect(container.querySelector('script')).toBeNull();
     expect(screen.getByRole('listitem')).toHaveTextContent('第一条');
     expect(screen.getByLabelText('证件号码 (选填)')).not.toBeRequired();
-    expect(screen.getByLabelText('参与者姓名')).toBeRequired();
-    expect(screen.getByLabelText('日期')).toHaveValue('2026-11-07');
+    expect(screen.getByLabelText('参与者姓名 *')).toBeRequired();
+    expect(
+      visibleLabel(screen.getByLabelText('参与者姓名 *')),
+    ).toHaveTextContent('参与者姓名 *');
+    expect(
+      starsIn(visibleLabel(screen.getByLabelText('证件号码 (选填)'))),
+    ).toEqual([]);
+    expect(screen.getByLabelText('日期 *')).toHaveValue('2026-11-07');
     expect(screen.getAllByRole('img', { name: /请在此处签名/ })).toHaveLength(
       3,
     );
@@ -189,9 +214,9 @@ describe('signing site waiver page', () => {
     );
 
     expect(
-      screen.getByLabelText('Participant name'),
+      screen.getByLabelText('Participant name *'),
     ).toHaveAccessibleDescription('Participant name is required.');
-    expect(screen.getByLabelText('Participant name')).toHaveFocus();
+    expect(screen.getByLabelText('Participant name *')).toHaveFocus();
     expect(
       screen.getByRole('group', { name: 'Participant signature' }),
     ).toHaveAccessibleDescription(
@@ -205,7 +230,7 @@ describe('signing site waiver page', () => {
       'Please fix the highlighted fields.',
     );
 
-    await user.type(screen.getByLabelText('Email'), 'not-an-email');
+    await user.type(screen.getByLabelText('Email *'), 'not-an-email');
     await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
     expect(
       screen.getByText('Enter a valid email address.'),
@@ -354,7 +379,7 @@ describe('signing site waiver page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This form was just updated. We loaded the latest version',
     );
-    expect(screen.getByLabelText('Participant name')).toHaveValue('Ada Snow');
+    expect(screen.getByLabelText('Participant name *')).toHaveValue('Ada Snow');
     await user.click(screen.getByRole('button', { name: 'Sign and submit' }));
     await screen.findByText('Signed, a copy has been emailed to you.');
     expect(sent.map((body) => body.version)).toEqual([3, 4]);
@@ -371,10 +396,10 @@ describe('signing site waiver page', () => {
     renderSign('?lang=zh');
 
     await user.type(
-      await screen.findByLabelText('Participant name'),
+      await screen.findByLabelText('Participant name *'),
       'Ada Snow',
     );
-    await user.type(screen.getByLabelText('Email'), 'ada@example.com');
+    await user.type(screen.getByLabelText('Email *'), 'ada@example.com');
     act(() => pads[0]!.draw());
     await user.click(screen.getByRole('checkbox', { name: /我已阅读并同意/ }));
     await user.click(screen.getByRole('button', { name: '签署并提交' }));
@@ -409,10 +434,10 @@ describe('signing site waiver page', () => {
         'Some answers were not accepted. Please check them and try again.',
       );
       expect(alert).toHaveTextContent('Field Email (email) must be an email');
-      expect(screen.getByLabelText('Email')).toHaveAccessibleDescription(
+      expect(screen.getByLabelText('Email *')).toHaveAccessibleDescription(
         'Email was not accepted. Please check it.',
       );
-      expect(screen.getByLabelText('Participant name')).toBeValid();
+      expect(screen.getByLabelText('Participant name *')).toBeValid();
     },
   );
 
@@ -523,7 +548,7 @@ describe('signing site waiver page', () => {
       'aria-pressed',
       'true',
     );
-    await user.type(screen.getByLabelText('参与者姓名'), 'Ada Snow');
+    await user.type(screen.getByLabelText('参与者姓名 *'), 'Ada Snow');
     act(() => pads[0]!.draw());
 
     await user.click(switcher.getByRole('button', { name: 'English' }));
@@ -535,13 +560,13 @@ describe('signing site waiver page', () => {
       }),
     ).toBeInTheDocument();
     expect(new URL(window.location.href).searchParams.get('lang')).toBe('en');
-    expect(screen.getByLabelText('Participant name')).toHaveValue('Ada Snow');
+    expect(screen.getByLabelText('Participant name *')).toHaveValue('Ada Snow');
     expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
 
-    await user.type(screen.getByLabelText('Email'), 'ada@example.com');
+    await user.type(screen.getByLabelText('Email *'), 'ada@example.com');
     await user.click(
       screen.getByRole('checkbox', { name: /I have read and agree/ }),
     );
@@ -646,8 +671,8 @@ describe('signing site waiver page', () => {
     const user = userEvent.setup();
     renderSign('?lang=en&email=Ada%40Example.com&name=Ada%20Snow');
 
-    const email = await screen.findByLabelText('Email');
-    const name = screen.getByLabelText('Participant name');
+    const email = await screen.findByLabelText('Email *');
+    const name = screen.getByLabelText('Participant name *');
     expect(email).toHaveValue('ada@example.com');
     expect(email).not.toHaveAttribute('readonly');
     expect(email).toBeEnabled();
@@ -702,7 +727,7 @@ describe('signing site waiver page', () => {
     );
     render(<SignApp />);
 
-    expect(await screen.findByLabelText('Email')).toHaveValue('a+b@x.com');
+    expect(await screen.findByLabelText('Email *')).toHaveValue('a+b@x.com');
     expect(window.location.pathname).toBe('/w/waiver');
     expect(window.location.search).toBe(
       '?lang=en&return=https%3A%2F%2Fssnow.club%2Fbook',
@@ -710,8 +735,8 @@ describe('signing site waiver page', () => {
     expect(window.history.state).toEqual({ from: 'link' });
 
     await user.click(screen.getByRole('button', { name: '中文' }));
-    expect(await screen.findByLabelText('电子邮箱')).toHaveValue('a+b@x.com');
-    expect(screen.getByLabelText('参与者姓名')).toHaveValue('Zoë');
+    expect(await screen.findByLabelText('电子邮箱 *')).toHaveValue('a+b@x.com');
+    expect(screen.getByLabelText('参与者姓名 *')).toHaveValue('Zoë');
     const params = new URL(window.location.href).searchParams;
     expect([...params.keys()]).toEqual(['lang', 'return']);
     expect(params.get('lang')).toBe('zh');
@@ -721,19 +746,19 @@ describe('signing site waiver page', () => {
     serveForm('zh');
     renderSign('?email=ada%40example.com');
 
-    const email = await screen.findByLabelText('电子邮箱');
+    const email = await screen.findByLabelText('电子邮箱 *');
     expect(email).toHaveValue('ada@example.com');
     expect(email).toHaveAccessibleDescription(
       '我们已根据您的预订填入邮箱。仅当您使用了其他邮箱时才需修改。',
     );
-    expect(screen.getByLabelText('参与者姓名')).toHaveValue('');
+    expect(screen.getByLabelText('参与者姓名 *')).toHaveValue('');
   });
 
   it('leaves the email empty when the link carries something that is not an email', async () => {
     serveForm('en');
     renderSign('?lang=en&email=not-an-email');
 
-    const email = await screen.findByLabelText('Email');
+    const email = await screen.findByLabelText('Email *');
     expect(email).toHaveValue('');
     expect(screen.queryByText(/We filled in/)).not.toBeInTheDocument();
   });
@@ -743,6 +768,78 @@ describe('signing site waiver page', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'This form could not be found.',
     );
+  });
+
+  it('marks every required field with a red star hidden from screen readers and keeps (optional) on the rest', async () => {
+    const field = (
+      key: string,
+      type: SignField['type'],
+      label: string,
+      required: boolean,
+    ) => ({ key, type, label, required });
+    server.use(
+      http.get(`${API}/sign/forms/kinds`, () =>
+        HttpResponse.json({
+          slug: 'kinds',
+          lang: 'en',
+          version: 1,
+          title: 'Every field kind',
+          bodyMarkdown: '',
+          fields: [
+            field('name', 'full_name', 'Full name', true),
+            field('mail', 'email', 'Email', true),
+            field('day', 'date', 'Date', true),
+            field('note', 'text', 'Note', true),
+            field('agree', 'checkbox', 'Agree', true),
+            field('init', 'initials', 'Initials', true),
+            field('sig', 'signature', 'Signature', true),
+            field('nick', 'text', 'Nickname', false),
+            field('photos', 'checkbox', 'Photos OK', false),
+            field('witness', 'signature', 'Witness signature', false),
+          ],
+        }),
+      ),
+    );
+    renderSign('?lang=en', '/w/kinds');
+
+    await screen.findByRole('heading', { level: 1, name: 'Every field kind' });
+    for (const name of ['Full name', 'Email', 'Date', 'Note']) {
+      const input = screen.getByLabelText(`${name} *`);
+      expect(input).toHaveAccessibleName(name);
+      expect(input).toBeRequired();
+      expect(input).toHaveAttribute('aria-required', 'true');
+    }
+    expect(screen.getByRole('checkbox', { name: 'Agree' })).toHaveAttribute(
+      'aria-required',
+      'true',
+    );
+    const required = [
+      ...['Full name', 'Email', 'Date', 'Note'].map((name) =>
+        screen.getByLabelText(`${name} *`),
+      ),
+      screen.getByRole('checkbox', { name: 'Agree' }),
+      screen.getByRole('group', { name: 'Initials' }),
+      screen.getByRole('group', { name: 'Signature' }),
+    ];
+    for (const control of required) {
+      const label = visibleLabel(control);
+      const stars = starsIn(label);
+      expect(stars).toHaveLength(1);
+      expect(stars[0]).toHaveAttribute('aria-hidden', 'true');
+      expect(stars[0]).toHaveClass('text-status-rejected');
+      expect(label).not.toHaveTextContent('(optional)');
+    }
+    const optional = [
+      screen.getByLabelText('Nickname (optional)'),
+      screen.getByLabelText('Photos OK (optional)'),
+      screen.getByRole('group', { name: /^Witness signature/ }),
+    ];
+    for (const control of optional) {
+      const label = visibleLabel(control);
+      expect(starsIn(label)).toEqual([]);
+      expect(label).toHaveTextContent('(optional)');
+    }
+    expect(screen.getByLabelText('Nickname (optional)')).not.toBeRequired();
   });
 
   it('signs a form with its own keys, a checkbox and drawn initials', async () => {
@@ -802,12 +899,12 @@ describe('signing site waiver page', () => {
     const user = userEvent.setup();
     renderSign('?lang=en', '/w/rental');
 
-    await user.type(await screen.findByLabelText('Renter'), 'Ana Lima');
-    expect(screen.getByLabelText('Renter')).toHaveAttribute(
+    await user.type(await screen.findByLabelText('Renter *'), 'Ana Lima');
+    expect(screen.getByLabelText('Renter *')).toHaveAttribute(
       'autocomplete',
       'name',
     );
-    await user.type(screen.getByLabelText('Email'), 'ana@example.com');
+    await user.type(screen.getByLabelText('Email *'), 'ana@example.com');
     await user.click(
       screen.getByRole('checkbox', { name: /I have read and agree/ }),
     );

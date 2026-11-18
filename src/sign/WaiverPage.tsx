@@ -470,7 +470,12 @@ export function WaiverPage({
           const label = (
             <span className="text-sm font-medium text-navy">
               {field.label}
-              {!field.required && (
+              {field.required ? (
+                <span aria-hidden className="text-status-rejected">
+                  {' '}
+                  *
+                </span>
+              ) : (
                 <span className="font-normal text-slate">
                   {' '}
                   ({text.optional})
