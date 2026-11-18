@@ -3,13 +3,13 @@ import { useT } from '@/i18n/core/I18nProvider';
 import type { Messages } from '@/i18n/core/types';
 import { Button, Input, Select, Toggle } from '@/components';
 import type { DocumentLanguage } from '../api';
+import { FIELD_ICONS } from '../admin/editor/labels';
 import {
   FORM_FIELD_KEY_MAX,
   FORM_FIELD_TYPES,
   FORM_TITLE_MAX,
   type FormFieldType,
 } from './api';
-import { FIELD_ICONS } from '../admin/editor/labels';
 import {
   EDITOR_TYPE,
   changeFieldType,
