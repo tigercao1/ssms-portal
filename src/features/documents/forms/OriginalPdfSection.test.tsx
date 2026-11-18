@@ -765,7 +765,7 @@ describe('Signing order on a PDF form', () => {
       .map((li) =>
         [...within(li).getAllByRole('button')[0]!.children]
           .filter((c) => !c.hasAttribute('aria-hidden'))
-          .map((c) => c.textContent)
+          .map((c) => c.textContent!.replace(/\u00a0/g, ' '))
           .join(' '),
       );
   const row = (n: number) =>
@@ -775,12 +775,12 @@ describe('Signing order on a PDF form', () => {
     placeChinese();
     const user = await openChinese();
     expect(rows()).toEqual([
-      '1. 参与者姓名 * p. 1',
-      '2. 电子邮箱 * p. 1',
-      '3. 日期 * p. 1',
-      '4. 证件号码 p. 1',
-      '5. 姓名缩写 p. 2',
-      '6. 参与者签名 * p. 2',
+      '1. 参与者姓名 * · p. 1',
+      '2. 电子邮箱 * · p. 1',
+      '3. 日期 * · p. 1',
+      '4. 证件号码 · p. 1',
+      '5. 姓名缩写 · p. 2',
+      '6. 参与者签名 * · p. 2',
     ]);
     expect(
       screen.getByText(
@@ -791,7 +791,7 @@ describe('Signing order on a PDF form', () => {
 
     const up = screen.getByRole('button', { name: 'Move 电子邮箱 up' });
     await user.click(up);
-    expect(rows()[0]).toBe('1. 电子邮箱 * p. 1');
+    expect(rows()[0]).toBe('1. 电子邮箱 * · p. 1');
     expect(
       screen.getByRole('button', { name: 'Move 电子邮箱 down' }),
     ).toHaveFocus();
@@ -861,12 +861,12 @@ describe('Signing order on a PDF form', () => {
     fireEvent.dragEnd(handles[3]!, { dataTransfer });
 
     expect(rows()).toEqual([
-      '1. 证件号码 p. 1',
-      '2. 参与者姓名 * p. 1',
-      '3. 电子邮箱 * p. 1',
-      '4. 日期 * p. 1',
-      '5. 姓名缩写 p. 2',
-      '6. 参与者签名 * p. 2',
+      '1. 证件号码 · p. 1',
+      '2. 参与者姓名 * · p. 1',
+      '3. 电子邮箱 * · p. 1',
+      '4. 日期 * · p. 1',
+      '5. 姓名缩写 · p. 2',
+      '6. 参与者签名 * · p. 2',
     ]);
     expect(screen.getByText('Unsaved changes')).toBeVisible();
   });
@@ -897,7 +897,7 @@ describe('Signing order on a PDF form', () => {
     await user.click(
       screen.getByRole('button', { name: 'Add a Text field to the PDF' }),
     );
-    expect(rows().at(-1)).toBe('7. 文本 p. 2');
+    expect(rows().at(-1)).toBe('7. 文本 · p. 2');
   });
 
   it('orders each language on its own', async () => {
@@ -912,7 +912,7 @@ describe('Signing order on a PDF form', () => {
     expect(await screen.findByText('Draft v1 saved.')).toBeVisible();
 
     await user.click(screen.getByRole('tab', { name: 'English' }));
-    expect(rows()[1]).toBe('2. Email * p. 1');
+    expect(rows()[1]).toBe('2. Email * · p. 1');
     await user.click(
       screen.getByRole('button', { name: 'Move Participant signature up' }),
     );

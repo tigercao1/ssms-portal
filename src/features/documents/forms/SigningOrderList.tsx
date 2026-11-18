@@ -90,7 +90,7 @@ export function SigningOrderList({
       <p className="text-xs text-slate">{s.signingOrderHint}</p>
       <ol
         aria-label={s.signingOrder}
-        className="flex max-h-80 flex-col overflow-y-auto rounded-md border border-grey/60"
+        className="flex max-h-96 flex-col overflow-y-auto rounded-md border border-grey/60"
       >
         {fields.map((field, index) => {
           const name = nameOf(field);
@@ -142,23 +142,24 @@ export function SigningOrderList({
                 type="button"
                 aria-current={selected ? 'true' : undefined}
                 onClick={() => onSelect(field.id)}
-                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-1 text-left text-sm text-ink hover:bg-navy-tint"
+                className="flex min-w-0 flex-1 items-baseline gap-1.5 rounded-sm px-1 py-1 text-left text-sm text-ink hover:bg-navy-tint"
               >
                 <span className="w-5 shrink-0 text-right text-xs tabular-nums text-slate">
                   {index + 1}.
                 </span>
-                <span aria-hidden className="w-4 shrink-0 text-center">
+                <span aria-hidden className="w-5 shrink-0 text-center text-xs">
                   {fieldIcon(field.type)}
                 </span>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1 break-words">
                   {name}
-                  {field.required ? ' *' : ''}
+                  {field.required ? '\u00a0*' : ''}
+                  {pages.length > 0 && (
+                    <span className="whitespace-nowrap text-xs text-slate">
+                      {' · '}
+                      {s.orderPage.replace('{pages}', pages.join(', '))}
+                    </span>
+                  )}
                 </span>
-                {pages.length > 0 && (
-                  <span className="shrink-0 text-xs text-slate">
-                    {s.orderPage.replace('{pages}', pages.join(', '))}
-                  </span>
-                )}
               </button>
               {editable &&
                 (['up', 'down'] as const).map((direction) => (
