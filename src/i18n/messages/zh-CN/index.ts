@@ -128,6 +128,12 @@ export const zhCN: Messages = {
     closeMenu: '关闭菜单',
     onboardingLocked: '资料审核通过后解锁',
     onboardingIncompleteLocked: '完成入职资料后解锁',
+    groupBooking: '预约',
+    groupInstructors: '教练',
+    groupDocuments: '文件与签署',
+    groupWebsite: '网站',
+    groupSettings: '设置',
+    groupReports: '报告',
   },
   status: {
     pending: '待审核',

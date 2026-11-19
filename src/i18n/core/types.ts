@@ -127,6 +127,12 @@ export interface Messages {
     closeMenu: string;
     onboardingLocked: string;
     onboardingIncompleteLocked: string;
+    groupBooking: string;
+    groupInstructors: string;
+    groupDocuments: string;
+    groupWebsite: string;
+    groupSettings: string;
+    groupReports: string;
   };
   status: {
     pending: string;

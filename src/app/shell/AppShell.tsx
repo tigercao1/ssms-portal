@@ -1,22 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useSession } from '@/auth/SessionProvider';
 import { useT } from '@/i18n/core/I18nProvider';
 import { Brandmark, Contour } from '@/components';
 import { LangSwitch } from '@/components/LangSwitch';
 import { cn } from '@/lib/cn';
 import { useMyChecklist } from '@/features/documents/onboarding/queries';
-import { LockIcon } from '@/features/documents/onboarding/Locked';
 import type { MyChecklist } from '@/features/documents/api';
 import type { Messages } from '@/i18n/core/types';
-
-interface NavItem {
-  to: string;
-  label: string;
-  end?: boolean;
-  locked?: boolean;
-  lockedLabel?: string;
-}
+import { AdminNavGroups } from './AdminNavGroups';
+import { ADMIN_DASHBOARD } from './adminNav';
+import { SidebarLink, type NavItem } from './SidebarLink';
 
 function lockedUntilOnboarded(
   checklist: MyChecklist | undefined,
@@ -45,6 +39,8 @@ export function AppShell() {
   const checklist = useMyChecklist({ enabled: !isAdmin });
   const onboardingLock = lockedUntilOnboarded(checklist.data, t);
 
+  const closeMenu = () => setOpen(false);
+
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
@@ -69,48 +65,27 @@ export function AppShell() {
     };
   }, [open]);
 
-  const items: NavItem[] = isAdmin
-    ? [
-        { to: '/admin', label: t.nav.dashboard, end: true },
-        { to: '/admin/instructors', label: t.nav.instructors },
-        { to: '/admin/documents', label: t.nav.documents },
-        { to: '/admin/document-review', label: t.nav.documentReview },
-        { to: '/admin/signatures', label: t.nav.signatures },
-        { to: '/admin/signing-forms', label: t.nav.signingForms },
-        { to: '/admin/reference', label: t.nav.reference },
-        { to: '/admin/pages', label: t.nav.pages },
-        { to: '/admin/shopify-sync', label: t.nav.shopifySync },
-        { to: '/admin/lesson-types', label: t.nav.lessonTypes },
-        { to: '/admin/customers', label: t.nav.customers },
-        { to: '/admin/booking', label: t.nav.booking },
-        { to: '/admin/classes', label: t.nav.classes },
-        { to: '/admin/payroll', label: t.nav.payroll },
-        { to: '/admin/insurance', label: t.nav.adminInsurance },
-        { to: '/admin/import-history', label: t.nav.importHistory },
-        { to: '/admin/settings/google', label: t.nav.google },
-        { to: '/admin/settings/api-tokens', label: t.nav.apiTokens },
-      ]
-    : [
-        { to: '/profile', label: t.nav.profile },
-        {
-          to: '/onboarding',
-          label: t.nav.onboarding,
-          locked: checklist.data?.locked ?? false,
-        },
-        {
-          to: '/insurance',
-          label: t.nav.insurance,
-          ...onboardingLock,
-          locked: onboardingLock.locked || (checklist.data?.locked ?? false),
-        },
-        { to: '/lessons', label: t.nav.lessonsPay, ...onboardingLock },
-        {
-          to: '/students',
-          label: t.nav.myStudents,
-          locked: checklist.data?.locked ?? false,
-        },
-        { to: '/settings', label: t.nav.settings },
-      ];
+  const instructorItems: NavItem[] = [
+    { to: '/profile', label: t.nav.profile },
+    {
+      to: '/onboarding',
+      label: t.nav.onboarding,
+      locked: checklist.data?.locked ?? false,
+    },
+    {
+      to: '/insurance',
+      label: t.nav.insurance,
+      ...onboardingLock,
+      locked: onboardingLock.locked || (checklist.data?.locked ?? false),
+    },
+    { to: '/lessons', label: t.nav.lessonsPay, ...onboardingLock },
+    {
+      to: '/students',
+      label: t.nav.myStudents,
+      locked: checklist.data?.locked ?? false,
+    },
+    { to: '/settings', label: t.nav.settings },
+  ];
 
   return (
     <div className="grid min-h-screen overflow-x-clip lg:grid-cols-[240px_1fr]">
@@ -138,38 +113,23 @@ export function AppShell() {
           aria-label={isAdmin ? t.nav.adminArea : t.nav.instructorArea}
           className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3"
         >
-          {items.map((it) => (
-            <NavLink
-              key={it.to}
-              to={it.to}
-              end={it.end}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'rounded-md px-3 py-2 text-sm transition-colors',
-                  'border-l-[3px] border-transparent',
-                  isActive
-                    ? 'border-l-red bg-white/10 font-medium text-white'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white',
-                )
-              }
-            >
-              {it.locked ? (
-                <span
-                  className="inline-flex items-center gap-2"
-                  title={it.lockedLabel ?? t.nav.onboardingLocked}
-                >
-                  <LockIcon />
-                  {it.label}{' '}
-                  <span className="sr-only">
-                    {it.lockedLabel ?? t.nav.onboardingLocked}
-                  </span>
-                </span>
-              ) : (
-                it.label
-              )}
-            </NavLink>
-          ))}
+          {isAdmin ? (
+            <>
+              <SidebarLink
+                item={{
+                  to: ADMIN_DASHBOARD.to,
+                  label: t.nav[ADMIN_DASHBOARD.label],
+                  end: ADMIN_DASHBOARD.end,
+                }}
+                onNavigate={closeMenu}
+              />
+              <AdminNavGroups onNavigate={closeMenu} />
+            </>
+          ) : (
+            instructorItems.map((it) => (
+              <SidebarLink key={it.to} item={it} onNavigate={closeMenu} />
+            ))
+          )}
         </nav>
         <div className="relative shrink-0 px-3 pb-5 pt-2">
           <button

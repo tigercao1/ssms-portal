@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Route,
@@ -8,6 +14,7 @@ import {
   type NavigateFunction,
 } from 'react-router-dom';
 import { AppShell } from './AppShell';
+import { ADMIN_REPORTS_ITEMS } from './adminNav';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/msw';
 import {
@@ -38,18 +45,19 @@ function CaptureNavigate() {
   return null;
 }
 
-function renderShell() {
-  renderWithProviders(
+function renderShell(route = '/admin') {
+  return renderWithProviders(
     <>
       <CaptureNavigate />
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/admin" element={<p>Dashboard page</p>} />
           <Route path="/admin/instructors" element={<p>Instructors page</p>} />
+          <Route path="*" element={<p>Other admin page</p>} />
         </Route>
       </Routes>
     </>,
-    { route: '/admin' },
+    { route },
   );
 }
 
@@ -137,6 +145,7 @@ describe('AppShell mobile menu', () => {
   it('closes when a nav link is clicked', async () => {
     renderShell();
     await openMenu();
+    await userEvent.click(groupToggle('Instructors'));
     await userEvent.click(screen.getByRole('link', { name: 'Instructors' }));
     expect(screen.getByText('Instructors page')).toBeInTheDocument();
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
@@ -182,125 +191,253 @@ describe('AppShell sidebar layout', () => {
   });
 });
 
+const ADMIN_GROUPS: [string, [string, string][]][] = [
+  [
+    'Booking',
+    [
+      ['Book a lesson', '/admin/booking'],
+      ['Classes', '/admin/classes'],
+      ['Customers', '/admin/customers'],
+      ['Lesson types', '/admin/lesson-types'],
+      ['Import history', '/admin/import-history'],
+    ],
+  ],
+  [
+    'Instructors',
+    [
+      ['Instructors', '/admin/instructors'],
+      ['Document review', '/admin/document-review'],
+      ['Payroll', '/admin/payroll'],
+      ['Lesson insurance', '/admin/insurance'],
+    ],
+  ],
+  [
+    'Documents',
+    [
+      ['Documents', '/admin/documents'],
+      ['Signing forms', '/admin/signing-forms'],
+      ['Signatures', '/admin/signatures'],
+    ],
+  ],
+  [
+    'Website',
+    [
+      ['Pages', '/admin/pages'],
+      ['Shopify sync', '/admin/shopify-sync'],
+    ],
+  ],
+  [
+    'Settings',
+    [
+      ['Reference data', '/admin/reference'],
+      ['Google Calendar', '/admin/settings/google'],
+      ['API tokens', '/admin/settings/api-tokens'],
+    ],
+  ],
+];
+
+function expectedLinks(group: string) {
+  return ADMIN_GROUPS.find(([name]) => name === group)?.[1];
+}
+
+function groupToggle(name: string) {
+  return within(menu()).getByRole('button', { name });
+}
+
+function expandedGroups() {
+  return within(menu())
+    .getAllByRole('button', { expanded: true })
+    .map((button) => button.textContent?.replace(/\d+$/, ''));
+}
+
+function linksIn(group: string) {
+  return within(screen.getByRole('group', { name: group }))
+    .getAllByRole('link')
+    .map((link) => [link.textContent, link.getAttribute('href')]);
+}
+
 describe('AppShell admin nav', () => {
-  it('links to the Shopify sync page', () => {
+  it('shows Dashboard first, then the groups with Booking leading', () => {
     renderShell();
-    expect(screen.getByRole('link', { name: 'Shopify sync' })).toHaveAttribute(
+    const nav = within(menu()).getByRole('navigation');
+    expect(within(nav).getAllByRole('link')[0]).toHaveAttribute(
       'href',
-      '/admin/shopify-sync',
+      '/admin',
+    );
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/admin',
+    );
+    expect(
+      within(nav)
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-controls')),
+    ).toEqual([
+      'admin-nav-booking',
+      'admin-nav-instructors',
+      'admin-nav-documents',
+      'admin-nav-website',
+      'admin-nav-settings',
+    ]);
+  });
+
+  it('opens Booking and keeps the other groups collapsed on the dashboard', () => {
+    renderShell();
+    expect(expandedGroups()).toEqual(['Booking']);
+    expect(linksIn('Booking')).toEqual(expectedLinks('Booking'));
+    expect(screen.queryByRole('link', { name: 'Payroll' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'API tokens' })).toBeNull();
+  });
+
+  it('reaches every admin link through its group, in group order', async () => {
+    renderShell();
+    for (const [group, links] of ADMIN_GROUPS.slice(1)) {
+      await userEvent.click(groupToggle(group));
+      expect(groupToggle(group)).toHaveAttribute('aria-expanded', 'true');
+      expect(linksIn(group)).toEqual(links);
+    }
+    expect(within(menu()).getAllByRole('link')).toHaveLength(18);
+  });
+
+  it('shows how many links each group holds', () => {
+    renderShell();
+    expect(groupToggle('Booking')).toHaveTextContent('Booking5');
+    expect(groupToggle('Instructors')).toHaveTextContent('Instructors4');
+    expect(groupToggle('Website')).toHaveTextContent('Website2');
+  });
+
+  it('collapses a group again from its header', async () => {
+    renderShell();
+    await userEvent.click(groupToggle('Booking'));
+    expect(groupToggle('Booking')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Book a lesson' })).toBeNull();
+  });
+
+  it('expands the group holding the current page', () => {
+    renderShell('/admin/signatures');
+    expect(expandedGroups()).toEqual(['Booking', 'Documents']);
+    expect(screen.getByRole('link', { name: 'Signatures' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
   });
 
-  it('links to the Google Calendar settings page', () => {
+  it('expands Instructors on an instructor detail page', () => {
+    renderShell('/admin/instructors/abc');
+    expect(groupToggle('Instructors')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens the group of a page reached from elsewhere, even after it was collapsed', async () => {
+    localStorage.setItem(
+      'ssms.adminNav.groups.v1',
+      JSON.stringify({ settings: false }),
+    );
     renderShell();
+    act(() => navigate('/admin/settings/google'));
+    expect(groupToggle('Settings')).toHaveAttribute('aria-expanded', 'true');
     expect(
       screen.getByRole('link', { name: 'Google Calendar' }),
-    ).toHaveAttribute('href', '/admin/settings/google');
+    ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('links to the API tokens page', () => {
+  it('toggles a group with Enter and Space and keeps focus on its header', async () => {
     renderShell();
-    expect(screen.getByRole('link', { name: 'API tokens' })).toHaveAttribute(
-      'href',
-      '/admin/settings/api-tokens',
-    );
+    groupToggle('Website').focus();
+    await userEvent.keyboard('{Enter}');
+    expect(groupToggle('Website')).toHaveAttribute('aria-expanded', 'true');
+    expect(groupToggle('Website')).toHaveFocus();
+    await userEvent.keyboard(' ');
+    expect(groupToggle('Website')).toHaveAttribute('aria-expanded', 'false');
+    expect(groupToggle('Website')).toHaveFocus();
   });
 
-  it('links to Signatures right after the document pages', () => {
+  it('moves focus to the header when collapsing a group that holds the focused link', () => {
     renderShell();
-    const links = screen
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'));
-    expect(links.indexOf('/admin/signatures')).toBe(
-      links.indexOf('/admin/document-review') + 1,
-    );
-    expect(screen.getByRole('link', { name: 'Signatures' })).toHaveAttribute(
-      'href',
-      '/admin/signatures',
-    );
+    screen.getByRole('link', { name: 'Book a lesson' }).focus();
+    fireEvent.click(groupToggle('Booking'));
+    expect(groupToggle('Booking')).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(groupToggle('Booking'));
   });
 
-  it('links to Signing forms right after Signatures', () => {
+  it('leaves focus alone when collapsing a group that does not hold it', () => {
+    renderShell('/admin/signatures');
+    const signatures = screen.getByRole('link', { name: 'Signatures' });
+    signatures.focus();
+    fireEvent.click(groupToggle('Booking'));
+    expect(groupToggle('Booking')).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(signatures);
+  });
+
+  it('remembers which groups were opened and closed in this browser', async () => {
+    const { unmount } = renderShell();
+    await userEvent.click(groupToggle('Booking'));
+    await userEvent.click(groupToggle('Website'));
+    unmount();
     renderShell();
-    const links = screen
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'));
-    expect(screen.getByRole('link', { name: 'Signing forms' })).toHaveAttribute(
-      'href',
-      '/admin/signing-forms',
-    );
-    expect(links.indexOf('/admin/signing-forms')).toBe(
-      links.indexOf('/admin/signatures') + 1,
-    );
+    expect(expandedGroups()).toEqual(['Website']);
   });
 
-  it('links to Pages after Reference data', () => {
+  it('falls back to the default groups when the saved state is unreadable', () => {
+    localStorage.setItem('ssms.adminNav.groups.v1', '{not json');
     renderShell();
-    const links = screen
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'));
-    expect(screen.getByRole('link', { name: 'Pages' })).toHaveAttribute(
-      'href',
-      '/admin/pages',
-    );
-    expect(links.indexOf('/admin/pages')).toBe(
-      links.indexOf('/admin/reference') + 1,
-    );
+    expect(expandedGroups()).toEqual(['Booking']);
   });
 
-  it('links to Lesson insurance right after Payroll', () => {
+  it('shows the same groups in the mobile menu and keeps it open while toggling', async () => {
     renderShell();
-    const links = screen
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'));
-    expect(
-      screen.getByRole('link', { name: 'Lesson insurance' }),
-    ).toHaveAttribute('href', '/admin/insurance');
-    expect(links.indexOf('/admin/insurance')).toBe(
-      links.indexOf('/admin/payroll') + 1,
-    );
+    await openMenu();
+    await userEvent.click(groupToggle('Documents'));
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'true');
+    expect(linksIn('Documents')).toEqual(expectedLinks('Documents'));
+    await userEvent.click(screen.getByRole('link', { name: 'Signing forms' }));
+    expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('links to Document review right after Documents', () => {
-    renderShell();
-    const links = screen
-      .getAllByRole('link')
-      .map((link) => link.getAttribute('href'));
-    expect(
-      screen.getByRole('link', { name: 'Document review' }),
-    ).toHaveAttribute('href', '/admin/document-review');
-    expect(links.indexOf('/admin/document-review')).toBe(
-      links.indexOf('/admin/documents') + 1,
-    );
+  it('adds a Reports group last once it has a page', () => {
+    ADMIN_REPORTS_ITEMS.push({ to: '/admin/bug-reports', label: 'dashboard' });
+    try {
+      renderShell('/admin/bug-reports');
+      const toggles = within(menu()).getAllByRole('button', {
+        expanded: true,
+      });
+      expect(toggles.at(-1)).toHaveAccessibleName('Reports');
+      expect(
+        within(screen.getByRole('group', { name: 'Reports' })).getByRole(
+          'link',
+        ),
+      ).toHaveAttribute('href', '/admin/bug-reports');
+    } finally {
+      ADMIN_REPORTS_ITEMS.length = 0;
+    }
   });
 
-  it('labels Document review in Chinese', () => {
+  it('names the groups in Chinese', () => {
     localStorage.setItem('ssms.locale', 'zh-CN');
     renderShell();
+    expect(
+      within(menu())
+        .getAllByRole('button', { name: /./ })
+        .filter((button) => button.hasAttribute('aria-controls'))
+        .map((button) => button.textContent?.replace(/\d+$/, '')),
+    ).toEqual(['预约', '教练', '文件与签署', '网站', '设置']);
+  });
+
+  it('labels Document review and Lesson insurance in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    renderShell();
+    await userEvent.click(groupToggle('教练'));
     expect(screen.getByRole('link', { name: '资料审核' })).toHaveAttribute(
       'href',
       '/admin/document-review',
     );
-  });
-
-  it('labels Lesson insurance in Chinese', () => {
-    localStorage.setItem('ssms.locale', 'zh-CN');
-    renderShell();
     expect(screen.getByRole('link', { name: '私课保险' })).toHaveAttribute(
       'href',
       '/admin/insurance',
     );
   });
 
-  it('links to Lesson types, Customers and Classes, not Calendar matching', () => {
+  it('does not link to Lesson products or Calendar matching', () => {
     renderShell();
-    for (const [name, href] of [
-      ['Lesson types', '/admin/lesson-types'],
-      ['Customers', '/admin/customers'],
-      ['Classes', '/admin/classes'],
-    ]) {
-      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
-    }
     expect(
       screen.queryByRole('link', { name: 'Lesson products' }),
     ).not.toBeInTheDocument();

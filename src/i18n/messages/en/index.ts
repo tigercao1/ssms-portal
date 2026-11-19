@@ -136,6 +136,12 @@ export const en: Messages = {
     closeMenu: 'Close menu',
     onboardingLocked: 'Locked until your profile is approved',
     onboardingIncompleteLocked: 'Locked until you finish onboarding',
+    groupBooking: 'Booking',
+    groupInstructors: 'Instructors',
+    groupDocuments: 'Documents',
+    groupWebsite: 'Website',
+    groupSettings: 'Settings',
+    groupReports: 'Reports',
   },
   status: {
     pending: 'Pending',
