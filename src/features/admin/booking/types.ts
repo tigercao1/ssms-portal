@@ -30,7 +30,6 @@ export type BookingSettingsInput = Omit<BookingSettings, 'updatedAt'>;
 
 export type UnavailableReason =
   | 'inactive'
-  | 'no_calendar'
   | 'calendar_not_writable'
   | 'calendar_error'
   | 'google_not_connected'
@@ -46,7 +45,7 @@ export interface InstructorAvailability {
   instructorId: string;
   displayNameEn: string;
   displayNameZh: string | null;
-  googleCalendarId: string;
+  googleCalendarId: string | null;
   busy: BusyBlock[];
   freeSlots: string[];
 }
@@ -91,6 +90,7 @@ export interface CreateBookingInput {
   repeat?: { weekly: true; count: number };
   status?: BookableStatus;
   addToCalendar?: boolean;
+  sendEmails?: boolean;
 }
 
 export type BatchBookingRow = Omit<CreateBookingInput, 'repeat'>;
@@ -101,7 +101,12 @@ export interface BatchBookingInput {
 }
 
 export type BatchRowResult =
-  | { index: number; status: 'created'; classes: BookedClass[] }
+  | {
+      index: number;
+      status: 'created';
+      classes: BookedClass[];
+      warnings: BookingWarning[];
+    }
   | { index: number; status: 'failed'; code: string; message: string };
 
 export interface BatchBookingResult {
@@ -115,6 +120,7 @@ export interface UpdateBookingInput {
   lessonTypeId?: string;
   customerIds?: string[];
   notes?: string | null;
+  sendEmails?: boolean;
 }
 
 export type CalendarSync = 'ok' | 'failed';
@@ -122,6 +128,17 @@ export type CalendarSync = 'ok' | 'failed';
 export interface BookedClass extends AdminClass {
   calendarSync: CalendarSync;
   calendarSyncError: string | null;
+}
+
+export interface BookingWarning {
+  code: string;
+  message: string;
+  customerId?: string;
+  instructorId?: string;
+}
+
+export interface NotifiedClass extends BookedClass {
+  warnings: BookingWarning[];
 }
 
 export interface EventDeletionIssue {

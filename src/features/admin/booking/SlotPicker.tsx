@@ -6,11 +6,13 @@ import { cn } from '@/lib/cn';
 import { Banner, Button, EmptyState, Field, Input } from '@/components';
 import {
   BLOCK_SIZES,
-  blockOptions,
+  byHour,
+  formatSchoolHour,
   formatSchoolTime,
-  resolveBlock,
+  groupedBlock,
+  onStartGrid,
+  schoolInstant,
   schoolParts,
-  slotsOnBlock,
   type BlockSize,
 } from './bookingRules';
 import type { Availability, InstructorAvailability } from './types';
@@ -46,14 +48,26 @@ function instructorName(row: InstructorAvailability, locale: Locale) {
   );
 }
 
+function NoCalendarNote({ row }: { row: InstructorAvailability }) {
+  const t = useT();
+  if (row.googleCalendarId) return null;
+  return <span className="text-sm text-slate">{t.booking.noCalendar}</span>;
+}
+
 export function SlotPicker({
   availability,
+  date,
+  block,
+  onBlock,
   instructorId,
   onInstructor,
   selected,
   onSelect,
 }: {
   availability: Availability;
+  date: string;
+  block: number;
+  onBlock: (block: BlockSize) => void;
   instructorId: string | null;
   onInstructor: (id: string | null) => void;
   selected: SlotChoice | null;
@@ -62,15 +76,18 @@ export function SlotPicker({
   const t = useT();
   const { locale } = useLocale();
   const [query, setQuery] = useState('');
-  const [chosenBlock, setChosenBlock] = useState<BlockSize>(30);
-  const { slotMinutes } = availability;
-  const free = availability.instructors.filter((i) => i.freeSlots.length > 0);
-  const allFree = [...new Set(free.flatMap((i) => i.freeSlots))].sort();
-  const options = blockOptions(allFree, slotMinutes);
-  const block = resolveBlock(chosenBlock, allFree, slotMinutes);
   const selectedStart = selected?.startsAt ?? null;
-  const chosen = free.find((i) => i.instructorId === instructorId) ?? null;
+  const free = availability.instructors.filter((i) => i.freeSlots.length > 0);
+  const chosen =
+    availability.instructors.find((i) => i.instructorId === instructorId) ??
+    null;
   const chosenId = chosen?.instructorId ?? null;
+  const [typed, setTyped] = useState(() =>
+    selectedStart && !chosen?.freeSlots.includes(selectedStart)
+      ? schoolParts(selectedStart).time
+      : '',
+  );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const focusAfter = useRef<'times' | 'list' | null>(null);
   const returnTo = useRef<string | null>(null);
   const timesRef = useRef<HTMLElement>(null);
@@ -89,19 +106,10 @@ export function SlotPicker({
     }
   }, [chosenId]);
 
-  useEffect(() => {
-    if (!selectedStart) return;
-    const fits = (size: BlockSize) =>
-      slotsOnBlock([selectedStart], size, slotMinutes).length > 0;
-    if (fits(block)) return;
-    const fit = BLOCK_SIZES.find(fits);
-    if (fit) setChosenBlock(fit);
-  }, [selectedStart, block, slotMinutes]);
-
   if (!availability.window) {
     return <Banner tone="info">{t.booking.dayClosed}</Banner>;
   }
-  if (free.length === 0) {
+  if (free.length === 0 && !chosen) {
     const notSetUp =
       availability.instructors.length === 0 &&
       availability.unavailable.length > 0;
@@ -123,47 +131,38 @@ export function SlotPicker({
 
   function chooseInstructor(id: string) {
     focusAfter.current = 'times';
+    setTyped('');
     onInstructor(id);
   }
 
   function changeInstructor() {
     focusAfter.current = 'list';
     returnTo.current = chosenId;
+    setTyped('');
     onInstructor(null);
   }
 
-  function chooseBlock(size: BlockSize) {
-    setChosenBlock(size);
-    const next = resolveBlock(size, allFree, slotMinutes);
-    if (
-      selectedStart &&
-      slotsOnBlock([selectedStart], next, slotMinutes).length === 0
-    ) {
-      onSelect(null);
-    }
-  }
-
-  const blockPicker = options.length > 1 && (
+  const blockPicker = (
     <div
       role="group"
       aria-label={t.booking.blockLabel}
-      className="flex w-full overflow-hidden rounded-md border border-navy sm:w-fit"
+      className="grid w-full grid-cols-4 overflow-hidden rounded-md border border-navy sm:w-fit"
     >
-      {options.map((size, index) => (
+      {BLOCK_SIZES.map((size, index) => (
         <button
           key={size}
           type="button"
           aria-pressed={block === size}
-          onClick={() => chooseBlock(size)}
+          onClick={() => onBlock(size)}
           className={cn(
-            'min-h-11 flex-1 px-4 text-sm transition-colors',
+            'min-h-11 px-4 text-sm transition-colors',
             index > 0 && 'border-l border-navy',
             block === size
               ? 'bg-navy text-white'
               : 'text-navy hover:bg-navy-tint',
           )}
         >
-          {t.booking.blockEvery.replace('{n}', String(size))}
+          {t.booking.blockMinutes.replace('{n}', String(size))}
         </button>
       ))}
     </div>
@@ -213,13 +212,14 @@ export function SlotPicker({
                   onClick={() => chooseInstructor(row.instructorId)}
                   className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-grey/60 px-4 py-2 text-left transition-colors hover:bg-navy-tint"
                 >
-                  <span className="font-medium text-ink">
-                    {instructorName(row, locale)}
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-medium text-ink">
+                      {instructorName(row, locale)}
+                    </span>
+                    <NoCalendarNote row={row} />
                   </span>
                   <span className="shrink-0 text-sm text-slate">
-                    {countLabel(
-                      slotsOnBlock(row.freeSlots, block, slotMinutes).length,
-                    )}
+                    {countLabel(row.freeSlots.length)}
                   </span>
                 </button>
               </li>
@@ -231,17 +231,70 @@ export function SlotPicker({
   }
 
   const name = instructorName(chosen, locale);
-  const times = slotsOnBlock(chosen.freeSlots, block, slotMinutes);
+  const times = chosen.freeSlots;
+  const typedOffGrid = typed !== '' && !onStartGrid(typed);
+
+  function pick(slot: string) {
+    if (!chosen) return;
+    setTyped('');
+    onSelect({ instructorId: chosen.instructorId, startsAt: slot });
+  }
+
+  function typeTime(value: string) {
+    if (!chosen) return;
+    setTyped(value);
+    if (onStartGrid(value))
+      onSelect({
+        instructorId: chosen.instructorId,
+        startsAt: schoolInstant(date, value),
+      });
+    else if (selectedStart) onSelect(null);
+  }
+
+  const chip = (slot: string) => {
+    const time = formatSchoolTime(slot, locale);
+    const isSelected =
+      selected?.instructorId === chosen.instructorId &&
+      selected.startsAt === slot;
+    return (
+      <button
+        key={slot}
+        type="button"
+        aria-pressed={isSelected}
+        aria-label={t.booking.slotLabel
+          .replace('{name}', name)
+          .replace('{time}', time)}
+        onClick={() => pick(slot)}
+        className={cn(
+          'min-h-11 rounded-md border font-mono text-sm transition-colors',
+          isSelected
+            ? 'border-navy bg-navy text-white ring-2 ring-navy ring-offset-2'
+            : 'border-grey/60 text-ink hover:bg-navy-tint',
+        )}
+      >
+        {time}
+      </button>
+    );
+  };
+
+  const grid = (slots: string[]) => (
+    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+      {slots.map(chip)}
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 rounded-md border border-navy bg-navy-tint px-4 py-2">
-        <span className="font-medium text-ink">{name}</span>
+        <span className="flex min-w-0 flex-col">
+          <span className="font-medium text-ink">{name}</span>
+          <NoCalendarNote row={chosen} />
+        </span>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-11"
+          className="h-11 shrink-0"
           onClick={changeInstructor}
         >
           {t.booking.changeInstructor}
@@ -256,48 +309,69 @@ export function SlotPicker({
       >
         {times.length === 0 ? (
           <p className="text-sm text-slate">{t.booking.noTimesAtBlock}</p>
+        ) : groupedBlock(block) ? (
+          <ul className="flex flex-col gap-2">
+            {byHour(times).map((group) => {
+              const open =
+                expanded[group.hour] ??
+                (selectedStart !== null && group.slots.includes(selectedStart));
+              const panelId = `hour-${chosen.instructorId}-${group.hour}`;
+              return (
+                <li key={group.hour} className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={() =>
+                      setExpanded((e) => ({ ...e, [group.hour]: !open }))
+                    }
+                    className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-grey/60 px-4 py-2 text-left text-sm text-ink transition-colors hover:bg-navy-tint"
+                  >
+                    <span>
+                      {t.booking.hourOpen
+                        .replace(
+                          '{hour}',
+                          formatSchoolHour(group.slots[0] ?? '', locale),
+                        )
+                        .replace('{n}', String(group.slots.length))}
+                    </span>
+                    <span aria-hidden className="text-slate">
+                      {open ? '−' : '+'}
+                    </span>
+                  </button>
+                  {open && <div id={panelId}>{grid(group.slots)}</div>}
+                </li>
+              );
+            })}
+          </ul>
         ) : (
           byDayPart(times).map((group) => (
             <div key={group.part} className="flex flex-col gap-2">
               <h3 className="text-sm font-medium text-slate">
                 {t.booking[group.part]}
               </h3>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                {group.slots.map((slot) => {
-                  const time = formatSchoolTime(slot, locale);
-                  const isSelected =
-                    selected?.instructorId === chosen.instructorId &&
-                    selected.startsAt === slot;
-                  return (
-                    <button
-                      key={slot}
-                      type="button"
-                      aria-pressed={isSelected}
-                      aria-label={t.booking.slotLabel
-                        .replace('{name}', name)
-                        .replace('{time}', time)}
-                      onClick={() =>
-                        onSelect({
-                          instructorId: chosen.instructorId,
-                          startsAt: slot,
-                        })
-                      }
-                      className={cn(
-                        'min-h-11 rounded-md border font-mono text-sm transition-colors',
-                        isSelected
-                          ? 'border-navy bg-navy text-white ring-2 ring-navy ring-offset-2'
-                          : 'border-grey/60 text-ink hover:bg-navy-tint',
-                      )}
-                    >
-                      {time}
-                    </button>
-                  );
-                })}
-              </div>
+              {grid(group.slots)}
             </div>
           ))
         )}
       </section>
+      <div className="sm:max-w-xs">
+        <Field
+          label={t.booking.typeTime}
+          hint={t.booking.typeTimeHint}
+          error={typedOffGrid ? t.booking.typeTimeOffGrid : undefined}
+        >
+          {(p) => (
+            <Input
+              {...p}
+              type="time"
+              step={300}
+              value={typed}
+              onChange={(e) => typeTime(e.target.value)}
+            />
+          )}
+        </Field>
+      </div>
     </div>
   );
 }

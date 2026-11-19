@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/auth/SessionProvider';
-import { useT } from '@/i18n/core/I18nProvider';
+import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { Banner, Button, Card, Field, Select } from '@/components';
 import { ApiError } from '@/lib/api';
 import type { AdminClass } from '@/lib/types';
 import { errorText } from '../LessonTypesPage';
 import { useBookBatch, useCreateBooking } from './bookingApi';
-import { BookingErrorBanner, Dialog } from './BookingParts';
+import { localizeField } from '@/i18n/core/localize';
+import {
+  BookingErrorBanner,
+  Dialog,
+  WarningsBanner,
+  pickedName,
+  warningLines,
+} from './BookingParts';
 import {
   BookedCardLine,
   CardEditor,
@@ -28,12 +35,14 @@ import { schoolParts } from './bookingRules';
 import { BookingSettingsCard } from './BookingSettingsCard';
 import { ReminderSettingsCard } from './ReminderSettingsCard';
 import { SyncToastHost } from './CalendarSync';
+import type { BookingWarning } from './types';
 
 const REPEAT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 interface BookedCard {
   card: DraftCard;
   classes: AdminClass[];
+  warnings: BookingWarning[];
 }
 
 interface Outcome {
@@ -47,6 +56,7 @@ function provesNothingBooked(error: unknown): boolean {
 
 export function BookLessonPage() {
   const t = useT();
+  const { locale } = useLocale();
   const today = schoolParts(Date.now()).date;
   const now = Date.now();
   const { user } = useSession();
@@ -115,6 +125,19 @@ export function BookLessonPage() {
     statusRef.current?.focus();
   }
 
+  function afterSend(error: unknown) {
+    if (provesNothingBooked(error)) {
+      const target = openId ?? cards[0]?.id;
+      if (target) {
+        setOpenId(target);
+        focusOn(`edit:${target}`);
+        return;
+      }
+    }
+    setFocus(null);
+    showStatus();
+  }
+
   function addCard() {
     if (frozen || full) return;
     const next = blankCard(today, cards.at(-1));
@@ -156,11 +179,14 @@ export function BookLessonPage() {
         edit((stored) => stored.filter((c) => c.id !== card.id));
         freshCard(card);
         setRepeat(1);
-        setOutcome({ booked: [{ card, classes }], failed: 0 });
+        setOutcome({
+          booked: [{ card, classes, warnings: classes[0]?.warnings ?? [] }],
+          failed: 0,
+        });
       },
-      onSettled: () => {
+      onSettled: (_data, error) => {
         sending.current = false;
-        showStatus();
+        afterSend(error);
       },
     });
   }
@@ -170,6 +196,7 @@ export function BookLessonPage() {
     const sent = drafts.cards;
     if (sent.length === 0) return;
     sending.current = true;
+    let failed: unknown = null;
     setFirstSend(!outcomeUnknown);
     setOutcome(null);
     setFailure(null);
@@ -188,7 +215,9 @@ export function BookLessonPage() {
       );
       const booked = sent.flatMap((card) => {
         const r = byId.get(card.id);
-        return r?.status === 'created' ? [{ card, classes: r.classes }] : [];
+        return r?.status === 'created'
+          ? [{ card, classes: r.classes, warnings: r.warnings }]
+          : [];
       });
       const remaining = sent.length - booked.length;
       update((cart) => ({
@@ -207,13 +236,14 @@ export function BookLessonPage() {
       else setOpenId(null);
       setOutcome({ booked, failed: remaining });
     } catch (error) {
+      failed = error;
       if (provesNothingBooked(error))
         update((cart) => ({ ...cart, outcomeUnknown: false }));
       setFailure(error);
     } finally {
       sending.current = false;
       setFirstSend(false);
-      showStatus();
+      afterSend(failed);
     }
   }
 
@@ -230,6 +260,22 @@ export function BookLessonPage() {
         : t.booking.book
       : t.booking.bookAll.replace('{n}', String(cards.length));
   const bookedCount = outcome?.booked.reduce((n, b) => n + b.classes.length, 0);
+  const emailWarnings = (outcome?.booked ?? []).flatMap((b) =>
+    warningLines(t, b.warnings, {
+      customer: (id) => {
+        const c = b.card.customers.find((x) => x.id === id);
+        return c ? pickedName(c) : null;
+      },
+      instructor: (id) =>
+        id === b.card.instructorId
+          ? localizeField(
+              b.card.instructorNameEn,
+              b.card.instructorNameZh,
+              locale,
+            ) || b.card.instructorNameEn
+          : null,
+    }),
+  );
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -303,6 +349,10 @@ export function BookLessonPage() {
               </Link>
             </Banner>
           )}
+          <WarningsBanner
+            title={t.booking.bookedWarningsTitle}
+            lines={[...new Set(emailWarnings)]}
+          />
           {outcome && outcome.failed > 0 && (
             <Banner tone="pending">
               {t.booking.batchFailedSome.replace('{n}', String(outcome.failed))}

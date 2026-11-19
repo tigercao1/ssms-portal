@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
 import {
-  blockOptions,
   bookingProblem,
+  byHour,
+  formatSchoolHour,
   fromDraft,
+  groupedBlock,
+  isPastStart,
+  largestFittingBlock,
   nextWeekday,
-  resolveBlock,
+  onStartGrid,
+  readBlockSize,
+  saveBlockSize,
   schoolInstant,
   schoolParts,
   shiftDate,
-  slotsOnBlock,
   toDraft,
   weekdayOf,
 } from './bookingRules';
@@ -86,6 +91,13 @@ describe('bookingProblem', () => {
     ).toEqual({ kind: 'conflict', conflicts: [] });
     expect(
       bookingProblem(
+        new ApiError(400, 'Lessons must start on a 5-minute boundary', {
+          code: 'START_NOT_ALIGNED',
+        }),
+      ),
+    ).toEqual({ kind: 'misaligned' });
+    expect(
+      bookingProblem(
         new ApiError(502, 'google', {
           googleStatus: 403,
           googleReason: 'forbidden',
@@ -109,29 +121,52 @@ describe('bookingProblem', () => {
 
 describe('start time blocks', () => {
   const at = (time: string) => schoolInstant('2026-12-12', time);
-  const quarter = ['09:00', '09:15', '09:30', '09:45', '10:00'].map(at);
 
-  it('keeps starts on the block and shows every slot at or below the slot size', () => {
-    expect(slotsOnBlock(quarter, 60, 15)).toEqual([at('09:00'), at('10:00')]);
-    expect(slotsOnBlock(quarter, 30, 15)).toEqual(
-      ['09:00', '09:30', '10:00'].map(at),
-    );
-    expect(slotsOnBlock(quarter, 15, 15)).toEqual(quarter);
-  });
-
-  it('offers only block sizes that show something different', () => {
-    expect(blockOptions(quarter, 15)).toEqual([60, 30, 15]);
-    expect(blockOptions(['09:00', '09:30', '10:00'].map(at), 30)).toEqual([
-      60, 30,
+  it('groups starts by hour only at 15 and 5 minutes', () => {
+    expect([60, 30, 15, 5].map(groupedBlock)).toEqual([
+      false,
+      false,
+      true,
+      true,
     ]);
-    expect(blockOptions(['09:00', '10:00'].map(at), 60)).toEqual([60]);
-    expect(blockOptions(['09:15', '09:45'].map(at), 30)).toEqual([30]);
+    const slots = ['09:00', '09:05', '09:55', '10:00', '13:30'].map(at);
+    expect(byHour(slots)).toEqual([
+      { hour: '09', slots: slots.slice(0, 3) },
+      { hour: '10', slots: [slots[3]] },
+      { hour: '13', slots: [slots[4]] },
+    ]);
+    expect(formatSchoolHour(at('10:05'), 'en')).toBe('10 AM');
+    expect(formatSchoolHour(at('13:00'), 'en')).toBe('1 PM');
   });
 
-  it('falls back to the offered block that shows the same starts', () => {
-    const hourly = ['09:00', '10:00'].map(at);
-    expect(resolveBlock(30, hourly, 60)).toBe(60);
-    expect(resolveBlock(60, ['09:15', '09:45'].map(at), 30)).toBe(30);
-    expect(resolveBlock(15, quarter, 15)).toBe(15);
+  it('accepts only times on the 5-minute grid', () => {
+    expect(onStartGrid('10:05')).toBe(true);
+    expect(onStartGrid('10:00')).toBe(true);
+    expect(onStartGrid('10:07')).toBe(false);
+    expect(onStartGrid('25:00')).toBe(false);
+    expect(onStartGrid('')).toBe(false);
+  });
+
+  it('finds the largest block a start sits on', () => {
+    expect(largestFittingBlock('10:00')).toBe(60);
+    expect(largestFittingBlock('10:30')).toBe(30);
+    expect(largestFittingBlock('10:45')).toBe(15);
+    expect(largestFittingBlock('10:05')).toBe(5);
+  });
+
+  it('remembers the block size on the device and ignores junk', () => {
+    localStorage.removeItem('ssms.bookingBlock');
+    expect(readBlockSize()).toBeNull();
+    saveBlockSize(5);
+    expect(readBlockSize()).toBe(5);
+    localStorage.setItem('ssms.bookingBlock', '7');
+    expect(readBlockSize()).toBeNull();
+  });
+
+  it('tells a past start from a future one', () => {
+    const now = Date.parse('2026-12-12T15:00:00.000Z');
+    expect(isPastStart('2026-12-12T14:55:00.000Z', now)).toBe(true);
+    expect(isPastStart('2026-12-12T15:00:00.000Z', now)).toBe(false);
+    expect(isPastStart('', now)).toBe(false);
   });
 });

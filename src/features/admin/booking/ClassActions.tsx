@@ -23,16 +23,80 @@ import {
   BookingErrorBanner,
   CustomerPicker,
   Dialog,
+  SendEmailsField,
+  WarningsBanner,
+  pickedName,
+  warningLines,
   type PickedCustomer,
 } from './BookingParts';
 import {
   formatSchoolDateTime,
+  isPastStart,
   schoolInstant,
   schoolParts,
 } from './bookingRules';
-import type { BookableStatus, UpdateBookingInput } from './types';
+import {
+  hideBookingWarnings,
+  showBookingWarnings,
+  useBookingWarnings,
+} from './bookingWarnings';
+import type {
+  BookableStatus,
+  BookingWarning,
+  UpdateBookingInput,
+} from './types';
 
 type Open = 'move' | 'cancel' | null;
+
+function participantsOf(item: AdminClass): PickedCustomer[] {
+  return item.participants.map((p) => ({
+    id: p.customerId,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    email: p.email,
+    phone: p.phone,
+  }));
+}
+
+function useWarningText(
+  customers: PickedCustomer[],
+  instructorName: (id: string) => string | null,
+) {
+  const t = useT();
+  return (warnings: BookingWarning[]) =>
+    warningLines(t, warnings, {
+      customer: (id) => {
+        const c = customers.find((x) => x.id === id);
+        return c ? pickedName(c) : null;
+      },
+      instructor: instructorName,
+    });
+}
+
+export function BookingWarningsHost() {
+  const t = useT();
+  const notice = useBookingWarnings();
+  if (!notice) return null;
+  const cancelled = notice.kind === 'cancelled';
+  return (
+    <Dialog
+      title={cancelled ? t.booking.cancelTitle : t.booking.moveTitle}
+      onClose={hideBookingWarnings}
+    >
+      <WarningsBanner
+        title={
+          cancelled
+            ? t.booking.cancelledWarningsTitle
+            : t.booking.movedWarningsTitle
+        }
+        lines={notice.lines}
+      />
+      <div className="flex justify-end">
+        <Button onClick={hideBookingWarnings}>{t.booking.done}</Button>
+      </div>
+    </Dialog>
+  );
+}
 
 export function ClassActions({ item }: { item: AdminClass }) {
   const t = useT();
@@ -133,6 +197,12 @@ function CancelDialog({
   const t = useT();
   const { locale } = useLocale();
   const cancel = useCancelBooking();
+  const [sendEmails, setSendEmails] = useState(true);
+  const instructor =
+    localizeField(item.instructorName, item.instructorNameZh, locale) || null;
+  const warningText = useWarningText(participantsOf(item), (id) =>
+    id === item.instructorId ? instructor : null,
+  );
   return (
     <Dialog title={t.booking.cancelTitle} onClose={onClose}>
       <p className="text-sm text-ink">
@@ -144,6 +214,12 @@ function CancelDialog({
       {item.googleCalendarId && (
         <p className="text-sm text-slate">{t.booking.cancelGoogle}</p>
       )}
+      <SendEmailsField
+        label={t.booking.sendEmailsCancel}
+        checked={sendEmails}
+        past={isPastStart(item.startsAt, Date.now())}
+        onChange={setSendEmails}
+      />
       {cancel.isError && <BookingErrorBanner error={cancel.error} />}
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>
@@ -152,7 +228,17 @@ function CancelDialog({
         <Button
           variant="danger"
           loading={cancel.isPending}
-          onClick={() => cancel.mutate(item.id, { onSuccess: onClose })}
+          onClick={() =>
+            cancel.mutateAsync({ id: item.id, sendEmails }).then(
+              (saved) => {
+                const lines = warningText(saved.warnings);
+                if (lines.length > 0)
+                  showBookingWarnings({ kind: 'cancelled', lines });
+                onClose();
+              },
+              () => undefined,
+            )
+          }
         >
           {t.booking.cancelConfirm}
         </Button>
@@ -179,15 +265,10 @@ function MoveDialog({
   const [instructorId, setInstructorId] = useState(item.instructorId);
   const [lessonTypeId, setLessonTypeId] = useState(item.lessonTypeId ?? '');
   const [notes, setNotes] = useState(item.notes ?? '');
-  const [customers, setCustomers] = useState<PickedCustomer[]>(
-    item.participants.map((p) => ({
-      id: p.customerId,
-      firstName: p.firstName,
-      lastName: p.lastName,
-      email: p.email,
-      phone: p.phone,
-    })),
+  const [customers, setCustomers] = useState<PickedCustomer[]>(() =>
+    participantsOf(item),
   );
+  const [sendEmails, setSendEmails] = useState(true);
 
   const instructorOptions = (instructors.data ?? [])
     .map((i) => ({
@@ -204,12 +285,13 @@ function MoveDialog({
     });
   }
 
-  const startsAt = date && time ? schoolInstant(date, time) : null;
+  const timeChanged = date !== start.date || time !== start.time;
+  const startsAt =
+    timeChanged && date && time ? schoolInstant(date, time) : null;
   const originalIds = item.participants.map((p) => p.customerId).join(',');
   const nextIds = customers.map((c) => c.id).join(',');
   const body: UpdateBookingInput = {
-    ...(startsAt &&
-      Date.parse(startsAt) !== Date.parse(item.startsAt) && { startsAt }),
+    ...(startsAt && { startsAt }),
     ...(instructorId !== item.instructorId && { instructorId }),
     ...(lessonTypeId && lessonTypeId !== item.lessonTypeId && { lessonTypeId }),
     ...(nextIds !== originalIds &&
@@ -217,11 +299,28 @@ function MoveDialog({
     ...(notes.trim() !== (item.notes ?? '') && { notes: notes.trim() || null }),
   };
   const changed = Object.keys(body).length > 0;
+  const warningText = useWarningText(
+    [...customers, ...participantsOf(item)],
+    (id) => instructorOptions.find((o) => o.id === id)?.name ?? null,
+  );
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (!changed || update.isPending) return;
-    update.mutate({ id: item.id, ...body }, { onSuccess: onClose });
+    update
+      .mutateAsync({
+        id: item.id,
+        ...body,
+        ...(!sendEmails && { sendEmails: false }),
+      })
+      .then(
+        (saved) => {
+          const lines = warningText(saved.warnings);
+          if (lines.length > 0) showBookingWarnings({ kind: 'moved', lines });
+          onClose();
+        },
+        () => undefined,
+      );
   }
 
   return (
@@ -297,6 +396,12 @@ function MoveDialog({
         {item.googleCalendarId && (
           <p className="text-sm text-slate">{t.booking.moveGoogle}</p>
         )}
+        <SendEmailsField
+          label={t.booking.sendEmailsMove}
+          checked={sendEmails}
+          past={isPastStart(startsAt ?? item.startsAt, Date.now())}
+          onChange={setSendEmails}
+        />
         {customers.length === 0 && (
           <Banner tone="pending">{t.booking.needCustomer}</Banner>
         )}
