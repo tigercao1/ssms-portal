@@ -77,12 +77,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     track('signed_out');
-    try {
-      await supabase.auth.signOut();
-    } finally {
-      queryClient.clear();
-    }
-  }, [queryClient]);
+    await supabase.auth.signOut();
+  }, []);
 
   const value = useMemo<SessionValue>(() => {
     const user = session?.user ?? null;

@@ -39,6 +39,10 @@ export function presentFlags(sets: PayFlagSet[]): PayFlag[] {
   return ORDER.filter((flag) => sets.some((set) => set[flag]));
 }
 
+export function isFlagged(flags: PayFlagSet) {
+  return ORDER.some((flag) => flags[flag]);
+}
+
 export function countedMinutes(flags: PayFlagSet, minutes: number) {
   if (flags.correction) return null;
   return flags.lateCancel ? -minutes : minutes;

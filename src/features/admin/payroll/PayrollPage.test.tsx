@@ -294,6 +294,9 @@ describe('PayrollPage', () => {
     expect(rows[1]).toHaveTextContent('No-show');
     expect(rows[1]).toHaveTextContent('$37.33/h');
     expect(rows[1]).toHaveTextContent('$56.00');
+    expect(
+      (rows[1] as HTMLTableRowElement).cells[0],
+    ).not.toHaveTextContent('$');
     expect(rows[3]).toHaveTextContent('$400.00/day');
     expect(rows[2]).toHaveTextContent('No lesson type');
     expect(rows[2]).toHaveTextContent('Scheduled');
@@ -718,6 +721,24 @@ describe('PayrollPage late lines', () => {
     expect(screen.getByText(/Lessons: 1/)).toHaveTextContent(
       'Lessons: 1 · Hours: 1.50',
     );
+  });
+
+  it('repeats a flagged line’s amount under its label on phones only', async () => {
+    const { jane: janeRows, tom: tomRows } = await openBoth();
+    const dateCells = [...janeRows, ...tomRows].map(
+      (row) => (row as HTMLTableRowElement).cells[0] as HTMLElement,
+    );
+
+    const amounts = dateCells.map((cell) =>
+      within(cell).getByText(/\$\d/),
+    );
+    expect(amounts.map((amount) => amount.textContent)).toEqual([
+      '$56.00',
+      '-$56.00',
+      '-$10.00',
+      '$60.00',
+    ]);
+    for (const amount of amounts) expect(amount).toHaveClass('sm:hidden');
   });
 
   it('shows both lines of a class moved between instructors', async () => {

@@ -544,7 +544,7 @@ function PeriodRows({ period, label }: { period: MyPayPeriod; label: string }) {
       {period.lessons.map((lesson) => {
         const name = lessonName(lesson, locale, t.myLessons.noLessonType);
         return (
-          <li key={lessonKey(lesson)} className={PERIOD_ROW}>
+          <li key={lesson.classId} className={PERIOD_ROW}>
             <span>
               {lessonDay(lesson.date, locale)} · {lesson.startTime}–
               {lesson.endTime}
@@ -581,9 +581,4 @@ function PeriodRows({ period, label }: { period: MyPayPeriod; label: string }) {
       ))}
     </ul>
   );
-}
-
-function lessonKey(lesson: MyLesson) {
-  if (lesson.lateCancel) return `${lesson.classId}|late_cancel`;
-  return lesson.late ? `${lesson.classId}|late` : lesson.classId;
 }

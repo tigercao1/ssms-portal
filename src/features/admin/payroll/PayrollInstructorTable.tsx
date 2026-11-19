@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn';
 import { withRateUnit } from '@/lib/rateUnit';
 import {
   countedMinutes,
+  isFlagged,
   PayFlagBadges,
   PayFlagsHelp,
   payFlagsOf,
@@ -212,6 +213,11 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
                 <td className="whitespace-nowrap py-1.5 pr-3">
                   {formatShortDay(line.date, locale)}
                   <PayFlagBadges flags={flags} />
+                  {isFlagged(flags) && (
+                    <span className="mt-1 block tabular-nums sm:hidden">
+                      {formatMoney(line.amount, line.currency, locale)}
+                    </span>
+                  )}
                 </td>
                 <td className="whitespace-nowrap py-1.5 pr-3 font-mono">
                   {line.time}
