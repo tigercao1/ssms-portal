@@ -27,6 +27,7 @@ import { ClassesPage } from '@/features/admin/ClassesPage';
 import { BookLessonPage } from '@/features/admin/booking/BookLessonPage';
 import { GoogleSettingsPage } from '@/features/admin/GoogleSettingsPage';
 import { ApiTokensPage } from '@/features/admin/apiTokens/ApiTokensPage';
+import { BugReportsPage } from '@/features/bugReports/BugReportsPage';
 import { PayrollPage } from '@/features/admin/payroll/PayrollPage';
 import { AdminInsurancePage } from '@/features/admin/insurance/AdminInsurancePage';
 import { ImportHistoryPage } from '@/features/admin/import/ImportHistoryPage';
@@ -287,6 +288,22 @@ export const router = createBrowserRouter([
                 element: (
                   <RequireAdmin>
                     <ApiTokensPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/bug-reports',
+                element: (
+                  <RequireAdmin>
+                    <BugReportsPage />
+                  </RequireAdmin>
+                ),
+              },
+              {
+                path: '/admin/bug-reports/:id',
+                element: (
+                  <RequireAdmin>
+                    <BugReportsPage />
                   </RequireAdmin>
                 ),
               },
