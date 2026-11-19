@@ -1907,6 +1907,46 @@ export const en: Messages = {
     onboardingBody:
       'Lessons and pay open once every required document on your onboarding checklist is done and your membership cards are approved.',
     onboardingOpen: 'Go to onboarding',
+    refreshFailed: "Couldn't refresh. Showing what was loaded earlier.",
+  },
+  payFlags: {
+    late: 'Late',
+    lateCancel: 'Late cancel',
+    correction: 'Correction',
+    reassigned: 'Reassigned',
+    helpTitle: 'What the labels mean',
+    lateHelp:
+      'Added or changed after its pay period was finalized, so it is paid in this period. The date is the real lesson date.',
+    lateCancelHelp:
+      'Cancelled after its pay period was finalized, so the pay is taken back in this period.',
+    correctionHelp:
+      'Adjusts an amount paid earlier. It is not counted as a lesson.',
+    reassignedHelp: 'The lesson moved between instructors after it was paid.',
+  },
+  bookingReminders: {
+    title: 'Lesson reminders',
+    body: 'Email customers and instructors before each lesson booked here.',
+    enabledLabel: 'Send reminder emails',
+    onSince: 'On since {date} (Toronto time)',
+    off: 'Off',
+    timesLabel: 'Reminder times',
+    timesHint: 'Up to 5, each from 15 minutes to 14 days before the lesson.',
+    amountFor: 'Reminder {n}: how long before',
+    unitFor: 'Reminder {n}: unit',
+    unitMinutes: 'minutes before',
+    unitHours: 'hours before',
+    unitDays: 'days before',
+    add: 'Add a reminder time',
+    removeFor: 'Remove reminder {n}',
+    empty: 'No reminder times yet.',
+    wholeNumber: 'Enter a whole number for each reminder time.',
+    save: 'Save reminders',
+    saved: 'Reminders saved.',
+    errRequired: 'Add at least one reminder time, or turn reminders off.',
+    errTooMany: 'Add at most 5 reminder times.',
+    errDuplicate: 'Each reminder time must be different.',
+    errRange:
+      'Each reminder time must be from 15 minutes to 14 days before the lesson.',
   },
   onboarding: {
     documentLanguage: 'Document language',

@@ -19,6 +19,10 @@ export function fakeMyLesson(overrides: Partial<MyLesson> = {}): MyLesson {
     currency: 'CAD',
     amount: 180,
     needsRate: false,
+    late: false,
+    lateCancel: false,
+    correction: false,
+    reassigned: false,
     ...overrides,
   };
 }

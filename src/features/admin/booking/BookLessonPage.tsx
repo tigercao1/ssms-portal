@@ -26,6 +26,7 @@ import {
 } from './bookingDrafts';
 import { schoolParts } from './bookingRules';
 import { BookingSettingsCard } from './BookingSettingsCard';
+import { ReminderSettingsCard } from './ReminderSettingsCard';
 import { SyncToastHost } from './CalendarSync';
 
 const REPEAT_COUNTS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -442,6 +443,7 @@ export function BookLessonPage() {
       )}
 
       <BookingSettingsCard />
+      <ReminderSettingsCard />
     </div>
   );
 }

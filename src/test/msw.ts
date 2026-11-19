@@ -422,6 +422,14 @@ export const handlers = [
   http.get(`${API}/admin/booking/sync-issues`, () =>
     HttpResponse.json({ classes: [], deletions: [] }),
   ),
+  http.get(`${API}/admin/booking/reminder-settings`, () =>
+    HttpResponse.json({
+      enabled: true,
+      offsetsMinutes: [1440, 60],
+      enabledAt: '2026-11-19T08:00:00Z',
+      updatedAt: '2026-11-19T08:00:00Z',
+    }),
+  ),
   http.get(`${API}/admin/lesson-types`, () => HttpResponse.json([])),
   http.get(`${API}/admin/pay-rates`, () => HttpResponse.json([])),
   http.get(`${API}/admin/customers`, ({ request }) => {

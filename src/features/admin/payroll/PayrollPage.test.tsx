@@ -8,6 +8,8 @@ import type { AdminInstructorRecord } from '@/lib/types';
 import { PayrollPage } from './PayrollPage';
 import type {
   PayrollAdjustment,
+  PayrollInstructorSummary,
+  PayrollLessonLine,
   PayrollPeriod,
   PayrollPeriodDetail,
   PayrollSettings,
@@ -560,5 +562,186 @@ describe('PayrollPage', () => {
     );
     renderWithProviders(<PayrollPage />);
     expect(await screen.findByText('Forbidden resource')).toBeInTheDocument();
+  });
+});
+
+describe('PayrollPage late lines', () => {
+  const current = period('2025-12-29', '2026-01-11', { isCurrent: true });
+  const tom = { ...jane, id: 'tom-1', email: 'tom@example.com' };
+  const base = detailFor(current).lines[0] as PayrollLessonLine;
+  const line = (overrides: Partial<PayrollLessonLine>): PayrollLessonLine => ({
+    ...base,
+    classStatus: 'completed',
+    flags: [],
+    ...overrides,
+  });
+  const summary = (
+    instructorId: string,
+    instructorName: string,
+    overrides: Partial<PayrollInstructorSummary>,
+  ): PayrollInstructorSummary => ({
+    instructorId,
+    instructorName,
+    instructorNameZh: null,
+    email: null,
+    currency: 'CAD',
+    lessons: 0,
+    minutes: 0,
+    lessonAmount: 0,
+    adjustmentAmount: 0,
+    total: 0,
+    needsRate: 0,
+    ...overrides,
+  });
+  const detail: PayrollPeriodDetail = {
+    period: current,
+    instructors: [
+      summary(jane.id, 'Jane Snow', {
+        lessons: 0,
+        minutes: 0,
+        lessonAmount: -10,
+        total: -10,
+      }),
+      summary(tom.id, 'Tom Reed', {
+        lessons: 1,
+        minutes: 90,
+        lessonAmount: 60,
+        total: 60,
+      }),
+    ],
+    lines: [
+      line({
+        classId: 'late-1',
+        date: '2025-12-20',
+        amount: 56,
+        flags: ['late'],
+      }),
+      line({
+        classId: 'moved',
+        date: '2025-12-22',
+        amount: -56,
+        flags: ['late_cancel', 'reassigned'],
+      }),
+      line({
+        classId: 'moved',
+        instructorId: tom.id,
+        instructorName: 'Tom Reed',
+        date: '2025-12-22',
+        amount: 60,
+        flags: ['late', 'reassigned'],
+      }),
+      line({
+        classId: 'fix',
+        date: '2025-12-23',
+        amount: -10,
+        flags: ['late', 'correction'],
+      }),
+    ],
+    adjustments: [],
+    totals: [{ currency: 'CAD', lessons: 1, minutes: 90, amount: 50 }],
+    needsRateCount: 0,
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-07T12:00:00'));
+    server.use(
+      http.get(`${API}/admin/instructors`, () =>
+        HttpResponse.json([jane, tom]),
+      ),
+      http.get(`${API}/admin/payroll/periods`, () =>
+        HttpResponse.json([current]),
+      ),
+      http.get(`${API}/admin/payroll/periods/:id`, () =>
+        HttpResponse.json(detail),
+      ),
+    );
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function openBoth(show = (name: string) => `Show lessons for ${name}`) {
+    const user = userEvent.setup();
+    renderWithProviders(<PayrollPage />);
+    await user.click(
+      await screen.findByRole('button', { name: show('Jane Snow') }),
+    );
+    await user.click(screen.getByRole('button', { name: show('Tom Reed') }));
+    const [, janeTable, tomTable] = screen.getAllByRole('table') as [
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+    ];
+    return {
+      jane: within(janeTable).getAllByRole('row').slice(1),
+      tom: within(tomTable).getAllByRole('row').slice(1),
+    };
+  }
+
+  it('labels each flag with its amount, counted minutes and real date', async () => {
+    const { jane: rows } = await openBoth();
+    const [late, cancel, correction] = rows as [
+      HTMLElement,
+      HTMLElement,
+      HTMLElement,
+    ];
+
+    expect(late).toHaveTextContent('Sat, Dec 20');
+    expect(within(late).getByText('Late')).toBeVisible();
+    expect(late).toHaveTextContent('90');
+    expect(late).toHaveTextContent('$56.00');
+
+    expect(within(cancel).getByText('Late cancel')).toBeVisible();
+    expect(within(cancel).getByText('Reassigned')).toBeVisible();
+    expect(cancel).toHaveTextContent('-90');
+    expect(cancel).toHaveTextContent('-$56.00');
+
+    expect(within(correction).getByText('Correction')).toBeVisible();
+    expect(within(correction).getByText('Late')).toBeVisible();
+    expect(correction).toHaveTextContent('—');
+    expect(correction).not.toHaveTextContent('-90');
+    expect(correction).toHaveTextContent('-$10.00');
+
+    expect(screen.getAllByText('What the labels mean')[0]).toBeVisible();
+    expect(
+      screen.getAllByText(
+        'Added or changed after its pay period was finalized, so it is paid in this period. The date is the real lesson date.',
+      )[0],
+    ).toBeVisible();
+    expect(
+      screen.getAllByText(
+        'The lesson moved between instructors after it was paid.',
+      )[0],
+    ).toBeVisible();
+    expect(screen.getByTestId('payroll-total')).toHaveTextContent('$50.00');
+    expect(screen.getByText(/Lessons: 1/)).toHaveTextContent(
+      'Lessons: 1 · Hours: 1.50',
+    );
+  });
+
+  it('shows both lines of a class moved between instructors', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { jane: janeRows, tom: tomRows } = await openBoth();
+
+    expect(janeRows).toHaveLength(3);
+    expect(tomRows).toHaveLength(1);
+    expect(janeRows[1]).toHaveTextContent('-$56.00');
+    expect(tomRows[0]).toHaveTextContent('$60.00');
+    expect(
+      within(tomRows[0] as HTMLElement).getByText('Reassigned'),
+    ).toBeVisible();
+    expect(
+      errors.mock.calls.some((args) => String(args[0]).includes('key')),
+    ).toBe(false);
+    errors.mockRestore();
+  });
+
+  it('shows the labels in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    await openBoth((name) => `显示 ${name} 的课程`);
+    for (const label of ['补发', '取消扣回', '更正', '改派']) {
+      expect(screen.getAllByText(label)[0]).toBeVisible();
+    }
   });
 });

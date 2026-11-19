@@ -4,6 +4,11 @@ import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import type { Locale } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
+import {
+  PayFlagBadges,
+  PayFlagsHelp,
+  presentFlags,
+} from '@/features/admin/payroll/PayFlags';
 import { formatMoney } from '@/features/admin/payroll/payrollFormat';
 import {
   LockIcon,
@@ -33,7 +38,7 @@ const SURFACE = 'rounded-lg border border-grey/60 bg-surface shadow-card';
 
 export function LessonsPayPage() {
   const t = useT();
-  const { data, isLoading, isError, refetch } = useMyLessons();
+  const { data, isLoading, isError, isFetching, refetch } = useMyLessons();
 
   if (isLoading)
     return (
@@ -41,7 +46,7 @@ export function LessonsPayPage() {
         <Spinner className="h-7 w-7" />
       </div>
     );
-  if (isError || !data)
+  if (!data)
     return (
       <Card>
         <Banner tone="error">{t.myLessons.loadFailed}</Banner>
@@ -59,6 +64,21 @@ export function LessonsPayPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl">{t.myLessons.title}</h1>
+      {isError && (
+        <Banner tone="pending">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>{t.myLessons.refreshFailed}</span>
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={isFetching}
+              onClick={() => void refetch()}
+            >
+              {t.common.retry}
+            </Button>
+          </div>
+        </Banner>
+      )}
       <LessonsBody data={data} />
     </div>
   );
@@ -242,6 +262,7 @@ function LessonPay({ lesson }: { lesson: MyLesson }) {
 function RateTimes({ lesson }: { lesson: MyLesson }) {
   const t = useT();
   const { locale } = useLocale();
+  if (lesson.correction) return <>—</>;
   const text = rateTimes(lesson, t, locale);
   if (text) return <>{text}</>;
   return <>{lesson.needsRate ? '—' : t.myLessons.noRate}</>;
@@ -436,9 +457,10 @@ function PeriodCard({ period }: { period: MyPayPeriod }) {
   const [open, setOpen] = useState(awaiting);
   const rowsId = useId();
   const dates = periodDates(period.startsOn, period.endsOn, locale);
-  const minutes = period.lessons.reduce((sum, l) => sum + l.minutes, 0);
+  const lessons = period.totals.reduce((sum, x) => sum + x.lessons, 0);
+  const minutes = period.totals.reduce((sum, x) => sum + x.minutes, 0);
   const summary = [
-    lessonsCount(period.lessons.length, t),
+    lessonsCount(lessons, t),
     t.myLessons.hours.replace('{hours}', hoursOf(minutes)),
     period.adjustments.length > 0
       ? adjustmentsCount(period.adjustments.length, t)
@@ -501,6 +523,10 @@ function PeriodCard({ period }: { period: MyPayPeriod }) {
       {open && (
         <div id={rowsId} className="border-t border-grey/60 bg-sunken/40">
           <PeriodRows period={period} label={dates} />
+          <PayFlagsHelp
+            flags={presentFlags(period.lessons)}
+            className="border-t border-grey/30 px-4 py-2"
+          />
         </div>
       )}
     </div>
@@ -518,10 +544,11 @@ function PeriodRows({ period, label }: { period: MyPayPeriod; label: string }) {
       {period.lessons.map((lesson) => {
         const name = lessonName(lesson, locale, t.myLessons.noLessonType);
         return (
-          <li key={lesson.classId} className={PERIOD_ROW}>
+          <li key={lessonKey(lesson)} className={PERIOD_ROW}>
             <span>
               {lessonDay(lesson.date, locale)} · {lesson.startTime}–
               {lesson.endTime}
+              <PayFlagBadges flags={lesson} />
               <span className="block text-xs text-slate lg:hidden">
                 {name} · <RateTimes lesson={lesson} />
               </span>
@@ -554,4 +581,9 @@ function PeriodRows({ period, label }: { period: MyPayPeriod; label: string }) {
       ))}
     </ul>
   );
+}
+
+function lessonKey(lesson: MyLesson) {
+  if (lesson.lateCancel) return `${lesson.classId}|late_cancel`;
+  return lesson.late ? `${lesson.classId}|late` : lesson.classId;
 }

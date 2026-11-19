@@ -12,7 +12,7 @@ export interface MyLesson {
   endTime: string;
   startsAt: string;
   endsAt: string;
-  status: 'scheduled' | 'completed' | 'no_show';
+  status: 'scheduled' | 'completed' | 'no_show' | 'cancelled';
   lessonTypeNameEn: string | null;
   lessonTypeNameZh: string | null;
   locationName: string | null;
@@ -23,6 +23,10 @@ export interface MyLesson {
   currency: string;
   amount: number | null;
   needsRate: boolean;
+  late: boolean;
+  lateCancel: boolean;
+  correction: boolean;
+  reassigned: boolean;
 }
 
 export interface MyAdjustment {
