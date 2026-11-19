@@ -1732,6 +1732,42 @@ export interface Messages {
     onboardingTitle: string;
     onboardingBody: string;
     onboardingOpen: string;
+    refreshFailed: string;
+  };
+  payFlags: {
+    late: string;
+    lateCancel: string;
+    correction: string;
+    reassigned: string;
+    helpTitle: string;
+    lateHelp: string;
+    lateCancelHelp: string;
+    correctionHelp: string;
+    reassignedHelp: string;
+  };
+  bookingReminders: {
+    title: string;
+    body: string;
+    enabledLabel: string;
+    onSince: string;
+    off: string;
+    timesLabel: string;
+    timesHint: string;
+    amountFor: string;
+    unitFor: string;
+    unitMinutes: string;
+    unitHours: string;
+    unitDays: string;
+    add: string;
+    removeFor: string;
+    empty: string;
+    wholeNumber: string;
+    save: string;
+    saved: string;
+    errRequired: string;
+    errTooMany: string;
+    errDuplicate: string;
+    errRange: string;
   };
   onboarding: {
     documentLanguage: string;

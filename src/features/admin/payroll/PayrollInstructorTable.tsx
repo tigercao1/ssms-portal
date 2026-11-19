@@ -6,6 +6,14 @@ import { localizeField } from '@/i18n/core/localize';
 import type { Messages } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
 import { withRateUnit } from '@/lib/rateUnit';
+import {
+  countedMinutes,
+  isFlagged,
+  PayFlagBadges,
+  PayFlagsHelp,
+  payFlagsOf,
+  presentFlags,
+} from './PayFlags';
 import { formatHours, formatMoney, formatShortDay } from './payrollFormat';
 import type {
   PayrollClassStatus,
@@ -166,6 +174,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
   if (lines.length === 0) {
     return <p className="text-slate">—</p>;
   }
+  const flagged = presentFlags(lines.map((line) => payFlagsOf(line.flags)));
   return (
     <div className="flex flex-col gap-2">
       <table className="w-full text-xs">
@@ -191,9 +200,11 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
           {lines.map((line) => {
             const needsRate = line.flags.includes('needs_rate');
             const alreadyPaid = line.flags.includes('already_paid');
+            const flags = payFlagsOf(line.flags);
+            const minutes = countedMinutes(flags, line.minutes);
             return (
               <tr
-                key={line.classId}
+                key={`${line.classId}|${line.instructorId}`}
                 className={cn(
                   'border-t border-grey/30 align-top',
                   needsRate && 'bg-status-pending/10',
@@ -201,6 +212,12 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
               >
                 <td className="whitespace-nowrap py-1.5 pr-3">
                   {formatShortDay(line.date, locale)}
+                  <PayFlagBadges flags={flags} />
+                  {isFlagged(flags) && (
+                    <span className="mt-1 block tabular-nums sm:hidden">
+                      {formatMoney(line.amount, line.currency, locale)}
+                    </span>
+                  )}
                 </td>
                 <td className="whitespace-nowrap py-1.5 pr-3 font-mono">
                   {line.time}
@@ -219,7 +236,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
                   {t.payroll[STATUS_KEYS[line.classStatus]]}
                 </td>
                 <td className="py-1.5 pr-3 text-right tabular-nums">
-                  {line.minutes}
+                  {minutes ?? '—'}
                 </td>
                 <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">
                   {line.hourlyRate === null
@@ -246,6 +263,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
           })}
         </tbody>
       </table>
+      <PayFlagsHelp flags={flagged} className="max-w-[20rem]" />
       <Link
         to="/admin/classes"
         className="self-start text-xs font-medium text-navy underline"

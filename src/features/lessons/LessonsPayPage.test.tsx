@@ -15,12 +15,13 @@ import { renderWithProviders } from '@/test/render';
 import { LessonsPayPage } from './LessonsPayPage';
 import {
   emptyLessons,
+  fakeMyLesson,
   fullLessons,
   onboardingLessons,
   pendingLessons,
   rejectedLessons,
 } from './fixtures';
-import type { MyLessonsResponse } from './types';
+import type { MyLessonsResponse, MyPayPeriod } from './types';
 import { expectMaskedInReplay } from '@/test/replayPrivacy';
 
 const API = 'http://localhost:3000';
@@ -569,5 +570,173 @@ describe('LessonsPayPage after a lesson is cancelled', () => {
         'Projected · 2 lessons(1 without a rate is not counted)$180.00',
       ),
     );
+  });
+});
+
+describe('LessonsPayPage late payroll lines', () => {
+  const current: MyPayPeriod = {
+    startsOn: '2027-02-08',
+    endsOn: '2027-02-21',
+    status: 'awaiting',
+    finalizedAt: null,
+    lessons: [
+      fakeMyLesson({ classId: 'n1', date: '2027-02-09', status: 'completed' }),
+      fakeMyLesson({
+        classId: 'l1',
+        date: '2027-01-20',
+        status: 'completed',
+        late: true,
+      }),
+      fakeMyLesson({
+        classId: 'x1',
+        date: '2027-01-21',
+        status: 'cancelled',
+        amount: -180,
+        lateCancel: true,
+        reassigned: true,
+      }),
+      fakeMyLesson({
+        classId: 'c1',
+        date: '2027-01-22',
+        status: 'completed',
+        amount: -20,
+        late: true,
+        correction: true,
+      }),
+    ],
+    adjustments: [],
+    totals: [
+      {
+        currency: 'CAD',
+        lessons: 1,
+        minutes: 120,
+        lessonAmount: 160,
+        adjustmentAmount: 0,
+        total: 160,
+        needsRateCount: 0,
+      },
+    ],
+  };
+
+  function rows() {
+    const list = screen.getByRole('list', { name: /Feb 8 – Feb 21, 2027/ });
+    return within(list).getAllByRole('listitem');
+  }
+
+  it('labels late, late cancel, correction and reassigned lines', async () => {
+    serve({ ...emptyLessons, periods: [current] });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Past lessons' });
+
+    const [normal, late, cancel, correction] = rows() as HTMLElement[];
+    expect(within(normal!).queryByText('Late')).toBeNull();
+    expect(late).toHaveTextContent('Wed, Jan 20');
+    expect(within(late!).getByText('Late')).toBeVisible();
+    expect(within(cancel!).getByText('Late cancel')).toBeVisible();
+    expect(within(cancel!).getByText('Reassigned')).toBeVisible();
+    expect(cancel).toHaveTextContent('-$180.00');
+    expect(within(correction!).getByText('Correction')).toBeVisible();
+    expect(correction).toHaveTextContent('—');
+    expect(correction).not.toHaveTextContent('× 2h');
+    expect(correction).toHaveTextContent('-$20.00');
+
+    expect(screen.getByText('What the labels mean')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Cancelled after its pay period was finalized, so the pay is taken back in this period.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'Adjusts an amount paid earlier. It is not counted as a lesson.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('counts lessons and hours from the period totals', async () => {
+    serve({ ...emptyLessons, periods: [current] });
+    renderPage();
+    const toggle = await screen.findByRole('button', {
+      name: /lessons for Feb 8 – Feb 21, 2027/,
+    });
+    expect(toggle).toHaveTextContent('1 lesson · 2h');
+    expect(within(toggle).getByTestId('period-total')).toHaveTextContent(
+      '≈ $160.00',
+    );
+  });
+
+  it('shows the labels in Chinese', async () => {
+    serve({ ...emptyLessons, periods: [current] });
+    renderPage('zh-CN');
+    await screen.findByRole('heading', { name: '已上的课' });
+    for (const label of ['补发', '取消扣回', '更正', '改派', '标签说明']) {
+      expect(screen.getAllByText(label)[0]).toBeVisible();
+    }
+  });
+});
+
+describe('LessonsPayPage background refresh failure', () => {
+  afterEach(() => {
+    focusManager.setFocused(undefined);
+  });
+
+  it('keeps the loaded page with a notice and a retry when a refetch fails', async () => {
+    let status = 200;
+    server.use(
+      http.get(`${API}/me/lessons`, () =>
+        status === 200
+          ? HttpResponse.json(fullLessons)
+          : HttpResponse.json({ message: 'boom' }, { status }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByTestId('upcoming-projected')).toBeVisible();
+
+    status = 500;
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    expect(
+      await screen.findByText(
+        "Couldn't refresh. Showing what was loaded earlier.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByTestId('upcoming-projected')).toHaveTextContent(
+      '$360.00',
+    );
+    expect(
+      screen.queryByText('Could not load your lessons and pay.'),
+    ).toBeNull();
+
+    status = 200;
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          "Couldn't refresh. Showing what was loaded earlier.",
+        ),
+      ).toBeNull(),
+    );
+  });
+
+  it('shows the full error card and no notice when nothing has loaded', async () => {
+    server.use(
+      http.get(`${API}/me/lessons`, () =>
+        HttpResponse.json({ message: 'boom' }, { status: 500 }),
+      ),
+    );
+    renderPage();
+    expect(
+      await screen.findByText('Could not load your lessons and pay.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("Couldn't refresh. Showing what was loaded earlier."),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('heading', { name: 'My lessons & pay' }),
+    ).toBeNull();
   });
 });

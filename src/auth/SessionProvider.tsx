@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { identifyUser, resetUser, track } from '@/lib/analytics';
@@ -39,23 +40,29 @@ function readRole(user: User | null): 'admin' | 'instructor' | null {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    let cachedUserId: string | null = null;
+    const adopt = (next: Session | null) => {
+      const nextUserId = next?.user?.id ?? null;
+      if (cachedUserId && cachedUserId !== nextUserId) queryClient.clear();
+      cachedUserId = nextUserId;
       setSession(next);
       setLoading(false);
+    };
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) adopt(data.session);
     });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) =>
+      adopt(next),
+    );
     return () => {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const userId = session?.user?.id ?? null;
   const role = readRole(session?.user ?? null);
