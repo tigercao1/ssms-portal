@@ -42,6 +42,12 @@ function containsPath(group: AdminNavGroup, pathname: string) {
   );
 }
 
+function listHoldsFocus(listId: string) {
+  return (
+    document.getElementById(listId)?.contains(document.activeElement) ?? false
+  );
+}
+
 function isOpen(open: OpenGroups, group: AdminNavGroup) {
   return open[group.id] ?? group.defaultOpen ?? false;
 }
@@ -75,9 +81,14 @@ export function AdminNavGroups({ onNavigate }: { onNavigate: () => void }) {
               id={buttonId}
               aria-expanded={expanded}
               aria-controls={listId}
-              onClick={() =>
-                setOpen((prev) => ({ ...prev, [group.id]: !expanded }))
-              }
+              onMouseDown={(event) => {
+                if (expanded && listHoldsFocus(listId)) event.preventDefault();
+              }}
+              onClick={(event) => {
+                if (expanded && listHoldsFocus(listId))
+                  event.currentTarget.focus();
+                setOpen((prev) => ({ ...prev, [group.id]: !expanded }));
+              }}
               className="flex items-center gap-2 rounded-md px-3 py-1.5 text-left text-[11px] font-medium uppercase tracking-wide text-white/55 hover:bg-white/5 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70"
             >
               <svg

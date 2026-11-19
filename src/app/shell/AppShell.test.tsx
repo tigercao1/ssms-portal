@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Route,
@@ -343,6 +349,23 @@ describe('AppShell admin nav', () => {
     await userEvent.keyboard(' ');
     expect(groupToggle('Website')).toHaveAttribute('aria-expanded', 'false');
     expect(groupToggle('Website')).toHaveFocus();
+  });
+
+  it('moves focus to the header when collapsing a group that holds the focused link', () => {
+    renderShell();
+    screen.getByRole('link', { name: 'Book a lesson' }).focus();
+    fireEvent.click(groupToggle('Booking'));
+    expect(groupToggle('Booking')).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(groupToggle('Booking'));
+  });
+
+  it('leaves focus alone when collapsing a group that does not hold it', () => {
+    renderShell('/admin/signatures');
+    const signatures = screen.getByRole('link', { name: 'Signatures' });
+    signatures.focus();
+    fireEvent.click(groupToggle('Booking'));
+    expect(groupToggle('Booking')).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(signatures);
   });
 
   it('remembers which groups were opened and closed in this browser', async () => {
