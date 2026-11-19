@@ -175,6 +175,11 @@ export function adminBugReportHandlers(state: BugReportsMockState) {
     }),
     http.get(`${API}/admin/bug-reports/:id`, ({ params }) => {
       state.detailRequests.push(String(params.id));
+      if (!/^bug-\d+$/.test(String(params.id)))
+        return HttpResponse.json(
+          { message: 'Validation failed (uuid is expected)' },
+          { status: 400 },
+        );
       const report = find(params.id);
       return report ? HttpResponse.json(report) : notFound();
     }),

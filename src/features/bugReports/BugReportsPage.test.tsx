@@ -1,10 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
-import { Route, Routes } from 'react-router-dom';
+import {
+  createMemoryRouter,
+  matchRoutes,
+  RouterProvider,
+} from 'react-router-dom';
 import { server } from '@/test/msw';
-import { renderWithProviders } from '@/test/render';
+import { I18nProvider } from '@/i18n/core/I18nProvider';
+import { router as appRouter } from '@/app/router';
 import { RequireAdmin } from '@/app/router/guards';
 import { BugReportsPage } from './BugReportsPage';
 import {
@@ -13,6 +23,7 @@ import {
   fakeBugReports,
   type BugReportsMockState,
 } from './fixtures';
+import type { BugReportDetail, UpdateBugReportBody } from './types';
 
 const session = vi.hoisted(() => ({ isAdmin: true, userId: 'auth-1' }));
 
@@ -25,6 +36,7 @@ vi.mock('@/auth/SessionProvider', () => ({
 }));
 
 let state: BugReportsMockState;
+let router: ReturnType<typeof createMemoryRouter>;
 
 beforeEach(() => {
   session.isAdmin = true;
@@ -33,36 +45,82 @@ beforeEach(() => {
   server.use(...adminBugReportHandlers(state));
 });
 
+afterEach(() => {
+  focusManager.setFocused(undefined);
+});
+
 function renderPage(route = '/admin/bug-reports') {
   const user = userEvent.setup();
-  renderWithProviders(
-    <Routes>
-      <Route
-        path="/admin/bug-reports"
-        element={
-          <RequireAdmin>
-            <BugReportsPage />
-          </RequireAdmin>
-        }
-      />
-      <Route path="/" element={<p>Home page</p>} />
-      <Route path="/profile/edit" element={<p>Edit profile page</p>} />
-    </Routes>,
-    { route },
+  const page = (
+    <RequireAdmin>
+      <BugReportsPage />
+    </RequireAdmin>
+  );
+  router = createMemoryRouter(
+    [
+      { path: '/admin/bug-reports', element: page },
+      { path: '/admin/bug-reports/:id', element: page },
+      { path: '/', element: <p>Home page</p> },
+      { path: '/profile/edit', element: <p>Edit profile page</p> },
+    ],
+    { initialEntries: [route] },
+  );
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <RouterProvider router={router} />
+      </I18nProvider>
+    </QueryClientProvider>,
   );
   return user;
 }
 
+function address() {
+  return `${router.state.location.pathname}${router.state.location.search}`;
+}
+
 async function rows(name = 'Bug reports') {
   const list = await screen.findByRole('list', { name });
-  return within(list).getAllByRole('button');
+  return within(list).getAllByRole('link');
+}
+
+async function refetchOnFocus() {
+  const before = state.detailRequests.length;
+  act(() => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+  await waitFor(() =>
+    expect(state.detailRequests.length).toBeGreaterThan(before),
+  );
+}
+
+function pausePatches() {
+  const releases: (() => void)[] = [];
+  server.use(
+    http.patch(
+      'http://localhost:3000/admin/bug-reports/:id',
+      async ({ params, request }) => {
+        const body = (await request.json()) as UpdateBugReportBody;
+        state.patches.push({ id: String(params.id), body });
+        await new Promise<void>((resolve) => releases.push(resolve));
+        const report = state.reports.find((r) => r.id === params.id)!;
+        Object.assign(report, body);
+        return HttpResponse.json(report);
+      },
+    ),
+  );
+  return releases;
 }
 
 async function openReport(
   user: ReturnType<typeof userEvent.setup>,
   text: RegExp,
 ) {
-  await user.click(await screen.findByRole('button', { name: text }));
+  await user.click(await screen.findByRole('link', { name: text }));
   return screen.getByRole('dialog', { name: 'Bug report' });
 }
 
@@ -200,7 +258,12 @@ describe('bug report detail', () => {
     const link = await within(panel).findByRole('link', {
       name: 'http://localhost:3000/profile/edit?tab',
     });
-    expect(link).toHaveAttribute('href', '/profile/edit?tab');
+    expect(link).toHaveAttribute(
+      'href',
+      'http://localhost:3000/profile/edit?tab',
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener');
     await user.click(within(panel).getByRole('button', { name: 'Close' }));
 
     panel = await openReport(user, /Typo on the insurance page/);
@@ -276,6 +339,273 @@ describe('bug report detail', () => {
   });
 });
 
+describe('triage form when the report changes elsewhere', () => {
+  function changeOnServer(changes: Partial<BugReportDetail>) {
+    Object.assign(state.reports[0]!, changes);
+  }
+
+  it('follows a status another admin changed and sends only the note this admin typed', async () => {
+    const user = renderPage();
+    const panel = await openReport(user, /spins forever/);
+    const status = await within(panel).findByRole('combobox', {
+      name: 'Status',
+    });
+    changeOnServer({ status: 'resolved' });
+    await refetchOnFocus();
+    await waitFor(() => expect(status).toHaveValue('resolved'));
+    expect(within(panel).getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await user.type(
+      within(panel).getByRole('textbox', { name: 'Admin note' }),
+      'My note',
+    );
+    await user.click(within(panel).getByRole('button', { name: 'Save' }));
+    await within(panel).findByText('Saved');
+    expect(state.patches).toEqual([
+      { id: 'bug-1', body: { adminNote: 'My note' } },
+    ]);
+    expect(state.reports[0]!.status).toBe('resolved');
+  });
+
+  it('follows a note another admin wrote while this admin only changed the status', async () => {
+    const user = renderPage();
+    const panel = await openReport(user, /spins forever/);
+    await user.selectOptions(
+      await within(panel).findByRole('combobox', { name: 'Status' }),
+      'In progress',
+    );
+    changeOnServer({ adminNote: 'Their note' });
+    await refetchOnFocus();
+    await waitFor(() =>
+      expect(
+        within(panel).getByRole('textbox', { name: 'Admin note' }),
+      ).toHaveValue('Their note'),
+    );
+    expect(within(panel).queryByText(/Someone else changed/)).toBeNull();
+    await user.click(within(panel).getByRole('button', { name: 'Save' }));
+    await within(panel).findByText('Saved');
+    expect(state.patches).toEqual([
+      { id: 'bug-1', body: { status: 'in_progress' } },
+    ]);
+  });
+
+  it('warns when the server changed a field with unsaved edits and keeps this admin’s edit on request', async () => {
+    const user = renderPage();
+    const panel = await openReport(user, /spins forever/);
+    const note = await within(panel).findByRole('textbox', {
+      name: 'Admin note',
+    });
+    await user.type(note, 'Mine');
+    changeOnServer({ adminNote: 'Theirs' });
+    await refetchOnFocus();
+
+    expect(
+      await within(panel).findByText(
+        'Someone else changed this report while you were editing it.',
+      ),
+    ).toBeVisible();
+    expect(note).toHaveValue('Mine');
+    expect(within(panel).getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await user.click(
+      within(panel).getByRole('button', { name: 'Keep my changes' }),
+    );
+    expect(within(panel).queryByText(/Someone else changed/)).toBeNull();
+    await user.click(within(panel).getByRole('button', { name: 'Save' }));
+    await within(panel).findByText('Saved');
+    expect(state.patches).toEqual([
+      { id: 'bug-1', body: { adminNote: 'Mine' } },
+    ]);
+  });
+
+  it('discards this admin’s edit and shows the server value on request', async () => {
+    const user = renderPage();
+    const panel = await openReport(user, /spins forever/);
+    const status = await within(panel).findByRole('combobox', {
+      name: 'Status',
+    });
+    await user.selectOptions(status, 'In progress');
+    changeOnServer({ status: 'wont_fix' });
+    await refetchOnFocus();
+
+    await user.click(
+      await within(panel).findByRole('button', { name: 'Discard my changes' }),
+    );
+    expect(status).toHaveValue('wont_fix');
+    expect(within(panel).getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(state.patches).toEqual([]);
+  });
+});
+
+describe('triage form while a save is pending', () => {
+  it('keeps one save in flight and Save disabled while the admin keeps editing', async () => {
+    const releases = pausePatches();
+    const user = renderPage();
+    const panel = await openReport(user, /spins forever/);
+    const note = await within(panel).findByRole('textbox', {
+      name: 'Admin note',
+    });
+    const save = within(panel).getByRole('button', { name: 'Save' });
+    await user.type(note, 'first');
+    await user.click(save);
+    await waitFor(() => expect(state.patches).toHaveLength(1));
+
+    await user.type(note, ' new edit');
+    await user.selectOptions(
+      within(panel).getByRole('combobox', { name: 'Status' }),
+      'In progress',
+    );
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(state.patches).toHaveLength(1);
+
+    act(() => releases.shift()!());
+    await waitFor(() => expect(save).toBeEnabled());
+    expect(note).toHaveValue('first new edit');
+    await user.click(save);
+    await waitFor(() => expect(state.patches).toHaveLength(2));
+    act(() => releases.shift()!());
+    await within(panel).findByText('Saved');
+
+    expect(state.patches.map((patch) => patch.body)).toEqual([
+      { adminNote: 'first' },
+      { status: 'in_progress', adminNote: 'first new edit' },
+    ]);
+    expect(note).toHaveValue('first new edit');
+    expect(save).toBeDisabled();
+  });
+});
+
+describe('reported page link', () => {
+  async function pageLinks(pageUrl: string) {
+    state.reports[0]!.pageUrl = pageUrl;
+    const user = renderPage();
+    const panel = await openReport(user, /spins forever/);
+    await within(panel).findByText('390x844');
+    return within(panel)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-label') === null);
+  }
+
+  it.each([
+    [
+      'a double slash after our origin',
+      'http://localhost:3000//evil.example/phish',
+    ],
+    [
+      'a backslash after our origin',
+      'http://localhost:3000/\\evil.example/phish',
+    ],
+    [
+      'backslashes in place of the path',
+      'http://localhost:3000\\\\evil.example/phish',
+    ],
+    ['a protocol-relative URL', '//evil.example/phish'],
+    ['a relative slash-backslash path', '/\\evil.example/phish'],
+    [
+      'a tab between the slashes',
+      'http://localhost:3000/\t/evil.example/phish',
+    ],
+    ['a leading tab', '\t//evil.example/phish'],
+    ['a javascript: URL', 'javascript:alert(document.cookie)'],
+    ['a data: URL', 'data:text/html,<script>alert(1)</script>'],
+    ['our origin as userinfo', 'http://localhost:3000@evil.example/phish'],
+    ['another origin', 'https://evil.example/phish'],
+  ])('shows %s as text, not a link', async (_, pageUrl) => {
+    expect(await pageLinks(pageUrl)).toEqual([]);
+    expect(
+      within(screen.getByRole('dialog')).getByText(pageUrl, {
+        normalizer: (text) => text,
+      }),
+    ).toBeVisible();
+  });
+
+  it('keeps an encoded-slash path on our own origin', async () => {
+    const [link] = await pageLinks(
+      'http://localhost:3000/%2F%2Fevil.example/phish',
+    );
+    expect(new URL((link as HTMLAnchorElement).href).origin).toBe(
+      window.location.origin,
+    );
+    expect(link).toHaveAttribute(
+      'href',
+      'http://localhost:3000/%2F%2Fevil.example/phish',
+    );
+  });
+});
+
+describe('bug report address', () => {
+  it('is served by the app router, as the notification email links to it', () => {
+    const matches = matchRoutes(appRouter.routes, '/admin/bug-reports/bug-1');
+    expect(matches?.at(-1)?.route.path).toBe('/admin/bug-reports/:id');
+  });
+
+  it('opens the report from its own address over the list', async () => {
+    renderPage('/admin/bug-reports/bug-2');
+    const panel = await screen.findByRole('dialog', { name: 'Bug report' });
+    expect(
+      await within(panel).findByText(
+        'The payroll total on the class list is off by one lesson.',
+      ),
+    ).toBeVisible();
+    expect(state.detailRequests).toEqual(['bug-2']);
+    expect(await rows()).toHaveLength(3);
+  });
+
+  it('links each row to its address and closes with the browser back button', async () => {
+    const user = renderPage('/admin/bug-reports?status=new');
+    const [row] = await rows();
+    expect(row).toHaveAttribute('href', '/admin/bug-reports/bug-1?status=new');
+    await user.click(row!);
+    expect(address()).toBe('/admin/bug-reports/bug-1?status=new');
+    expect(
+      await screen.findByRole('dialog', { name: 'Bug report' }),
+    ).toBeVisible();
+
+    await act(() => router.navigate(-1));
+    expect(address()).toBe('/admin/bug-reports?status=new');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+
+    await act(() => router.navigate(1));
+    expect(
+      await screen.findByRole('dialog', { name: 'Bug report' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(address()).toBe('/admin/bug-reports?status=new');
+    expect(router.state.historyAction).toBe('POP');
+  });
+
+  it('closes a report opened from its address to the list', async () => {
+    const user = renderPage('/admin/bug-reports/bug-1');
+    await screen.findByRole('dialog', { name: 'Bug report' });
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(address()).toBe('/admin/bug-reports');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await rows()).toHaveLength(3);
+  });
+
+  it.each([
+    ['an unknown', '/admin/bug-reports/bug-999'],
+    ['a malformed', '/admin/bug-reports/not%20a%20report'],
+  ])(
+    'says %s report is missing and links back to the list',
+    async (_, route) => {
+      const user = renderPage(route);
+      const panel = await screen.findByRole('dialog', { name: 'Bug report' });
+      expect(await within(panel).findByRole('alert')).toHaveTextContent(
+        "This report doesn't exist, or the link is broken.",
+      );
+      await user.click(
+        within(panel).getByRole('link', { name: 'Back to bug reports' }),
+      );
+      expect(address()).toBe('/admin/bug-reports');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    },
+  );
+});
+
 describe('bug reports access', () => {
   it('sends instructors home without asking the API', async () => {
     session.isAdmin = false;
@@ -285,6 +615,13 @@ describe('bug reports access', () => {
       screen.queryByRole('heading', { name: 'Bug reports' }),
     ).not.toBeInTheDocument();
     expect(state.listQueries).toEqual([]);
+  });
+
+  it('sends instructors home from a report address without asking the API', async () => {
+    session.isAdmin = false;
+    renderPage('/admin/bug-reports/bug-1');
+    expect(await screen.findByText('Home page')).toBeVisible();
+    expect(state.detailRequests).toEqual([]);
   });
 });
 

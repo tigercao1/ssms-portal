@@ -2184,6 +2184,11 @@ export interface Messages {
     save: string;
     saved: string;
     saveFailed: string;
+    changedElsewhere: string;
+    keepMine: string;
+    discardMine: string;
+    notFound: string;
+    backToList: string;
   };
   validation: {
     required: string;

@@ -1,5 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   Banner,
   Button,
@@ -14,6 +20,7 @@ import {
 } from '@/components';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import type { Locale, Messages } from '@/i18n/core/types';
+import { ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { SCHOOL_TIME_ZONE } from '@/features/admin/booking/bookingRules';
 import { Chip } from '@/features/documents/admin/badges';
@@ -92,15 +99,33 @@ function torontoDateTime(iso: string, locale: Locale): string {
   }).format(new Date(iso));
 }
 
-function ownOriginPath(pageUrl: string): string | null {
+const LIST_PATH = '/admin/bug-reports';
+
+function ownOriginUrl(pageUrl: string): URL | null {
+  let url: URL;
   try {
-    const url = new URL(pageUrl);
-    return url.origin === window.location.origin
-      ? `${url.pathname}${url.search}`
-      : null;
+    url = new URL(pageUrl, window.location.origin);
   } catch {
     return null;
   }
+  const path = url.pathname;
+  const singleSlashPath =
+    path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
+  return url.origin === window.location.origin && singleSlashPath ? url : null;
+}
+
+function shownPageUrl(pageUrl: string): string {
+  const url = ownOriginUrl(pageUrl);
+  return url ? `${url.pathname}${url.search}` : pageUrl;
+}
+
+function openedFromList(state: unknown): boolean {
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    'fromList' in state &&
+    state.fromList === true
+  );
 }
 
 function roleLabel(role: BugReportItem['reporter']['role'], t: Messages) {
@@ -147,8 +172,16 @@ export function BugReportsPage() {
   const [params, setParams] = useSearchParams();
   const status = parseStatus(params.get('status'));
   const page = parsePage(params.get('page'));
-  const [openId, setOpenId] = useState<string | null>(null);
+  const { id: openId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const listHref = `${LIST_PATH}${location.search}`;
   const reports = useBugReports(status, page);
+
+  const closeReport = () => {
+    if (openedFromList(location.state)) navigate(-1);
+    else navigate(listHref);
+  };
 
   const show = (next: { status?: BugReportStatus | null; page?: number }) => {
     const nextStatus = next.status === undefined ? status : next.status;
@@ -214,9 +247,9 @@ export function BugReportsPage() {
           >
             {items.map((report) => (
               <li key={report.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenId(report.id)}
+                <Link
+                  to={`${LIST_PATH}/${encodeURIComponent(report.id)}${location.search}`}
+                  state={{ fromList: true }}
                   className="flex w-full flex-col gap-1.5 px-4 py-3 text-left hover:bg-navy-tint/50 focus-visible:bg-navy-tint/50 focus-visible:outline-none"
                 >
                   <span className="flex flex-wrap items-center gap-2">
@@ -241,10 +274,10 @@ export function BugReportsPage() {
                     </span>
                     <span>{torontoDateTime(report.createdAt, locale)}</span>
                     <span className="break-all font-mono">
-                      {ownOriginPath(report.pageUrl) ?? report.pageUrl}
+                      {shownPageUrl(report.pageUrl)}
                     </span>
                   </span>
-                </button>
+                </Link>
               </li>
             ))}
           </ul>
@@ -266,22 +299,42 @@ export function BugReportsPage() {
           />
         </Card>
       )}
-      {openId && <BugReportPanel id={openId} onClose={() => setOpenId(null)} />}
+      {openId && (
+        <BugReportPanel id={openId} listHref={listHref} onClose={closeReport} />
+      )}
     </div>
   );
 }
 
-function BugReportPanel({ id, onClose }: { id: string; onClose: () => void }) {
+function BugReportPanel({
+  id,
+  listHref,
+  onClose,
+}: {
+  id: string;
+  listHref: string;
+  onClose: () => void;
+}) {
   const t = useT();
   const report = useBugReport(id);
+  const missing =
+    report.error instanceof ApiError &&
+    (report.error.status === 404 || report.error.status === 400);
   return (
     <Drawer title={t.bugReports.detailTitle} onClose={onClose}>
       {report.data ? (
         <BugReportView report={report.data} />
       ) : report.isError ? (
-        <Banner tone="error">
-          {errorText(report.error, t.bugReports.loadFailed)}
-        </Banner>
+        <div className="flex flex-col items-start gap-3">
+          <Banner tone="error">
+            {missing
+              ? t.bugReports.notFound
+              : errorText(report.error, t.bugReports.loadFailed)}
+          </Banner>
+          <Link to={listHref} className="text-sm text-navy underline">
+            {t.bugReports.backToList}
+          </Link>
+        </div>
       ) : (
         <div className="flex justify-center py-10">
           <Spinner />
@@ -295,7 +348,7 @@ function BugReportView({ report }: { report: BugReportDetail }) {
   const t = useT();
   const s = t.bugReports;
   const { locale } = useLocale();
-  const ownPath = ownOriginPath(report.pageUrl);
+  const ownUrl = ownOriginUrl(report.pageUrl);
   const environment = [
     [s.appVersion, report.appVersion],
     [s.viewport, report.viewport],
@@ -343,10 +396,15 @@ function BugReportView({ report }: { report: BugReportDetail }) {
           </dd>
           <dt className="text-slate">{s.page}</dt>
           <dd className="break-all font-mono text-xs">
-            {ownPath ? (
-              <Link to={ownPath} className="text-navy underline">
+            {ownUrl ? (
+              <a
+                href={ownUrl.href}
+                target="_blank"
+                rel="noopener"
+                className="text-navy underline"
+              >
                 {report.pageUrl}
-              </Link>
+              </a>
             ) : (
               report.pageUrl
             )}
@@ -408,23 +466,90 @@ function EnvironmentRow({
   );
 }
 
+interface FieldEdit<T> {
+  value: T;
+  base: T;
+}
+
+function editAfterSave<T>(
+  edit: FieldEdit<T> | null,
+  sent: T,
+  saved: T,
+): FieldEdit<T> | null {
+  return !edit || edit.value === sent || edit.value === saved
+    ? null
+    : { value: edit.value, base: saved };
+}
+
 function TriageForm({ report }: { report: BugReportDetail }) {
   const t = useT();
   const s = t.bugReports;
   const update = useUpdateBugReport(report.id);
-  const [status, setStatus] = useState(report.status);
-  const [note, setNote] = useState(report.adminNote ?? '');
-  const savedNote = report.adminNote ?? '';
-  const statusChanged = status !== report.status;
-  const noteChanged = note.trim() !== savedNote;
+  const serverNote = report.adminNote ?? '';
+  const [statusEdit, setStatusEdit] =
+    useState<FieldEdit<BugReportStatus> | null>(null);
+  const [noteEdit, setNoteEdit] = useState<FieldEdit<string> | null>(null);
+  const status = statusEdit?.value ?? report.status;
+  const note = noteEdit?.value ?? serverNote;
+  const statusChanged =
+    statusEdit !== null && statusEdit.value !== statusEdit.base;
+  const noteChanged =
+    noteEdit !== null && noteEdit.value.trim() !== noteEdit.base;
+  const statusConflict =
+    statusChanged &&
+    report.status !== statusEdit.base &&
+    report.status !== statusEdit.value;
+  const noteConflict =
+    noteChanged &&
+    serverNote !== noteEdit.base &&
+    serverNote !== noteEdit.value.trim();
+  const conflict = statusConflict || noteConflict;
+  const canSave =
+    (statusChanged || noteChanged) && !conflict && !update.isPending;
+
+  const editStatus = (value: BugReportStatus) => {
+    const base = statusEdit?.base ?? report.status;
+    setStatusEdit(value === base ? null : { value, base });
+  };
+
+  const editNote = (value: string) => {
+    const base = noteEdit?.base ?? serverNote;
+    setNoteEdit(value === base ? null : { value, base });
+  };
+
+  const keepMine = () => {
+    if (statusConflict) setStatusEdit({ ...statusEdit, base: report.status });
+    if (noteConflict) setNoteEdit({ ...noteEdit, base: serverNote });
+  };
+
+  const discardMine = () => {
+    if (statusConflict) setStatusEdit(null);
+    if (noteConflict) setNoteEdit(null);
+  };
 
   const save = (e: FormEvent) => {
     e.preventDefault();
-    if (update.isPending || (!statusChanged && !noteChanged)) return;
-    update.mutate({
-      ...(statusChanged && { status }),
-      ...(noteChanged && { adminNote: note.trim() || null }),
-    });
+    if (!canSave) return;
+    const sentStatus = statusChanged ? statusEdit.value : undefined;
+    const sentNote = noteChanged ? noteEdit.value : undefined;
+    update.mutate(
+      {
+        ...(sentStatus !== undefined && { status: sentStatus }),
+        ...(sentNote !== undefined && { adminNote: sentNote.trim() || null }),
+      },
+      {
+        onSuccess: (saved) => {
+          if (sentStatus !== undefined)
+            setStatusEdit((edit) =>
+              editAfterSave(edit, sentStatus, saved.status),
+            );
+          if (sentNote !== undefined)
+            setNoteEdit((edit) =>
+              editAfterSave(edit, sentNote, saved.adminNote ?? ''),
+            );
+        },
+      },
+    );
   };
 
   return (
@@ -437,10 +562,9 @@ function TriageForm({ report }: { report: BugReportDetail }) {
           <Select
             {...a11y}
             value={status}
-            onChange={(e) => {
-              setStatus(parseStatus(e.target.value) ?? report.status);
-              update.reset();
-            }}
+            onChange={(e) =>
+              editStatus(parseStatus(e.target.value) ?? report.status)
+            }
           >
             {STATUSES.map((option) => (
               <option key={option} value={option}>
@@ -458,13 +582,35 @@ function TriageForm({ report }: { report: BugReportDetail }) {
             rows={4}
             maxLength={ADMIN_NOTE_MAX}
             value={note}
-            onChange={(e) => {
-              setNote(e.target.value);
-              update.reset();
-            }}
+            onChange={(e) => editNote(e.target.value)}
           />
         )}
       </Field>
+      {conflict && (
+        <Banner tone="pending">
+          <div className="flex flex-col items-start gap-2">
+            <p>{s.changedElsewhere}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={keepMine}
+              >
+                {s.keepMine}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={discardMine}
+              >
+                {s.discardMine}
+              </Button>
+            </div>
+          </div>
+        </Banner>
+      )}
       {update.isError && (
         <Banner tone="error">
           {s.saveFailed.replace(
@@ -478,11 +624,11 @@ function TriageForm({ report }: { report: BugReportDetail }) {
           type="submit"
           size="sm"
           loading={update.isPending}
-          disabled={!statusChanged && !noteChanged}
+          disabled={!canSave}
         >
           {s.save}
         </Button>
-        {update.isSuccess && (
+        {update.isSuccess && !statusEdit && !noteEdit && (
           <span role="status" className="text-sm text-status-approved">
             {s.saved}
           </span>

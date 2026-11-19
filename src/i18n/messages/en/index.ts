@@ -2401,6 +2401,12 @@ export const en: Messages = {
     save: 'Save',
     saved: 'Saved',
     saveFailed: "Couldn't save: {reason}",
+    changedElsewhere:
+      'Someone else changed this report while you were editing it.',
+    keepMine: 'Keep my changes',
+    discardMine: 'Discard my changes',
+    notFound: "This report doesn't exist, or the link is broken.",
+    backToList: 'Back to bug reports',
   },
   validation: {
     required: 'This field is required.',

@@ -2274,6 +2274,11 @@ export const zhCN: Messages = {
     save: '保存',
     saved: '已保存',
     saveFailed: '保存失败：{reason}',
+    changedElsewhere: '你编辑时，有人修改了这条报告。',
+    keepMine: '保留我的修改',
+    discardMine: '放弃我的修改',
+    notFound: '这条报告不存在，或者链接有误。',
+    backToList: '返回问题报告',
   },
   validation: {
     required: '此字段为必填项。',

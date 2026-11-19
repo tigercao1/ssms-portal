@@ -299,6 +299,14 @@ export const router = createBrowserRouter([
                   </RequireAdmin>
                 ),
               },
+              {
+                path: '/admin/bug-reports/:id',
+                element: (
+                  <RequireAdmin>
+                    <BugReportsPage />
+                  </RequireAdmin>
+                ),
+              },
             ],
           },
         ],
