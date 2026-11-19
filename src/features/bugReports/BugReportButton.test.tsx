@@ -472,8 +472,22 @@ describe('screenshot limit', () => {
     );
     await screen.findByRole('img', { name: 'Screenshot preview' });
     await user.type(describeBox(), 'With a picture');
+    await user.type(expectBox(), 'It works');
+    await user.click(screen.getByRole('radio', { name: 'Small annoyance' }));
     await user.click(sendButton());
     return user;
+  }
+
+  function expectBox() {
+    return screen.getByRole('textbox', { name: 'What did you expect' });
+  }
+
+  function expectTextKept() {
+    expect(describeBox()).toHaveValue('With a picture');
+    expect(expectBox()).toHaveValue('It works');
+    expect(
+      screen.getByRole('radio', { name: 'Small annoyance' }),
+    ).toBeChecked();
   }
 
   it('explains a screenshot limit instead of the report limit and keeps the text', async () => {
@@ -484,7 +498,7 @@ describe('screenshot limit', () => {
       'Too many screenshot uploads, or the upload failed. Send the report without the screenshot, or try again later.',
     );
     expect(alert).not.toHaveTextContent('You have sent several reports');
-    expect(describeBox()).toHaveValue('With a picture');
+    expectTextKept();
     expect(reportsSent(state)).toEqual([]);
   });
 
@@ -498,7 +512,11 @@ describe('screenshot limit', () => {
       'Thanks, we got it',
     );
     const [sent] = reportsSent(state);
-    expect(sent).toMatchObject({ description: 'With a picture' });
+    expect(sent).toMatchObject({
+      description: 'With a picture',
+      expected: 'It works',
+      severity: 'minor',
+    });
     expect(sent).not.toHaveProperty('screenshotKey');
     expect(state.calls.map((call) => call.kind)).toEqual([
       'screenshot-url',
@@ -509,6 +527,10 @@ describe('screenshot limit', () => {
   it('offers to send without the screenshot when the upload itself fails', async () => {
     state.uploadStatus = 403;
     const user = await sendWithScreenshot();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Too many screenshot uploads, or the upload failed. Send the report without the screenshot, or try again later.',
+    );
+    expectTextKept();
     await user.click(
       await screen.findByRole('button', { name: 'Send without screenshot' }),
     );
@@ -522,9 +544,35 @@ describe('screenshot limit', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'You have sent several reports, try again later',
     );
+    expectTextKept();
     expect(
       screen.queryByRole('button', { name: 'Send without screenshot' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('sends once when Send without screenshot is double-clicked', async () => {
+    state.presignStatus = 429;
+    const user = await sendWithScreenshot();
+    server.use(
+      http.post(`${API}/me/bug-reports`, async ({ request }) => {
+        state.calls.push({
+          kind: 'report',
+          body: (await request.json()) as BugReportBody,
+        });
+        await delay(50);
+        return HttpResponse.json(
+          { id: 'bug-1', createdAt: '2026-11-19T15:00:00Z' },
+          { status: 201 },
+        );
+      }),
+    );
+    await user.dblClick(
+      await screen.findByRole('button', { name: 'Send without screenshot' }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Thanks, we got it',
+    );
+    expect(reportsSent(state)).toHaveLength(1);
   });
 });
 
