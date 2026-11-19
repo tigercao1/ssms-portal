@@ -16,7 +16,11 @@ import {
 } from '@/components';
 import { useT } from '@/i18n/core/I18nProvider';
 import { collectEnvironment } from './environment';
-import { submitErrorText, useSubmitBugReport } from './reportApi';
+import {
+  ScreenshotUploadError,
+  submitErrorText,
+  useSubmitBugReport,
+} from './reportApi';
 import {
   prepareScreenshot,
   ScreenshotError,
@@ -126,8 +130,7 @@ export function BugReportDialog({
     refocusFileInput.current = true;
   };
 
-  const send = async (e: FormEvent) => {
-    e.preventDefault();
+  const sendReport = async (withScreenshot: boolean) => {
     setSubmitted(true);
     if (!description.trim()) {
       descriptionRef.current?.focus();
@@ -143,7 +146,7 @@ export function BugReportDialog({
           ...(severity && { severity }),
           ...environment,
         },
-        screenshot: screenshot?.blob ?? null,
+        screenshot: withScreenshot ? (screenshot?.blob ?? null) : null,
       })
       .then(
         () => true,
@@ -151,6 +154,11 @@ export function BugReportDialog({
       );
     sending.current = false;
     if (sent) onSent();
+  };
+
+  const send = (e: FormEvent) => {
+    e.preventDefault();
+    void sendReport(true);
   };
 
   return (
@@ -182,7 +190,21 @@ export function BugReportDialog({
           className="flex flex-col gap-4"
         >
           {submit.isError && (
-            <Banner tone="error">{submitErrorText(submit.error, t)}</Banner>
+            <Banner tone="error">
+              <div className="flex flex-col items-start gap-2">
+                <p>{submitErrorText(submit.error, t)}</p>
+                {submit.error instanceof ScreenshotUploadError && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void sendReport(false)}
+                  >
+                    {s.sendWithoutScreenshot}
+                  </Button>
+                )}
+              </div>
+            </Banner>
           )}
           <Field
             label={s.whatHappened}

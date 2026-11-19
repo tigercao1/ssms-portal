@@ -28,16 +28,16 @@ async function uploadScreenshot(screenshot: Blob): Promise<string> {
     contentType: screenshot.type,
     contentLength: screenshot.size,
   };
-  const { uploadUrl, key } = await api<ScreenshotUploadUrl>(
-    '/me/bug-reports/screenshot-url',
-    { method: 'POST', body },
-  );
   try {
+    const { uploadUrl, key } = await api<ScreenshotUploadUrl>(
+      '/me/bug-reports/screenshot-url',
+      { method: 'POST', body },
+    );
     await putToPresignedUrl(uploadUrl, screenshot, body.contentType);
+    return key;
   } catch {
     throw new ScreenshotUploadError();
   }
-  return key;
 }
 
 export async function submitBugReport({

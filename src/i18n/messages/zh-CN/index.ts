@@ -2222,7 +2222,9 @@ export const zhCN: Messages = {
     rateLimited: '你已发送多条报告，请稍后再试',
     invalid: '报告未被接受，请检查内容后重试。',
     sendFailed: '报告发送失败。你填写的内容仍保留着，请重试。',
-    screenshotUploadFailed: '截图上传失败。请重试，或移除截图后再发送。',
+    screenshotUploadFailed:
+      '截图上传次数过多，或上传失败。请不带截图发送报告，或稍后再试。',
+    sendWithoutScreenshot: '不带截图发送',
     discardTitle: '放弃这份报告？',
     discardBody: '你填写的内容尚未发送，关闭后将丢失。',
     keepEditing: '继续填写',

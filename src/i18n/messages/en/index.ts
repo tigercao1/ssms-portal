@@ -2350,7 +2350,8 @@ export const en: Messages = {
     sendFailed:
       "We couldn't send your report. Your text is still here, so try again.",
     screenshotUploadFailed:
-      "The screenshot couldn't be uploaded. Try again, or remove it and send without it.",
+      'Too many screenshot uploads, or the upload failed. Send the report without the screenshot, or try again later.',
+    sendWithoutScreenshot: 'Send without screenshot',
     discardTitle: 'Discard this report?',
     discardBody: "What you've written hasn't been sent and will be lost.",
     keepEditing: 'Keep editing',

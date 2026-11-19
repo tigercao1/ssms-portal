@@ -2134,6 +2134,7 @@ export interface Messages {
     invalid: string;
     sendFailed: string;
     screenshotUploadFailed: string;
+    sendWithoutScreenshot: string;
     discardTitle: string;
     discardBody: string;
     keepEditing: string;

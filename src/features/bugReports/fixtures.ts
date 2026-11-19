@@ -19,10 +19,17 @@ export interface BugReportsMockState {
   nextId: number;
   reportStatus: number | null;
   uploadStatus: number | null;
+  presignStatus: number | null;
 }
 
 export function createBugReportsState(): BugReportsMockState {
-  return { calls: [], nextId: 1, reportStatus: null, uploadStatus: null };
+  return {
+    calls: [],
+    nextId: 1,
+    reportStatus: null,
+    uploadStatus: null,
+    presignStatus: null,
+  };
 }
 
 export function reportsSent(state: BugReportsMockState): BugReportBody[] {
@@ -36,6 +43,11 @@ export function myBugReportHandlers(state: BugReportsMockState) {
     http.post(`${API}/me/bug-reports/screenshot-url`, async ({ request }) => {
       const body = (await request.json()) as ScreenshotUploadUrlBody;
       state.calls.push({ kind: 'screenshot-url', body });
+      if (state.presignStatus)
+        return HttpResponse.json(
+          { message: 'ThrottlerException: Too Many Requests' },
+          { status: state.presignStatus },
+        );
       const key = `bug-reports/shot-${state.nextId}.jpg`;
       return HttpResponse.json({
         uploadUrl: `${MOCK_SCREENSHOT_ORIGIN}/upload/${key}?sig=mock`,

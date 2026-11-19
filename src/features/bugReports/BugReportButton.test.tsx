@@ -452,13 +452,79 @@ describe('report screenshot', () => {
     await user.type(describeBox(), 'Upload me');
     await user.click(sendButton());
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      "The screenshot couldn't be uploaded.",
+      'Too many screenshot uploads, or the upload failed. Send the report without the screenshot, or try again later.',
     );
     expect(describeBox()).toHaveValue('Upload me');
     expect(
       screen.getByRole('img', { name: 'Screenshot preview' }),
     ).toBeInTheDocument();
     expect(reportsSent(state)).toEqual([]);
+  });
+});
+
+describe('screenshot limit', () => {
+  async function sendWithScreenshot() {
+    mockImagePipeline({ width: 800, height: 600, outputBytes: 50_000 });
+    const { user } = await openDialog();
+    await user.upload(
+      screenshotInput(),
+      new File(['x'], 'a.png', { type: 'image/png' }),
+    );
+    await screen.findByRole('img', { name: 'Screenshot preview' });
+    await user.type(describeBox(), 'With a picture');
+    await user.click(sendButton());
+    return user;
+  }
+
+  it('explains a screenshot limit instead of the report limit and keeps the text', async () => {
+    state.presignStatus = 429;
+    await sendWithScreenshot();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Too many screenshot uploads, or the upload failed. Send the report without the screenshot, or try again later.',
+    );
+    expect(alert).not.toHaveTextContent('You have sent several reports');
+    expect(describeBox()).toHaveValue('With a picture');
+    expect(reportsSent(state)).toEqual([]);
+  });
+
+  it('sends the report without a screenshot key from the screenshot error', async () => {
+    state.presignStatus = 429;
+    const user = await sendWithScreenshot();
+    await user.click(
+      await screen.findByRole('button', { name: 'Send without screenshot' }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Thanks, we got it',
+    );
+    const [sent] = reportsSent(state);
+    expect(sent).toMatchObject({ description: 'With a picture' });
+    expect(sent).not.toHaveProperty('screenshotKey');
+    expect(state.calls.map((call) => call.kind)).toEqual([
+      'screenshot-url',
+      'report',
+    ]);
+  });
+
+  it('offers to send without the screenshot when the upload itself fails', async () => {
+    state.uploadStatus = 403;
+    const user = await sendWithScreenshot();
+    await user.click(
+      await screen.findByRole('button', { name: 'Send without screenshot' }),
+    );
+    await screen.findByRole('status');
+    expect(reportsSent(state)[0]).not.toHaveProperty('screenshotKey');
+  });
+
+  it('keeps the report limit message for a 429 on the report itself', async () => {
+    state.reportStatus = 429;
+    await sendWithScreenshot();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'You have sent several reports, try again later',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Send without screenshot' }),
+    ).not.toBeInTheDocument();
   });
 });
 
