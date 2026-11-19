@@ -108,54 +108,66 @@ export function addMinutes(iso: string, minutes: number): string {
   return new Date(Date.parse(iso) + minutes * MINUTE_MS).toISOString();
 }
 
-export const BLOCK_SIZES = [60, 30, 15] as const;
+export const BLOCK_SIZES = [60, 30, 15, 5] as const;
 export type BlockSize = (typeof BLOCK_SIZES)[number];
+export const START_STEP_MINUTES = 5;
+const BLOCK_KEY = 'ssms.bookingBlock';
 
-function minuteOfDay(iso: string): number {
-  const [h = 0, m = 0] = schoolParts(iso).time.split(':').map(Number);
-  return h * 60 + m;
+export function isBlockSize(value: unknown): value is BlockSize {
+  return BLOCK_SIZES.some((size) => size === value);
 }
 
-export function slotsOnBlock(
-  slots: string[],
-  block: BlockSize,
-  slotMinutes: number,
-): string[] {
-  if (block <= slotMinutes) return slots;
-  return slots.filter((slot) => minuteOfDay(slot) % block === 0);
+export function groupedBlock(block: number): boolean {
+  return block < 30;
 }
 
-export function blockOptions(
-  slots: string[],
-  slotMinutes: number,
-): BlockSize[] {
-  const seen = new Set<string>();
-  const options: BlockSize[] = [];
-  for (const block of BLOCK_SIZES) {
-    const shown = slotsOnBlock(slots, block, slotMinutes);
-    const key = shown.join();
-    if (shown.length === 0 || seen.has(key)) continue;
-    seen.add(key);
-    options.push(block);
+export function readBlockSize(): BlockSize | null {
+  try {
+    const stored = Number(window.localStorage.getItem(BLOCK_KEY));
+    return isBlockSize(stored) ? stored : null;
+  } catch {
+    return null;
   }
-  return options;
 }
 
-export function resolveBlock(
-  chosen: BlockSize,
-  slots: string[],
-  slotMinutes: number,
-): BlockSize {
-  const options = blockOptions(slots, slotMinutes);
-  if (options.includes(chosen)) return chosen;
-  const key = slotsOnBlock(slots, chosen, slotMinutes).join();
-  return (
-    options.find(
-      (block) => slotsOnBlock(slots, block, slotMinutes).join() === key,
-    ) ??
-    options.at(-1) ??
-    chosen
-  );
+export function saveBlockSize(block: BlockSize) {
+  try {
+    window.localStorage.setItem(BLOCK_KEY, String(block));
+  } catch {
+    return;
+  }
+}
+
+export function onStartGrid(time: string): boolean {
+  if (!isTimeOfDay(time)) return false;
+  return Number(time.slice(3)) % START_STEP_MINUTES === 0;
+}
+
+export function largestFittingBlock(time: string): BlockSize {
+  const minute = Number(time.slice(3));
+  return BLOCK_SIZES.find((size) => minute % size === 0) ?? START_STEP_MINUTES;
+}
+
+export function byHour(slots: string[]): { hour: string; slots: string[] }[] {
+  const groups: { hour: string; slots: string[] }[] = [];
+  for (const slot of slots) {
+    const hour = schoolParts(slot).time.slice(0, 2);
+    const current = groups[groups.length - 1];
+    if (current?.hour === hour) current.slots.push(slot);
+    else groups.push({ hour, slots: [slot] });
+  }
+  return groups;
+}
+
+export function formatSchoolHour(iso: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale === 'zh-CN' ? 'zh-CN' : 'en-US', {
+    timeZone: SCHOOL_TIME_ZONE,
+    hour: 'numeric',
+  }).format(new Date(iso));
+}
+
+export function isPastStart(startsAt: string, now: number): boolean {
+  return startsAt !== '' && Date.parse(startsAt) < now;
 }
 
 export function isTimeOfDay(value: string): boolean {
@@ -223,8 +235,11 @@ export function fromDraft(draft: SettingsDraft): BookingSettingsInput | null {
   };
 }
 
+export const START_NOT_ALIGNED = 'START_NOT_ALIGNED';
+
 export type BookingProblem =
   | { kind: 'conflict'; conflicts: BookingConflict[] }
+  | { kind: 'misaligned' }
   | { kind: 'google'; status: number | null; reason: string | null }
   | { kind: 'message'; message: string }
   | { kind: 'unknown' };
@@ -235,7 +250,11 @@ export function bookingProblem(err: unknown): BookingProblem {
     conflicts?: BookingConflict[];
     googleStatus?: number | null;
     googleReason?: string | null;
+    code?: string;
   };
+  if (err.status === 400 && body.code === START_NOT_ALIGNED) {
+    return { kind: 'misaligned' };
+  }
   if (err.status === 409 && Array.isArray(body.conflicts)) {
     return { kind: 'conflict', conflicts: body.conflicts };
   }

@@ -38,6 +38,7 @@ export interface DraftCard {
   locationId: string;
   status?: BookableStatus;
   addToCalendar?: boolean;
+  sendEmails?: boolean;
   error?: DraftError;
 }
 
@@ -150,6 +151,7 @@ function isCard(value: unknown): value is DraftCard {
     isString(r.locationId) &&
     isStatus(r.status) &&
     isOptionalBoolean(r.addToCalendar) &&
+    isOptionalBoolean(r.sendEmails) &&
     isError(r.error)
   );
 }
@@ -292,6 +294,7 @@ export function toBatchRow(card: DraftCard): BatchBookingRow {
     ...(card.addToCalendar !== undefined && {
       addToCalendar: card.addToCalendar,
     }),
+    ...(card.sendEmails === false && { sendEmails: false }),
   };
 }
 

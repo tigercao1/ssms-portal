@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import { useSession } from '@/auth/SessionProvider';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
+import type { Messages } from '@/i18n/core/types';
 import { api } from '@/lib/api';
 import { Banner, Button, Field, Input } from '@/components';
 import { cn } from '@/lib/cn';
@@ -23,6 +24,7 @@ import {
   formatSchoolDateTime,
   formatSchoolTime,
 } from './bookingRules';
+import type { BookingWarning } from './types';
 
 export type PickedCustomer = Pick<
   Customer,
@@ -422,6 +424,9 @@ export function BookingErrorBanner({ error }: { error: unknown }) {
       </Banner>
     );
   }
+  if (problem.kind === 'misaligned') {
+    return <Banner tone="error">{t.booking.errStartNotAligned}</Banner>;
+  }
   if (problem.kind === 'google') {
     const code = [problem.status, problem.reason].filter(Boolean).join(' ');
     return (
@@ -433,6 +438,80 @@ export function BookingErrorBanner({ error }: { error: unknown }) {
   return (
     <Banner tone="error">
       {problem.kind === 'message' ? problem.message : t.errors.generic}
+    </Banner>
+  );
+}
+
+export function SendEmailsField({
+  label,
+  checked,
+  past,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  past: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const t = useT();
+  if (past)
+    return <p className="text-sm text-slate">{t.booking.pastNoEmails}</p>;
+  return (
+    <label className="flex min-h-11 items-center gap-2 text-sm text-ink">
+      <input
+        type="checkbox"
+        role="switch"
+        className="h-5 w-5"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {label}
+    </label>
+  );
+}
+
+export function warningLines(
+  t: Messages,
+  warnings: BookingWarning[] | undefined,
+  names: {
+    customer: (id: string) => string | null;
+    instructor: (id: string) => string | null;
+  },
+): string[] {
+  const lines = (warnings ?? []).map((w) => {
+    if (w.code === 'customer_email_missing')
+      return t.booking.warningNoEmail.replace(
+        '{name}',
+        (w.customerId && names.customer(w.customerId)) || t.booking.theCustomer,
+      );
+    if (w.code === 'instructor_email_missing')
+      return t.booking.warningNoEmail.replace(
+        '{name}',
+        (w.instructorId && names.instructor(w.instructorId)) ||
+          t.booking.theInstructor,
+      );
+    return w.message;
+  });
+  return [...new Set(lines)];
+}
+
+export function WarningsBanner({
+  title,
+  lines,
+}: {
+  title: string;
+  lines: string[];
+}) {
+  if (lines.length === 0) return null;
+  return (
+    <Banner tone="pending" title={title}>
+      <ul data-private className="list-disc pl-5">
+        {lines.map((line) => (
+          <li key={line} className="break-words">
+            {line}
+          </li>
+        ))}
+      </ul>
     </Banner>
   );
 }

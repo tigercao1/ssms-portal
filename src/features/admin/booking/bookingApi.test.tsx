@@ -30,9 +30,33 @@ describe('booking mutations', () => {
     const { qc, wrapper } = setup();
     const { result } = renderHook(() => useCancelBooking(), { wrapper });
 
-    await act(() => result.current.mutateAsync('c1'));
+    await act(() => result.current.mutateAsync({ id: 'c1', sendEmails: true }));
 
     expect(qc.getQueryState(periodKey)?.isInvalidated).toBe(true);
+  });
+
+  it('sends sendEmails false on cancel only when emails are turned off', async () => {
+    const bodies: string[] = [];
+    server.use(
+      http.post(
+        `${API}/admin/booking/classes/:id/cancel`,
+        async ({ request }) => {
+          bodies.push(await request.text());
+          return HttpResponse.json(
+            fakeClass({ id: 'c1', status: 'cancelled' }),
+          );
+        },
+      ),
+    );
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useCancelBooking(), { wrapper });
+
+    await act(() => result.current.mutateAsync({ id: 'c1', sendEmails: true }));
+    await act(() =>
+      result.current.mutateAsync({ id: 'c1', sendEmails: false }),
+    );
+
+    expect(bodies).toEqual(['', JSON.stringify({ sendEmails: false })]);
   });
 
   it('marks cached payroll stale after a lesson is moved', async () => {

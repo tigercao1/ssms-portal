@@ -103,10 +103,12 @@ interface Recorded {
 
 function serve({
   avail = availability(),
+  availFor,
   last = null,
   bookResponse,
 }: {
   avail?: Availability;
+  availFor?: (slotMinutes: number | null) => Availability;
   last?: LastClass | null;
   bookResponse?: () => Response;
 } = {}): Recorded {
@@ -151,8 +153,12 @@ function serve({
       });
     }),
     http.get(`${API}/admin/booking/availability`, ({ request }) => {
-      recorded.availabilityQueries.push(new URL(request.url).searchParams);
-      return HttpResponse.json(avail);
+      const params = new URL(request.url).searchParams;
+      recorded.availabilityQueries.push(params);
+      const step = params.get('slotMinutes');
+      return HttpResponse.json(
+        availFor ? availFor(step ? Number(step) : null) : avail,
+      );
     }),
     http.get(`${API}/admin/booking/customers/:id/last`, () =>
       HttpResponse.json({ last }),
@@ -247,12 +253,21 @@ describe('BookLessonPage', () => {
     expect(instructorRows()).toEqual(['Jane Snow2 times']);
     expect(screen.queryByText(/Eddie Lee/)).not.toBeInTheDocument();
     expect(screen.queryByText(/read-only/)).not.toBeInTheDocument();
+    const blocks = screen.getByRole('group', { name: 'Start time interval' });
     expect(
-      screen.queryByRole('group', { name: 'Start time interval' }),
-    ).not.toBeInTheDocument();
+      within(blocks)
+        .getAllByRole('button')
+        .map((b) => [b.textContent, b.getAttribute('aria-pressed')]),
+    ).toEqual([
+      ['60 min', 'true'],
+      ['30 min', 'false'],
+      ['15 min', 'false'],
+      ['5 min', 'false'],
+    ]);
     const query = recorded.availabilityQueries.at(-1);
     expect(query?.get('date')).toBe('2026-12-12');
     expect(query?.get('lessonTypeId')).toBe('lt1');
+    expect(query?.has('slotMinutes')).toBe(false);
 
     await chooseSlot(user, 'Jane Snow', '10:00');
     expect(
@@ -573,127 +588,316 @@ describe('BookLessonPage', () => {
     expect(document.body).not.toHaveFocus();
   });
 
-  it('focuses the times section when the instructor has no start at the block', async () => {
+  it('says so when the chosen instructor has no start at a bigger block', async () => {
     const base = availability();
+    const mia = {
+      ...base.instructors[0]!,
+      instructorId: 'inst-3',
+      displayNameEn: 'Mia Park',
+      displayNameZh: null,
+    };
     serve({
-      avail: availability({
-        slotMinutes: 30,
-        instructors: [
-          { ...base.instructors[0]!, freeSlots: [at(9, 0), at(10, 0)] },
-          {
-            ...base.instructors[0]!,
-            instructorId: 'inst-3',
-            displayNameEn: 'Mia Park',
-            displayNameZh: null,
-            freeSlots: [at(9, 30)],
-          },
-        ],
-      }),
+      availFor: (step) =>
+        availability({
+          slotMinutes: step ?? 30,
+          instructors: [
+            { ...base.instructors[0]!, freeSlots: [at(9, 0), at(10, 0)] },
+            { ...mia, freeSlots: step === 60 ? [] : [at(9, 30)] },
+          ],
+        }),
     });
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
     await chooseLesson(user);
-    const blocks = await screen.findByRole('group', {
-      name: 'Start time interval',
-    });
-    await user.click(
-      within(blocks).getByRole('button', { name: 'Every 60 min' }),
-    );
-    await user.click(screen.getByRole('button', { name: /^Mia Park/ }));
+    await user.click(await screen.findByRole('button', { name: /^Mia Park/ }));
     expect(
-      screen.getByRole('region', { name: 'Start times for Mia Park' }),
+      screen.getByRole('button', { name: 'Book Mia Park at 09:30' }),
     ).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: '60 min' }));
+    expect(
+      await screen.findByText(
+        'No start times at this interval. Choose a shorter one.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Mia Park')).toBeInTheDocument();
   });
 
-  it('filters start times by a 60, 30 or 15 minute block', async () => {
-    const free = [
-      at(9, 0),
-      at(9, 15),
-      at(9, 30),
-      at(11, 45),
-      at(13, 0),
-      at(13, 15),
-      at(17, 30),
-    ];
+  it('asks the server for the chosen block and groups 15 and 5 minute starts by hour', async () => {
+    const steps: Record<number, string[]> = {
+      60: [at(9, 0), at(10, 0), at(13, 0)],
+      30: [at(9, 0), at(9, 30), at(10, 0), at(13, 0)],
+      15: [at(9, 0), at(9, 15), at(9, 30), at(9, 45), at(10, 0), at(13, 0)],
+      5: [at(9, 0), at(9, 5), at(9, 10), at(9, 55), at(10, 0), at(10, 5)],
+    };
     const base = availability();
-    serve({
-      avail: availability({
-        slotMinutes: 15,
-        instructors: [{ ...base.instructors[0]!, busy: [], freeSlots: free }],
-      }),
+    const recorded = serve({
+      availFor: (step) =>
+        availability({
+          slotMinutes: step ?? 30,
+          instructors: [
+            {
+              ...base.instructors[0]!,
+              busy: [],
+              freeSlots: steps[step ?? 30] ?? [],
+            },
+          ],
+        }),
     });
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
     await chooseLesson(user);
-    expect(
-      await screen.findByRole('button', { name: /^Jane Snow/ }),
-    ).toHaveTextContent('4 times');
-    await user.click(screen.getByRole('button', { name: /^Jane Snow/ }));
-    const blocks = screen.getByRole('group', { name: 'Start time interval' });
-    const shown = () =>
-      within(screen.getByRole('region', { name: 'Start times for Jane Snow' }))
-        .getAllByRole('button')
+    await user.click(await screen.findByRole('button', { name: /^Jane Snow/ }));
+    const times = () =>
+      screen.getByRole('region', { name: 'Start times for Jane Snow' });
+    const chips = () =>
+      within(times())
+        .queryAllByRole('button', { name: /^Book Jane Snow at / })
         .map((b) => b.textContent);
+    const hours = () =>
+      within(times())
+        .queryAllByRole('button')
+        .filter((b) => b.hasAttribute('aria-expanded'))
+        .map((b) => b.textContent?.replace(/[+−]$/, ''));
+    expect(screen.getByRole('button', { name: '30 min' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(chips()).toEqual(['09:00', '09:30', '10:00', '13:00']);
+    expect(hours()).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: '60 min' }));
+    await waitFor(() => expect(chips()).toEqual(['09:00', '10:00', '13:00']));
+    expect(recorded.availabilityQueries.at(-1)?.get('slotMinutes')).toBe('60');
+    expect(localStorage.getItem('ssms.bookingBlock')).toBe('60');
+
+    await user.click(screen.getByRole('button', { name: '5 min' }));
+    await waitFor(() =>
+      expect(hours()).toEqual(['9 AM · 4 open', '10 AM · 2 open']),
+    );
+    expect(recorded.availabilityQueries.at(-1)?.get('slotMinutes')).toBe('5');
+    expect(localStorage.getItem('ssms.bookingBlock')).toBe('5');
+    expect(chips()).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: /^9 AM · 4 open/ }));
     expect(
-      within(blocks).getByRole('button', { name: 'Every 30 min' }),
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(shown()).toEqual(['09:00', '09:30', '13:00', '17:30']);
-
+      screen.getByRole('button', { name: /^9 AM · 4 open/ }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(chips()).toEqual(['09:00', '09:05', '09:10', '09:55']);
     await user.click(
-      within(blocks).getByRole('button', { name: 'Every 60 min' }),
-    );
-    expect(shown()).toEqual(['09:00', '13:00']);
-
-    await user.click(
-      within(blocks).getByRole('button', { name: 'Every 15 min' }),
-    );
-    expect(shown()).toEqual([
-      '09:00',
-      '09:15',
-      '09:30',
-      '11:45',
-      '13:00',
-      '13:15',
-      '17:30',
-    ]);
-    expect(screen.getByText('Morning')).toBeInTheDocument();
-    expect(screen.getByText('Afternoon')).toBeInTheDocument();
-    expect(screen.getByText('Evening')).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole('button', { name: 'Book Jane Snow at 09:15' }),
+      screen.getByRole('button', { name: 'Book Jane Snow at 09:05' }),
     );
     expect(startChosen()).toBe(true);
-    await user.click(
-      within(blocks).getByRole('button', { name: 'Every 30 min' }),
+
+    await user.click(screen.getByRole('button', { name: '15 min' }));
+    await waitFor(() =>
+      expect(hours()).toEqual([
+        '9 AM · 4 open',
+        '10 AM · 1 open',
+        '1 PM · 1 open',
+      ]),
     );
-    expect(startChosen()).toBe(false);
+    expect(chips()).toEqual(['09:00', '09:15', '09:30', '09:45']);
+    expect(startChosen()).toBe(true);
   });
 
-  it('offers only block sizes that change what the slot size shows', async () => {
-    const base = availability();
+  it('uses the block size remembered on this device', async () => {
+    localStorage.setItem('ssms.bookingBlock', '15');
+    const recorded = serve({
+      availFor: (step) => availability({ slotMinutes: step ?? 60 }),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await chooseLesson(user);
+    await screen.findByRole('list', { name: 'Free instructors' });
+    expect(recorded.availabilityQueries[0]?.get('slotMinutes')).toBe('15');
+    expect(screen.getByRole('button', { name: '15 min' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('accepts a typed start on the 5-minute grid and refuses one off it', async () => {
+    const recorded = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
+    });
+    await chooseLesson(user);
+    await user.click(await screen.findByRole('button', { name: /^Jane Snow/ }));
+    const typed = screen.getByLabelText('Or type a time');
+    fireEvent.change(typed, { target: { value: '10:07' } });
+    expect(
+      screen.getByText('Use a time on a 5-minute mark, like 10:05.'),
+    ).toBeInTheDocument();
+    expect(typed).toHaveAttribute('aria-invalid', 'true');
+    expect(startChosen()).toBe(false);
+
+    fireEvent.change(typed, { target: { value: '10:05' } });
+    expect(
+      screen.queryByText('Use a time on a 5-minute mark, like 10:05.'),
+    ).not.toBeInTheDocument();
+    expect(startChosen()).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings[0]?.startsAt).toBe('2026-12-12T15:05:00.000Z');
+  });
+
+  it("shows the server's misaligned start message", async () => {
     serve({
+      bookResponse: () =>
+        HttpResponse.json(
+          {
+            statusCode: 400,
+            message: 'Lessons must start on a 5-minute boundary',
+            code: 'START_NOT_ALIGNED',
+          },
+          { status: 400 },
+        ),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
+    });
+    await chooseLesson(user);
+    await chooseSlot(user, 'Jane Snow', '10:00');
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Lessons must start on a 5-minute mark, like 10:05.',
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Find a customer')).toHaveFocus(),
+    );
+  });
+
+  it('lists an instructor with no calendar as bookable by email invite only', async () => {
+    const base = availability();
+    const recorded = serve({
       avail: availability({
-        slotMinutes: 30,
         instructors: [
+          ...base.instructors,
           {
             ...base.instructors[0]!,
-            freeSlots: [at(9, 0), at(9, 30), at(10, 0)],
+            instructorId: 'inst-4',
+            displayNameEn: 'Noah Kim',
+            displayNameZh: null,
+            googleCalendarId: null,
           },
         ],
       }),
     });
     const user = userEvent.setup();
     renderWithProviders(<BookLessonPage />);
-    await chooseLesson(user);
-    const blocks = await screen.findByRole('group', {
-      name: 'Start time interval',
+    await pickLily(user);
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
     });
+    await chooseLesson(user);
+    await screen.findByRole('list', { name: 'Free instructors' });
+    expect(instructorRows()).toEqual([
+      'Jane Snow2 times',
+      'Noah KimNo calendar connected: invite by email only2 times',
+    ]);
+    await chooseSlot(user, 'Noah Kim', '10:00');
     expect(
-      within(blocks)
-        .getAllByRole('button')
-        .map((b) => b.textContent),
-    ).toEqual(['Every 60 min', 'Every 30 min']);
+      screen.getByText('No calendar connected: invite by email only'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings[0]?.instructorId).toBe('inst-4');
+  });
+
+  it('sends emails by default and lets the admin turn them off', async () => {
+    const recorded = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
+    });
+    await chooseLesson(user);
+    await chooseSlot(user, 'Jane Snow', '10:00');
+    const toggle = screen.getByRole('switch', {
+      name: 'Send confirmation emails',
+    });
+    expect(toggle).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings[0]).not.toHaveProperty('sendEmails');
+
+    await chooseSlot(user, 'Jane Snow', '11:00');
+    await user.click(
+      screen.getByRole('switch', { name: 'Send confirmation emails' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+    await waitFor(() => expect(recorded.bookings).toHaveLength(2));
+    expect(recorded.bookings[1]).toMatchObject({ sendEmails: false });
+  });
+
+  it('shows the past-time label instead of the email toggle for a past lesson', async () => {
+    serve();
+    serveInstructors();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    expect(
+      screen.getByRole('switch', { name: 'Send confirmation emails' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add a past lesson' }));
+    expect(
+      screen.queryByRole('switch', { name: 'Send confirmation emails' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Past time: no emails will be sent'),
+    ).toBeInTheDocument();
+  });
+
+  it('names who got no email after a booking', async () => {
+    serve({
+      bookResponse: () =>
+        HttpResponse.json(
+          [
+            {
+              ...fakeClass({ id: 'new' }),
+              calendarSync: 'ok',
+              calendarSyncError: null,
+              warnings: [
+                {
+                  code: 'customer_email_missing',
+                  message: 'The customer has no email address',
+                  customerId: 'cu1',
+                },
+                {
+                  code: 'instructor_email_missing',
+                  message: 'The instructor has no email address',
+                  instructorId: 'inst-1',
+                },
+              ],
+            },
+          ],
+          { status: 201 },
+        ),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await pickLily(user);
+    fireEvent.change(screen.getByLabelText('Date'), {
+      target: { value: '2026-12-12' },
+    });
+    await chooseLesson(user);
+    await chooseSlot(user, 'Jane Snow', '10:00');
+    await user.click(screen.getByRole('button', { name: 'Book lesson' }));
+    const banner = (
+      await screen.findByText('Booked. Some emails were not sent')
+    ).closest('[role="status"]');
+    expect(banner).toHaveTextContent(
+      'No email sent to Lily Chen: no email address on file',
+    );
+    expect(banner).toHaveTextContent(
+      'No email sent to Jane Snow: no email address on file',
+    );
   });
 
   it('creates a new customer from the dialog and adds them', async () => {
@@ -769,13 +973,18 @@ describe('BookLessonPage', () => {
 
   it('selects the last instructor and shows an off-block last time at a smaller block', async () => {
     const base = availability();
-    serve({
-      avail: availability({
-        slotMinutes: 15,
-        instructors: [
-          { ...base.instructors[0]!, freeSlots: [at(9, 0), at(10, 15)] },
-        ],
-      }),
+    const recorded = serve({
+      availFor: (step) =>
+        availability({
+          slotMinutes: step ?? 30,
+          instructors: [
+            {
+              ...base.instructors[0]!,
+              freeSlots:
+                step === 15 ? [at(9, 0), at(10, 15)] : [at(9, 0), at(10, 0)],
+            },
+          ],
+        }),
       last: {
         classId: 'old',
         startsAt: '2026-12-05T15:15:00.000Z',
@@ -800,8 +1009,10 @@ describe('BookLessonPage', () => {
     expect(
       within(
         screen.getByRole('group', { name: 'Start time interval' }),
-      ).getByRole('button', { name: 'Every 15 min' }),
+      ).getByRole('button', { name: '15 min' }),
     ).toHaveAttribute('aria-pressed', 'true');
+    expect(recorded.availabilityQueries.at(-1)?.get('slotMinutes')).toBe('15');
+    expect(localStorage.getItem('ssms.bookingBlock')).toBeNull();
   });
 
   it('selects the last instructor without a time when that time is taken', async () => {
@@ -1156,6 +1367,7 @@ function createdAll(body: BatchBookingInput): BatchBookingResult {
           calendarSyncError: null,
         },
       ],
+      warnings: [],
     })),
   };
 }
@@ -1527,8 +1739,15 @@ describe('BookLessonPage booking cards', () => {
 
     expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
     expect(
-      screen.getByText(/2 booking\(s\) could not be booked/),
+      screen.getByText(
+        '2 booking(s) could not be booked. They are shown above with the reason.',
+      ),
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByText(/could not be booked/)
+        .compareDocumentPosition(region(1)) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
     expect(
       within(screen.getByRole('list', { name: 'Booked' })).getAllByRole(
         'listitem',
@@ -1736,6 +1955,9 @@ describe('BookLessonPage booking cards', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'bookings must be an array',
     );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Find a customer')).toHaveFocus(),
+    );
     expect(
       screen.getByRole('button', { name: 'Remove booking 1' }),
     ).toBeEnabled();
@@ -1872,5 +2094,128 @@ describe('BookLessonPage booking cards', () => {
     );
     expect(cardRegions()).toHaveLength(1);
     expect(localStorage.getItem(DRAFTS_KEY)).toBeNull();
+  });
+});
+
+describe('BookLessonPage card emails and copy', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-10T17:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    hideSyncToast();
+  });
+
+  it('keeps a saved availability card whose time has passed bookable with the past label', async () => {
+    seedCards([
+      card({ startsAt: '2026-12-09T15:00:00.000Z', date: '2026-12-09' }),
+    ]);
+    const recorded = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    const booking = region(1);
+    expect(within(booking).getByText('Ready')).toBeInTheDocument();
+    expect(
+      within(booking).getByText('Past time: no emails will be sent'),
+    ).toBeInTheDocument();
+    expect(
+      within(booking).queryByRole('switch', {
+        name: 'Send confirmation emails',
+      }),
+    ).not.toBeInTheDocument();
+    const book = screen.getByRole('button', { name: 'Book lesson' });
+    expect(book).toBeEnabled();
+    await user.click(book);
+    expect(await screen.findByText('Booked 1 lesson(s)')).toBeInTheDocument();
+    expect(recorded.bookings[0]?.startsAt).toBe('2026-12-09T15:00:00.000Z');
+  });
+
+  it('sends each card’s email choice in Book all and names who got no email', async () => {
+    seedCards([
+      card({ sendEmails: false }),
+      card({ id: 'd2', startsAt: '2026-12-12T16:00:00.000Z' }),
+    ]);
+    serve();
+    const sent = serveBatch((body) =>
+      HttpResponse.json({
+        ...createdAll(body),
+        results: createdAll(body).results.map((r) => ({
+          ...r,
+          warnings:
+            r.index === 1
+              ? [
+                  {
+                    code: 'customer_email_missing',
+                    message: 'The customer has no email address',
+                    customerId: 'cu1',
+                  },
+                ]
+              : [],
+        })),
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    await user.click(screen.getByRole('button', { name: 'Book all (2)' }));
+    expect(await screen.findByText('Booked 2 lesson(s)')).toBeInTheDocument();
+    expect(sent[0]?.bookings[0]).toMatchObject({ sendEmails: false });
+    expect(sent[0]?.bookings[1]).not.toHaveProperty('sendEmails');
+    expect(
+      screen
+        .getByText('Booked. Some emails were not sent')
+        .closest('[role="status"]'),
+    ).toHaveTextContent('No email sent to Lily Chen: no email address on file');
+  });
+
+  it('saves a 5-minute slot size in Booking settings', async () => {
+    const recorded = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<BookLessonPage />);
+    const slot = await screen.findByLabelText('Slot size');
+    expect(
+      within(slot)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['5 minutes', '15 minutes', '30 minutes', '60 minutes']);
+    await user.selectOptions(slot, '5');
+    await user.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(recorded.settingsPuts).toHaveLength(1));
+    expect(recorded.settingsPuts[0]).toMatchObject({ slotMinutes: 5 });
+  });
+
+  it('joins missing items with the Chinese list separator', () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    seedCards([
+      card({ customers: [], instructorId: '', startsAt: '' }),
+      card({ id: 'd2' }),
+    ]);
+    serve();
+    renderWithProviders(<BookLessonPage />);
+    expect(
+      screen.getByText('预约 1：客户、教练、开始时间'),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['INSTRUCTOR_NOT_FOUND', '该教练已不存在。'],
+    ['INSTRUCTOR_NOT_BOOKABLE', '只有在职且已批准的教练才能接新课程。'],
+    ['LESSON_TYPE_NOT_FOUND', '该课程类型已不存在。'],
+    ['LOCATION_NOT_FOUND', '该地点已不存在。'],
+    ['REFERENCE_NOT_FOUND', '此预约中的某项内容已不存在，请检查后重试。'],
+    ['BOOKING_FAILED', '此预约无法保存。'],
+    ['INTERNAL_ERROR', '服务器出错，预约未能保存，请重试。'],
+    ['START_NOT_ALIGNED', '课程必须在 5 分钟整点开始，例如 10:05。'],
+  ])('shows the %s row error in Chinese', (code, text) => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    seedCards([
+      card({ error: { code, message: 'English server text' } }),
+      card({ id: 'd2' }),
+    ]);
+    serve();
+    renderWithProviders(<BookLessonPage />);
+    const first = screen.getByRole('region', { name: '预约 1' });
+    expect(first).toHaveTextContent(text);
+    expect(first).not.toHaveTextContent('English server text');
   });
 });

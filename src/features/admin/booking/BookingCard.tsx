@@ -21,14 +21,20 @@ import { errorText } from '../LessonTypesPage';
 import { useLessonTypes } from '../lessonsApi';
 import { SlotPicker } from './SlotPicker';
 import { fetchLastClass, useAvailability } from './bookingApi';
-import { CustomerPicker, pickedName } from './BookingParts';
+import { CustomerPicker, SendEmailsField, pickedName } from './BookingParts';
 import {
   addMinutes,
   formatSchoolDateTime,
   formatSchoolTime,
+  isPastStart,
+  largestFittingBlock,
   nextWeekday,
+  onStartGrid,
+  readBlockSize,
+  saveBlockSize,
   schoolInstant,
   schoolParts,
+  type BlockSize,
 } from './bookingRules';
 import type { CardGap, CardMode, DraftCard, DraftError } from './bookingDrafts';
 import type { BookableStatus } from './types';
@@ -45,6 +51,14 @@ const ERROR_KEYS = {
   GOOGLE_NOT_CONNECTED: 'errGoogleNotConnected',
   GOOGLE_NOT_CONFIGURED: 'errGoogleNotConfigured',
   GOOGLE_WRITE_FAILED: 'errGoogleWriteFailed',
+  INSTRUCTOR_NOT_FOUND: 'errInstructorNotFound',
+  INSTRUCTOR_NOT_BOOKABLE: 'errInstructorNotBookable',
+  LESSON_TYPE_NOT_FOUND: 'errLessonTypeNotFound',
+  LOCATION_NOT_FOUND: 'errLocationNotFound',
+  REFERENCE_NOT_FOUND: 'errReferenceNotFound',
+  BOOKING_FAILED: 'errBookingFailed',
+  INTERNAL_ERROR: 'errInternalError',
+  START_NOT_ALIGNED: 'errStartNotAligned',
 } as const satisfies Record<string, keyof Messages['booking']>;
 
 const GAP_KEYS = {
@@ -62,7 +76,7 @@ export function cardErrorText(t: Messages, error: DraftError): string {
 }
 
 export function gapsText(t: Messages, gaps: CardGap[]): string {
-  return gaps.map((g) => t.booking[GAP_KEYS[g]]).join(', ');
+  return gaps.map((g) => t.booking[GAP_KEYS[g]]).join(t.booking.listSeparator);
 }
 
 function summaryParts(card: DraftCard, t: Messages, locale: Locale) {
@@ -214,6 +228,9 @@ export function CardSummary({
           <p className="break-words text-slate">
             {t.booking.cardMissing.replace('{items}', gapsText(t, gaps))}
           </p>
+        )}
+        {isPastStart(card.startsAt, Date.now()) && (
+          <p className="break-words text-slate">{t.booking.pastNoEmails}</p>
         )}
         {card.error && (
           <p className="break-words text-status-rejected">
@@ -428,6 +445,14 @@ export function CardEditor({
               />
             )}
           </Field>
+          <SendEmailsField
+            label={t.booking.sendEmails}
+            checked={card.sendEmails !== false}
+            past={
+              card.mode === 'past' || isPastStart(card.startsAt, Date.now())
+            }
+            onChange={(next) => onChange({ sendEmails: next })}
+          />
           {gaps.length > 0 && (
             <p className="text-sm text-slate">
               {t.booking.cardMissing.replace('{items}', gapsText(t, gaps))}
@@ -579,19 +604,44 @@ function GridFields({
   onChange: (patch: Patch) => void;
 }) {
   const t = useT();
+  const [chosenBlock, setChosenBlock] = useState<BlockSize | null>(
+    readBlockSize,
+  );
+  const [autoBlock, setAutoBlock] = useState<BlockSize | null>(null);
+  const requested = autoBlock ?? chosenBlock;
   const availability = useAvailability(
     hasLessonType && card.date
-      ? { date: card.date, lessonTypeId: card.lessonTypeId }
+      ? {
+          date: card.date,
+          lessonTypeId: card.lessonTypeId,
+          ...(requested && { slotMinutes: requested }),
+        }
       : null,
   );
+  const block = requested ?? availability.data?.slotMinutes ?? 30;
+
+  function chooseBlock(size: BlockSize) {
+    setAutoBlock(null);
+    setChosenBlock(size);
+    saveBlockSize(size);
+  }
+
   useEffect(() => {
-    if (!preferred || !availability.data) return;
+    if (!preferred || !availability.data || availability.isPlaceholderData)
+      return;
     const row = availability.data.instructors.find(
       (i) => i.instructorId === preferred.instructorId,
     );
     const match = row?.freeSlots.find(
       (s) => schoolParts(s).time === preferred.time,
     );
+    if (row && !match && onStartGrid(preferred.time)) {
+      const fit = largestFittingBlock(preferred.time);
+      if (fit < availability.data.slotMinutes) {
+        setAutoBlock(fit);
+        return;
+      }
+    }
     onPreferredDone();
     if (!row || row.freeSlots.length === 0) return;
     onChange({
@@ -600,7 +650,13 @@ function GridFields({
       instructorNameZh: row.displayNameZh,
       startsAt: match ?? '',
     });
-  }, [preferred, availability.data, onChange, onPreferredDone]);
+  }, [
+    preferred,
+    availability.data,
+    availability.isPlaceholderData,
+    onChange,
+    onPreferredDone,
+  ]);
 
   function namesOf(id: string) {
     const row = availability.data?.instructors.find(
@@ -638,6 +694,9 @@ function GridFields({
       ) : availability.data ? (
         <SlotPicker
           availability={availability.data}
+          date={card.date}
+          block={block}
+          onBlock={chooseBlock}
           instructorId={card.instructorId || null}
           onInstructor={(id) => {
             onChange({

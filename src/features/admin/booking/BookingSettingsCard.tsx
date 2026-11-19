@@ -117,7 +117,7 @@ function SettingsForm({ settings }: { settings: BookingSettings }) {
                   update({ slotMinutes: Number(e.target.value) })
                 }
               >
-                {[15, 30, 60].map((n) => (
+                {[5, 15, 30, 60].map((n) => (
                   <option key={n} value={n}>
                     {t.booking.minutesOption.replace('{n}', String(n))}
                   </option>
