@@ -35,6 +35,11 @@ import {
   schoolInstant,
   schoolParts,
 } from './bookingRules';
+import {
+  hideBookingWarnings,
+  showBookingWarnings,
+  useBookingWarnings,
+} from './bookingWarnings';
 import type {
   BookableStatus,
   BookingWarning,
@@ -68,23 +73,28 @@ function useWarningText(
     });
 }
 
-function WarningsResult({
-  title,
-  lines,
-  onClose,
-}: {
-  title: string;
-  lines: string[];
-  onClose: () => void;
-}) {
+export function BookingWarningsHost() {
   const t = useT();
+  const notice = useBookingWarnings();
+  if (!notice) return null;
+  const cancelled = notice.kind === 'cancelled';
   return (
-    <>
-      <WarningsBanner title={title} lines={lines} />
+    <Dialog
+      title={cancelled ? t.booking.cancelTitle : t.booking.moveTitle}
+      onClose={hideBookingWarnings}
+    >
+      <WarningsBanner
+        title={
+          cancelled
+            ? t.booking.cancelledWarningsTitle
+            : t.booking.movedWarningsTitle
+        }
+        lines={notice.lines}
+      />
       <div className="flex justify-end">
-        <Button onClick={onClose}>{t.booking.done}</Button>
+        <Button onClick={hideBookingWarnings}>{t.booking.done}</Button>
       </div>
-    </>
+    </Dialog>
   );
 }
 
@@ -188,22 +198,11 @@ function CancelDialog({
   const { locale } = useLocale();
   const cancel = useCancelBooking();
   const [sendEmails, setSendEmails] = useState(true);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const instructor =
     localizeField(item.instructorName, item.instructorNameZh, locale) || null;
   const warningText = useWarningText(participantsOf(item), (id) =>
     id === item.instructorId ? instructor : null,
   );
-  if (warnings.length > 0)
-    return (
-      <Dialog title={t.booking.cancelTitle} onClose={onClose}>
-        <WarningsResult
-          title={t.booking.cancelledWarningsTitle}
-          lines={warnings}
-          onClose={onClose}
-        />
-      </Dialog>
-    );
   return (
     <Dialog title={t.booking.cancelTitle} onClose={onClose}>
       <p className="text-sm text-ink">
@@ -230,15 +229,14 @@ function CancelDialog({
           variant="danger"
           loading={cancel.isPending}
           onClick={() =>
-            cancel.mutate(
-              { id: item.id, sendEmails },
-              {
-                onSuccess: (saved) => {
-                  const lines = warningText(saved.warnings);
-                  if (lines.length > 0) setWarnings(lines);
-                  else onClose();
-                },
+            cancel.mutateAsync({ id: item.id, sendEmails }).then(
+              (saved) => {
+                const lines = warningText(saved.warnings);
+                if (lines.length > 0)
+                  showBookingWarnings({ kind: 'cancelled', lines });
+                onClose();
               },
+              () => undefined,
             )
           }
         >
@@ -271,7 +269,6 @@ function MoveDialog({
     participantsOf(item),
   );
   const [sendEmails, setSendEmails] = useState(true);
-  const [warnings, setWarnings] = useState<string[]>([]);
 
   const instructorOptions = (instructors.data ?? [])
     .map((i) => ({
@@ -310,28 +307,21 @@ function MoveDialog({
   function submit(e: FormEvent) {
     e.preventDefault();
     if (!changed || update.isPending) return;
-    update.mutate(
-      { id: item.id, ...body, ...(!sendEmails && { sendEmails: false }) },
-      {
-        onSuccess: (saved) => {
+    update
+      .mutateAsync({
+        id: item.id,
+        ...body,
+        ...(!sendEmails && { sendEmails: false }),
+      })
+      .then(
+        (saved) => {
           const lines = warningText(saved.warnings);
-          if (lines.length > 0) setWarnings(lines);
-          else onClose();
+          if (lines.length > 0) showBookingWarnings({ kind: 'moved', lines });
+          onClose();
         },
-      },
-    );
+        () => undefined,
+      );
   }
-
-  if (warnings.length > 0)
-    return (
-      <Dialog title={t.booking.moveTitle} onClose={onClose}>
-        <WarningsResult
-          title={t.booking.movedWarningsTitle}
-          lines={warnings}
-          onClose={onClose}
-        />
-      </Dialog>
-    );
 
   return (
     <Dialog title={t.booking.moveTitle} onClose={onClose}>

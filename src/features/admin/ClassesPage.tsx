@@ -42,7 +42,7 @@ import {
 import { schoolParts } from './booking/bookingRules';
 import { errorText } from './payroll/payrollFormat';
 import { PromoBadge } from './LessonTypesPage';
-import { ClassActions } from './booking/ClassActions';
+import { BookingWarningsHost, ClassActions } from './booking/ClassActions';
 import {
   SyncBadge,
   SyncIssuesBanner,
@@ -270,6 +270,7 @@ export function ClassesPage() {
       </div>
       <SyncIssuesBanner />
       <SyncToastHost />
+      <BookingWarningsHost />
       {exportCsv.isError && (
         <Banner tone="error">
           {t.lessons.exportFailed.replace(

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -16,7 +16,8 @@ import {
   contactlessCustomer,
   deletedCustomer,
 } from '@/features/documents/lookups/fixtures';
-import { ClassActions } from './ClassActions';
+import { BookingWarningsHost, ClassActions } from './ClassActions';
+import { hideBookingWarnings } from './bookingWarnings';
 
 vi.mock('@/auth/SessionProvider', () => ({
   useSession: () => ({ user: { id: 'admin-1' } }),
@@ -85,6 +86,8 @@ function openMenu(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ClassActions', () => {
+  afterEach(() => hideBookingWarnings());
+
   it('marks a lesson completed or no-show', async () => {
     const calls = serve();
     const user = userEvent.setup();
@@ -534,10 +537,15 @@ describe('ClassActions', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<ClassActions item={booked} />);
+    renderWithProviders(
+      <>
+        <ClassActions item={booked} />
+        <BookingWarningsHost />
+      </>,
+    );
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: 'Move or edit…' }));
-    const dialog = screen.getByRole('dialog', { name: 'Move or edit lesson' });
+    let dialog = screen.getByRole('dialog', { name: 'Move or edit lesson' });
     const toggle = within(dialog).getByRole('switch', {
       name: 'Send update emails',
     });
@@ -552,8 +560,9 @@ describe('ClassActions', () => {
       within(dialog).getByRole('button', { name: 'Save changes' }),
     );
     expect(
-      await within(dialog).findByText('Saved. Some emails were not sent'),
+      await screen.findByText('Saved. Some emails were not sent'),
     ).toBeInTheDocument();
+    dialog = screen.getByRole('dialog', { name: 'Move or edit lesson' });
     expect(dialog).toHaveTextContent(
       'No email sent to Lily Chen: no email address on file',
     );
@@ -607,7 +616,12 @@ describe('ClassActions', () => {
       ),
     );
     const user = userEvent.setup();
-    renderWithProviders(<ClassActions item={booked} />);
+    renderWithProviders(
+      <>
+        <ClassActions item={booked} />
+        <BookingWarningsHost />
+      </>,
+    );
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: 'Cancel lesson…' }));
     let dialog = screen.getByRole('dialog', { name: 'Cancel this lesson?' });
@@ -629,8 +643,9 @@ describe('ClassActions', () => {
       within(dialog).getByRole('button', { name: 'Cancel lesson' }),
     );
     expect(
-      await within(dialog).findByText('Cancelled. Some emails were not sent'),
+      await screen.findByText('Cancelled. Some emails were not sent'),
     ).toBeInTheDocument();
+    dialog = screen.getByRole('dialog', { name: 'Cancel this lesson?' });
     expect(dialog).toHaveTextContent(
       'No email sent to Lily Chen: no email address on file',
     );
