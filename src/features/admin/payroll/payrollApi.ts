@@ -8,7 +8,7 @@ import type {
   PayrollSettings,
 } from './types';
 
-const payrollKey = ['admin', 'payroll'] as const;
+export const payrollKey = ['admin', 'payroll'] as const;
 const settingsKey = [...payrollKey, 'settings'] as const;
 const periodKey = (id: string) => [...payrollKey, 'period', id] as const;
 
