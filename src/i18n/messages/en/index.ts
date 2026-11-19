@@ -2328,6 +2328,8 @@ export const en: Messages = {
     severityMinor: 'Small annoyance',
     screenshot: 'Screenshot',
     screenshotHint: 'Optional. PNG, JPEG or WebP. You can also paste one here.',
+    screenshotPrivacy:
+      'A screenshot may show private information. Hide or crop it before you send.',
     addScreenshot: 'Add screenshot',
     removeScreenshot: 'Remove screenshot',
     screenshotPreview: 'Screenshot preview',

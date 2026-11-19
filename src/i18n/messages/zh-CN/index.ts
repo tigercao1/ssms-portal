@@ -2204,6 +2204,7 @@ export const zhCN: Messages = {
     severityMinor: '小麻烦',
     screenshot: '截图',
     screenshotHint: '选填。PNG、JPEG 或 WebP，也可以直接粘贴到这里。',
+    screenshotPrivacy: '截图可能会显示隐私信息，发送前请先遮挡或裁掉。',
     addScreenshot: '添加截图',
     removeScreenshot: '移除截图',
     screenshotPreview: '截图预览',

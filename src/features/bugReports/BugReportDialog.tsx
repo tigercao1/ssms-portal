@@ -240,6 +240,7 @@ export function BugReportDialog({
             <span className="text-sm font-medium text-navy">
               {s.screenshot}
             </span>
+            <p className="text-sm text-slate">{s.screenshotPrivacy}</p>
             {screenshot ? (
               <div className="flex flex-col items-start gap-2">
                 <img

@@ -344,6 +344,20 @@ describe('report screenshot', () => {
     ]);
   });
 
+  it('warns that a screenshot may show private information, before and after attaching one', async () => {
+    mockImagePipeline({ width: 800, height: 600, outputBytes: 50_000 });
+    const { user, dialog } = await openDialog();
+    const warning =
+      'A screenshot may show private information. Hide or crop it before you send.';
+    expect(within(dialog).getByText(warning)).toBeVisible();
+    await user.upload(
+      screenshotInput(),
+      new File(['x'], 'a.png', { type: 'image/png' }),
+    );
+    await screen.findByRole('img', { name: 'Screenshot preview' });
+    expect(within(dialog).getByText(warning)).toBeVisible();
+  });
+
   it('takes a pasted screenshot', async () => {
     mockImagePipeline({ width: 800, height: 600, outputBytes: 50_000 });
     const { user } = await openDialog();
@@ -568,6 +582,11 @@ describe('report dialog in Chinese', () => {
     expect(
       within(dialog).getByText('我们还会发送：页面、浏览器、屏幕尺寸'),
     ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(
+        '截图可能会显示隐私信息，发送前请先遮挡或裁掉。',
+      ),
+    ).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: '发送报告' }));
     expect(await screen.findByText('请说明发生了什么。')).toBeVisible();
     await user.type(

@@ -2115,6 +2115,7 @@ export interface Messages {
     severityMinor: string;
     screenshot: string;
     screenshotHint: string;
+    screenshotPrivacy: string;
     addScreenshot: string;
     removeScreenshot: string;
     screenshotPreview: string;
