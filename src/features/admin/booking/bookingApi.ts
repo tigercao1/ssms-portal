@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { payrollKey } from '../payroll/payrollApi';
 import { warnIfSyncFailed } from './syncToast';
 import type {
   Availability,
@@ -28,6 +29,7 @@ function useRefreshBookings() {
       qc.invalidateQueries({ queryKey: availabilityKey }),
       qc.invalidateQueries({ queryKey: classesKey }),
       qc.invalidateQueries({ queryKey: syncIssuesKey }),
+      qc.invalidateQueries({ queryKey: payrollKey }),
     ]);
   };
 }
