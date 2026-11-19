@@ -203,6 +203,16 @@ describe('signing site waiver page', () => {
     expect(document.documentElement.lang).toBe('en');
   });
 
+  it('has no portal bug report button', async () => {
+    serveForm('en');
+    renderSign('?lang=en');
+
+    await screen.findByRole('heading', { level: 1 });
+    expect(
+      screen.queryByRole('button', { name: /Report an issue|报告问题/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows required-field errors inline in the page language and does not submit', async () => {
     serveForm('en');
     const sent = captureSubmit();

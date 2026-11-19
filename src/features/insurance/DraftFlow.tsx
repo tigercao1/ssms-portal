@@ -396,7 +396,7 @@ export function DraftFlow({
       <div
         data-testid="dock"
         className={cn(
-          'sticky bottom-0 z-10 -mx-4 -mb-8 mt-5 flex flex-wrap items-center justify-between gap-2.5 border-t border-grey/60 bg-surface px-4 py-2.5 shadow-[0_-8px_20px_-12px_rgba(28,34,51,0.3)]',
+          'sticky bottom-0 z-10 -mx-4 -mb-24 mt-5 flex flex-wrap items-center justify-between gap-2.5 border-t border-grey/60 bg-surface px-4 py-2.5 shadow-[0_-8px_20px_-12px_rgba(28,34,51,0.3)]',
           typing && 'hidden',
         )}
       >
