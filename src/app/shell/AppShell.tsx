@@ -6,6 +6,7 @@ import { Brandmark, Contour } from '@/components';
 import { LangSwitch } from '@/components/LangSwitch';
 import { cn } from '@/lib/cn';
 import { useMyChecklist } from '@/features/documents/onboarding/queries';
+import { BugReportButton } from '@/features/bugReports/BugReportButton';
 import type { MyChecklist } from '@/features/documents/api';
 import type { Messages } from '@/i18n/core/types';
 import { AdminNavGroups } from './AdminNavGroups';
@@ -184,10 +185,11 @@ export function AppShell() {
             )}
           </div>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 lg:px-8">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-8 lg:px-8">
           <Outlet />
         </main>
       </div>
+      <BugReportButton />
     </div>
   );
 }
