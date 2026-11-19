@@ -8,5 +8,7 @@ export function useMyLessons() {
   return useQuery({
     queryKey: MY_LESSONS_KEY,
     queryFn: () => api<MyLessonsResponse>('/me/lessons'),
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }

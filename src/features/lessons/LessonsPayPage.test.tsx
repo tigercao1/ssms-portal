@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { I18nProvider } from '@/i18n/core/I18nProvider';
+import { queryClient } from '@/lib/query';
 import { server } from '@/test/msw';
 import { renderWithProviders } from '@/test/render';
 import { LessonsPayPage } from './LessonsPayPage';
@@ -481,6 +489,84 @@ describe('LessonsPayPage in Chinese', () => {
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(
         '你的资料未通过审核你无法被安排新的课程。你过去的课程和工资见下方。',
+      ),
+    );
+  });
+});
+
+describe('LessonsPayPage after a lesson is cancelled', () => {
+  afterEach(() => {
+    focusManager.setFocused(undefined);
+  });
+
+  const afterCancel: MyLessonsResponse = {
+    ...fullLessons,
+    upcoming: {
+      ...fullLessons.upcoming,
+      lessons: fullLessons.upcoming.lessons.filter((l) => l.classId !== 'c2'),
+      projected: [{ currency: 'CAD', amount: 180, lessons: 1 }],
+    },
+  };
+
+  function setup() {
+    let body = fullLessons;
+    server.use(http.get(`${API}/me/lessons`, () => HttpResponse.json(body)));
+    const client = new QueryClient({
+      defaultOptions: queryClient.getDefaultOptions(),
+    });
+    const open = () =>
+      render(
+        <QueryClientProvider client={client}>
+          <I18nProvider>
+            <MemoryRouter initialEntries={['/lessons']}>
+              <LessonsPayPage />
+            </MemoryRouter>
+          </I18nProvider>
+        </QueryClientProvider>,
+      );
+    return {
+      open,
+      cancel: () => {
+        body = afterCancel;
+      },
+    };
+  }
+
+  const projected = () =>
+    screen
+      .findByTestId('upcoming-projected')
+      .then((cell) => cell.closest('tr'));
+
+  it('shows the new projected total when the page is opened again', async () => {
+    const { open, cancel } = setup();
+    const view = open();
+    expect(await projected()).toHaveTextContent('Projected · 3 lessons');
+    view.unmount();
+
+    cancel();
+    open();
+
+    await waitFor(async () =>
+      expect(await projected()).toHaveTextContent(
+        'Projected · 2 lessons(1 without a rate is not counted)$180.00',
+      ),
+    );
+  });
+
+  it('shows the new projected total when the tab regains focus', async () => {
+    const { open, cancel } = setup();
+    open();
+    expect(await projected()).toHaveTextContent('Projected · 3 lessons');
+
+    cancel();
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    await waitFor(async () =>
+      expect(await projected()).toHaveTextContent(
+        'Projected · 2 lessons(1 without a rate is not counted)$180.00',
       ),
     );
   });
