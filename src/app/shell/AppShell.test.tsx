@@ -14,7 +14,6 @@ import {
   type NavigateFunction,
 } from 'react-router-dom';
 import { AppShell } from './AppShell';
-import { ADMIN_REPORTS_ITEMS } from './adminNav';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/msw';
 import {
@@ -278,6 +277,7 @@ describe('AppShell admin nav', () => {
       'admin-nav-documents',
       'admin-nav-website',
       'admin-nav-settings',
+      'admin-nav-reports',
     ]);
   });
 
@@ -393,22 +393,15 @@ describe('AppShell admin nav', () => {
     expect(hamburger()).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('adds a Reports group last once it has a page', () => {
-    ADMIN_REPORTS_ITEMS.push({ to: '/admin/bug-reports', label: 'dashboard' });
-    try {
-      renderShell('/admin/bug-reports');
-      const toggles = within(menu()).getAllByRole('button', {
-        expanded: true,
-      });
-      expect(toggles.at(-1)).toHaveAccessibleName('Reports');
-      expect(
-        within(screen.getByRole('group', { name: 'Reports' })).getByRole(
-          'link',
-        ),
-      ).toHaveAttribute('href', '/admin/bug-reports');
-    } finally {
-      ADMIN_REPORTS_ITEMS.length = 0;
-    }
+  it('lists Bug reports in the Reports group, last', () => {
+    renderShell('/admin/bug-reports');
+    const toggles = within(menu()).getAllByRole('button', { expanded: true });
+    expect(toggles.at(-1)).toHaveAccessibleName('Reports');
+    expect(
+      within(screen.getByRole('group', { name: 'Reports' })).getByRole('link', {
+        name: 'Bug reports',
+      }),
+    ).toHaveAttribute('href', '/admin/bug-reports');
   });
 
   it('names the groups in Chinese', () => {
@@ -419,7 +412,7 @@ describe('AppShell admin nav', () => {
         .getAllByRole('button', { name: /./ })
         .filter((button) => button.hasAttribute('aria-controls'))
         .map((button) => button.textContent?.replace(/\d+$/, '')),
-    ).toEqual(['预约', '教练', '文件与签署', '网站', '设置']);
+    ).toEqual(['预约', '教练', '文件与签署', '网站', '设置', '报告']);
   });
 
   it('labels Document review and Lesson insurance in Chinese', async () => {

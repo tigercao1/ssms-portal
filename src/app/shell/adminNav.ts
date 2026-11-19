@@ -21,7 +21,9 @@ export const ADMIN_DASHBOARD: AdminNavItem = {
   end: true,
 };
 
-export const ADMIN_REPORTS_ITEMS: AdminNavItem[] = [];
+export const ADMIN_REPORTS_ITEMS: AdminNavItem[] = [
+  { to: '/admin/bug-reports', label: 'bugReports' },
+];
 
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
