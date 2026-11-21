@@ -8,6 +8,7 @@ import {
   PayFlagBadges,
   PayFlagsHelp,
   presentFlags,
+  signed,
 } from '@/features/admin/payroll/PayFlags';
 import { formatMoney } from '@/features/admin/payroll/payrollFormat';
 import {
@@ -253,7 +254,9 @@ function LessonPay({ lesson }: { lesson: MyLesson }) {
     ) : (
       <>—</>
     );
-  const amount = formatMoney(lesson.amount, lesson.currency, locale);
+  const amount = lesson.adjusted
+    ? signedMoney(lesson.amount, lesson.currency, locale)
+    : formatMoney(lesson.amount, lesson.currency, locale);
   if (lesson.needsRate)
     return <>{t.myLessons.noRateAmount.replace('{amount}', amount)}</>;
   return <>{amount}</>;
@@ -263,6 +266,10 @@ function RateTimes({ lesson }: { lesson: MyLesson }) {
   const t = useT();
   const { locale } = useLocale();
   if (lesson.correction) return <>—</>;
+  if (lesson.adjusted)
+    return (
+      <>{t.payFlags.minutesDelta.replace('{n}', signed(lesson.minutes))}</>
+    );
   const text = rateTimes(lesson, t, locale);
   if (text) return <>{text}</>;
   return <>{lesson.needsRate ? '—' : t.myLessons.noRate}</>;
@@ -544,7 +551,10 @@ function PeriodRows({ period, label }: { period: MyPayPeriod; label: string }) {
       {period.lessons.map((lesson) => {
         const name = lessonName(lesson, locale, t.myLessons.noLessonType);
         return (
-          <li key={lesson.classId} className={PERIOD_ROW}>
+          <li
+            key={`${lesson.classId}|${lesson.currency}`}
+            className={PERIOD_ROW}
+          >
             <span>
               {lessonDay(lesson.date, locale)} · {lesson.startTime}–
               {lesson.endTime}

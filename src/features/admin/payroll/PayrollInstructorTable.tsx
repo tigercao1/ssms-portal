@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn';
 import { withRateUnit } from '@/lib/rateUnit';
 import {
   countedMinutes,
+  flaggedAmount,
   isFlagged,
   PayFlagBadges,
   PayFlagsHelp,
@@ -204,7 +205,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
             const minutes = countedMinutes(flags, line.minutes);
             return (
               <tr
-                key={`${line.classId}|${line.instructorId}`}
+                key={`${line.classId}|${line.instructorId}|${line.currency}`}
                 className={cn(
                   'border-t border-grey/30 align-top',
                   needsRate && 'bg-status-pending/10',
@@ -215,7 +216,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
                   <PayFlagBadges flags={flags} />
                   {isFlagged(flags) && (
                     <span className="mt-1 block tabular-nums sm:hidden">
-                      {formatMoney(line.amount, line.currency, locale)}
+                      {flaggedAmount(flags, line.amount, line.currency, locale)}
                     </span>
                   )}
                 </td>
@@ -249,7 +250,7 @@ function InstructorLessons({ lines }: { lines: PayrollLessonLine[] }) {
                 </td>
                 <td className="py-1.5 text-right tabular-nums">
                   <span className="flex flex-col items-end gap-1">
-                    {formatMoney(line.amount, line.currency, locale)}
+                    {flaggedAmount(flags, line.amount, line.currency, locale)}
                     {needsRate && <NeedsRateBadge />}
                     {alreadyPaid && (
                       <span className="rounded-sm bg-sunken px-2 py-0.5 text-xs font-medium text-slate">

@@ -23,6 +23,8 @@ export function fakeMyLesson(overrides: Partial<MyLesson> = {}): MyLesson {
     lateCancel: false,
     correction: false,
     reassigned: false,
+    adjusted: false,
+    changes: [],
     ...overrides,
   };
 }

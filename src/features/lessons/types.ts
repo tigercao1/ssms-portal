@@ -1,3 +1,4 @@
+import type { PayChange } from '@/features/admin/payroll/PayFlags';
 import type { RateUnit } from '@/lib/types';
 
 export type LessonsLockReason =
@@ -27,6 +28,8 @@ export interface MyLesson {
   lateCancel: boolean;
   correction: boolean;
   reassigned: boolean;
+  adjusted: boolean;
+  changes: PayChange[];
 }
 
 export interface MyAdjustment {

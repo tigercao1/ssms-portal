@@ -777,6 +777,7 @@ export const en: Messages = {
     groupSizeInvalid: 'Enter a whole number from 1 to 100, or leave empty.',
     durationLabel: 'Duration (minutes)',
     durationInvalid: 'Enter whole minutes from 1 to 1440.',
+    durationStep: 'Use a multiple of 5 minutes, like 45 or 60.',
     promoLabel: 'Promo lesson',
     activeLabel: 'Active',
     sortOrderLabel: 'Sort order',
@@ -1947,6 +1948,12 @@ export const en: Messages = {
     correctionHelp:
       'Adjusts an amount paid earlier. It is not counted as a lesson.',
     reassignedHelp: 'The lesson moved between instructors after it was paid.',
+    adjusted: 'Adjusted',
+    adjustedHelp:
+      'The length or lesson type changed after the lesson was paid. The difference is paid or taken back in this period, with the change in minutes. It is not counted as another lesson.',
+    changedLength: 'Length changed',
+    changedLessonType: 'Lesson type changed',
+    minutesDelta: '{n} min',
   },
   bookingReminders: {
     title: 'Lesson reminders',

@@ -766,3 +766,127 @@ describe('PayrollPage late lines', () => {
     }
   });
 });
+
+describe('PayrollPage adjusted lines', () => {
+  const current = period('2025-12-29', '2026-01-11', { isCurrent: true });
+  const base = detailFor(current).lines[0] as PayrollLessonLine;
+  const line = (overrides: Partial<PayrollLessonLine>): PayrollLessonLine => ({
+    ...base,
+    classStatus: 'completed',
+    flags: [],
+    ...overrides,
+  });
+  const detail: PayrollPeriodDetail = {
+    period: current,
+    instructors: [
+      {
+        instructorId: jane.id,
+        instructorName: 'Jane Snow',
+        instructorNameZh: null,
+        email: null,
+        currency: 'CAD',
+        lessons: 0,
+        minutes: 0,
+        lessonAmount: 15,
+        adjustmentAmount: 0,
+        total: 15,
+        needsRate: 0,
+      },
+    ],
+    lines: [
+      line({
+        classId: 'longer',
+        date: '2025-12-20',
+        minutes: 30,
+        amount: 45,
+        flags: ['adjusted', 'changed_length'],
+      }),
+      line({
+        classId: 'shorter',
+        date: '2025-12-21',
+        minutes: -30,
+        amount: -30,
+        flags: ['adjusted', 'changed_length', 'changed_lesson_type'],
+      }),
+    ],
+    adjustments: [],
+    totals: [{ currency: 'CAD', lessons: 0, minutes: 0, amount: 15 }],
+    needsRateCount: 0,
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-07T12:00:00'));
+    server.use(
+      http.get(`${API}/admin/instructors`, () => HttpResponse.json([jane])),
+      http.get(`${API}/admin/payroll/periods`, () =>
+        HttpResponse.json([current]),
+      ),
+      http.get(`${API}/admin/payroll/periods/:id`, () =>
+        HttpResponse.json(detail),
+      ),
+    );
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function openJane(show = 'Show lessons for Jane Snow') {
+    const user = userEvent.setup();
+    renderWithProviders(<PayrollPage />);
+    await user.click(await screen.findByRole('button', { name: show }));
+    const [, table] = screen.getAllByRole('table') as [
+      HTMLElement,
+      HTMLElement,
+    ];
+    return within(table).getAllByRole('row').slice(1) as HTMLTableRowElement[];
+  }
+
+  it('labels an adjusted line with its reason, signed minutes and signed amount', async () => {
+    const [longer, shorter] = (await openJane()) as [
+      HTMLTableRowElement,
+      HTMLTableRowElement,
+    ];
+
+    expect(within(longer).getByText('Adjusted')).toBeVisible();
+    expect(within(longer).getByText('Length changed')).toBeVisible();
+    expect(longer).toHaveTextContent('+30');
+    expect(longer).toHaveTextContent('+$45.00');
+
+    expect(within(shorter).getByText('Adjusted')).toBeVisible();
+    expect(
+      within(shorter).getByText('Length changed, Lesson type changed'),
+    ).toBeVisible();
+    expect(shorter).toHaveTextContent('-30');
+    expect(shorter).toHaveTextContent('-$30.00');
+
+    const phoneAmounts = [longer, shorter].map((row) =>
+      within(row.cells[0] as HTMLElement).getByText(/\$\d/),
+    );
+    expect(phoneAmounts.map((amount) => amount.textContent)).toEqual([
+      '+$45.00',
+      '-$30.00',
+    ]);
+    for (const amount of phoneAmounts) expect(amount).toHaveClass('sm:hidden');
+
+    expect(screen.getByText('What the labels mean')).toBeVisible();
+    expect(
+      screen.getByText(
+        'The length or lesson type changed after the lesson was paid. The difference is paid or taken back in this period, with the change in minutes. It is not counted as another lesson.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('shows the adjusted label and reasons in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const [longer, shorter] = (await openJane('显示 Jane Snow 的课程')) as [
+      HTMLTableRowElement,
+      HTMLTableRowElement,
+    ];
+    expect(within(longer).getByText('已调整')).toBeVisible();
+    expect(within(longer).getByText('时长已更改')).toBeVisible();
+    expect(
+      within(shorter).getByText('时长已更改、课程类型已更改'),
+    ).toBeVisible();
+  });
+});

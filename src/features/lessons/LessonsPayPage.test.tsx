@@ -675,6 +675,90 @@ describe('LessonsPayPage late payroll lines', () => {
   });
 });
 
+describe('LessonsPayPage adjusted lines', () => {
+  const current: MyPayPeriod = {
+    startsOn: '2027-02-08',
+    endsOn: '2027-02-21',
+    status: 'awaiting',
+    finalizedAt: null,
+    lessons: [
+      fakeMyLesson({
+        classId: 'a1',
+        date: '2027-01-20',
+        status: 'completed',
+        minutes: 30,
+        amount: 45,
+        adjusted: true,
+        changes: ['length'],
+      }),
+      fakeMyLesson({
+        classId: 'a2',
+        date: '2027-01-21',
+        status: 'completed',
+        minutes: -30,
+        amount: -45,
+        adjusted: true,
+        changes: ['length', 'lesson_type'],
+      }),
+    ],
+    adjustments: [],
+    totals: [
+      {
+        currency: 'CAD',
+        lessons: 0,
+        minutes: 0,
+        lessonAmount: 0,
+        adjustmentAmount: 0,
+        total: 0,
+        needsRateCount: 0,
+      },
+    ],
+  };
+
+  function rows() {
+    const list = screen.getByRole('list', { name: /2027/ });
+    return within(list).getAllByRole('listitem');
+  }
+
+  it('labels an adjusted line with its reason, minute change and signed amount', async () => {
+    serve({ ...emptyLessons, periods: [current] });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Past lessons' });
+
+    const [longer, shorter] = rows() as HTMLElement[];
+    expect(within(longer!).getByText('Adjusted')).toBeVisible();
+    expect(within(longer!).getByText('Length changed')).toBeVisible();
+    expect(within(longer!).getAllByText('+30 min')[0]).toBeInTheDocument();
+    expect(longer).toHaveTextContent('+$45.00');
+    expect(longer).not.toHaveTextContent('× ');
+
+    expect(
+      within(shorter!).getByText('Length changed, Lesson type changed'),
+    ).toBeVisible();
+    expect(within(shorter!).getAllByText('-30 min')[0]).toBeInTheDocument();
+    expect(shorter).toHaveTextContent('-$45.00');
+
+    expect(screen.getByText('What the labels mean')).toBeVisible();
+    expect(
+      screen.getByText(
+        'The length or lesson type changed after the lesson was paid. The difference is paid or taken back in this period, with the change in minutes. It is not counted as another lesson.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('shows the adjusted label in Chinese', async () => {
+    serve({ ...emptyLessons, periods: [current] });
+    renderPage('zh-CN');
+    await screen.findByRole('heading', { name: '已上的课' });
+    const [longer, shorter] = rows() as HTMLElement[];
+    expect(within(longer!).getByText('已调整')).toBeVisible();
+    expect(within(longer!).getAllByText('+30 分钟')[0]).toBeInTheDocument();
+    expect(
+      within(shorter!).getByText('时长已更改、课程类型已更改'),
+    ).toBeVisible();
+  });
+});
+
 describe('LessonsPayPage background refresh failure', () => {
   afterEach(() => {
     focusManager.setFocused(undefined);
