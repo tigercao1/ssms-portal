@@ -2,6 +2,7 @@ import { Fragment, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocale, useT } from '@/i18n/core/I18nProvider';
 import { localizeField } from '@/i18n/core/localize';
 import { ApiError } from '@/lib/api';
+import type { Messages } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
 import {
   ActionsMenu,
@@ -245,6 +246,11 @@ export function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
+function lessonTypeError(err: unknown, t: Messages): string {
+  const text = errorText(err, t.errors.generic);
+  return text.includes('multiple of 5') ? t.lessonTypes.durationStep : text;
+}
+
 interface FormValues {
   nameEn: string;
   nameZh: string;
@@ -285,6 +291,7 @@ function parseValues(v: FormValues) {
       groupSize === 'invalid' || (groupSize !== null && groupSize > 100),
     durationInvalid:
       duration === null || duration === 'invalid' || duration > 1440,
+    durationStepInvalid: typeof duration === 'number' && duration % 5 !== 0,
     input: {
       nameEn: v.nameEn.trim(),
       nameZh: v.nameZh.trim() || null,
@@ -354,15 +361,23 @@ function LessonTypeFields({
         label={t.lessonTypes.durationLabel}
         required
         error={
-          showErrors && parsed.durationInvalid
-            ? t.lessonTypes.durationInvalid
-            : undefined
+          !showErrors
+            ? undefined
+            : parsed.durationInvalid
+              ? t.lessonTypes.durationInvalid
+              : parsed.durationStepInvalid
+                ? t.lessonTypes.durationStep
+                : undefined
         }
       >
         {(p) => (
           <Input
             {...p}
+            type="number"
             inputMode="numeric"
+            min={5}
+            max={1440}
+            step={5}
             value={values.durationMin}
             onChange={(e) => set('durationMin', e.target.value)}
           />
@@ -424,7 +439,10 @@ function EditLessonType({
       .map((key) => [key, parsed.input[key]]),
   ) as LessonTypeInput;
   const invalid =
-    !parsed.input.nameEn || parsed.groupSizeInvalid || parsed.durationInvalid;
+    !parsed.input.nameEn ||
+    parsed.groupSizeInvalid ||
+    parsed.durationInvalid ||
+    parsed.durationStepInvalid;
   const dirty = Object.keys(changes).length > 0;
 
   function submit(e: FormEvent) {
@@ -454,9 +472,7 @@ function EditLessonType({
         showErrors
       />
       {update.isError && !isNameTaken(update.error) && (
-        <Banner tone="error">
-          {errorText(update.error, t.errors.generic)}
-        </Banner>
+        <Banner tone="error">{lessonTypeError(update.error, t)}</Banner>
       )}
       <div className="flex justify-end gap-2">
         <Button
@@ -486,7 +502,10 @@ function AddLessonType() {
   const [touched, setTouched] = useState(false);
   const parsed = parseValues(values);
   const invalid =
-    !parsed.input.nameEn || parsed.groupSizeInvalid || parsed.durationInvalid;
+    !parsed.input.nameEn ||
+    parsed.groupSizeInvalid ||
+    parsed.durationInvalid ||
+    parsed.durationStepInvalid;
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -516,9 +535,7 @@ function AddLessonType() {
           showErrors={touched}
         />
         {create.isError && !isNameTaken(create.error) && (
-          <Banner tone="error">
-            {errorText(create.error, t.errors.generic)}
-          </Banner>
+          <Banner tone="error">{lessonTypeError(create.error, t)}</Banner>
         )}
         {create.isSuccess && (
           <Banner tone="approved">{t.lessonTypes.added}</Banner>

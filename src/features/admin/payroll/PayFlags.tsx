@@ -1,15 +1,26 @@
 import { useT } from '@/i18n/core/I18nProvider';
-import type { Messages } from '@/i18n/core/types';
+import type { Locale, Messages } from '@/i18n/core/types';
 import { cn } from '@/lib/cn';
+import { formatMoney } from './payrollFormat';
 
 export interface PayFlagSet {
   late: boolean;
   lateCancel: boolean;
   correction: boolean;
   reassigned: boolean;
+  adjusted: boolean;
+  changes: PayChange[];
 }
 
-const ORDER = ['late', 'lateCancel', 'correction', 'reassigned'] as const;
+export type PayChange = 'length' | 'lesson_type';
+
+const ORDER = [
+  'late',
+  'lateCancel',
+  'correction',
+  'reassigned',
+  'adjusted',
+] as const;
 export type PayFlag = (typeof ORDER)[number];
 
 const HELP: Record<PayFlag, keyof Messages['payFlags']> = {
@@ -17,13 +28,25 @@ const HELP: Record<PayFlag, keyof Messages['payFlags']> = {
   lateCancel: 'lateCancelHelp',
   correction: 'correctionHelp',
   reassigned: 'reassignedHelp',
+  adjusted: 'adjustedHelp',
 };
+
+const CHANGE_LABEL: Record<PayChange, keyof Messages['payFlags']> = {
+  length: 'changedLength',
+  lesson_type: 'changedLessonType',
+};
+
+const CHANGE_FLAGS: [string, PayChange][] = [
+  ['changed_length', 'length'],
+  ['changed_lesson_type', 'lesson_type'],
+];
 
 const TONE: Record<PayFlag, string> = {
   late: 'bg-navy-tint text-navy',
   lateCancel: 'bg-red-tint text-ink',
   correction: 'bg-status-pending/20 text-ink',
   reassigned: 'bg-sunken text-slate',
+  adjusted: 'bg-navy-tint text-ink',
 };
 
 export function payFlagsOf(flags: string[]): PayFlagSet {
@@ -32,6 +55,10 @@ export function payFlagsOf(flags: string[]): PayFlagSet {
     lateCancel: flags.includes('late_cancel'),
     correction: flags.includes('correction'),
     reassigned: flags.includes('reassigned'),
+    adjusted: flags.includes('adjusted'),
+    changes: CHANGE_FLAGS.filter(([flag]) => flags.includes(flag)).map(
+      ([, change]) => change,
+    ),
   };
 }
 
@@ -45,7 +72,22 @@ export function isFlagged(flags: PayFlagSet) {
 
 export function countedMinutes(flags: PayFlagSet, minutes: number) {
   if (flags.correction) return null;
+  if (flags.adjusted) return signed(minutes);
   return flags.lateCancel ? -minutes : minutes;
+}
+
+export function signed(n: number) {
+  return n > 0 ? `+${n}` : String(n);
+}
+
+export function flaggedAmount(
+  flags: PayFlagSet,
+  amount: number,
+  currency: string,
+  locale: Locale,
+) {
+  const text = formatMoney(amount, currency, locale);
+  return flags.adjusted && amount > 0 ? `+${text}` : text;
 }
 
 export function PayFlagBadges({ flags }: { flags: PayFlagSet }) {
@@ -66,6 +108,13 @@ export function PayFlagBadges({ flags }: { flags: PayFlagSet }) {
           {t.payFlags[flag]}
         </span>
       ))}
+      {flags.adjusted && flags.changes.length > 0 && (
+        <span className="whitespace-nowrap py-0.5 text-xs text-slate">
+          {flags.changes
+            .map((change) => t.payFlags[CHANGE_LABEL[change]])
+            .join(t.booking.listSeparator)}
+        </span>
+      )}
     </span>
   );
 }

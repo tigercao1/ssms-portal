@@ -705,6 +705,7 @@ export interface Messages {
     groupSizeInvalid: string;
     durationLabel: string;
     durationInvalid: string;
+    durationStep: string;
     promoLabel: string;
     activeLabel: string;
     sortOrderLabel: string;
@@ -1769,6 +1770,11 @@ export interface Messages {
     lateCancelHelp: string;
     correctionHelp: string;
     reassignedHelp: string;
+    adjusted: string;
+    adjustedHelp: string;
+    changedLength: string;
+    changedLessonType: string;
+    minutesDelta: string;
   };
   bookingReminders: {
     title: string;

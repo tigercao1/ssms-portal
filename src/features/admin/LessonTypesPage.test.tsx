@@ -811,3 +811,76 @@ describe('LessonTypesPage pay rates', () => {
     ).toEqual(['按小时', '按天']);
   });
 });
+
+describe('LessonTypesPage 5-minute durations', () => {
+  const duration = (f: ReturnType<typeof within>) =>
+    f.getByLabelText(/Duration \(minutes\)|时长（分钟）/) as HTMLInputElement;
+  function form(heading: string) {
+    return within(
+      screen.getByRole('heading', { name: heading }).closest('form')!,
+    );
+  }
+
+  it('asks for a multiple of 5 minutes before adding', async () => {
+    const calls = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<LessonTypesPage />);
+    await screen.findByText('Private 2h');
+    const f = form('Add lesson type');
+    expect(duration(f)).toHaveAttribute('step', '5');
+
+    await user.type(f.getByLabelText('English name', { exact: false }), 'X');
+    await user.type(duration(f), '62');
+    await user.click(f.getByRole('button', { name: 'Add' }));
+    expect(
+      f.getByText('Use a multiple of 5 minutes, like 45 or 60.'),
+    ).toBeInTheDocument();
+    expect(calls.typePosts).toHaveLength(0);
+
+    await user.clear(duration(f));
+    await user.type(duration(f), '65');
+    await user.click(f.getByRole('button', { name: 'Add' }));
+    await waitFor(() =>
+      expect(calls.typePosts).toEqual([
+        expect.objectContaining({ nameEn: 'X', durationMin: 65 }),
+      ]),
+    );
+  });
+
+  it('keeps Save off while an edited duration is not a multiple of 5', async () => {
+    const calls = serve();
+    const user = userEvent.setup();
+    renderWithProviders(<LessonTypesPage />);
+    await rowAction(user, 'Private 2h', 'Edit Private 2h');
+    const f = form('Edit lesson type');
+
+    await user.clear(duration(f));
+    await user.type(duration(f), '93');
+    expect(
+      f.getByText('Use a multiple of 5 minutes, like 45 or 60.'),
+    ).toBeInTheDocument();
+    expect(f.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(calls.typePatches).toHaveLength(0);
+  });
+
+  it('shows the API multiple-of-5 error in the active language', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    serve({
+      typeError: {
+        status: 400,
+        message: 'durationMin must be a multiple of 5 minutes',
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<LessonTypesPage />);
+    await screen.findByRole('heading', { name: '课程类型' });
+    const f = form('添加课程类型');
+
+    await user.type(f.getByLabelText('英文名称', { exact: false }), 'X');
+    await user.type(duration(f), '95');
+    await user.click(f.getByRole('button', { name: '添加' }));
+    expect(await f.findByRole('alert')).toHaveTextContent(
+      '请输入 5 的倍数分钟，例如 45 或 60。',
+    );
+  });
+});

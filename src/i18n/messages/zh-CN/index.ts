@@ -736,6 +736,7 @@ export const zhCN: Messages = {
     groupSizeInvalid: '请输入 1 到 100 的整数，或留空。',
     durationLabel: '时长（分钟）',
     durationInvalid: '请输入 1 到 1440 的整数分钟。',
+    durationStep: '请输入 5 的倍数分钟，例如 45 或 60。',
     promoLabel: '特价课',
     activeLabel: '启用',
     sortOrderLabel: '排序',
@@ -1845,6 +1846,12 @@ export const zhCN: Messages = {
     lateCancelHelp: '在所属工资周期结算后才取消，因此在本周期扣回已付工资。',
     correctionHelp: '调整之前已付的金额，不计为一节课。',
     reassignedHelp: '这节课在支付后改由其他教练负责。',
+    adjusted: '已调整',
+    adjustedHelp:
+      '这节课在支付后更改了时长或课程类型。差额在本周期补发或扣回，并显示分钟变化，不另计为一节课。',
+    changedLength: '时长已更改',
+    changedLessonType: '课程类型已更改',
+    minutesDelta: '{n} 分钟',
   },
   bookingReminders: {
     title: '课程提醒',
