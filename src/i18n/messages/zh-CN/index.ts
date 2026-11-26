@@ -1183,6 +1183,7 @@ export const zhCN: Messages = {
       '{email} 最近一次签署于 {date}，早于本免责年度，需要重新签署。',
     validThisYear: '本免责年度有效',
     expired: '已过期',
+    jotform: 'Jotform',
     link: '关联到客户',
     linkFor: '将 {name} 签署的 {title} 关联到客户',
     linkTitle: '将签署记录关联到客户',

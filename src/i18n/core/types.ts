@@ -1139,6 +1139,7 @@ export interface Messages {
     checkExpired: string;
     validThisYear: string;
     expired: string;
+    jotform: string;
     link: string;
     linkFor: string;
     linkTitle: string;
