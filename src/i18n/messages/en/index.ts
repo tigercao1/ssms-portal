@@ -1248,6 +1248,7 @@ export const en: Messages = {
       '{email} last signed on {date}, before this waiver year. Needs re-sign.',
     validThisYear: 'Valid this waiver year',
     expired: 'Expired',
+    jotform: 'Jotform',
     link: 'Link to a customer',
     linkFor: 'Link {title} signed by {name} to a customer',
     linkTitle: 'Link signature to a customer',

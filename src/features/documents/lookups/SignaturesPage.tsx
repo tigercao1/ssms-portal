@@ -222,6 +222,7 @@ function SignatureRow({
               label={entry.validThisYear ? s.validThisYear : s.expired}
             />
           )}
+          {entry.source === 'jotform' && <Chip tone="navy" label={s.jotform} />}
         </span>
         <span className="text-xs text-slate">{details.join(' · ')}</span>
       </div>

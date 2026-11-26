@@ -36,6 +36,7 @@ export interface SignedDocumentEntry {
   signedAt: string;
   hasSignedCopy: boolean;
   validThisYear?: boolean;
+  source?: 'ssms' | 'jotform';
 }
 
 export interface Signer {

@@ -196,6 +196,14 @@ describe('Waiver status for this waiver year', () => {
     const lily = await waitFor(() => person('Lily Chen'));
     expect(within(lily).getByText('Waiver signed Nov 7, 2026')).toBeVisible();
     expect(within(lily).getAllByText('Valid this waiver year')).toHaveLength(2);
+    expect(within(lily).queryByText('Jotform')).toBeNull();
+  });
+
+  it('marks a waiver imported from Jotform and counts it for this waiver year', async () => {
+    await search('fang');
+    const fang = await waitFor(() => person('Fang Wang'));
+    expect(within(fang).getByText('Jotform')).toBeVisible();
+    expect(within(fang).getByText('Valid this waiver year')).toBeVisible();
   });
 
   it('asks for a re-sign when the only waiver is from an earlier year', async () => {
