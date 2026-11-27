@@ -4,13 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { PageEditorPage } from './PageEditorPage';
-import { MAX_PAGE_BYTES } from './pageRules';
 import { renderWithProviders } from '@/test/render';
 import { fakePage, server } from '@/test/msw';
 import type { PublicPage } from '@/lib/types';
 
 const API = 'http://localhost:3000';
 const HTML = '<!doctype html><h1>Guide</h1><script>alert(1)</script>';
+const MIB = 1024 * 1024;
 
 interface Calls {
   uploads: { contentType: string | null; body: string }[];
@@ -142,7 +142,42 @@ describe('PageEditorPage upload', () => {
     ).toBeInTheDocument();
   });
 
-  it('rejects files over 2 MiB without a request', async () => {
+  it('shows the 10 MB limit in the hint', async () => {
+    serve();
+    renderEditor();
+
+    expect(
+      await screen.findByText(
+        'One self-contained .html or .htm file, up to 10 MB.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('uploads a file of exactly 10 MiB', async () => {
+    serve();
+    const sizes: number[] = [];
+    server.use(
+      http.put(`${API}/admin/pages/:id/content`, async ({ request }) => {
+        sizes.push((await request.arrayBuffer()).byteLength);
+        return HttpResponse.json(
+          fakePage({ hasContent: true, sizeBytes: 10 * MIB }),
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByRole('heading', { name: 'Winter guide' });
+
+    await user.upload(
+      fileInput(),
+      new File([new Uint8Array(10 * MIB)], 'max.html', { type: 'text/html' }),
+    );
+
+    expect(await screen.findByText('Uploaded max.html.')).toBeInTheDocument();
+    expect(sizes).toEqual([10 * MIB]);
+  });
+
+  it('rejects files over 10 MiB without a request', async () => {
     const calls = serve();
     const user = userEvent.setup();
     renderEditor();
@@ -150,13 +185,36 @@ describe('PageEditorPage upload', () => {
 
     await user.upload(
       fileInput(),
-      new File([new Uint8Array(MAX_PAGE_BYTES + 1)], 'big.html', {
+      new File([new Uint8Array(10 * MIB + 1)], 'big.html', {
         type: 'text/html',
       }),
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'That file is 2.0 MB. The limit is 2 MB.',
+      'That file is 10.0 MB. The limit is 10 MB.',
+    );
+    expect(calls.uploads).toEqual([]);
+  });
+
+  it('shows the 10 MB limit in Chinese', async () => {
+    localStorage.setItem('ssms.locale', 'zh-CN');
+    const calls = serve();
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByRole('heading', { name: 'Winter guide' });
+    expect(
+      screen.getByText('单个独立的 .html 或 .htm 文件，最大 10 MB。'),
+    ).toBeInTheDocument();
+
+    await user.upload(
+      screen.getByLabelText('要上传的 HTML 文件'),
+      new File([new Uint8Array(10 * MIB + 1)], 'big.html', {
+        type: 'text/html',
+      }),
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '该文件大小为 10.0 MB，上限为 10 MB。',
     );
     expect(calls.uploads).toEqual([]);
   });
@@ -190,7 +248,7 @@ describe('PageEditorPage upload', () => {
     await user.upload(fileInput(), new File([HTML], 'guide.htm'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /The limit is 2 MB/,
+      /The limit is 10 MB\./,
     );
   });
 

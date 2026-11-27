@@ -5,7 +5,7 @@ export interface Env {
   DOCS_INTERNAL_TOKEN: string;
 }
 
-export const MAX_OBJECT_BYTES = 2_097_152;
+const MAX_OBJECT_BYTES = 10 * 1024 * 1024;
 
 const HOME_URL = 'https://ssnow.club/';
 const HTML_CONTENT_TYPE = 'text/html; charset=utf-8';
